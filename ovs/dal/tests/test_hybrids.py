@@ -18,9 +18,9 @@
 Basic test module
 """
 import unittest
-from ovs.dal.helpers import HybridRunner, Descriptor
+from ovs.dal.helpers import Descriptor, HybridRunner
 from ovs.dal.relations import RelationMapper
-from ovs.lib.tests.helpers import Helper
+from ovs.dal.tests.helpers import DalHelper
 
 
 class Hybrid(unittest.TestCase):
@@ -35,13 +35,13 @@ class Hybrid(unittest.TestCase):
         (Re)Sets the stores on every test
         """
         self.debug = False
-        Helper.setup()
+        DalHelper.setup()
 
     def tearDown(self):
         """
         Clean up after every UnitTest
         """
-        Helper.teardown()
+        DalHelper.teardown()
 
     def _print_message(self, message):
         if self.debug is True:

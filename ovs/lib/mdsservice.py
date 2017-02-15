@@ -648,7 +648,7 @@ class MDSServiceController(object):
                 client = MetadataServerClient.load(service)
                 client.set_role(str(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
 
-            for service in all_info_dict['primary']['used'] + all_info_dict['secondary']['used']:
+            for service in list(all_info_dict['primary']['used']) + list(all_info_dict['secondary']['used']):
                 if not isinstance(service, Service):
                     continue
                 if service not in new_services:

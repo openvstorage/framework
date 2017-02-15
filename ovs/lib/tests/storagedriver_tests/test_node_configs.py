@@ -20,12 +20,11 @@ import copy
 import unittest
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.system import System
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.storagedriver import StorageDriverController
-from ovs.lib.tests.helpers import Helper
 
 
 class NodeConfigTest(unittest.TestCase):
@@ -36,24 +35,23 @@ class NodeConfigTest(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        self.persistent = Helper.setup(fake_sleep=True)[1]
+        self.persistent = DalHelper.setup(fake_sleep=True)[1]
         Configuration.set('/ovs/framework/arakoon_clusters|voldrv', 'voldrv')
-        Configuration.set('/ovs/framework/hosts/1/ports', {'arakoon': [10000, 10100]})
         Configuration.set('/ovs/framework/rdma', False)
 
     def tearDown(self):
         """
         Clean up the unittest
         """
-        Helper.teardown(fake_sleep=True)
+        DalHelper.teardown(fake_sleep=True)
 
     def test_distances(self):
         """
         Validates different node distances generated (to be passed into the StorageDriver)
         """
         # Single node cluster, no domains
-        self.persistent.clean()
-        structure = Helper.build_service_structure(
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -64,8 +62,8 @@ class NodeConfigTest(unittest.TestCase):
             self.assertDictEqual(sd._cluster_node_config()['node_distance_map'], expected[sd_id])
 
         # Two nodes, no domains
-        self.persistent.clean()
-        structure = Helper.build_service_structure(
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -77,8 +75,8 @@ class NodeConfigTest(unittest.TestCase):
             self.assertDictEqual(sd._cluster_node_config()['node_distance_map'], expected[sd_id])
 
         # Two nodes, one domain, and only one node is is in the domain
-        self.persistent.clean()
-        structure = Helper.build_service_structure(
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'domains': [1],
              'storagerouters': [1, 2],
@@ -92,8 +90,8 @@ class NodeConfigTest(unittest.TestCase):
             self.assertDictEqual(sd._cluster_node_config()['node_distance_map'], expected[sd_id])
 
         # Two nodes, one domain, and both are in the domain
-        self.persistent.clean()
-        structure = Helper.build_service_structure(
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'domains': [1],
              'storagerouters': [1, 2],
@@ -118,8 +116,8 @@ class NodeConfigTest(unittest.TestCase):
         #    8          |         |
         #    9          |    4    |
         #   10          |    1    |     5
-        self.persistent.clean()
-        structure = Helper.build_service_structure(
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'domains': [1, 2, 3, 4, 5],
              'storagerouters': range(1, 11),
@@ -268,7 +266,7 @@ class NodeConfigTest(unittest.TestCase):
                                             'network_server_uri': _config.network_server_uri,
                                             'node_distance_map': _config.node_distance_map})
 
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'domains': [1, 2],
              'storagerouters': [1, 2],
@@ -277,8 +275,6 @@ class NodeConfigTest(unittest.TestCase):
         )
         storagerouters = structure['storagerouters']
         vpool = structure['vpools'][1]
-        System._machine_id = {storagerouters[1].ip: '1',
-                              storagerouters[2].ip: '2'}
         ArakoonInstaller.create_cluster('voldrv', ServiceType.ARAKOON_CLUSTER_TYPES.SD, storagerouters[1].ip, '/tmp')
 
         # Initial run, it will now be configured

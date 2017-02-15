@@ -26,8 +26,6 @@ from django.http import HttpResponse
 from api.middleware import OVSMiddleware
 from api.oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
 from api.oauth2.toolbox import OAuth2Toolbox
-from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.system import System
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
@@ -36,7 +34,9 @@ from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.user import User
 from ovs.dal.lists.userlist import UserList
-from ovs.lib.tests.helpers import Helper
+from ovs.dal.tests.helpers import DalHelper
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 
 
 class Authentication(unittest.TestCase):
@@ -49,7 +49,7 @@ class Authentication(unittest.TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        Helper.setup(fake_sleep=True)
+        DalHelper.setup(fake_sleep=True)
 
         admin_group = Group()
         admin_group.name = 'administrators'
@@ -160,7 +160,7 @@ class Authentication(unittest.TestCase):
         """
         Clean up the unittest
         """
-        Helper.teardown(fake_sleep=True)
+        DalHelper.teardown(fake_sleep=True)
 
     def _assert_failure(self, view, request, status_code, error_code, exception):
         middleware = OVSMiddleware()

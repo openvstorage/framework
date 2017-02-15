@@ -109,7 +109,7 @@ class StorageRouterClient(object):
                 item[self.vpool_guid] = {}
 
     @staticmethod
-    def clean(vpool_guid=None, volume_id=None):
+    def _clean(vpool_guid=None, volume_id=None):
         """
         Clean everything up from previous runs
         """
@@ -394,7 +394,7 @@ class StorageRouterClient(object):
         _ = req_timeout_secs
         for volume_id, volume_info in StorageRouterClient.volumes[self.vpool_guid].iteritems():
             if volume_info['target_path'] == devicename:
-                StorageRouterClient.clean(self.vpool_guid, volume_id)
+                StorageRouterClient._clean(self.vpool_guid, volume_id)
                 break
 
     def update_metadata_backend_config(self, volume_id, metadata_backend_config, req_timeout_secs=None):
@@ -514,7 +514,7 @@ class MDSClient(object):
             self.key = key
 
     @staticmethod
-    def clean():
+    def _clean():
         """
         Clean everything up from previous runs
         """

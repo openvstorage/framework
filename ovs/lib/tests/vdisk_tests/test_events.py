@@ -21,10 +21,10 @@ import unittest
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
-from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 
 
@@ -36,7 +36,7 @@ class VDiskEventsTest(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        Helper.setup()
+        DalHelper.setup()
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
         Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
@@ -45,14 +45,14 @@ class VDiskEventsTest(unittest.TestCase):
         """
         Clean up the unittest
         """
-        Helper.teardown()
+        DalHelper.teardown()
 
     def test_reusing_devicename(self):
         """
         Validates whether the framework can handle out of sync processed events when a vDisk with the same devicename
         is created and removed over and over
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -140,7 +140,7 @@ class VDiskEventsTest(unittest.TestCase):
         """
         Validates whether the sync works as expected
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -203,7 +203,7 @@ class VDiskEventsTest(unittest.TestCase):
         """
         Validates whether folder renames are correctly processed
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)

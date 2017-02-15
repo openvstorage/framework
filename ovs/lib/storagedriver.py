@@ -204,7 +204,7 @@ class StorageDriverController(object):
     #########
     @staticmethod
     @add_hooks('nodetype', 'demote')
-    def on_demote(cluster_ip, master_ip, offline_node_ips=None):
+    def _on_demote(cluster_ip, master_ip, offline_node_ips=None):
         """
         Handles the demote for the StorageDrivers
         :param cluster_ip: IP of the node to demote
@@ -241,7 +241,7 @@ class StorageDriverController(object):
 
     @staticmethod
     @add_hooks('noderemoval', 'remove')
-    def on_remove(cluster_ip, complete_removal):
+    def _on_remove(cluster_ip, complete_removal):
         """
         Handles the StorageDriver removal part of a node
         :param cluster_ip: IP of the node which is being removed from the cluster
