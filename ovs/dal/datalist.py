@@ -36,7 +36,7 @@ class DataList(object):
     """
 
     # Test hooks for unit tests
-    test_hooks = {}
+    _test_hooks = {}
 
     class WhereOperator(object):
         """
@@ -219,8 +219,8 @@ class DataList(object):
                     self.from_index = 'full'
                 keys = list(keys)
 
-                if 'data_generator' in DataList.test_hooks:
-                    DataList.test_hooks['data_generator'](self)
+                if 'data_generator' in DataList._test_hooks:
+                    DataList._test_hooks['data_generator'](self)
 
                 for index, value in enumerate(self._persistent.get_multi(keys, must_exist=False)):
                     if value is not None:
@@ -384,8 +384,8 @@ class DataList(object):
                 except ObjectNotFoundException:
                     pass
 
-            if 'post_query' in DataList.test_hooks:
-                DataList.test_hooks['post_query'](self)
+            if 'post_query' in DataList._test_hooks:
+                DataList._test_hooks['post_query'](self)
 
             if self._key is not None and elements > 0 and self._can_cache:
                 self._volatile.set(self._key, self._guids, 300 + randint(0, 300))  # Cache between 5 and 10 minutes

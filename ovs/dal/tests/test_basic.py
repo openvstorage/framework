@@ -30,7 +30,7 @@ from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.t_teststoragedriver import TestStorageDriver
 from ovs.dal.hybrids.t_teststoragerouter import TestStorageRouter
 from ovs.dal.hybrids.t_testvpool import TestVPool
-from ovs.dal.tests.helpers import Helper
+from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -48,13 +48,13 @@ class Basic(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        self.volatile, self.persistent = Helper.setup(fake_sleep=True)
+        self.volatile, self.persistent = DalHelper.setup(fake_sleep=True)
 
     def tearDown(self):
         """
         Clean up the unittest
         """
-        Helper.teardown(fake_sleep=True)
+        DalHelper.teardown(fake_sleep=True)
 
     def test_invalidobject(self):
         """
@@ -802,33 +802,33 @@ class Basic(unittest.TestCase):
         disk_2.name = 'test2'
         disk_2.save()
         # Validates new object creation
-        DataList.test_hooks['post_query'] = _inject_new
+        DataList._test_hooks['post_query'] = _inject_new
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
-        del DataList.test_hooks['post_query']
+        del DataList._test_hooks['post_query']
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
         # Clear the list cache for the next test
         VolatileFactory.store.delete('ovs_list_6cf5641344cb2ec305c89920407d0def867e1744c88605fdc0f6665a348724a8')
         # Validates object change
-        DataList.test_hooks['post_query'] = _inject_update
+        DataList._test_hooks['post_query'] = _inject_update
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
-        del DataList.test_hooks['post_query']
+        del DataList._test_hooks['post_query']
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 2, 'Two disk should be found ({0})'.format(len(disks)))
         # Clear the list cache for the next test
         VolatileFactory.store.delete('ovs_list_6cf5641344cb2ec305c89920407d0def867e1744c88605fdc0f6665a348724a8')
         # Validates object deletion
-        DataList.test_hooks['post_query'] = _inject_delete
+        DataList._test_hooks['post_query'] = _inject_delete
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
-        del DataList.test_hooks['post_query']
+        del DataList._test_hooks['post_query']
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 1, 'One disk should be found ({0})'.format(len(disks)))
@@ -1735,7 +1735,7 @@ class Basic(unittest.TestCase):
         disk2.name = 'disk2'
         disk2.something = 'one'
         disk2.save()
-        DataList.test_hooks['data_generator'] = _inject_delete
+        DataList._test_hooks['data_generator'] = _inject_delete
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('something', DataList.operator.EQUALS, 'one')]})
         self.assertEqual(len(dlist), 1)
@@ -1760,7 +1760,7 @@ class Basic(unittest.TestCase):
         disk2 = TestDisk()
         disk2.name = 'disk2'
         disk2.save()
-        DataList.test_hooks['data_generator'] = _uses_indexes
+        DataList._test_hooks['data_generator'] = _uses_indexes
         Basic._called = False
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('guid', DataList.operator.IN, [disk1.guid])]})

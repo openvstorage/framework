@@ -22,11 +22,11 @@ import json
 import shutil
 import unittest
 from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.system import System
-from ovs.lib.tests.helpers import Helper
+from ovs.extensions.tests.helpers import ExtensionsHelper
 
 
 class ArakoonInstallerTester(unittest.TestCase):
@@ -37,25 +37,20 @@ class ArakoonInstallerTester(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        Helper.setup()
+        DalHelper.setup()
 
     def tearDown(self):
         """
         Clean up test suite
         """
-        Helper.teardown()
+        DalHelper.teardown()
 
     def test_cluster_maintenance(self):
         """
         Validates whether a cluster can be correctly created
         """
-        Configuration.set('/ovs/framework/hosts/1/ports', {'arakoon': [10000, 10100]})
-        Configuration.set('/ovs/framework/hosts/2/ports', {'arakoon': [20000, 20100]})
-
-        structure = Helper.build_service_structure(structure={'storagerouters': [1, 2]})
+        structure = DalHelper.build_dal_structure(structure={'storagerouters': [1, 2]})
         storagerouters = structure['storagerouters']
-        System._machine_id = {storagerouters[1].ip: '1',
-                              storagerouters[2].ip: '2'}
 
         # Create new cluster
         mountpoint = storagerouters[1].disks[0].partitions[0].mountpoint
@@ -64,7 +59,7 @@ class ArakoonInstallerTester(unittest.TestCase):
         base_dir = mountpoint + '/test_create_cluster'
         info = ArakoonInstaller.create_cluster('test', ServiceType.ARAKOON_CLUSTER_TYPES.FWK, storagerouters[1].ip, base_dir)
 
-        reality = Helper.extract_dir_structure(base_dir)
+        reality = ExtensionsHelper.extract_dir_structure(base_dir)
         expected = {'dirs': {'arakoon': {'dirs': {'test': {'dirs': {'tlogs': {'dirs': {},
                                                                               'files': []},
                                                                     'db': {'dirs': {},
@@ -75,7 +70,7 @@ class ArakoonInstallerTester(unittest.TestCase):
         self.assertDictEqual(reality, expected)
         expected = '{0}\n\n{1}\n\n'.format(ArakoonInstallerTester.EXPECTED_CLUSTER_CONFIG.format('1', 'test', ''),
                                            ArakoonInstallerTester.EXPECTED_NODE_CONFIG.format(
-                                               '1', storagerouters[1].ip, 10000, base_dir, '1', 10001
+                                               '1', storagerouters[1].ip, 20000, base_dir, '1', 20001
                                            ))
         self.assertEqual(Configuration.get(ArakoonInstaller.CONFIG_KEY.format('test'), raw=True), expected)
         # @TODO: assert service availability here. It should be stopped
@@ -105,7 +100,7 @@ class ArakoonInstallerTester(unittest.TestCase):
             shutil.rmtree(mountpoint)
         base_dir2 = mountpoint + '/test_extend_cluster'
         ArakoonInstaller.extend_cluster(storagerouters[1].ip, storagerouters[2].ip, 'test', base_dir2)
-        reality = Helper.extract_dir_structure(base_dir)
+        reality = ExtensionsHelper.extract_dir_structure(base_dir)
         expected = {'dirs': {'arakoon': {'dirs': {'test': {'dirs': {'tlogs': {'dirs': {},
                                                                               'files': []},
                                                                     'db': {'dirs': {},
@@ -116,10 +111,10 @@ class ArakoonInstallerTester(unittest.TestCase):
         self.assertDictEqual(reality, expected)
         expected = '{0}\n\n{1}\n\n{2}\n\n'.format(ArakoonInstallerTester.EXPECTED_CLUSTER_CONFIG.format('1,2', 'test', ''),
                                                   ArakoonInstallerTester.EXPECTED_NODE_CONFIG.format(
-                                                      '1', storagerouters[1].ip, 10000, base_dir, '1', 10001
+                                                      '1', storagerouters[1].ip, 20000, base_dir, '1', 20001
                                                   ),
                                                   ArakoonInstallerTester.EXPECTED_NODE_CONFIG.format(
-                                                      '2', storagerouters[2].ip, 20000, base_dir2, '2', 20001
+                                                      '2', storagerouters[2].ip, 20100, base_dir2, '2', 20101
                                                   ))
         self.assertEqual(Configuration.get(ArakoonInstaller.CONFIG_KEY.format('test'), raw=True), expected)
         # @TODO: assert service availability here. It should be stopped
@@ -146,14 +141,14 @@ class ArakoonInstallerTester(unittest.TestCase):
 
         # Shrinking cluster
         ArakoonInstaller.shrink_cluster(storagerouters[1].ip, storagerouters[2].ip, 'test')
-        reality = Helper.extract_dir_structure(base_dir)
+        reality = ExtensionsHelper.extract_dir_structure(base_dir)
         expected = {'dirs': {'arakoon': {'dirs': {'test': {'dirs': {}, 'files': []}},
                                          'files': []}},
                     'files': []}
         self.assertDictEqual(reality, expected)
         expected = '{0}\n\n{1}\n\n'.format(ArakoonInstallerTester.EXPECTED_CLUSTER_CONFIG.format('2', 'test', ''),
                                            ArakoonInstallerTester.EXPECTED_NODE_CONFIG.format(
-                                               '2', storagerouters[2].ip, 20000, base_dir2, '2', 20001
+                                               '2', storagerouters[2].ip, 20100, base_dir2, '2', 20101
                                            ))
         self.assertEqual(Configuration.get(ArakoonInstaller.CONFIG_KEY.format('test'), raw=True), expected)
         # @TODO: assert service availability here. It should have been stopped and started again

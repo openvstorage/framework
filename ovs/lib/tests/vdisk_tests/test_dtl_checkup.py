@@ -24,10 +24,10 @@ from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, DTLMode
-from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 
 
@@ -39,13 +39,13 @@ class DTLCheckup(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        Helper.setup()
+        DalHelper.setup()
 
     def tearDown(self):
         """
         Clean up the unittest
         """
-        Helper.teardown()
+        DalHelper.teardown()
 
     def _run_and_validate_dtl_checkup(self, vdisk, validations):
         """
@@ -99,7 +99,7 @@ class DTLCheckup(unittest.TestCase):
         Execute some DTL checkups on a single node installation
         """
         # Create 1 vdisk in single node without domains
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
@@ -163,7 +163,7 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |      1      |
         #  |      sr 4      |       |                 |                  |      1      |
         #  |      sr 5      |       |                 |                  |      1      |
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
@@ -190,7 +190,7 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |      1      |
         #  |      sr 4      |       |                 |                  |      1      |
         #  |      sr 5      |       |                 |                  |      1      |
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
@@ -218,7 +218,7 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |             |
         #  |      sr 4      |       |                 |                  |             |
         #  |      sr 5      |       |                 |                  |             |
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1, 2, 3],
@@ -265,7 +265,7 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |             |
         #  |      sr 4      |       |                 |                  |             |
         #  |      sr 5      |       |                 |                  |             |
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1, 2, 3],
@@ -349,7 +349,7 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |             |
         #  |      sr 4      |       |                 |                  |             |
         #  |      sr 5      |       |                 |                  |             |
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1, 2, 3],
@@ -442,7 +442,7 @@ class DTLCheckup(unittest.TestCase):
         """
         Verify that when more than 3 Storage Routers are available as possible DTL target, the same target is used over and over again
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1],
@@ -480,7 +480,7 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |      domain 1   |                  |             |
         #  |      sr 4      |       |      domain 2   |                  |             |
         #  |      sr 5      |       |                 |                  |             |
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1, 2],
@@ -548,7 +548,7 @@ class DTLCheckup(unittest.TestCase):
         """
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
         #  |      sr 1      |   1   |                 |                  |             |
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
@@ -597,7 +597,7 @@ class DTLCheckup(unittest.TestCase):
         """
         Validates whether the DTL checkup logic can fix a vDisk who's DTL is configured to an unexpected ip
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)

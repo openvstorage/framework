@@ -36,7 +36,7 @@ class DummyPersistentStore(object):
         self._sequences_tlog = {}
         self._keep_in_memory_only = True
 
-    def clean(self):
+    def _clean(self):
         """
         Empties the store
         """

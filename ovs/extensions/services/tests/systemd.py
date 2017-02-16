@@ -26,13 +26,6 @@ class Systemd(object):
     services = {}
 
     @staticmethod
-    def clean():
-        """
-        Clean up mocked Class
-        """
-        Systemd.services = {}
-
-    @staticmethod
     def add_service(name, client, params=None, target_name=None, startup_dependency=None, delay_registration=False):
         """
         Adds a mocked service
@@ -135,3 +128,10 @@ class Systemd(object):
         """
         _ = client, path
         return name
+
+    @staticmethod
+    def _clean():
+        """
+        Clean up mocked Class
+        """
+        Systemd.services = {}
