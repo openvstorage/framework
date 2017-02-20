@@ -35,6 +35,7 @@ from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.generic import GenericController
@@ -664,6 +665,7 @@ class UpdateController(object):
                 UpdateController.change_services_state(services=['memcached'],
                                                        ssh_clients=ssh_clients,
                                                        action='start')
+                VolatileFactory.store = None
 
             # Migrate DAL
             if 'framework' in components:
