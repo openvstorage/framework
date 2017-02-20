@@ -66,6 +66,8 @@ class GenericController(object):
         success = []
         fail = []
         for vdisk in VDiskList.get_vdisks():
+            if vdisk.is_vtemplate is True:
+                continue
             try:
                 metadata = {'label': '',
                             'is_consistent': False,
