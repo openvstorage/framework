@@ -676,7 +676,7 @@ class MDSServiceController(object):
         for current_mds_service in vpool.mds_services:
             if current_mds_service.service.storagerouter_guid == storagerouter.guid:
                 load = MDSServiceController.get_mds_load(current_mds_service)[0]
-                if mds_service is None or load < mds_service[1]:
+                if mds_service[0] is None or load < mds_service[1]:
                     mds_service = (current_mds_service, load)
         return mds_service
 
