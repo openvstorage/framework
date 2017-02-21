@@ -25,6 +25,7 @@ from ovs.celery_run import celery
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.filemutex import NoLockAvailableException
@@ -103,10 +104,13 @@ class UpdateController(object):
                 if cluster_name is None:
                     continue
 
-                if cluster == 'cacc':
-                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=client.ip)
-                else:
-                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+                ip = client.ip if cluster == 'cacc' else None
+                try:
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)
+                except ArakoonNoMaster:
+                    raise RuntimeError('Arakoon cluster {0} does not have a master'.format(cluster))
+                except ArakoonNotFound:
+                    raise RuntimeError('Arakoon cluster {0} does not have the required metadata key'.format(cluster))
 
                 if arakoon_metadata['internal'] is True:
                     arakoon_list.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_metadata['cluster_name']))
@@ -217,15 +221,16 @@ class UpdateController(object):
             if cluster_name is None:
                 continue
 
-            if cluster == 'cacc':
-                local_ip = System.get_my_storagerouter().ip
-                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=local_ip)
-            else:
-                local_ip = None
-                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+            ip = System.get_my_storagerouter().ip if cluster == 'cacc' else None
+            try:
+                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)
+            except ArakoonNoMaster:
+                raise RuntimeError('Arakoon cluster {0} does not have a master'.format(cluster))
+            except ArakoonNotFound:
+                raise RuntimeError('Arakoon cluster {0} does not have the required metadata key'.format(cluster))
 
             if arakoon_metadata['internal'] is True:
-                config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=local_ip)
+                config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=ip)
                 if cluster == 'ovsdb':
                     arakoon_ovs_info['down'] = len(config.nodes) < 3
                     arakoon_ovs_info['name'] = arakoon_metadata['cluster_name']
@@ -412,12 +417,17 @@ class UpdateController(object):
                     UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
                 else:
                     cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'arakoon-'))
-                    if cluster_name == 'config':
-                        master_ip = StorageRouterList.get_masters()[0].ip  # Any master node should be part of the internal 'cacc' cluster
-                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', ip=master_ip)
-                    else:
-                        master_ip = None
-                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+                    master_ip = StorageRouterList.get_masters()[0].ip if cluster_name == 'config' else None
+                    temp_cluster_name = 'cacc' if cluster_name == 'config' else cluster_name
+                    try:
+                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=temp_cluster_name, ip=master_ip)
+                    except ArakoonNoMaster:
+                        UpdateController._logger.warning('Arakoon cluster {0} does not have a master, not restarting related services'.format(cluster_name))
+                        continue
+                    except ArakoonNotFound:
+                        UpdateController._logger.warning('Arakoon cluster {0} does not have the required metadata key, not restarting related services'.format(cluster_name))
+                        continue
+
                     if arakoon_metadata['internal'] is True:
                         config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=master_ip)
                         if client.ip in [node.ip for node in config.nodes]:
