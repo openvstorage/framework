@@ -135,8 +135,7 @@ class NodeTypeController(object):
 
             if node_action == 'demote':
                 for cluster_name in Configuration.list('/ovs/arakoon'):
-                    config = ArakoonClusterConfig(cluster_name, False)
-                    config.load_config()
+                    config = ArakoonClusterConfig(cluster_id=cluster_name)
                     arakoon_client = ArakoonInstaller.build_client(config)
                     metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
                     if len(config.nodes) == 1 and config.nodes[0].ip == ip and metadata.get('internal') is True:
@@ -226,24 +225,20 @@ class NodeTypeController(object):
         external_config = Configuration.get('/ovs/framework/external_config')
         if external_config is None:
             Toolbox.log(logger=NodeTypeController._logger, messages='Joining Arakoon configuration cluster')
-            metadata = ArakoonInstaller.extend_cluster(master_ip=master_ip,
+            metadata = ArakoonInstaller.extend_cluster(cluster_name='config',
+                                                       ip=master_ip,
                                                        new_ip=cluster_ip,
-                                                       cluster_name='config',
-                                                       base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                                       ports=[26400, 26401],
-                                                       filesystem=True)
+                                                       base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
             ArakoonInstaller.restart_cluster_add(cluster_name='config',
                                                  current_ips=metadata['ips'],
-                                                 new_ip=cluster_ip,
-                                                 filesystem=True)
+                                                 new_ip=cluster_ip)
             ServiceManager.register_service(node_name=machine_id,
                                             service_metadata=metadata['service_metadata'])
 
         # Find other (arakoon) master nodes
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-        config.load_config()
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
         master_node_ips = [node.ip for node in config.nodes]
         if cluster_ip in master_node_ips:
             master_node_ips.remove(cluster_ip)
@@ -253,14 +248,13 @@ class NodeTypeController(object):
         arakoon_ports = []
         if arakoon_metadata['internal'] is True:
             Toolbox.log(logger=NodeTypeController._logger, messages='Joining Arakoon OVS DB cluster')
-            result = ArakoonInstaller.extend_cluster(master_ip=master_ip,
+            result = ArakoonInstaller.extend_cluster(cluster_name=arakoon_cluster_name,
                                                      new_ip=cluster_ip,
-                                                     cluster_name=arakoon_cluster_name,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
             ArakoonInstaller.restart_cluster_add(cluster_name=arakoon_cluster_name,
                                                  current_ips=result['ips'],
-                                                 new_ip=cluster_ip, filesystem=False)
-            arakoon_ports = [result['client_port'], result['messaging_port']]
+                                                 new_ip=cluster_ip)
+            arakoon_ports = result['ports']
 
         if configure_memcached is True:
             NodeTypeController.configure_memcached(client=target_client, logger=NodeTypeController._logger)
@@ -284,8 +278,7 @@ class NodeTypeController(object):
             Toolbox.log(logger=NodeTypeController._logger, messages='Restarting master node services')
             ArakoonInstaller.restart_cluster_add(cluster_name=arakoon_cluster_name,
                                                  current_ips=master_node_ips,
-                                                 new_ip=cluster_ip,
-                                                 filesystem=False)
+                                                 new_ip=cluster_ip)
             PersistentFactory.store = None
             VolatileFactory.store = None
 
@@ -371,8 +364,7 @@ class NodeTypeController(object):
         # Find other (arakoon) master nodes
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-        config.load_config()
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
         master_node_ips = [node.ip for node in config.nodes]
         if cluster_ip in master_node_ips:
             master_node_ips.remove(cluster_ip)
@@ -386,20 +378,17 @@ class NodeTypeController(object):
         offline_node_ips = [node.ip for node in offline_nodes]
         if arakoon_metadata['internal'] is True:
             Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Arakoon {0} cluster'.format(arakoon_cluster_name))
-            ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
-                                            remaining_node_ips=master_node_ips,
-                                            cluster_name=arakoon_cluster_name,
+            ArakoonInstaller.shrink_cluster(cluster_name=arakoon_cluster_name,
+                                            ip=cluster_ip,
                                             offline_nodes=offline_node_ips)
-
         try:
             external_config = Configuration.get('/ovs/framework/external_config')
             if external_config is None:
                 Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Arakoon config cluster')
-                ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
-                                                remaining_node_ips=master_node_ips,
-                                                cluster_name='config',
-                                                offline_nodes=offline_node_ips,
-                                                filesystem=True)
+                ArakoonInstaller.shrink_cluster(cluster_name='config',
+                                                ip=cluster_ip,
+                                                remaining_ip=master_node_ips[0],
+                                                offline_nodes=offline_node_ips)
         except Exception as ex:
             Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to leave configuration cluster', ex], loglevel='exception')
 

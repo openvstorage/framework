@@ -492,8 +492,7 @@ class NodeInstallationController(object):
                     if promote_completed is False:
                         Toolbox.log(logger=NodeInstallationController._logger, messages='Analyzing cluster layout')
                         framework_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
-                        arakoon_config = ArakoonClusterConfig(cluster_id=framework_cluster_name, filesystem=False)
-                        arakoon_config.load_config()
+                        arakoon_config = ArakoonClusterConfig(cluster_id=framework_cluster_name)
                         NodeInstallationController._logger.debug('{0} nodes for cluster {1} found'.format(len(arakoon_config.nodes), framework_cluster_name))
                         if (len(arakoon_config.nodes) < 3 or node_type == 'master') and node_type != 'extra':
                             configure_rabbitmq = Toolbox.is_service_internally_managed(service='rabbitmq')
@@ -697,7 +696,7 @@ class NodeInstallationController(object):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configure Arakoon')
             if metadata is not None and metadata['internal'] is True:
                 try:
-                    ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
+                    ArakoonInstaller.delete_cluster(cluster_name=cluster_name)
                 except Exception as ex:
                     Toolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to delete cluster', ex], loglevel='exception')
                 base_dir = required_info['/ovs/framework/paths|ovsdb']
@@ -717,6 +716,8 @@ class NodeInstallationController(object):
         """
         Sets up the first node services. This node is always a master
         """
+        from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up first node', title=True)
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
@@ -724,7 +725,6 @@ class NodeInstallationController(object):
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration management')
         if external_config is None and not cluster_name.startswith('preconfig-'):
             if Interactive.ask_yesno(message='Use an external cluster?', default_value=False) is True:
-                from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
                 file_location = ArakoonConfiguration.CACC_LOCATION
                 while not target_client.file_exists(file_location):
                     Toolbox.log(logger=NodeInstallationController._logger, messages='Please place a copy of the Arakoon\'s client configuration file at: {0}'.format(file_location))
@@ -737,22 +737,15 @@ class NodeInstallationController(object):
         target_client.file_write(bootstrap_location, json.dumps({'configuration_store': 'arakoon'}, indent=4))
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration Arakoon')
-        from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+
         if external_config is None:
             arakoon_config_cluster = 'config'
             info = ArakoonInstaller.create_cluster(cluster_name=arakoon_config_cluster,
                                                    cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                                    ip=cluster_ip,
                                                    base_dir='/opt/OpenvStorage/db',
-                                                   locked=False,
-                                                   filesystem=True,
-                                                   ports=[26400, 26401])
-            ArakoonInstaller.start_cluster(cluster_name=arakoon_config_cluster,
-                                           master_ip=cluster_ip,
-                                           filesystem=True)
-            ArakoonInstaller.claim_cluster(cluster_name=arakoon_config_cluster,
-                                           master_ip=cluster_ip,
-                                           filesystem=True,
+                                                   locked=False)
+            ArakoonInstaller.start_cluster(ip=cluster_ip,
                                            metadata=info['metadata'])
             contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
             target_client.file_write(ArakoonConfiguration.CACC_LOCATION, contents)
@@ -761,14 +754,8 @@ class NodeInstallationController(object):
         else:
             arakoon_cacc_cluster = 'cacc'
             ArakoonInstaller.claim_cluster(cluster_name=arakoon_cacc_cluster,
-                                           master_ip=cluster_ip,
-                                           filesystem=True,
-                                           metadata={'internal': False,
-                                                     'cluster_name': arakoon_cacc_cluster,
-                                                     'cluster_type': ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
-                                                     'in_use': True})
-            arakoon_config = ArakoonClusterConfig(arakoon_cacc_cluster, True)
-            arakoon_config.load_config(cluster_ip)
+                                           ip=cluster_ip)
+            arakoon_config = ArakoonClusterConfig(cluster_id=arakoon_cacc_cluster, source_ip=cluster_ip)
             arakoon_client = ArakoonInstaller.build_client(arakoon_config)
             arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, arakoon_config.export_ini())
 
@@ -786,7 +773,7 @@ class NodeInstallationController(object):
             ServiceManager.add_service(service, params={}, client=target_client)
             Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
-        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, locked=False)
+        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
         arakoon_ports = []
         if metadata is None:  # No externally managed cluster found, we create 1 ourselves
             Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up Arakoon cluster ovsdb')
@@ -797,15 +784,9 @@ class NodeInstallationController(object):
                                                      ip=cluster_ip,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
                                                      locked=False)
-            ArakoonInstaller.start_cluster(cluster_name=arakoon_ovsdb_cluster,
-                                           master_ip=cluster_ip,
-                                           filesystem=False)
-            ArakoonInstaller.claim_cluster(cluster_name=arakoon_ovsdb_cluster,
-                                           master_ip=cluster_ip,
-                                           filesystem=False,
-                                           metadata=result['metadata'])
-            arakoon_ports = [result['client_port'], result['messaging_port']]
             metadata = result['metadata']
+            arakoon_ports = result['ports']
+            ArakoonInstaller.start_cluster(metadata=metadata)
         else:
             Toolbox.log(logger=NodeInstallationController._logger, messages='Externally managed Arakoon cluster of type {0} found with name {1}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, metadata['cluster_name']))
             internal = False

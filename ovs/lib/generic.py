@@ -455,7 +455,7 @@ class GenericController(object):
         cluster_info = []
         storagerouters = StorageRouterList.get_storagerouters()
         if os.environ.get('RUNNING_UNITTESTS') != 'True':
-            cluster_info = [('cacc', storagerouters[0], True)]
+            cluster_info = [('cacc', storagerouters[0])]
 
         cluster_names = []
         for service in ServiceList.get_services():
@@ -466,31 +466,28 @@ class GenericController(object):
                 if cluster in cluster_names:
                     continue
                 cluster_names.append(cluster)
-                cluster_info.append((cluster, service.storagerouter, False))
+                cluster_info.append((cluster, service.storagerouter))
         workload = {}
-        for cluster, storagerouter, filesystem in cluster_info:
+        for cluster, storagerouter in cluster_info:
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
-            config = ArakoonClusterConfig(cluster, filesystem=filesystem)
-            config.load_config(storagerouter.ip)
+            ip = storagerouter.ip if cluster == 'cacc' else None
+            config = ArakoonClusterConfig(cluster, source_ip=ip)
             for node in config.nodes:
                 if node.ip not in workload:
                     workload[node.ip] = {'node_id': node.name,
                                          'clusters': []}
-                workload[node.ip]['clusters'].append((cluster, filesystem))
+                workload[node.ip]['clusters'].append((cluster, ip))
         for storagerouter in storagerouters:
             try:
                 if storagerouter.ip not in workload:
                     continue
                 node_workload = workload[storagerouter.ip]
                 client = SSHClient(storagerouter)
-                for cluster, filesystem in node_workload['clusters']:
+                for cluster, ip in node_workload['clusters']:
                     try:
                         GenericController._logger.debug('  Collapsing cluster {0} on {1}'.format(cluster, storagerouter.ip))
-                        if filesystem is True:
-                            config_path = ArakoonClusterConfig.CONFIG_FILE.format(cluster)
-                        else:
-                            config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster))
-                        client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config_path])
+                        config = ArakoonClusterConfig(cluster_id=cluster, source_ip=ip)
+                        client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config.external_config_path])
                         GenericController._logger.debug('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
                     except:
                         GenericController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))

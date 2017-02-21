@@ -69,7 +69,7 @@ class OVSMigrator(object):
                 try:
                     metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
                 except NotFoundException:
-                    metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=local_ip)
+                    metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=local_ip)
 
                 if metadata['internal'] is False:
                     continue

@@ -535,13 +535,10 @@ class Generic(unittest.TestCase):
                                                        ip=storagerouter_1.ip,
                                                        base_dir=base_dir,
                                                        internal=internal)
-                ArakoonInstaller.claim_cluster(cluster_name=cluster_name,
-                                               master_ip=storagerouter_1.ip,
-                                               filesystem=False,
-                                               metadata=info['metadata'])
-                ArakoonInstaller.extend_cluster(master_ip=storagerouter_1.ip,
+                ArakoonInstaller.start_cluster(metadata=info['metadata'])
+                ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
+                                                ip=storagerouter_1.ip if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG else None,
                                                 new_ip=storagerouter_2.ip,
-                                                cluster_name=cluster_name,
                                                 base_dir=base_dir)
 
                 service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
@@ -556,11 +553,11 @@ class Generic(unittest.TestCase):
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type,
                                              storagerouter=storagerouter_1,
-                                             ports=[info['client_port'], info['messaging_port']])
+                                             ports=info['ports'])
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type,
                                              storagerouter=storagerouter_2,
-                                             ports=[info['client_port'], info['messaging_port']])
+                                             ports=info['ports'])
                 else:
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type)

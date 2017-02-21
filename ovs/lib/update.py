@@ -25,6 +25,7 @@ from ovs.celery_run import celery
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.filemutex import NoLockAvailableException
@@ -103,10 +104,13 @@ class UpdateController(object):
                 if cluster_name is None:
                     continue
 
-                if cluster == 'cacc':
-                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=client.ip)
-                else:
-                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+                ip = client.ip if cluster == 'cacc' else None
+                try:
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)
+                except ArakoonNoMaster:
+                    raise RuntimeError('Arakoon cluster {0} does not have a master'.format(cluster))
+                except ArakoonNotFound:
+                    raise RuntimeError('Arakoon cluster {0} does not have the required metadata key'.format(cluster))
 
                 if arakoon_metadata['internal'] is True:
                     arakoon_list.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_metadata['cluster_name']))
@@ -217,14 +221,16 @@ class UpdateController(object):
             if cluster_name is None:
                 continue
 
-            if cluster == 'cacc':
-                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=System.get_my_storagerouter().ip)
-            else:
-                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+            ip = System.get_my_storagerouter().ip if cluster == 'cacc' else None
+            try:
+                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)
+            except ArakoonNoMaster:
+                raise RuntimeError('Arakoon cluster {0} does not have a master'.format(cluster))
+            except ArakoonNotFound:
+                raise RuntimeError('Arakoon cluster {0} does not have the required metadata key'.format(cluster))
 
             if arakoon_metadata['internal'] is True:
-                config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=(cluster == 'cacc'))
-                config.load_config(System.get_my_storagerouter().ip if cluster == 'cacc' else None)
+                config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=ip)
                 if cluster == 'ovsdb':
                     arakoon_ovs_info['down'] = len(config.nodes) < 3
                     arakoon_ovs_info['name'] = arakoon_metadata['cluster_name']
@@ -380,22 +386,19 @@ class UpdateController(object):
         from ovs.extensions.generic.toolbox import ExtensionsToolbox
 
         # Remove services which have been renamed in the migration code
-        local_sr = System.get_my_storagerouter()
-        local_ip = local_sr.ip
-        local_client = SSHClient(endpoint=local_sr, username='root')
-        for version_file in local_client.file_list(directory='/opt/OpenvStorage/run'):
+        for version_file in client.file_list(directory='/opt/OpenvStorage/run'):
             if not version_file.endswith('.remove'):
                 continue
             packages = set()
-            contents = local_client.file_read(filename='/opt/OpenvStorage/run/{0}'.format(version_file))
+            contents = client.file_read(filename='/opt/OpenvStorage/run/{0}'.format(version_file))
             for part in contents.split(';'):
                 packages.add(part.split('=')[0])
             if packages.issubset(UpdateController._packages_core['storagedriver']) and 'storagedriver' in components:
                 service_name = version_file.replace('.remove', '').replace('.version', '')
                 UpdateController._logger.debug('{0}: Removing service {1}'.format(client.ip, service_name))
-                ServiceManager.stop_service(name=service_name, client=local_client)
-                ServiceManager.remove_service(name=service_name, client=local_client)
-                local_client.file_delete(filenames=['/opt/OpenvStorage/run/{0}'.format(version_file)])
+                ServiceManager.stop_service(name=service_name, client=client)
+                ServiceManager.remove_service(name=service_name, client=client)
+                client.file_delete(filenames=['/opt/OpenvStorage/run/{0}'.format(version_file)])
 
         # Verify whether certain services need to be restarted
         update_information = UpdateController.get_update_information_core({})
@@ -414,19 +417,22 @@ class UpdateController(object):
                     UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
                 else:
                     cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'arakoon-'))
-                    if cluster_name == 'config':
-                        filesystem = True
-                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=local_ip)
-                    else:
-                        filesystem = True
-                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+                    master_ip = StorageRouterList.get_masters()[0].ip if cluster_name == 'config' else None
+                    temp_cluster_name = 'cacc' if cluster_name == 'config' else cluster_name
+                    try:
+                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=temp_cluster_name, ip=master_ip)
+                    except ArakoonNoMaster:
+                        UpdateController._logger.warning('Arakoon cluster {0} does not have a master, not restarting related services'.format(cluster_name))
+                        continue
+                    except ArakoonNotFound:
+                        UpdateController._logger.warning('Arakoon cluster {0} does not have the required metadata key, not restarting related services'.format(cluster_name))
+                        continue
+
                     if arakoon_metadata['internal'] is True:
-                        master_ip = StorageRouterList.get_masters()[0].ip  # Any master node should be part of the internal 'cacc' cluster
-                        config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=filesystem)
-                        config.load_config(ip=master_ip)
-                        if local_ip in [node.ip for node in config.nodes]:
+                        config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=master_ip)
+                        if client.ip in [node.ip for node in config.nodes]:
                             UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
-                            ArakoonInstaller.restart_node(cluster_name=cluster_name,
+                            ArakoonInstaller.restart_node(metadata=arakoon_metadata,
                                                           client=client)
             UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
 
