@@ -14,13 +14,27 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
+"""
+Waiter module
+"""
+
 import time
 from threading import Lock
 
 
 class Waiter(object):
+    """
+    This class allows to synchronize threads
+    """
 
     def __init__(self, target, auto_reset=False):
+        """
+        Waiter initializer
+        :param target: The amount of threads that need to wait before all waits are released
+        :type target: int
+        :param auto_reset: Whether the counter should be reset automatically after the wait is finished
+        :type auto_reset: bool
+        """
         self._target = target
         self._counter = 0
         self._lock = Lock()
@@ -29,6 +43,13 @@ class Waiter(object):
         self._auto_release_counter = 0
 
     def wait(self, timeout=5):
+        """
+        Wait for synchronization for a max amount of seconds
+        :param timeout: The time to wait
+        :type timeout: int
+        :return: None
+        :rtype: NoneType
+        """
         with self._lock:
             self._counter += 1
             reached = self._counter == self._target
@@ -37,7 +58,7 @@ class Waiter(object):
                     time.sleep(0.05)
                 self._counter = 0
                 with self._auto_release_lock:
-                    self._auto_release_lock = 0
+                    self._auto_release_counter = 0
         if reached is False:
             start = time.time()
             while self._counter < self._target:
@@ -48,4 +69,9 @@ class Waiter(object):
                 self._auto_release_counter += 1
 
     def get_counter(self):
+        """
+        Current counter value
+        :return: Counter
+        :rtype: int
+        """
         return self._counter
