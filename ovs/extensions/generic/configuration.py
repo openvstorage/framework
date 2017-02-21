@@ -240,7 +240,7 @@ class Configuration(object):
             port_info = {}
 
         mds_port_range = port_info.get('mds', [26300, 26399])
-        arakoon_start_port = port_info.get('arakoon', 26402)
+        arakoon_start_port = port_info.get('arakoon', 26400)
         storagedriver_port_range = port_info.get('storagedriver', [26200, 26299])
 
         host_config = {'ports': {'storagedriver': [storagedriver_port_range],

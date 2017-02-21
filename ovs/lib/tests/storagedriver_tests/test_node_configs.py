@@ -275,7 +275,10 @@ class NodeConfigTest(unittest.TestCase):
         )
         storagerouters = structure['storagerouters']
         vpool = structure['vpools'][1]
-        ArakoonInstaller.create_cluster('voldrv', ServiceType.ARAKOON_CLUSTER_TYPES.SD, storagerouters[1].ip, '/tmp')
+        ArakoonInstaller.create_cluster(cluster_name='voldrv',
+                                        cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
+                                        ip=storagerouters[1].ip,
+                                        base_dir='/tmp')
 
         # Initial run, it will now be configured
         StorageRouterClient.node_config_recordings = []

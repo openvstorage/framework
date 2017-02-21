@@ -522,8 +522,7 @@ class StorageRouterController(object):
         storagedriver.save()
 
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-        config.load_config()
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
         arakoon_nodes = []
         for node in config.nodes:
             arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})

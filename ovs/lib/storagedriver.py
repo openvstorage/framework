@@ -232,9 +232,8 @@ class StorageDriverController(object):
                 raise RuntimeError('Could not find any remaining arakoon nodes for the voldrv cluster')
             StorageDriverController._logger.debug('* Shrink StorageDriver cluster')
             cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
-                                            remaining_node_ips=remaining_ips,
-                                            cluster_name=cluster_name,
+            ArakoonInstaller.shrink_cluster(cluster_name=cluster_name,
+                                            ip=cluster_ip,
                                             offline_nodes=offline_node_ips)
             current_service.delete()
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
@@ -343,18 +342,10 @@ class StorageDriverController(object):
                 result = ArakoonInstaller.create_cluster(cluster_name=arakoon_voldrv_cluster,
                                                          cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
                                                          ip=storagerouter.ip,
-                                                         base_dir=partition.folder,
-                                                         filesystem=False)
-                ports = [result['client_port'], result['messaging_port']]
+                                                         base_dir=partition.folder)
+                ports = result['ports']
                 metadata = result['metadata']
-                ArakoonInstaller.restart_cluster_add(cluster_name=arakoon_voldrv_cluster,
-                                                     current_ips=current_ips,
-                                                     new_ip=storagerouter.ip,
-                                                     filesystem=False)
-                ArakoonInstaller.claim_cluster(cluster_name=arakoon_voldrv_cluster,
-                                               master_ip=storagerouter.ip,
-                                               filesystem=False,
-                                               metadata=metadata)
+                ArakoonInstaller.start_cluster(metadata=metadata)
                 current_ips.append(storagerouter.ip)
             else:
                 ports = []
@@ -376,25 +367,22 @@ class StorageDriverController(object):
             for storagerouter, partition in available_storagerouters.iteritems():
                 if storagerouter.ip in current_ips:
                     continue
-                result = ArakoonInstaller.extend_cluster(master_ip=current_services[0].storagerouter.ip,
+                result = ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
                                                          new_ip=storagerouter.ip,
-                                                         cluster_name=cluster_name,
                                                          base_dir=partition.folder)
                 _add_service(service_storagerouter=storagerouter,
-                             arakoon_ports=[result['client_port'], result['messaging_port']],
+                             arakoon_ports=result['ports'],
                              service_name=ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
                 current_ips.append(storagerouter.ip)
                 ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
                                                      current_ips=current_ips,
-                                                     new_ip=storagerouter.ip,
-                                                     filesystem=False)
+                                                     new_ip=storagerouter.ip)
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
 
     @staticmethod
     def _configure_arakoon_to_volumedriver(cluster_name):
         StorageDriverController._logger.info('Update existing vPools')
-        config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=False)
-        config.load_config()
+        config = ArakoonClusterConfig(cluster_id=cluster_name)
         arakoon_nodes = []
         for node in config.nodes:
             arakoon_nodes.append({'host': node.ip,

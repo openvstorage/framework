@@ -57,7 +57,10 @@ class ArakoonInstallerTester(unittest.TestCase):
         if os.path.exists(mountpoint) and mountpoint != '/':
             shutil.rmtree(mountpoint)
         base_dir = mountpoint + '/test_create_cluster'
-        info = ArakoonInstaller.create_cluster('test', ServiceType.ARAKOON_CLUSTER_TYPES.FWK, storagerouters[1].ip, base_dir)
+        info = ArakoonInstaller.create_cluster(cluster_name='test',
+                                               cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
+                                               ip=storagerouters[1].ip,
+                                               base_dir=base_dir)
 
         reality = ExtensionsHelper.extract_dir_structure(base_dir)
         expected = {'dirs': {'arakoon': {'dirs': {'test': {'dirs': {'tlogs': {'dirs': {},
@@ -72,20 +75,19 @@ class ArakoonInstallerTester(unittest.TestCase):
                                            ArakoonInstallerTester.EXPECTED_NODE_CONFIG.format(
                                                '1', storagerouters[1].ip, 20000, base_dir, '1', 20001
                                            ))
-        self.assertEqual(Configuration.get(ArakoonInstaller.CONFIG_KEY.format('test'), raw=True), expected)
+        self.assertEqual(Configuration.get(ArakoonClusterConfig.CONFIG_KEY.format('test'), raw=True), expected)
         # @TODO: assert service availability here. It should be stopped
 
-        ArakoonInstaller.start_cluster('test', storagerouters[1].ip, filesystem=False)
+        ArakoonInstaller.start_cluster(metadata=info['metadata'])
         # @TODO: assert the service is running
 
-        config = ArakoonClusterConfig('test', filesystem=False)
-        config.load_config(storagerouters[1].ip)
+        config = ArakoonClusterConfig(cluster_id='test')
         client = ArakoonInstaller.build_client(config)
         reality = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY)
         self.assertEqual(reality, expected)
         self.assertFalse(client.exists(ArakoonInstaller.METADATA_KEY))
 
-        ArakoonInstaller.claim_cluster('test', storagerouters[1].ip, filesystem=False, metadata=info['metadata'])
+        ArakoonInstaller.claim_cluster(cluster_name='test')
 
         reality = json.loads(client.get(ArakoonInstaller.METADATA_KEY))
         expected = {'cluster_name': 'test',
@@ -99,7 +101,9 @@ class ArakoonInstallerTester(unittest.TestCase):
         if os.path.exists(mountpoint) and mountpoint != '/':
             shutil.rmtree(mountpoint)
         base_dir2 = mountpoint + '/test_extend_cluster'
-        ArakoonInstaller.extend_cluster(storagerouters[1].ip, storagerouters[2].ip, 'test', base_dir2)
+        ArakoonInstaller.extend_cluster(cluster_name='test',
+                                        new_ip=storagerouters[2].ip,
+                                        base_dir=base_dir2)
         reality = ExtensionsHelper.extract_dir_structure(base_dir)
         expected = {'dirs': {'arakoon': {'dirs': {'test': {'dirs': {'tlogs': {'dirs': {},
                                                                               'files': []},
@@ -116,18 +120,19 @@ class ArakoonInstallerTester(unittest.TestCase):
                                                   ArakoonInstallerTester.EXPECTED_NODE_CONFIG.format(
                                                       '2', storagerouters[2].ip, 20100, base_dir2, '2', 20101
                                                   ))
-        self.assertEqual(Configuration.get(ArakoonInstaller.CONFIG_KEY.format('test'), raw=True), expected)
+        self.assertEqual(Configuration.get(ArakoonClusterConfig.CONFIG_KEY.format('test'), raw=True), expected)
         # @TODO: assert service availability here. It should be stopped
 
         catchup_command = 'arakoon --node 2 -config file://opt/OpenvStorage/config/framework.json?key=/ovs/arakoon/test/config -catchup-only'
         SSHClient._run_returns[catchup_command] = None
         SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add('test', [storagerouters[1].ip], storagerouters[2].ip, filesystem=False)
+        ArakoonInstaller.restart_cluster_add(cluster_name='test',
+                                             current_ips=[storagerouters[1].ip],
+                                             new_ip=storagerouters[2].ip)
         self.assertIn(catchup_command, SSHClient._run_recordings)
         # @TODO: assert the service is running
 
-        config = ArakoonClusterConfig('test', filesystem=False)
-        config.load_config(storagerouters[2].ip)
+        config = ArakoonClusterConfig(cluster_id='test')
         client = ArakoonInstaller.build_client(config)
         reality = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY)
         self.assertEqual(reality, expected)
@@ -140,7 +145,8 @@ class ArakoonInstallerTester(unittest.TestCase):
         self.assertDictEqual(reality, expected)
 
         # Shrinking cluster
-        ArakoonInstaller.shrink_cluster(storagerouters[1].ip, storagerouters[2].ip, 'test')
+        ArakoonInstaller.shrink_cluster(cluster_name='test',
+                                        ip=storagerouters[1].ip)
         reality = ExtensionsHelper.extract_dir_structure(base_dir)
         expected = {'dirs': {'arakoon': {'dirs': {'test': {'dirs': {}, 'files': []}},
                                          'files': []}},
@@ -150,11 +156,10 @@ class ArakoonInstallerTester(unittest.TestCase):
                                            ArakoonInstallerTester.EXPECTED_NODE_CONFIG.format(
                                                '2', storagerouters[2].ip, 20100, base_dir2, '2', 20101
                                            ))
-        self.assertEqual(Configuration.get(ArakoonInstaller.CONFIG_KEY.format('test'), raw=True), expected)
+        self.assertEqual(Configuration.get(ArakoonClusterConfig.CONFIG_KEY.format('test'), raw=True), expected)
         # @TODO: assert service availability here. It should have been stopped and started again
 
-        config = ArakoonClusterConfig('test', filesystem=False)
-        config.load_config(storagerouters[2].ip)
+        config = ArakoonClusterConfig(cluster_id='test')
         client = ArakoonInstaller.build_client(config)
         reality = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY)
         self.assertEqual(reality, expected)

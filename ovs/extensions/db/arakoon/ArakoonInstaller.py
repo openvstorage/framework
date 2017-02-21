@@ -29,6 +29,7 @@ from ovs.extensions.generic.sshclient import CalledProcessError, SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.service import ServiceManager
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 from StringIO import StringIO
 
@@ -80,54 +81,59 @@ class ArakoonClusterConfig(object):
     """
     contains cluster config parameters
     """
-    CONFIG_KEY = '/ovs/arakoon/{0}/config'
+    CONFIG_ROOT = '/ovs/arakoon'
+    CONFIG_KEY = CONFIG_ROOT + '/{0}/config'
     CONFIG_FILE = '/opt/OpenvStorage/config/arakoon_{0}.ini'
 
-    def __init__(self, cluster_id, filesystem, plugins=None):
+    def __init__(self, cluster_id, load_config=True, ip=None, plugins=None):
         """
         Initializes an empty Cluster Config
         """
-        self.filesystem = filesystem
-        self.cluster_id = cluster_id
-        self._extra_globals = {'tlog_max_entries': 5000}
-        self.nodes = []
         self._plugins = []
+        self._extra_globals = {'tlog_max_entries': 5000}
         if isinstance(plugins, list):
             self._plugins = plugins
         elif isinstance(plugins, basestring):
             self._plugins.append(plugins)
 
-    @property
-    def config_path(self):
-        """
-        Retrieve the configuration path
-        :return: Configuration path
-        """
-        if self.filesystem is False:
-            return ArakoonClusterConfig.CONFIG_KEY.format(self.cluster_id)
-        return ArakoonClusterConfig.CONFIG_FILE.format(self.cluster_id)
+        self.ip = ip
+        self.nodes = []
+        self.cluster_id = cluster_id
+        if ip is None:
+            self.internal_config_path = ArakoonClusterConfig.CONFIG_KEY.format(cluster_id)
+            self.external_config_path = Configuration.get_configuration_path(self.internal_config_path)
+        else:
+            self.internal_config_path = ArakoonClusterConfig.CONFIG_FILE.format(cluster_id)
+            self.external_config_path = self.internal_config_path
 
-    def _load_client(self, ip):
-        if self.filesystem is True:
+        if load_config is True:
+            if ip is None:
+                contents = Configuration.get(self.internal_config_path, raw=True)
+            else:
+                client = self.load_client(ip)
+                contents = client.file_read(self.internal_config_path)
+            self.read_config(contents)
+
+    def load_client(self, ip):
+        """
+        Create an SSHClient instance to the IP provided
+        :param ip: IP for the SSHClient
+        :type ip: str
+        :return: An SSHClient instance
+        :rtype: ovs.extensions.generic.sshclient.SSHClient
+        """
+        if self.ip is not None:
             if ip is None:
                 raise RuntimeError('An IP should be passed for filesystem configuration')
             return SSHClient(ip, username=ArakoonInstaller.SSHCLIENT_USER)
-
-    def load_config(self, ip=None):
-        """
-        Reads a configuration from reality
-        """
-        if self.filesystem is False:
-            contents = Configuration.get(self.config_path, raw=True)
-        else:
-            client = self._load_client(ip)
-            contents = client.file_read(self.config_path)
-        self.read_config(contents)
 
     def read_config(self, contents):
         """
         Constructs a configuration object from config contents
         :param contents: Raw .ini contents
+        :type contents: str
+        :return: None
+        :rtype: NoneType
         """
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))
@@ -156,6 +162,8 @@ class ArakoonClusterConfig(object):
     def export(self):
         """
         Exports the current configuration to a python dict
+        :return: Data available in the Arakoon configuration
+        :rtype: dict
         """
         data = {'global': {'cluster_id': self.cluster_id,
                            'cluster': ','.join(sorted(node.name for node in self.nodes)),
@@ -179,6 +187,8 @@ class ArakoonClusterConfig(object):
     def export_ini(self):
         """
         Exports the current configuration to an ini file format
+        :return: Arakoon configuration in string format
+        :rtype: str
         """
         contents = RawConfigParser()
         data = self.export()
@@ -192,28 +202,19 @@ class ArakoonClusterConfig(object):
         contents.write(config_io)
         return str(config_io.getvalue())
 
-    def write_config(self, ip=None):
-        """
-        Writes the configuration down to in the format expected by Arakoon
-        """
-        contents = self.export_ini()
-        if self.filesystem is False:
-            Configuration.set(self.config_path, contents, raw=True)
-        else:
-            client = self._load_client(ip)
-            client.file_write(self.config_path, contents)
-
     def delete_config(self, ip=None):
         """
         Deletes a configuration file
+        :return: None
+        :rtype: NoneType
         """
-        if self.filesystem is False:
-            key = self.config_path
+        if self.ip is None:
+            key = self.internal_config_path
             if Configuration.exists(key, raw=True):
                 Configuration.delete(key, raw=True)
         else:
-            client = self._load_client(ip)
-            client.file_delete(self.config_path)
+            client = self.load_client(ip)
+            client.file_delete(self.internal_config_path)
 
     @staticmethod
     def get_cluster_name(internal_name):
@@ -235,12 +236,10 @@ class ArakoonClusterConfig(object):
 
 class ArakoonInstaller(object):
     """
-    class to dynamically install/(re)configure Arakoon cluster
+    Class to dynamically install/(re)configure Arakoon cluster
     """
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
-    CONFIG_ROOT = '/ovs/arakoon'
-    CONFIG_KEY = CONFIG_ROOT + '/{0}/config'
     SSHCLIENT_USER = 'ovs'
     METADATA_KEY = '__ovs_metadata'
     INTERNAL_CONFIG_KEY = '__ovs_config'
@@ -263,6 +262,7 @@ class ArakoonInstaller(object):
         :param directories: Directories to delete
         :type directories: list
         :return: None
+        :rtype: NoneType
         """
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
             return
@@ -297,7 +297,7 @@ class ArakoonInstaller(object):
             root_client.file_delete(info)
 
     @staticmethod
-    def create_cluster(cluster_name, cluster_type, ip, base_dir, plugins=None, locked=True, internal=True, filesystem=False, ports=None):
+    def create_cluster(cluster_name, cluster_type, ip, base_dir, plugins=None, internal=True, port_range=None):
         """
         Always creates a cluster but marks it's usage according to the internal flag
         :param cluster_name: Name of the cluster
@@ -310,21 +310,27 @@ class ArakoonInstaller(object):
         :type base_dir: str
         :param plugins: Plugins that should be added to the configuration file
         :type plugins: dict
-        :param locked: Indicates whether the create should run in a locked context (e.g. to prevent port conflicts)
-        :type locked: bool
         :param internal: Is cluster internally managed by OVS
         :type internal: bool
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :param ports: A list of ports to be used for this cluster's node
-        :type ports: list
-        :return: Ports used by Arakoon cluster
+        :param port_range: Range of ports which should be used for the Arakoon processes (2 available ports in the range will be selected) eg: [26400, 26499]
+        :type port_range: list
+        :return: Ports used by the cluster, metadata of the cluster and metadata of the service
         :rtype: dict
         """
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
             raise ValueError('Cluster type {0} is not supported. Please choose from {1}'.format(cluster_type, ', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
+        if plugins is not None and not isinstance(plugins, dict):
+            raise ValueError('Plugins should be a dict')
 
-        client = SSHClient(ip, username=ArakoonInstaller.SSHCLIENT_USER)
+        locked = True
+        filesystem = False
+        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG:
+            locked = False
+            filesystem = True
+        elif cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.FWK:
+            locked = False
+
+        client = SSHClient(endpoint=ip, username=ArakoonInstaller.SSHCLIENT_USER)
         if filesystem is True:
             exists = client.file_exists(ArakoonClusterConfig.CONFIG_FILE.format(cluster_name))
         else:
@@ -332,7 +338,7 @@ class ArakoonInstaller(object):
         if exists is True:
             raise ValueError('An Arakoon cluster with name "{0}" already exists'.format(cluster_name))
 
-        ArakoonInstaller._logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
+        ArakoonInstaller._logger.debug('Creating cluster {0} of type {1} on {2}'.format(cluster_name, cluster_type, ip))
 
         node_name = System.get_my_machine_id(client)
         base_dir = base_dir.rstrip('/')
@@ -346,9 +352,17 @@ class ArakoonInstaller(object):
                 from ovs.extensions.generic.volatilemutex import volatile_mutex
                 port_mutex = volatile_mutex('arakoon_install_ports_{0}'.format(ip))
                 port_mutex.acquire(wait=60)
-            if ports is None:
-                ports = ArakoonInstaller._get_free_ports(client)
-            config = ArakoonClusterConfig(cluster_name, filesystem, plugins.keys() if plugins is not None else None)
+
+            if filesystem is True:
+                if port_range is None:
+                    port_range = [26400]
+                ports = System.get_free_ports(selected_range=port_range, nr=2, client=client)
+            else:
+                ports = ArakoonInstaller._get_free_ports(client=client, port_range=port_range)
+            config = ArakoonClusterConfig(cluster_id=cluster_name,
+                                          ip=ip if filesystem is True else None,
+                                          load_config=False,
+                                          plugins=plugins.keys() if plugins is not None else None)
             config.nodes.append(ArakoonNodeConfig(name=node_name,
                                                   ip=ip,
                                                   client_port=ports[0],
@@ -359,96 +373,112 @@ class ArakoonInstaller(object):
                                                   tlog_dir=tlog_dir))
             metadata = {'internal': internal,
                         'cluster_name': cluster_name,
-                        'cluster_type': cluster_type.upper(),
+                        'cluster_type': cluster_type,
                         'in_use': False}
             service_metadata = ArakoonInstaller._deploy(config=config,
-                                                        filesystem=filesystem,
                                                         plugins=plugins.values() if plugins is not None else None,
-                                                        delay_service_registration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)[ip]
+                                                        delay_service_registration=filesystem)[ip]
         finally:
             if port_mutex is not None:
                 port_mutex.release()
 
-        ArakoonInstaller._logger.debug('Creating cluster {0} on {1} completed'.format(cluster_name, ip))
-        return {'metadata': metadata,
-                'client_port': ports[0],
-                'messaging_port': ports[1],
+        ArakoonInstaller._logger.debug('Creating cluster {0} of type {1} on {2} completed'.format(cluster_name, cluster_type, ip))
+
+        if plugins is not None:
+            ArakoonInstaller._logger.debug('Linking plugins {0} for cluster {1}'.format(plugins.keys(), cluster_name))
+            for function in Toolbox.fetch_hooks(component='arakoon', sub_component='link_plugins'):
+                function(client=SSHClient(ip),
+                         plugins=plugins.keys(),
+                         data_dir=base_dir,
+                         cluster_name=cluster_name)
+
+        return {'ports': [ports[0], ports[1]],  # Client port, messaging port
+                'metadata': metadata,
                 'service_metadata': service_metadata}
 
     @staticmethod
-    def delete_cluster(cluster_name, ip, filesystem=False):
+    def delete_cluster(cluster_name, ip=None):
         """
         Deletes a complete cluster
         :param cluster_name: Name of the cluster to remove
         :type cluster_name: str
-        :param ip: IP address of the last node of a cluster
+        :param ip: IP of one of the already existing nodes (Only required for filesystem Arakoons)
         :type ip: str
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
         :return: None
+        :rtype: NoneType
         """
-        ArakoonInstaller._logger.debug('Deleting cluster {0} on {1}'.format(cluster_name, ip))
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(ip)
-        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=config.cluster_id, filesystem=filesystem, ip=ip)['cluster_type']
+        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)['cluster_type']
+        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG:
+            if ip is None:
+                raise ValueError('IP is required for filesystem Arakoons')
+            filesystem = True
+        else:
+            ip = None  # Reset to None if passed, because only applicable for filesystem Arakoons
+            filesystem = False
 
-        service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=config.cluster_id)
+        ArakoonInstaller._logger.debug('Deleting cluster {0} of type {1}'.format(cluster_name, cluster_type))
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=ip)
+        service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
         for node in config.nodes:
             try:
                 ServiceManager.unregister_service(service_name=service_name, node_name=node.name)
             except:
-                ArakoonInstaller._logger.exception('Un-registering service {0} on {1} failed'.format(service_name, ip))
+                ArakoonInstaller._logger.exception('Un-registering service {0} on {1} failed'.format(service_name, node.ip))
 
         # Cleans up a complete cluster (remove services, directories and configuration files)
         for node in config.nodes:
-            ArakoonInstaller._destroy_node(config, node, delay_unregistration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)
-            config.delete_config(ip)
-
-        ArakoonInstaller._logger.debug('Deleting cluster {0} on {1} completed'.format(cluster_name, ip))
+            ArakoonInstaller._destroy_node(cluster_name=cluster_name,
+                                           node=node,
+                                           delay_unregistration=filesystem)
+            config.delete_config(ip=ip)
+        ArakoonInstaller._logger.debug('Deleting cluster {0} of type {1} completed'.format(cluster_name, cluster_type))
 
     @staticmethod
-    def extend_cluster(master_ip, new_ip, cluster_name, base_dir, locked=True, filesystem=False, ports=None):
+    def extend_cluster(cluster_name, new_ip, base_dir, ip=None, plugins=None, port_range=None):
         """
         Extends a cluster to a given new node
-        :param master_ip: IP of one of the already existing nodes
-        :type master_ip: str
-        :param new_ip: IP address of the node to be added
-        :type new_ip: str
         :param cluster_name: Name of the cluster to be extended
         :type cluster_name: str
-        :param base_dir: Base directory that will hold the db and tlogs
+        :param new_ip: IP address of the node to be added
+        :type new_ip: str
+        :param base_dir: Base directory that should contain the data and tlogs
         :type base_dir: str
-        :param locked: Indicates whether the extend should run in a locked context (e.g. to prevent port conflicts)
-        :type locked: bool
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :param ports: A list of ports to be used for this cluster's node
-        :type ports: list
-        :return: Ports used by Arakoon cluster
+        :param ip: IP of one of the already existing nodes (Only required for filesystem Arakoons)
+        :type ip: str
+        :param plugins: Plugins that should be added to the configuration file
+        :type plugins: dict
+        :param port_range: Range of ports which should be used for the Arakoon processes (2 available ports in the range will be selected) eg: [26400, 26499]
+        :type port_range: list
+        :return: Ports used by the cluster, IPs on which the cluster is extended and metadata for the service
         :rtype: dict
         """
-        ArakoonInstaller._logger.debug('Extending cluster {0} from {1} to {2}'.format(cluster_name, master_ip, new_ip))
+        if plugins is not None and not isinstance(plugins, dict):
+            raise ValueError('Plugins should be a dict')
+
+        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)['cluster_type']
+        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG:
+            if ip is None:
+                raise ValueError('IP is required for filesystem Arakoons')
+            filesystem = True
+        else:
+            ip = None  # Reset to None if passed, because only applicable for filesystem Arakoons
+            filesystem = False
+
+        from ovs.extensions.generic.volatilemutex import volatile_mutex
+
+        ArakoonInstaller._logger.debug('Extending cluster {0} of type {1} to {2}'.format(cluster_name, cluster_type, new_ip))
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=ip)
+        client = SSHClient(endpoint=new_ip, username=ArakoonInstaller.SSHCLIENT_USER)
         base_dir = base_dir.rstrip('/')
-
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(master_ip)
-        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=config.cluster_id, filesystem=filesystem, ip=master_ip)['cluster_type']
-
-        client = SSHClient(new_ip, username=ArakoonInstaller.SSHCLIENT_USER)
-        node_name = System.get_my_machine_id(client)
-
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
-        ArakoonInstaller.clean_leftover_arakoon_data(new_ip, [home_dir, tlog_dir])
+        node_name = System.get_my_machine_id(client=client)
+        ArakoonInstaller.clean_leftover_arakoon_data(ip=new_ip, directories=[home_dir, tlog_dir])
 
-        port_mutex = None
-        try:
-            if locked is True:
-                from ovs.extensions.generic.volatilemutex import volatile_mutex
-                port_mutex = volatile_mutex('arakoon_install_ports_{0}'.format(new_ip))
-                port_mutex.acquire(wait=60)
-            if ports is None:
-                ports = ArakoonInstaller._get_free_ports(client)
+        with volatile_mutex('arakoon_install_ports_{0}'.format(new_ip), wait=60):
+            if port_range is None:
+                port_range = [26400]
+            ports = ArakoonInstaller._get_free_ports(client=client, port_range=port_range)
             if node_name not in [node.name for node in config.nodes]:
                 config.nodes.append(ArakoonNodeConfig(name=node_name,
                                                       ip=new_ip,
@@ -459,110 +489,120 @@ class ArakoonInstaller(object):
                                                       home=home_dir,
                                                       tlog_dir=tlog_dir))
             service_metadata = ArakoonInstaller._deploy(config=config,
-                                                        filesystem=filesystem,
-                                                        delay_service_registration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)[new_ip]
-        finally:
-            if port_mutex is not None:
-                port_mutex.release()
+                                                        delay_service_registration=filesystem)[new_ip]
 
-        ArakoonInstaller._logger.debug('Extending cluster {0} from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
-        return {'client_port': ports[0],
-                'messaging_port': ports[1],
-                'service_metadata': service_metadata,
-                'ips': [node.ip for node in config.nodes]}
+        ArakoonInstaller._logger.debug('Extending cluster {0} of type {1} to {2} completed'.format(cluster_name, cluster_type, new_ip))
+
+        if plugins is not None:
+            ArakoonInstaller._logger.debug('Linking plugins {0} for cluster {1}'.format(plugins.keys(), cluster_name))
+            for function in Toolbox.fetch_hooks(component='arakoon', sub_component='link_plugins'):
+                function(client=SSHClient(new_ip),
+                         plugins=plugins.keys(),
+                         data_dir=base_dir,
+                         cluster_name=cluster_name)
+
+        return {'ips': [node.ip for node in config.nodes],
+                'ports': [ports[0], ports[1]],  # Client port, messaging port
+                'service_metadata': service_metadata}
 
     @staticmethod
-    def shrink_cluster(deleted_node_ip, remaining_node_ips, cluster_name, offline_nodes=None, filesystem=False):
+    def shrink_cluster(cluster_name, ip, remaining_ip=None, offline_nodes=None):
         """
         Removes a node from a cluster, the old node will become a slave
-        :param deleted_node_ip: The ip of the node that should be deleted
-        :type deleted_node_ip: str
-        :param remaining_node_ips: The IPs of the remaining nodes
-        :type remaining_node_ips: list
         :param cluster_name: The name of the cluster to shrink
         :type cluster_name: str
+        :param ip: The IP of the node that should be removed from the cluster
+        :type ip: str
+        :param remaining_ip: An IP of 1 of the remaining nodes in the cluster (Only required for filesystem Arakoons)
+        :type remaining_ip: str
         :param offline_nodes: Storage Routers which are offline
         :type offline_nodes: list
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :return: Remaining running Arakoon IPs
+        :return: IPs of the remaining nodes in the cluster
         :rtype: list
         """
-        ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(remaining_node_ips[0])
-        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=config.cluster_id, filesystem=filesystem, ip=remaining_node_ips[0])['cluster_type']
+        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=remaining_ip)['cluster_type']
+        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG:
+            if remaining_ip is None or remaining_ip in offline_nodes:
+                raise ValueError('IP is required for filesystem Arakoons')
+            filesystem = True
+        else:
+            filesystem = False
+            remaining_ip = None  # Reset to None if passed, because only applicable for filesystem Arakoons
 
         if offline_nodes is None:
             offline_nodes = []
 
+        # Shrink the cluster
+        ArakoonInstaller._logger.debug('Shrinking cluster {0} of type {1} from {2}'.format(cluster_name, cluster_type, ip))
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=remaining_ip)
+        restart_ips = []
         removal_node = None
         for node in config.nodes[:]:
-            if node.ip == deleted_node_ip:
+            if node.ip == ip:
                 config.nodes.remove(node)
                 removal_node = node
                 if node.ip not in offline_nodes:
-                    ArakoonInstaller._destroy_node(config, node, delay_unregistration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)
+                    ArakoonInstaller._destroy_node(cluster_name=cluster_name,
+                                                   node=node,
+                                                   delay_unregistration=filesystem)
                     if filesystem is True:
                         config.delete_config(node.ip)
-        ArakoonInstaller._deploy(config=config,
-                                 filesystem=filesystem,
-                                 offline_nodes=offline_nodes,
-                                 delay_service_registration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)
-        restart_ips = [node.ip for node in config.nodes if node.ip != deleted_node_ip and node.ip not in offline_nodes]
-        ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
+            elif node.ip not in offline_nodes:
+                restart_ips.append(node.ip)
 
+        ArakoonInstaller._deploy(config=config,
+                                 offline_nodes=offline_nodes,
+                                 delay_service_registration=filesystem)
+        ArakoonInstaller._logger.debug('Shrinking cluster {0} of type {1} from {2} completed'.format(cluster_name, cluster_type, ip))
+
+        # Recreate the config
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=remaining_ip)
+
+        # Restart remaining nodes
         ArakoonInstaller._logger.debug('Restart sequence (remove) for {0}'.format(cluster_name))
-        ArakoonInstaller._logger.debug('Remaining ips: {0}'.format(', '.join(restart_ips)))
-        for ip in restart_ips:
-            client = SSHClient(ip, username='root')
-            ArakoonInstaller.stop(cluster_name, client=client)
-            ArakoonInstaller.start(cluster_name, client=client)
+        for restart_ip in restart_ips:
+            ArakoonInstaller._logger.debug('  Restarting IP: {0}'.format(restart_ip))
+            client = SSHClient(endpoint=restart_ip, username='root')
+            ArakoonInstaller.stop(cluster_name=cluster_name, client=client)
+            ArakoonInstaller.start(cluster_name=cluster_name, client=client)
             ArakoonInstaller._logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
             if len(restart_ips) > 2:  # A two node cluster needs all nodes running
-                ArakoonInstaller.wait_for_cluster(cluster_name, restart_ips[0], filesystem)
-        ArakoonInstaller.wait_for_cluster(cluster_name, restart_ips[0], filesystem)
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(restart_ips[0])
-        arakoon_client = ArakoonInstaller.build_client(config)
+                ArakoonInstaller._wait_for_cluster(config=config)
+        arakoon_client = ArakoonInstaller._wait_for_cluster(config=config)
         arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, config.export_ini())
-        if removal_node is not None:
-            # noinspection PyUnresolvedReferences
-            ServiceManager.unregister_service(node_name=removal_node.name,
-                                              service_name=ArakoonInstaller.get_service_name_for_cluster(cluster_name=config.cluster_id))
-        ArakoonInstaller._logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
 
+        if removal_node is not None:
+            ServiceManager.unregister_service(node_name=removal_node.name,
+                                              service_name=ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
+        ArakoonInstaller._logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
         return restart_ips
 
     @staticmethod
-    def get_unused_arakoon_metadata_and_claim(cluster_type, locked=True, cluster_name=None):
+    def get_unused_arakoon_metadata_and_claim(cluster_type, cluster_name=None):
         """
-        Retrieve Arakoon cluster information based on its type
-        :param cluster_type: Type of Arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
+        Retrieve cluster information based on its type
+        :param cluster_type: Type of the cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
         :type cluster_type: str
-        :param locked: Execute this in a locked context
-        :type locked: bool
         :param cluster_name: Name of the cluster to claim
         :type cluster_name: str
-        :return: Metadata of the Arakoon cluster
+        :return: Metadata of the cluster
         :rtype: dict
         """
-        cluster_type = cluster_type.upper()
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
             raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
-        if not Configuration.dir_exists(ArakoonInstaller.CONFIG_ROOT):
+        if not Configuration.dir_exists(ArakoonClusterConfig.CONFIG_ROOT):
             return None
 
         mutex = volatile_mutex('claim_arakoon_metadata', wait=10)
+        locked = cluster_type not in [ServiceType.ARAKOON_CLUSTER_TYPES.CFG, ServiceType.ARAKOON_CLUSTER_TYPES.FWK]
         try:
             if locked is True:
                 mutex.acquire()
 
-            for cl_name in Configuration.list(ArakoonInstaller.CONFIG_ROOT):
+            for cl_name in Configuration.list(ArakoonClusterConfig.CONFIG_ROOT):
                 if cluster_name is not None and cl_name != cluster_name:
                     continue
-                config = ArakoonClusterConfig(cluster_id=cl_name, filesystem=False)
-                config.load_config()
+                config = ArakoonClusterConfig(cluster_id=cl_name)
                 arakoon_client = ArakoonInstaller.build_client(config)
                 if arakoon_client.exists(ArakoonInstaller.METADATA_KEY):
                     metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
@@ -575,78 +615,80 @@ class ArakoonInstaller(object):
                 mutex.release()
 
     @staticmethod
-    def get_unused_arakoon_clusters(cluster_type):
+    def get_unused_arakoon_clusters(cluster_type, ip=None):
         """
         Retrieve all unclaimed clusters of type <cluster_type>
-        :param cluster_type: Type of Arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
+        :param cluster_type: Type of the cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
         :type cluster_type: str
-        :return: All unclaimed Arakoon clusters of specified type
+        :param ip: The IP address of one of the nodes containing the configuration file (Only required for filesystem Arakoons)
+        :type ip: str
+        :return: All unclaimed clusters of specified type
         :rtype: list
         """
         clusters = []
-        cluster_type = cluster_type.upper()
-        if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
-            raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
-        if not Configuration.dir_exists(ArakoonInstaller.CONFIG_ROOT):
+        if not Configuration.dir_exists(ArakoonClusterConfig.CONFIG_ROOT):
             return clusters
 
-        for cluster_name in Configuration.list(ArakoonInstaller.CONFIG_ROOT):
-            config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=False)
-            config.load_config()
-            arakoon_client = ArakoonInstaller.build_client(config)
-            metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
+        if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
+            raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
+        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG:
+            if ip is None:
+                raise ValueError('IP is required for filesystem Arakoons')
+        else:
+            ip = None  # Reset to None if passed, because only applicable for filesystem Arakoons
+
+        for cluster_name in Configuration.list(ArakoonClusterConfig.CONFIG_ROOT):
+            metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)
             if metadata['cluster_type'] == cluster_type and metadata['in_use'] is False:
                 clusters.append(metadata)
         return clusters
 
     @staticmethod
-    def get_arakoon_metadata_by_cluster_name(cluster_name, filesystem=False, ip=None):
+    def get_arakoon_metadata_by_cluster_name(cluster_name, ip=None):
         """
-        Retrieve Arakoon cluster information based on its name
-        :param cluster_name: Name of the Arakoon cluster
+        Retrieve cluster information based on its name
+        :param cluster_name: Name of the cluster
         :type cluster_name: str
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :param ip: The ip address of one of the nodes containing the configuration file, if on filesystem
+        :param ip: The IP address of one of the nodes containing the configuration file (Only required for filesystem Arakoons)
         :type ip: str
-        :return: Arakoon cluster metadata information
+        :return: Cluster metadata information
         :rtype: dict
         """
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(ip)
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=ip)
         arakoon_client = ArakoonInstaller.build_client(config)
         return json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
 
     @staticmethod
-    def _get_free_ports(client):
+    def _get_free_ports(client, port_range=None):
         node_name = System.get_my_machine_id(client)
         clusters = []
         exclude_ports = []
-        if Configuration.dir_exists(ArakoonInstaller.CONFIG_ROOT):
-            for cluster_name in Configuration.list(ArakoonInstaller.CONFIG_ROOT):
-                config = ArakoonClusterConfig(cluster_name, False)
-                config.load_config()
+        if Configuration.dir_exists(ArakoonClusterConfig.CONFIG_ROOT):
+            for cluster_name in Configuration.list(ArakoonClusterConfig.CONFIG_ROOT):
+                config = ArakoonClusterConfig(cluster_id=cluster_name)
                 for node in config.nodes:
                     if node.name == node_name:
                         clusters.append(cluster_name)
                         exclude_ports.append(node.client_port)
                         exclude_ports.append(node.messaging_port)
 
-        ports = System.get_free_ports(Configuration.get('/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name)), exclude_ports, 2, client)
+        if port_range is None:
+            port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name))
+        ports = System.get_free_ports(selected_range=port_range, exclude=exclude_ports, nr=2, client=client)
         ArakoonInstaller._logger.debug('  Loaded free ports {0} based on existing clusters {1}'.format(ports, clusters))
         return ports
 
     @staticmethod
-    def _destroy_node(config, node, delay_unregistration=False):
+    def _destroy_node(cluster_name, node, delay_unregistration=False):
         """
         Cleans up a single node (remove services, directories and configuration files)
         """
-        ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1}'.format(node.ip, config.cluster_id))
+        ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1}'.format(node.ip, cluster_name))
 
         # Removes services for a cluster on a given node
         root_client = SSHClient(node.ip, username='root')
-        ArakoonInstaller.stop(config.cluster_id, client=root_client)
-        ArakoonInstaller.remove(config.cluster_id, client=root_client, delay_unregistration=delay_unregistration)
+        ArakoonInstaller.stop(cluster_name=cluster_name, client=root_client)
+        ArakoonInstaller.remove(cluster_name=cluster_name, client=root_client, delay_unregistration=delay_unregistration)
 
         # Cleans all directories on a given node
         abs_paths = {node.tlog_dir, node.home}  # That's a set
@@ -655,10 +697,10 @@ class ArakoonInstaller(object):
         if node.crash_log_sinks.startswith('/'):
             abs_paths.add(os.path.dirname(os.path.abspath(node.crash_log_sinks)))
         root_client.dir_delete(list(abs_paths))
-        ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
+        ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, cluster_name))
 
     @staticmethod
-    def _deploy(config, filesystem, offline_nodes=None, plugins=None, delay_service_registration=False):
+    def _deploy(config, offline_nodes=None, plugins=None, delay_service_registration=False):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
@@ -674,7 +716,12 @@ class ArakoonInstaller(object):
             root_client = SSHClient(node.ip, username='root')
 
             # Distributes a configuration file to all its nodes
-            config.write_config(node.ip)
+            contents = config.export_ini()
+            if config.ip is None:
+                Configuration.set(config.internal_config_path, contents, raw=True)
+            else:
+                client = config.load_client(node.ip)
+                client.file_write(config.internal_config_path, contents)
 
             # Create dirs as root because mountpoint /mnt/cache1 is typically owned by root
             abs_paths = {node.tlog_dir, node.home}  # That's a set
@@ -688,10 +735,6 @@ class ArakoonInstaller(object):
             root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
             # Creates services for/on all nodes in the config
-            if config.filesystem is True:
-                config_path = config.config_path
-            else:
-                config_path = Configuration.get_configuration_path(config.config_path)
             extra_version_cmd = ''
             if plugins is not None:
                 extra_version_cmd = ';'.join(plugins)
@@ -699,10 +742,10 @@ class ArakoonInstaller(object):
                                                   client=root_client,
                                                   params={'CLUSTER': config.cluster_id,
                                                           'NODE_ID': node.name,
-                                                          'CONFIG_PATH': config_path,
+                                                          'CONFIG_PATH': config.external_config_path,
                                                           'EXTRA_VERSION_CMD': extra_version_cmd},
                                                   target_name='ovs-arakoon-{0}'.format(config.cluster_id),
-                                                  startup_dependency=('ovs-watcher-config' if filesystem is False else None),
+                                                  startup_dependency=('ovs-watcher-config' if config.ip is None else None),
                                                   delay_registration=delay_service_registration)
             service_metadata[node.ip] = metadata
             ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
@@ -711,12 +754,13 @@ class ArakoonInstaller(object):
     @staticmethod
     def start(cluster_name, client):
         """
-        Starts an Arakoon cluster
+        Starts a cluster service on the client provided
         :param cluster_name: The name of the cluster service to start
         :type cluster_name: str
         :param client: Client on which to start the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: None
+        :rtype: NoneType
         """
         service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
         if ServiceManager.has_service(name=service_name, client=client) is True:
@@ -725,12 +769,13 @@ class ArakoonInstaller(object):
     @staticmethod
     def stop(cluster_name, client):
         """
-        Stops an Arakoon service
+        Stops a cluster service on the client provided
         :param cluster_name: The name of the cluster service to stop
         :type cluster_name: str
         :param client: Client on which to stop the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: None
+        :rtype: NoneType
         """
         service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
         if ServiceManager.has_service(name=service_name, client=client) is True:
@@ -739,12 +784,13 @@ class ArakoonInstaller(object):
     @staticmethod
     def is_running(cluster_name, client):
         """
-        Checks if Arakoon service is running
+        Checks if the cluster service is running on the client provided
         :param cluster_name: The name of the cluster service to check
         :type cluster_name: str
         :param client: Client on which to check the service
-        :type client: SSHClient
-        :return: None
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :return: True if the cluster service is running, False otherwise
+        :rtype: bool
         """
         service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
         if ServiceManager.has_service(name=service_name, client=client):
@@ -754,86 +800,84 @@ class ArakoonInstaller(object):
     @staticmethod
     def remove(cluster_name, client, delay_unregistration=False):
         """
-        Removes an Arakoon service
+        Removes a cluster service from the client provided
         :param cluster_name: The name of the cluster service to remove
         :type cluster_name: str
         :param client: Client on which to remove the service
-        :type client: SSHClient
-        :param delay_unregistration: Un-register the service right away or not
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param delay_unregistration: Un-register the cluster service right away or not
         :type delay_unregistration: bool
         :return: None
+        :rtype: NoneType
         """
         service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
         if ServiceManager.has_service(name=service_name, client=client) is True:
             ServiceManager.remove_service(name=service_name, client=client, delay_unregistration=delay_unregistration)
 
     @staticmethod
-    def wait_for_cluster(cluster_name, node_ip, filesystem=False):
+    def _wait_for_cluster(config):
         """
         Waits for an Arakoon cluster to be available (by sending a nop)
-        :param cluster_name: Name of the cluster to wait on
-        :type cluster_name: str
-        :param node_ip: IP address of one of the cluster's nodes
-        :type node_ip: str
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :return: True
-        :rtype: Boolean
         """
-        ArakoonInstaller._logger.debug('Waiting for cluster {0}'.format(cluster_name))
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(node_ip)
+        ArakoonInstaller._logger.debug('Waiting for cluster {0}'.format(config.cluster_id))
         arakoon_client = ArakoonInstaller.build_client(config)
         arakoon_client.nop()
-        ArakoonInstaller._logger.debug('Waiting for cluster {0}: available'.format(cluster_name))
-        return True
+        ArakoonInstaller._logger.debug('Waiting for cluster {0}: available'.format(config.cluster_id))
+        return arakoon_client
 
     @staticmethod
-    def start_cluster(cluster_name, master_ip, filesystem):
+    def start_cluster(metadata, ip=None):
         """
         Execute a start sequence (only makes sense for a fresh cluster)
-        :param cluster_name: Name of the cluster to start
-        :type cluster_name: str
-        :param master_ip: IP of one of the cluster nodes
-        :type master_ip: str
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
+        :param metadata: The metadata of the cluster
+        :type metadata: dict
+        :param ip: IP of one of the cluster nodes (Only required for filesystem Arakoons)
+        :type ip: str
         :return: None
+        :rtype: NoneType
         """
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(master_ip)
-        root_clients = [SSHClient(node.ip, username='root') for node in config.nodes]
+        cluster_name = metadata['cluster_name']
+        cluster_type = metadata['cluster_type']
+        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG:
+            if ip is None:
+                raise ValueError('IP is required for filesystem Arakoons')
+        else:
+            ip = None  # Reset to None if passed, because only applicable for filesystem Arakoons
+
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=ip)
+        root_clients = [SSHClient(endpoint=node.ip, username='root') for node in config.nodes]
         for client in root_clients:
-            ArakoonInstaller.start(cluster_name, client)
-        ArakoonInstaller.wait_for_cluster(cluster_name, master_ip, filesystem)
-        arakoon_client = ArakoonInstaller.build_client(config)
+            ArakoonInstaller.start(cluster_name=cluster_name, client=client)
+        arakoon_client = ArakoonInstaller._wait_for_cluster(config=config)
         arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, config.export_ini())
+
+        metadata['in_use'] = True
+        arakoon_client.set(ArakoonInstaller.METADATA_KEY, json.dumps(metadata, indent=4))
 
     @staticmethod
     def restart_node(cluster_name, client):
         """
-        Execute a restart sequence for the Arakoon service running on the specified IP
+        Execute a restart sequence for the cluster service running on the specified IP
         This scenario is only supported when NO configuration changes have been applied
         and should have no impact on Arakoon performance if 1 node fails to restart due to backwards compatibility
-        :param cluster_name: Name of the cluster to restart
+        :param cluster_name: Name of the cluster service to restart
         :type cluster_name: str
-        :param client: Client on which to restart the Arakoon service
-        :type client: SSHClient
+        :param client: Client on which to restart the cluster service
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: None
+        :rtype: NoneType
         """
-        ArakoonInstaller._logger.debug('Restart sequence for {0} via {1}'.format(cluster_name, client.ip))
-
-        config = ArakoonClusterConfig(cluster_name, cluster_name == 'config')
-        config.load_config(ip=client.ip)
-
+        ArakoonInstaller._logger.debug('Restarting node {0} for cluster {1}'.format(client.ip, cluster_name))
+        filesystem = cluster_name == 'config'
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=client.ip if filesystem is True else None)
         if len(config.nodes) > 0:
-            ArakoonInstaller.stop(cluster_name, client)
-            ArakoonInstaller.start(cluster_name, client)
+            ArakoonInstaller.stop(cluster_name=cluster_name, client=client)
+            ArakoonInstaller.start(cluster_name=cluster_name, client=client)
+            ArakoonInstaller._wait_for_cluster(config=config)
             ArakoonInstaller._logger.debug('Restarted node {0} on cluster {1}'.format(client.ip, cluster_name))
-            ArakoonInstaller.wait_for_cluster(cluster_name, config.nodes[0].ip, cluster_name == 'config')
 
     @staticmethod
-    def restart_cluster_add(cluster_name, current_ips, new_ip, filesystem):
+    def restart_cluster_add(cluster_name, current_ips, new_ip):
         """
         Execute a (re)start sequence after adding a new node to a cluster.
         :param cluster_name: Name of the cluster to restart
@@ -842,88 +886,74 @@ class ArakoonInstaller(object):
         :type current_ips: list
         :param new_ip: IP of the newly added node
         :type new_ip: str
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
         :return: None
+        :rtype: NoneType
         """
-        ArakoonInstaller._logger.debug('Restart sequence (add) for {0}'.format(cluster_name))
-        ArakoonInstaller._logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
-        ArakoonInstaller._logger.debug('New ip: {0}'.format(new_ip))
-
-        client = SSHClient(new_ip, username=ArakoonInstaller.SSHCLIENT_USER)
-        if ArakoonInstaller.is_running(cluster_name, client):
+        ArakoonInstaller._logger.debug('Restarting cluster {0} with current IPs: {1} and newly added IP {2}'.format(cluster_name, ', '.join(current_ips), new_ip))
+        filesystem = cluster_name == 'config'
+        client = SSHClient(endpoint=new_ip, username=ArakoonInstaller.SSHCLIENT_USER)
+        if ArakoonInstaller.is_running(cluster_name=cluster_name, client=client):
             ArakoonInstaller._logger.info('Arakoon service for {0} is already running'.format(cluster_name))
             return
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(new_ip)
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=new_ip if filesystem is True else None)
         arakoon_client = ArakoonInstaller.build_client(config)
 
         if len(config.nodes) > 1:
             ArakoonInstaller._logger.debug('Catching up new node {0} for cluster {1}'.format(new_ip, cluster_name))
             node_name = [node.name for node in config.nodes if node.ip == new_ip][0]
-            if filesystem is True:
-                config_path = config.config_path
-            else:
-                config_path = Configuration.get_configuration_path(config.config_path)
-            client.run(['arakoon', '--node', node_name, '-config', config_path, '-catchup-only'])
+            client.run(['arakoon', '--node', node_name, '-config', config.external_config_path, '-catchup-only'])
             ArakoonInstaller._logger.debug('Catching up new node {0} for cluster {1} completed'.format(new_ip, cluster_name))
 
+        # Restart current nodes in the cluster
         threshold = 2 if new_ip in current_ips else 1
         for ip in current_ips:
             if ip == new_ip:
                 continue
-            current_client = SSHClient(ip, username='root')
-            ArakoonInstaller.stop(cluster_name, client=current_client)
-            ArakoonInstaller.start(cluster_name, client=current_client)
-            ArakoonInstaller._logger.debug('  Restarted node {0} for cluster {1}'.format(current_client.ip, cluster_name))
+            root_client = SSHClient(endpoint=ip, username='root')
+            ArakoonInstaller.stop(cluster_name=cluster_name, client=root_client)
+            ArakoonInstaller.start(cluster_name=cluster_name, client=root_client)
+            ArakoonInstaller._logger.debug('  Restarted node {0} for cluster {1}'.format(root_client.ip, cluster_name))
             if len(current_ips) > threshold:  # A two node cluster needs all nodes running
-                ArakoonInstaller.wait_for_cluster(cluster_name, ip, filesystem)
-        client = SSHClient(new_ip, username='root')
-        ArakoonInstaller.start(cluster_name, client=client)
-        ArakoonInstaller.wait_for_cluster(cluster_name, new_ip, filesystem)
+                ArakoonInstaller._wait_for_cluster(config=config)
+
+        # Start new node in the cluster
+        client = SSHClient(endpoint=new_ip, username='root')
+        ArakoonInstaller.start(cluster_name=cluster_name, client=client)
+        ArakoonInstaller._wait_for_cluster(config=config)
         arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, config.export_ini())
         ArakoonInstaller._logger.debug('Started node {0} for cluster {1}'.format(new_ip, cluster_name))
 
     @staticmethod
-    def claim_cluster(cluster_name, master_ip, filesystem, metadata=None):
+    def claim_cluster(cluster_name, ip=None):
         """
         Claims the cluster
         :param cluster_name: Name of the cluster to claim
         :type cluster_name: str
-        :param master_ip: IP of one of the cluster nodes
-        :type master_ip: str
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :param metadata: Metadata if not yet in the cluster
-        :type metadata: dict
+        :param ip: IP of one of the cluster nodes (Only required for filesystem Arakoons)
+        :type ip: str|None
+        :return: None
+        :rtype: NoneType
         """
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(master_ip)
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=ip)
         arakoon_client = ArakoonInstaller.build_client(config)
-        if metadata is None:
-            metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
+        metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
         metadata['in_use'] = True
         arakoon_client.set(ArakoonInstaller.METADATA_KEY, json.dumps(metadata, indent=4))
-        arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, config.export_ini())
 
     @staticmethod
-    def unclaim_cluster(cluster_name, master_ip, filesystem, metadata=None):
+    def unclaim_cluster(cluster_name, ip=None):
         """
         Un-claims the cluster
         :param cluster_name: Name of the cluster to un-claim
         :type cluster_name: str
-        :param master_ip: IP of one of the cluster nodes
-        :type master_ip: str or None
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :param metadata: Metadata if not yet in the cluster
-        :type metadata: dict
+        :param ip: IP of one of the cluster nodes (Only required for filesystem Arakoons)
+        :type ip: str|None
+        :return: None
+        :rtype: NoneType
         """
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(master_ip)
+        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=ip)
         arakoon_client = ArakoonInstaller.build_client(config=config)
-        if metadata is None:
-            metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
+        metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
         metadata['in_use'] = False
         arakoon_client.set(ArakoonInstaller.METADATA_KEY, json.dumps(metadata, indent=4))
 

@@ -188,8 +188,7 @@ class ObjectRegistryClient(object):
         if key not in oclient_vpool_cache:
             arakoon_node_configs = []
             arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-            config.load_config()
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
             for node in config.nodes:
                 arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
             client = ORClient(str(vpool.guid), str(arakoon_cluster_name), arakoon_node_configs)
@@ -258,8 +257,7 @@ class ClusterRegistryClient(object):
         key = vpool.identifier
         if key not in crclient_vpool_cache:
             arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-            config.load_config()
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
             arakoon_node_configs = []
             for node in config.nodes:
                 arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
@@ -293,8 +291,7 @@ class FSMetaDataClient(object):
         key = vpool.identifier
         if key not in fsmclient_vpool_cache:
             arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-            config.load_config()
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
             arakoon_node_configs = []
             for node in config.nodes:
                 arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
