@@ -85,7 +85,7 @@ class ArakoonInstallerTester(unittest.TestCase):
         client = ArakoonInstaller.build_client(config)
         reality = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY)
         self.assertEqual(reality, expected)
-        self.assertFalse(client.exists(ArakoonInstaller.METADATA_KEY))
+        self.assertTrue(client.exists(ArakoonInstaller.METADATA_KEY))
 
         ArakoonInstaller.claim_cluster(cluster_name='test')
 

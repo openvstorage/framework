@@ -471,7 +471,7 @@ class GenericController(object):
         for cluster, storagerouter in cluster_info:
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
             ip = storagerouter.ip if cluster == 'cacc' else None
-            config = ArakoonClusterConfig(cluster, ip=ip)
+            config = ArakoonClusterConfig(cluster, source_ip=ip)
             for node in config.nodes:
                 if node.ip not in workload:
                     workload[node.ip] = {'node_id': node.name,
@@ -486,7 +486,7 @@ class GenericController(object):
                 for cluster, ip in node_workload['clusters']:
                     try:
                         GenericController._logger.debug('  Collapsing cluster {0} on {1}'.format(cluster, storagerouter.ip))
-                        config = ArakoonClusterConfig(cluster_id=cluster, ip=ip)
+                        config = ArakoonClusterConfig(cluster_id=cluster, source_ip=ip)
                         client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config.external_config_path])
                         GenericController._logger.debug('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
                     except:

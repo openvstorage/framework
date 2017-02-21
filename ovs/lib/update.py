@@ -225,7 +225,7 @@ class UpdateController(object):
                 arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
 
             if arakoon_metadata['internal'] is True:
-                config = ArakoonClusterConfig(cluster_id=cluster_name, ip=local_ip)
+                config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=local_ip)
                 if cluster == 'ovsdb':
                     arakoon_ovs_info['down'] = len(config.nodes) < 3
                     arakoon_ovs_info['name'] = arakoon_metadata['cluster_name']
@@ -381,22 +381,19 @@ class UpdateController(object):
         from ovs.extensions.generic.toolbox import ExtensionsToolbox
 
         # Remove services which have been renamed in the migration code
-        local_sr = System.get_my_storagerouter()
-        local_ip = local_sr.ip
-        local_client = SSHClient(endpoint=local_sr, username='root')
-        for version_file in local_client.file_list(directory='/opt/OpenvStorage/run'):
+        for version_file in client.file_list(directory='/opt/OpenvStorage/run'):
             if not version_file.endswith('.remove'):
                 continue
             packages = set()
-            contents = local_client.file_read(filename='/opt/OpenvStorage/run/{0}'.format(version_file))
+            contents = client.file_read(filename='/opt/OpenvStorage/run/{0}'.format(version_file))
             for part in contents.split(';'):
                 packages.add(part.split('=')[0])
             if packages.issubset(UpdateController._packages_core['storagedriver']) and 'storagedriver' in components:
                 service_name = version_file.replace('.remove', '').replace('.version', '')
                 UpdateController._logger.debug('{0}: Removing service {1}'.format(client.ip, service_name))
-                ServiceManager.stop_service(name=service_name, client=local_client)
-                ServiceManager.remove_service(name=service_name, client=local_client)
-                local_client.file_delete(filenames=['/opt/OpenvStorage/run/{0}'.format(version_file)])
+                ServiceManager.stop_service(name=service_name, client=client)
+                ServiceManager.remove_service(name=service_name, client=client)
+                client.file_delete(filenames=['/opt/OpenvStorage/run/{0}'.format(version_file)])
 
         # Verify whether certain services need to be restarted
         update_information = UpdateController.get_update_information_core({})
@@ -417,15 +414,15 @@ class UpdateController(object):
                     cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'arakoon-'))
                     if cluster_name == 'config':
                         master_ip = StorageRouterList.get_masters()[0].ip  # Any master node should be part of the internal 'cacc' cluster
-                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', ip=local_ip)
+                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', ip=master_ip)
                     else:
                         master_ip = None
                         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
                     if arakoon_metadata['internal'] is True:
-                        config = ArakoonClusterConfig(cluster_id=cluster_name, ip=master_ip)
-                        if local_ip in [node.ip for node in config.nodes]:
+                        config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=master_ip)
+                        if client.ip in [node.ip for node in config.nodes]:
                             UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
-                            ArakoonInstaller.restart_node(cluster_name=cluster_name,
+                            ArakoonInstaller.restart_node(metadata=arakoon_metadata,
                                                           client=client)
             UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
 

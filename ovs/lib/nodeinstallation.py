@@ -743,7 +743,8 @@ class NodeInstallationController(object):
             info = ArakoonInstaller.create_cluster(cluster_name=arakoon_config_cluster,
                                                    cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                                    ip=cluster_ip,
-                                                   base_dir='/opt/OpenvStorage/db')
+                                                   base_dir='/opt/OpenvStorage/db',
+                                                   locked=False)
             ArakoonInstaller.start_cluster(ip=cluster_ip,
                                            metadata=info['metadata'])
             contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
@@ -754,7 +755,7 @@ class NodeInstallationController(object):
             arakoon_cacc_cluster = 'cacc'
             ArakoonInstaller.claim_cluster(cluster_name=arakoon_cacc_cluster,
                                            ip=cluster_ip)
-            arakoon_config = ArakoonClusterConfig(cluster_id=arakoon_cacc_cluster, ip=cluster_ip)
+            arakoon_config = ArakoonClusterConfig(cluster_id=arakoon_cacc_cluster, source_ip=cluster_ip)
             arakoon_client = ArakoonInstaller.build_client(arakoon_config)
             arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, arakoon_config.export_ini())
 
@@ -781,7 +782,8 @@ class NodeInstallationController(object):
             result = ArakoonInstaller.create_cluster(cluster_name=arakoon_ovsdb_cluster,
                                                      cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
                                                      ip=cluster_ip,
-                                                     base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
+                                                     base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
+                                                     locked=False)
             metadata = result['metadata']
             arakoon_ports = result['ports']
             ArakoonInstaller.start_cluster(metadata=metadata)
