@@ -42,6 +42,7 @@ class MDSServices(unittest.TestCase):
         Configuration.set('/ovs/framework/logging|level', 'DEBUG')
         Configuration.set('/ovs/framework/logging|default_file', 'generic')
         Configuration.set('/ovs/framework/logging|default_name', 'logger')
+        self.maxDiff = None
 
     def tearDown(self):
         """
@@ -350,11 +351,11 @@ class MDSServices(unittest.TestCase):
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
 
         # Sub-Test 1: Validate the start configuration which is simple, each disk has only its default local master
-        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY | LOAD (in percent) |
-        # |    1   |       1       |   1   |     1      |      2       |    10    |       20,0        |
-        # |    2   |       2       |   1   |     1      |      2       |    10    |       20,0        |
-        # |    3   |       3       |   1   |     2      |      1       |    10    |       20,0        |
-        # |    4   |       4       |   1   |     2      |      1       |    10    |       20,0        |
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
+        # |    1   |       1       |   1   |     1      |      2       |    10    |
+        # |    2   |       2       |   1   |     1      |      2       |    10    |
+        # |    3   |       3       |   1   |     2      |      1       |    10    |
+        # |    4   |       4       |   1   |     2      |      1       |    10    |
         configs = [[{'ip': '10.0.0.1', 'port': 1}],
                    [{'ip': '10.0.0.1', 'port': 1}],
                    [{'ip': '10.0.0.2', 'port': 2}],
@@ -392,11 +393,11 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 3: Validating whether an overloaded node is correctly rebalanced
-        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY | LOAD (in percent) |
-        # |    1   |       1       |   1   |     1      |      2       |    10    |       20,0        |
-        # |    2   |       2       |   1   |     1      |      2       |    2     |      100,0        |
-        # |    3   |       3       |   1   |     2      |      1       |    10    |       20,0        |
-        # |    4   |       4       |   1   |     2      |      1       |    10    |       20,0        |
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
+        # |    1   |       1       |   1   |     1      |      2       |    10    |
+        # |    2   |       2       |   1   |     1      |      2       |    2     |
+        # |    3   |       3       |   1   |     2      |      1       |    10    |
+        # |    4   |       4       |   1   |     2      |      1       |    10    |
         mds_services[2].capacity = 2
         mds_services[2].save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
@@ -549,6 +550,16 @@ class MDSServices(unittest.TestCase):
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
 
         # Validate the start configuration which is simple, each disk has only its default local master
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
+        # |    1   |       1       |   1   |     1      |      2       |    10    |
+        # |    2   |       2       |   1   |     1      |      2       |    10    |
+        # |    3   |       2       |   1   |     1      |      2       |    10    |
+        # |    4   |       3       |   1   |     1      |      -       |    10    |
+        # |    5   |       4       |   1   |     1      |      3       |    10    |
+        # |    6   |       5       |   1   |     2      |      3       |    10    |
+        # |    7   |       5       |   1   |     2      |      3       |    10    |
+        # |    8   |       6       |   1   |     3      |      -       |    10    |
+        # |    9   |       7       |   1   |     3      |      1       |    10    |
         configs = [[{'ip': '10.0.0.1', 'port': 1}],
                    [{'ip': '10.0.0.2', 'port': 2}],
                    [{'ip': '10.0.0.2', 'port': 3}],
@@ -593,10 +604,20 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 7: Update 2 primary failure domains (Cannot be identical to secondary failure domains)
-        storagerouter_domains[3].domain = domains[3]
-        storagerouter_domains[6].domain = domains[2]
+        storagerouter_domains[3].domain = domains[3]  # sr 2: primary domain 1 -> 3
+        storagerouter_domains[6].domain = domains[2]  # sr 4: primary domain 1 -> 2
         storagerouter_domains[3].save()
         storagerouter_domains[6].save()
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
+        # |    1   |       1       |   1   |     1      |      2       |    10    |
+        # |    2   |       2       |   1   |    [3]     |      2       |    10    |
+        # |    3   |       2       |   1   |    [3]     |      2       |    10    |
+        # |    4   |       3       |   1   |     1      |      -       |    10    |
+        # |    5   |       4       |   1   |     2      |      3       |    10    |
+        # |    6   |       5       |   1   |     2      |      3       |    10    |
+        # |    7   |       5       |   1   |     2      |      3       |    10    |
+        # |    8   |       6       |   1   |     3      |      -       |    10    |
+        # |    9   |       7       |   1   |     3      |      1       |    10    |
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
@@ -620,8 +641,18 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 8: Update a secondary failure domain (Cannot be identical to primary failure domain)
-        storagerouter_domains[9].domain = domains[1]
+        storagerouter_domains[9].domain = domains[1]  # sr 5: sec domain 3 -> 1
         storagerouter_domains[9].save()
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
+        # |    1   |       1       |   1   |     1      |      2       |    10    |
+        # |    2   |       2       |   1   |     3      |      2       |    10    |
+        # |    3   |       2       |   1   |     3      |      2       |    10    |
+        # |    4   |       3       |   1   |     1      |      -       |    10    |
+        # |    5   |       4       |   1   |     2      |      3       |    10    |
+        # |    6   |       5       |   1   |     2      |     [1]      |    10    |
+        # |    7   |       5       |   1   |     2      |     [1]      |    10    |
+        # |    8   |       6       |   1   |     3      |      -       |    10    |
+        # |    9   |       7       |   1   |     3      |      1       |    10    |
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
@@ -650,6 +681,16 @@ class MDSServices(unittest.TestCase):
         srd.domain = domains[3]
         srd.storagerouter = storagerouters[3]
         srd.save()
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
+        # |    1   |       1       |   1   |     1      |      2       |    10    |
+        # |    2   |       2       |   1   |     3      |      2       |    10    |
+        # |    3   |       2       |   1   |     3      |      2       |    10    |
+        # |    4   |       3       |   1   |     1      |     [3]      |    10    |
+        # |    5   |       4       |   1   |     2      |      3       |    10    |
+        # |    6   |       5       |   1   |     2      |      1       |    10    |
+        # |    7   |       5       |   1   |     2      |      1       |    10    |
+        # |    8   |       6       |   1   |     3      |      -       |    10    |
+        # |    9   |       7       |   1   |     3      |      1       |    10    |
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
@@ -673,8 +714,18 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 10: Remove 2 secondary failure domains
-        storagerouter_domains[2].delete()
-        storagerouter_domains[12].delete()
+        storagerouter_domains[2].delete()   # sr 1: sec domain 2 -> -
+        storagerouter_domains[12].delete()  # sr 7: sec domain 1 -> -
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
+        # |    1   |       1       |   1   |     1      |     [-]      |    10    |
+        # |    2   |       2       |   1   |     3      |      2       |    10    |
+        # |    3   |       2       |   1   |     3      |      2       |    10    |
+        # |    4   |       3       |   1   |     1      |      3       |    10    |
+        # |    5   |       4       |   1   |     2      |      3       |    10    |
+        # |    6   |       5       |   1   |     2      |      1       |    10    |
+        # |    7   |       5       |   1   |     2      |      1       |    10    |
+        # |    8   |       6       |   1   |     3      |      -       |    10    |
+        # |    9   |       7       |   1   |     3      |     [-]      |    10    |
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
@@ -734,6 +785,16 @@ class MDSServices(unittest.TestCase):
 
         # Sub-Test 12: Reduce safety
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
+        # |    1   |       1       |   1   |     1      |      -       |    10    |
+        # |    2   |       2       |   1   |     3      |      2       |    10    |
+        # |    3   |       2       |   1   |     3      |      2       |    10    |
+        # |    4   |       3       |   1   |     1      |      3       |    10    |
+        # |    5   |       4       |   1   |     2      |      3       |    10    |
+        # |    6   |       5       |   1   |     2      |      1       |    10    |
+        # |    7   |       5       |   1   |     2      |      1       |    10    |
+        # |    8   |       6       |   1   |     3      |      -       |    10    |
+        # |    9   |       7       |   1   |     3      |      -       |    10    |
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 6}],
