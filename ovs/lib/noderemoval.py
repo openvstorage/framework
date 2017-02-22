@@ -68,7 +68,7 @@ class NodeRemovalController(object):
             if not re.match(SSHClient.IP_REGEX, node_ip):
                 raise ValueError('Invalid IP {0} specified'.format(node_ip))
 
-            storage_router_all = StorageRouterList.get_storagerouters()
+            storage_router_all = sorted(StorageRouterList.get_storagerouters(), key=lambda k: k.name)
             storage_router_masters = StorageRouterList.get_masters()
             storage_router_all_ips = set([storage_router.ip for storage_router in storage_router_all])
             storage_router_master_ips = set([storage_router.ip for storage_router in storage_router_masters])
@@ -94,16 +94,17 @@ class NodeRemovalController(object):
             for storage_router in storage_router_all:
                 try:
                     client = SSHClient(storage_router, username='root')
-                    if client.run(['pwd']):
-                        Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
-                        ip_client_map[storage_router.ip] = client
-                        if storage_router != storage_router_to_remove and storage_router.node_type == 'MASTER':
-                            master_ip = storage_router.ip
                 except (UnableToConnectException, NotAuthenticatedException):
                     Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
                     storage_routers_offline.append(storage_router)
                     if storage_router == storage_router_to_remove:
                         storage_router_to_remove_online = False
+                    continue
+
+                Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
+                ip_client_map[storage_router.ip] = client
+                if storage_router != storage_router_to_remove and storage_router.node_type == 'MASTER':
+                    master_ip = storage_router.ip
 
             if len(ip_client_map) == 0 or master_ip is None:
                 raise RuntimeError('Could not connect to any master node in the cluster')
@@ -148,6 +149,7 @@ class NodeRemovalController(object):
                 Toolbox.log(logger=NodeRemovalController._logger, messages='Abort removal', title=True)
                 sys.exit(1)
 
+            remove_asd_manager = True
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 if ServiceManager.has_service(name='asd-manager', client=client):
@@ -239,7 +241,7 @@ class NodeRemovalController(object):
                         loglevel='error')
             sys.exit(1)
 
-        if remove_asd_manager is True:
+        if remove_asd_manager is True and storage_router_to_remove_online is True:
             Toolbox.log(logger=NodeRemovalController._logger, messages='\nRemoving ASD Manager')
             with remote(storage_router_to_remove.ip, [os]) as rem:
                 rem.os.system('asd-manager remove --force-yes')
