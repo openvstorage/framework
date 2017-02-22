@@ -18,6 +18,7 @@ Disk module
 """
 
 import re
+import uuid
 from subprocess import check_output, CalledProcessError
 from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.os.os import OSManager
@@ -68,7 +69,7 @@ class DiskTools(object):
             end = 100
 
         if label_type == 'gpt':
-            command = "parted '{0}' -a optimal -s mkpart '{1}' '{2}%' '{3}%'".format(disk_alias, disk_alias.split('/')[-1], start, end)
+            command = "parted '{0}' -a optimal -s mkpart '{1}' '{2}%' '{3}%'".format(disk_alias, uuid.uuid4(), start, end)
         elif label_type == 'msdos':
             command = "parted '{0}' -a optimal -s mkpart primary ext4 '{1}%' '{2}%'".format(disk_alias, start, end)
         elif label_type == 'bsd':
