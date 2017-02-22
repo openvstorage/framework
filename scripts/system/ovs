@@ -154,24 +154,33 @@ print 'Done'"""
             if [ "$3" == "all" ] ; then
                 python -c """
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.service import ServiceManager
-for storagerouter in StorageRouterList.get_storagerouters():
+for storagerouter in sorted(StorageRouterList.get_storagerouters(), key=lambda k: k.name):
     print '{0} on {1}...'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)
-    ServiceManager.$1_service('watcher-framework', SSHClient(storagerouter, username='root'))
+    try:
+        client = SSHClient(storagerouter, username='root')
+    except UnableToConnectException:
+        print '{0} on {1}... failed (Node unreachable)'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)
+        continue
+    ServiceManager.$1_service('watcher-framework', client)
 print 'Done'"""
             else
                 python -c """
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.service import ServiceManager
 storagerouter = StorageRouterList.get_by_ip('$3')
 if storagerouter is None:
     print 'Could not find StorageRouter with ip $3'
 else:
     print '{0} on {1}...'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)
-    ServiceManager.$1_service('watcher-framework', SSHClient(storagerouter, username='root'))
-    print 'Done'"""
+    try:
+        client = SSHClient(storagerouter, username='root')
+        ServiceManager.$1_service('watcher-framework', client)
+        print 'Done'
+    except UnableToConnectException:
+        print '{0} on {1}... failed (Node unreachable)'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)"""
             fi
         else
             show_help
