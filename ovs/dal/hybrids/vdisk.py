@@ -291,9 +291,11 @@ class VDisk(DataObject):
             vdiskstatsdict['read_operations'] = pc.read_request_size.events()
             vdiskstatsdict['write_operations'] = pc.write_request_size.events()
             for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
-                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored',
-                        'partial_read_fast', 'partial_read_slow']:
+                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored']:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
+            for key in ['partial_read_fast', 'partial_read_slow']:
+                if hasattr(vdiskstats, key):
+                    vdiskstatsdict[key] = getattr(vdiskstats, key)
             # Do some more manual calculations
             block_size = self.metadata.get('lba_size', 0) * self.metadata.get('cluster_multiplier', 0)
             if block_size == 0:
