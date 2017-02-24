@@ -128,7 +128,8 @@ class StorageDriver(DataObject):
             sdstatsdict['read_operations'] = pc.read_request_size.events()
             sdstatsdict['write_operations'] = pc.write_request_size.events()
             for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
-                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored']:
+                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored',
+                        'partial_read_fast', 'partial_read_slow']:
                 sdstatsdict[key] = getattr(sdstats, key)
             # Do some more manual calculations
             block_size = 0
