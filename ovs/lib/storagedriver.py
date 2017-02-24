@@ -84,7 +84,7 @@ class StorageDriverController(object):
                 MDSServiceController.ensure_safety(disk)
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.cluster_registry_checkup', schedule=Schedule(minute='0', hour='0'))
+    @celery.task(name='ovs.storagedriver.cluster_registry_checkup', schedule=Schedule(minute='0', hour='0'), bind=True)
     @ensure_single(task_name='ovs.storagedriver.cluster_registry_checkup', mode='CHAINED')
     def cluster_registry_checkup():
         """
@@ -160,7 +160,7 @@ class StorageDriverController(object):
         return changed_vpools
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=Schedule(minute='15', hour='*'))
+    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=Schedule(minute='15', hour='*'), bind=True)
     def scheduled_voldrv_arakoon_checkup():
         """
         Makes sure the volumedriver arakoon is on all available master nodes
@@ -169,7 +169,7 @@ class StorageDriverController(object):
         StorageDriverController._voldrv_arakoon_checkup(False)
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.manual_voldrv_arakoon_checkup')
+    @celery.task(name='ovs.storagedriver.manual_voldrv_arakoon_checkup', bind=True)
     def manual_voldrv_arakoon_checkup():
         """
         Creates a new Arakoon Cluster if required and extends cluster if possible on all available master nodes

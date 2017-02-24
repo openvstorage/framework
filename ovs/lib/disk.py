@@ -35,13 +35,13 @@ class DiskController(object):
     _logger = LogHandler.get('lib', name='disk')
 
     @staticmethod
-    @celery.task(name='ovs.disk.sync_with_reality')
+    @celery.task(name='ovs.disk.sync_with_reality', bind=True)
     @ensure_single(task_name='ovs.disk.sync_with_reality', mode='CHAINED')
     def sync_with_reality(storagerouter_guid):
         """
-        Syncs the Disks from all StorageRouters with the reality.
+        Syncs the Disks from the StorageRouter specified with the reality.
 
-        CHANGES MADE TO THIS CODE SHOULD BE REFLECTED IN THE ASD-MANAGER list_disks CALL TOO!!!!!!!!!!!!!!!!!!!!
+        CHANGES MADE TO THIS CODE SHOULD BE REFLECTED IN THE ASD-MANAGER list_disks CALL TOO!
 
         :param storagerouter_guid: Guid of the Storage Router to synchronize
         :type storagerouter_guid: str

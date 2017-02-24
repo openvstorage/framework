@@ -93,19 +93,16 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 Tasks with different arguments will be executed in parallel
      - CHAINED: Identical as DEDUPED with the exception that all tasks will be executed in serial.
 
-    :param task_name:        Name of the task to ensure its singularity
-    :type task_name:         String
-
+    :param task_name: Name of the task to ensure its singularity
+    :type task_name: str
     :param extra_task_names: Extra tasks to take into account
-    :type extra_task_names:  List
-
-    :param mode:             Mode of the ensure single. Allowed values: DEFAULT, CHAINED
-    :type mode:              String
-
-    :param global_timeout:   Timeout before raising error (Only applicable in CHAINED mode)
-    :type global_timeout:    Integer
-
-    :return:                 Pointer to function
+    :type extra_task_names: list
+    :param mode: Mode of the ensure single. Allowed values: DEFAULT, CHAINED
+    :type mode: str
+    :param global_timeout: Timeout before raising error (Only applicable in CHAINED mode)
+    :type global_timeout: int
+    :return: Pointer to function
+    :rtype: func
     """
     logger = LogHandler.get('lib', name='ensure single')
 
@@ -114,9 +111,10 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
         Wrapper function
         :param function: Function to check
         """
-        def new_function(*args, **kwargs):
+        def new_function(self=None, *args, **kwargs):
             """
             Wrapped function
+            :param self: With bind=True, the celery task result itself is passed in
             :param args: Arguments without default values
             :param kwargs: Arguments with default values
             """
@@ -162,7 +160,11 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                     persistent_client.set(key, val)
                 return val
 
+            if not hasattr(self, 'request'):
+                raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
+
             now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
+            async_task = self.request.id is not None  # Async tasks have an ID, inline executed tasks have None as ID
             task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
             persistent_key = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)
             persistent_client = PersistentFactory.get_client()
@@ -215,12 +217,33 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                     if item['kwargs'] == kwargs_dict:
                         job_counter += 1
                         if job_counter == 2:  # 1st job with same params is being executed, 2nd is scheduled for execution ==> Discard current
-                            log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
-                            return None
+                            if async_task is True:  # Not waiting for other jobs to finish since asynchronously
+                                log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                                return None
+
+                            # Let's wait for 2nd job in queue to have finished
+                            if persistent_client.exists(persistent_key):
+                                counter = 0
+                                while counter < timeout:
+                                    log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
+                                    values = persistent_client.get(persistent_key)['values']
+                                    if item['timestamp'] not in [value['timestamp'] for value in values]:
+                                        return None
+                                    counter += 1
+                                    time.sleep(1)
+                                    if counter == timeout:
+                                        log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
+                                                    level='error')
+                                        raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                                                         now,
+                                                                                                                                                                         task_name,
+                                                                                                                                                                         timeout))
+
                 log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
                 update_value(key=persistent_key,
                              append=True,
-                             value_to_update={'kwargs': kwargs_dict})
+                             value_to_update={'kwargs': kwargs_dict,
+                                              'timestamp': now})
 
                 # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
                 counter = 0
@@ -242,13 +265,14 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                             finally:
                                 update_value(key=persistent_key,
                                              append=False,
-                                             value_to_update={'kwargs': kwargs_dict})
+                                             value_to_update=queued_jobs[0])
                         counter += 1
                         time.sleep(1)
                         if counter == timeout:
                             update_value(key=persistent_key,
                                          append=False,
-                                         value_to_update={'kwargs': kwargs_dict})
+                                         value_to_update={'kwargs': kwargs_dict,
+                                                          'timestamp': now})
                             log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
                                         level='error')
                             raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
@@ -261,7 +285,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                                 level='error')
                     raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
 
-                # Create key to be stored in arakoon and update kwargs with args
+                # Update kwargs with args
                 timeout = kwargs.pop('ensure_single_timeout') if 'ensure_single_timeout' in kwargs else global_timeout
                 function_info = inspect.getargspec(function)
                 kwargs_dict = {}
@@ -277,8 +301,28 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 # Validate whether another job with same params is being executed, skip if so
                 for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
                     if item['kwargs'] == kwargs_dict:
-                        log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
-                        return None
+                        if async_task is True:  # Not waiting for other jobs to finish since asynchronously
+                            log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                            return None
+
+                        # Let's wait for 2nd job in queue to have finished
+                        if persistent_client.exists(persistent_key):
+                            counter = 0
+                            while counter < timeout:
+                                log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
+                                values = persistent_client.get(persistent_key)['values']
+                                if item['timestamp'] not in [value['timestamp'] for value in values]:
+                                    return None
+                                counter += 1
+                                time.sleep(1)
+                                if counter == timeout:
+                                    log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
+                                                level='error')
+                                    raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                                                     now,
+                                                                                                                                                                     task_name,
+                                                                                                                                                                     timeout))
+
                 log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
                 update_value(key=persistent_key,
                              append=True,
@@ -294,7 +338,6 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                         first_element = value['values'][0]['timestamp'] if len(value['values']) > 0 else None
 
                     if first_element == now:
-                        output = None
                         try:
                             if counter != 0:
                                 current_time = int(time.time())
@@ -315,7 +358,9 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                     time.sleep(1)
                     if counter == timeout:
                         update_value(key=persistent_key,
-                                     append=False)
+                                     append=False,
+                                     value_to_update={'kwargs': kwargs_dict,
+                                                      'timestamp': now})
                         log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
                                     level='error')
                         raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,

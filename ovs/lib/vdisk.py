@@ -912,7 +912,7 @@ class VDiskController(object):
             raise Exception('Failed to update the values for vDisk {0}'.format(vdisk.name))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.dtl_checkup', schedule=Schedule(minute='15', hour='0,4,8,12,16,20'))
+    @celery.task(name='ovs.vdisk.dtl_checkup', schedule=Schedule(minute='15', hour='0,4,8,12,16,20'), bind=True)
     @ensure_single(task_name='ovs.vdisk.dtl_checkup', mode='DEDUPED')
     def dtl_checkup(vpool_guid=None, vdisk_guid=None, storagerouters_to_exclude=None):
         """

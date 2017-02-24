@@ -1337,7 +1337,7 @@ class StorageRouterController(object):
         storagerouter.save()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.configure_disk')
+    @celery.task(name='ovs.storagerouter.configure_disk', bind=True)
     @ensure_single(task_name='ovs.storagerouter.configure_disk', mode='CHAINED', global_timeout=1800)
     def configure_disk(storagerouter_guid, disk_guid, partition_guid, offset, size, roles):
         """

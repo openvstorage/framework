@@ -755,7 +755,7 @@ class MDSServiceController(object):
         return config_set
 
     @staticmethod
-    @celery.task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'))
+    @celery.task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), bind=True)
     @ensure_single(task_name='ovs.mds.mds_checkup', mode='CHAINED')
     def mds_checkup():
         """

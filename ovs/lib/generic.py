@@ -56,7 +56,7 @@ class GenericController(object):
     _logger = LogHandler.get('lib', name='generic tasks')
 
     @staticmethod
-    @celery.task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'))
+    @celery.task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'), bind=True)
     @ensure_single(task_name='ovs.generic.snapshot_all_vdisks', extra_task_names=['ovs.generic.delete_snapshots'])
     def snapshot_all_vdisks():
         """
@@ -84,7 +84,7 @@ class GenericController(object):
         return success, fail
 
     @staticmethod
-    @celery.task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'))
+    @celery.task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'), bind=True)
     @ensure_single(task_name='ovs.generic.delete_snapshots')
     def delete_snapshots(timestamp=None):
         """
@@ -199,7 +199,7 @@ class GenericController(object):
         GenericController._logger.info('Delete snapshots finished')
 
     @staticmethod
-    @celery.task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'))
+    @celery.task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), bind=True)
     @ensure_single(task_name='ovs.generic.execute_scrub')
     def execute_scrub():
         """
@@ -442,7 +442,7 @@ class GenericController(object):
             GenericController._logger.exception(message)
 
     @staticmethod
-    @celery.task(name='ovs.generic.collapse_arakoon', schedule=Schedule(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'))
+    @celery.task(name='ovs.generic.collapse_arakoon', schedule=Schedule(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'), bind=True)
     @ensure_single(task_name='ovs.generic.collapse_arakoon')
     def collapse_arakoon():
         """
@@ -496,7 +496,7 @@ class GenericController(object):
         GenericController._logger.info('Arakoon collapse finished')
 
     @staticmethod
-    @celery.task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'))
+    @celery.task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'), bind=True)
     @ensure_single(task_name='ovs.generic.refresh_package_information', mode='DEDUPED')
     def refresh_package_information():
         """
