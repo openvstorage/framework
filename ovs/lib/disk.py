@@ -19,12 +19,11 @@ DiskController module
 """
 import re
 import time
-from ovs.celery_run import celery
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.decorators import ovs_task
 from ovs.log.log_handler import LogHandler
 
 
@@ -35,8 +34,7 @@ class DiskController(object):
     _logger = LogHandler.get('lib', name='disk')
 
     @staticmethod
-    @celery.task(name='ovs.disk.sync_with_reality', bind=True)
-    @ensure_single(task_name='ovs.disk.sync_with_reality', mode='CHAINED')
+    @ovs_task(name='ovs.disk.sync_with_reality', ensure_single_info={'mode': 'CHAINED'})
     def sync_with_reality(storagerouter_guid):
         """
         Syncs the Disks from the StorageRouter specified with the reality.

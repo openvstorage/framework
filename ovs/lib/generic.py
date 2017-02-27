@@ -25,7 +25,6 @@ from datetime import datetime, timedelta
 from Queue import Empty, Queue
 from threading import Thread
 from time import mktime
-from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.vdisk import VDisk
@@ -41,7 +40,7 @@ from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
-from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
@@ -56,8 +55,7 @@ class GenericController(object):
     _logger = LogHandler.get('lib', name='generic tasks')
 
     @staticmethod
-    @celery.task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'), bind=True)
-    @ensure_single(task_name='ovs.generic.snapshot_all_vdisks', extra_task_names=['ovs.generic.delete_snapshots'])
+    @ovs_task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'), ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['ovs.generic.delete_snapshots']})
     def snapshot_all_vdisks():
         """
         Snapshots all vDisks
@@ -84,8 +82,7 @@ class GenericController(object):
         return success, fail
 
     @staticmethod
-    @celery.task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'), bind=True)
-    @ensure_single(task_name='ovs.generic.delete_snapshots')
+    @ovs_task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'), ensure_single_info={'mode': 'DEFAULT'})
     def delete_snapshots(timestamp=None):
         """
         Delete snapshots & scrubbing policy
@@ -199,8 +196,7 @@ class GenericController(object):
         GenericController._logger.info('Delete snapshots finished')
 
     @staticmethod
-    @celery.task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), bind=True)
-    @ensure_single(task_name='ovs.generic.execute_scrub')
+    @ovs_task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), ensure_single_info={'mode': 'DEFAULT'})
     def execute_scrub():
         """
         Retrieve and execute scrub work
@@ -442,8 +438,7 @@ class GenericController(object):
             GenericController._logger.exception(message)
 
     @staticmethod
-    @celery.task(name='ovs.generic.collapse_arakoon', schedule=Schedule(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'), bind=True)
-    @ensure_single(task_name='ovs.generic.collapse_arakoon')
+    @ovs_task(name='ovs.generic.collapse_arakoon', schedule=Schedule(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'), ensure_single_info={'mode': 'DEFAULT'})
     def collapse_arakoon():
         """
         Collapse Arakoon's Tlogs
@@ -496,8 +491,7 @@ class GenericController(object):
         GenericController._logger.info('Arakoon collapse finished')
 
     @staticmethod
-    @celery.task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'), bind=True)
-    @ensure_single(task_name='ovs.generic.refresh_package_information', mode='DEDUPED')
+    @ovs_task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'), ensure_single_info={'mode': 'DEDUPED'})
     def refresh_package_information():
         """
         Retrieve and store the package information of all StorageRouters
@@ -549,7 +543,7 @@ class GenericController(object):
             raise Exception(' - {0}'.format('\n - '.join(errors)))
 
     @staticmethod
-    @celery.task(name='ovs.generic.run_backend_domain_hooks')
+    @ovs_task(name='ovs.generic.run_backend_domain_hooks')
     def run_backend_domain_hooks(backend_guid):
         """
         Run hooks when the Backend Domains have been updated

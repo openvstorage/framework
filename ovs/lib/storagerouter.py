@@ -24,7 +24,6 @@ import time
 from ConfigParser import RawConfigParser
 from subprocess import CalledProcessError
 from StringIO import StringIO
-from ovs.celery_run import celery
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
@@ -53,7 +52,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
-from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
@@ -74,7 +73,7 @@ class StorageRouterController(object):
     storagerouterclient.Logger.enableLogging()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.ping')
+    @ovs_task(name='ovs.storagerouter.ping')
     def ping(storagerouter_guid, timestamp):
         """
         Update a Storage Router's celery heartbeat
@@ -90,7 +89,7 @@ class StorageRouterController(object):
                 storagerouter.save()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_metadata')
+    @ovs_task(name='ovs.storagerouter.get_metadata')
     def get_metadata(storagerouter_guid):
         """
         Gets physical information about the machine this task is running on
@@ -170,7 +169,7 @@ class StorageRouterController(object):
                 'scrub_available': StorageRouterController._check_scrub_partition_present()}
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.add_vpool')
+    @ovs_task(name='ovs.storagerouter.add_vpool')
     def add_vpool(parameters):
         """
         Add a vPool to the machine this task is running on
@@ -885,7 +884,7 @@ class StorageRouterController(object):
         StorageRouterController._logger.info('Add vPool {0} ended successfully'.format(vpool_name))
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.remove_storagedriver')
+    @ovs_task(name='ovs.storagerouter.remove_storagedriver')
     def remove_storagedriver(storagedriver_guid, offline_storage_router_guids=None):
         """
         Removes a Storage Driver (if its the last Storage Driver for a vPool, the vPool is removed as well)
@@ -1187,7 +1186,7 @@ class StorageRouterController(object):
             vpool.save()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_version_info')
+    @ovs_task(name='ovs.storagerouter.get_version_info')
     def get_version_info(storagerouter_guid):
         """
         Returns version information regarding a given StorageRouter
@@ -1201,7 +1200,7 @@ class StorageRouterController(object):
                 'versions': PackageManager.get_installed_versions(client)}
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_support_info')
+    @ovs_task(name='ovs.storagerouter.get_support_info')
     def get_support_info(storagerouter_guid):
         """
         Returns support information regarding a given StorageRouter
@@ -1217,7 +1216,7 @@ class StorageRouterController(object):
                 'enablesupport': Configuration.get('ovs/framework/support|enablesupport')}
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_support_metadata')
+    @ovs_task(name='ovs.storagerouter.get_support_metadata')
     def get_support_metadata():
         """
         Returns support metadata for a given storagerouter. This should be a routed task!
@@ -1225,7 +1224,7 @@ class StorageRouterController(object):
         return SupportAgent().get_heartbeat_data()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_logfiles')
+    @ovs_task(name='ovs.storagerouter.get_logfiles')
     def get_logfiles(local_storagerouter_guid):
         """
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
@@ -1248,7 +1247,7 @@ class StorageRouterController(object):
         return logfilename
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.configure_support')
+    @ovs_task(name='ovs.storagerouter.configure_support')
     def configure_support(enable, enable_support):
         """
         Configures support on all StorageRouters
@@ -1282,7 +1281,7 @@ class StorageRouterController(object):
         return True
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.mountpoint_exists')
+    @ovs_task(name='ovs.storagerouter.mountpoint_exists')
     def mountpoint_exists(name, storagerouter_guid):
         """
         Checks whether a given mountpoint for a vPool exists
@@ -1297,7 +1296,7 @@ class StorageRouterController(object):
         return client.dir_exists(directory='/mnt/{0}'.format(name))
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.refresh_hardware')
+    @ovs_task(name='ovs.storagerouter.refresh_hardware')
     def refresh_hardware(storagerouter_guid):
         """
         Refreshes all hardware related information
@@ -1337,8 +1336,7 @@ class StorageRouterController(object):
         storagerouter.save()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.configure_disk', bind=True)
-    @ensure_single(task_name='ovs.storagerouter.configure_disk', mode='CHAINED', global_timeout=1800)
+    @ovs_task(name='ovs.storagerouter.configure_disk', ensure_single_info={'mode': 'CHAINED', 'global_timeout': 1800})
     def configure_disk(storagerouter_guid, disk_guid, partition_guid, offset, size, roles):
         """
         Configures a partition

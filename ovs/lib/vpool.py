@@ -18,9 +18,8 @@
 VPool module
 """
 
-from ovs.celery_run import celery
 from ovs.dal.lists.storagedriverlist import StorageDriverList
-from ovs.lib.helpers.decorators import log
+from ovs.lib.helpers.decorators import log, ovs_task
 
 
 class VPoolController(object):
@@ -29,7 +28,7 @@ class VPoolController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.vpool.up_and_running')
+    @ovs_task(name='ovs.vpool.up_and_running')
     @log('VOLUMEDRIVER_TASK')
     def up_and_running(storagedriver_id):
         """

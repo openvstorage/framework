@@ -17,7 +17,7 @@
 """
 Contains various decorators
 """
-
+import os
 import json
 import time
 import random
@@ -75,7 +75,33 @@ def log(event_type):
     return wrap
 
 
-def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeout=300):
+def ovs_task(**kwargs):
+    """
+    Decorator to execute celery tasks in OVS
+    These tasks can be wrapped additionally in the ensure single decorator
+    """
+    if 'name' not in kwargs:
+        raise ValueError('Name is a mandatory keyword argument for the ovs_task decorator')
+
+    def wrapper(f):
+        """
+        Wrapper function
+        """
+        from ovs.celery_run import celery
+
+        ensure_single_info = kwargs.pop('ensure_single_info', {})
+        if ensure_single_info != {} and os.environ.get('RUNNING_UNITTESTS') != 'True':
+            mode = ensure_single_info.pop('mode', None)
+            if mode is None:
+                raise ValueError('Mode is a mandatory keyword argument for the _ensure_single decorator')
+            f = _ensure_single(task_name=kwargs['name'], mode=str(mode), **ensure_single_info)(f)
+            kwargs['bind'] = True
+        f = celery.task(**kwargs)(f)
+        return f
+    return wrapper
+
+
+def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300):
     """
     Decorator ensuring a new task cannot be started in case a certain task is
     running, scheduled or reserved.
@@ -111,7 +137,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
         Wrapper function
         :param function: Function to check
         """
-        def new_function(self=None, *args, **kwargs):
+        def new_function(self, *args, **kwargs):
             """
             Wrapped function
             :param self: With bind=True, the celery task result itself is passed in
@@ -139,8 +165,9 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 :return:                Updated value
                 """
                 with volatile_mutex(name=key, wait=5):
-                    if persistent_client.exists(key):
-                        val = persistent_client.get(key)
+                    vals = list(persistent_client.get_multi([key], must_exist=False))
+                    if vals[0] is not None:
+                        val = vals[0]
                         if append is True and value_to_update is not None:
                             val['values'].append(value_to_update)
                         elif append is False and value_to_update is not None:
@@ -222,22 +249,23 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                                 return None
 
                             # Let's wait for 2nd job in queue to have finished
-                            if persistent_client.exists(persistent_key):
-                                counter = 0
-                                while counter < timeout:
-                                    log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
-                                    values = persistent_client.get(persistent_key)['values']
-                                    if item['timestamp'] not in [value['timestamp'] for value in values]:
-                                        return None
-                                    counter += 1
-                                    time.sleep(1)
-                                    if counter == timeout:
-                                        log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
-                                                    level='error')
-                                        raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
-                                                                                                                                                                         now,
-                                                                                                                                                                         task_name,
-                                                                                                                                                                         timeout))
+                            counter = 0
+                            while counter < timeout:
+                                log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
+                                values = list(persistent_client.get_multi([persistent_key], must_exist=False))
+                                if values[0] is None:
+                                    return None  # All pending jobs have been deleted in the meantime, no need to wait
+                                if item['timestamp'] not in [value['timestamp'] for value in values[0]['values']]:
+                                    return None  # Similar tasks have been executed, so sync task currently waiting can return without having been executed
+                                counter += 1
+                                time.sleep(1)
+                                if counter == timeout:
+                                    log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
+                                                level='error')
+                                    raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                                                     now,
+                                                                                                                                                                     task_name,
+                                                                                                                                                                     timeout))
 
                 log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
                 update_value(key=persistent_key,
@@ -248,9 +276,9 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
                 counter = 0
                 while counter < timeout:
-                    if persistent_client.exists(persistent_key):
-                        values = persistent_client.get(persistent_key)['values']
-                        queued_jobs = [v for v in values if v['kwargs'] == kwargs_dict]
+                    values = list(persistent_client.get_multi([persistent_key], must_exist=False))
+                    if values[0] is not None:
+                        queued_jobs = [v for v in values[0]['values'] if v['kwargs'] == kwargs_dict]
                         if len(queued_jobs) == 1:
                             try:
                                 if counter != 0:
@@ -306,22 +334,23 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                             return None
 
                         # Let's wait for 2nd job in queue to have finished
-                        if persistent_client.exists(persistent_key):
-                            counter = 0
-                            while counter < timeout:
-                                log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
-                                values = persistent_client.get(persistent_key)['values']
-                                if item['timestamp'] not in [value['timestamp'] for value in values]:
-                                    return None
-                                counter += 1
-                                time.sleep(1)
-                                if counter == timeout:
-                                    log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
-                                                level='error')
-                                    raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
-                                                                                                                                                                     now,
-                                                                                                                                                                     task_name,
-                                                                                                                                                                     timeout))
+                        counter = 0
+                        while counter < timeout:
+                            log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
+                            values = list(persistent_client.get_multi([persistent_key], must_exist=False))
+                            if values[0] is None:
+                                return None  # All pending jobs have been deleted in the meantime, no need to wait
+                            if item['timestamp'] not in [value['timestamp'] for value in values[0]['values']]:
+                                return None  # Similar tasks have been executed, so sync task currently waiting can return without having been executed
+                            counter += 1
+                            time.sleep(1)
+                            if counter == timeout:
+                                log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
+                                            level='error')
+                                raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                                                 now,
+                                                                                                                                                                 task_name,
+                                                                                                                                                                 timeout))
 
                 log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
                 update_value(key=persistent_key,
@@ -333,8 +362,9 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 first_element = None
                 counter = 0
                 while counter < timeout:
-                    if persistent_client.exists(persistent_key):
-                        value = persistent_client.get(persistent_key)
+                    values = list(persistent_client.get_multi([persistent_key], must_exist=False))
+                    if values[0] is not None:
+                        value = values[0]
                         first_element = value['values'][0]['timestamp'] if len(value['values']) > 0 else None
 
                     if first_element == now:
