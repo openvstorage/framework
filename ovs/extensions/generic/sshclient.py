@@ -31,6 +31,7 @@ import select
 import socket
 import logging
 import tempfile
+import warnings
 import unicodedata
 from subprocess import CalledProcessError, PIPE, Popen
 from ovs.dal.helpers import Descriptor
@@ -201,6 +202,7 @@ class SSHClient(object):
         from paramiko import AuthenticationException
         try:
             try:
+                warnings.simplefilter('ignore')
                 self._client.connect(self.ip, username=self.username, password=self.password)
             except:
                 try:
@@ -208,6 +210,8 @@ class SSHClient(object):
                 except:
                     pass
                 raise
+            finally:
+                warnings.resetwarnings()
         except socket.error as ex:
             message = str(ex)
             if 'No route to host' in message or 'Unable to connect' in message:
