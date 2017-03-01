@@ -30,7 +30,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'
-    THIS_VERSION = 15
+    THIS_VERSION = 16
 
     def __init__(self):
         """ Init method """
@@ -338,5 +338,28 @@ class OVSMigrator(object):
                             if DiskPartition.ROLES.DTL not in junction_partition.partition.roles:
                                 junction_partition.partition.roles.append(DiskPartition.ROLES.DTL)
                                 junction_partition.partition.save()
+
+            # Version 16: Addition of 'ExecReload' for AlbaProxy SystemD services
+            getattr(ServiceManager, 'has_service')  # Invoke ServiceManager to fill out the ImplementationClass (default None)
+            if ServiceManager.ImplementationClass == Systemd:  # Upstart does not have functionality to reload a process' configuration
+                changed_clients = set()
+                for storagedriver in StorageDriverList.get_storagedrivers():
+                    root_client = sr_client_map[storagedriver.storagerouter_guid]
+                    for alba_proxy in storagedriver.alba_proxies:
+                        service = alba_proxy.service
+                        if not ServiceManager.has_service(name=service.name, client=root_client):
+                            continue
+                        if 'ExecReload=' in root_client.file_read(filename='/lib/systemd/system/ovs-{0}.service'.format(service.name)):
+                            continue
+
+                        changed_clients.add(root_client)
+                        service_key = '/ovs/framework/hosts/{0}/services/{1}'.format(storagedriver.storagerouter.machine_id, service.name)
+                        # No need to edit the service version file, since this change only requires a daemon-reload
+                        ServiceManager.add_service(name='ovs-albaproxy',
+                                                   client=root_client,
+                                                   params=Configuration.get(service_key),
+                                                   target_name='ovs-{0}'.format(service.name))
+                for root_client in changed_clients:
+                    root_client.run(['systemctl', 'daemon-reload'])
 
         return OVSMigrator.THIS_VERSION
