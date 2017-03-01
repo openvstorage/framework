@@ -316,7 +316,8 @@ class VDisk(DataObject):
                 if hasattr(pc, counter):
                     counter_object = getattr(pc, counter)
                     for method, target in info.iteritems():
-                        statsdict[target] = getattr(counter_object, method)()
+                        if hasattr(counter_object, method):
+                            statsdict[target] = getattr(counter_object, method)()
 
             for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
                         'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored',
