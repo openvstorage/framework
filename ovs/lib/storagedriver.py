@@ -158,7 +158,9 @@ class StorageDriverController(object):
         return changed_vpools
 
     @staticmethod
-    @ovs_task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=Schedule(minute='15', hour='*'), ensure_single_info={'mode': 'DEFAULT'})
+    @ovs_task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup',
+              schedule=Schedule(minute='15', hour='*'),
+              ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['ovs.storagedriver.manual_voldrv_arakoon_checkup']})
     def scheduled_voldrv_arakoon_checkup():
         """
         Makes sure the volumedriver arakoon is on all available master nodes
@@ -167,7 +169,8 @@ class StorageDriverController(object):
         StorageDriverController._voldrv_arakoon_checkup(False)
 
     @staticmethod
-    @ovs_task(name='ovs.storagedriver.manual_voldrv_arakoon_checkup', ensure_single_info={'mode': 'DEFAULT'})
+    @ovs_task(name='ovs.storagedriver.manual_voldrv_arakoon_checkup',
+              ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['ovs.storagedriver.scheduled_voldrv_arakoon_checkup']})
     def manual_voldrv_arakoon_checkup():
         """
         Creates a new Arakoon Cluster if required and extends cluster if possible on all available master nodes

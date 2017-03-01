@@ -80,9 +80,6 @@ def ovs_task(**kwargs):
     Decorator to execute celery tasks in OVS
     These tasks can be wrapped additionally in the ensure single decorator
     """
-    if 'name' not in kwargs:
-        raise ValueError('Name is a mandatory keyword argument for the ovs_task decorator')
-
     def wrapper(f):
         """
         Wrapper function
@@ -92,16 +89,13 @@ def ovs_task(**kwargs):
         ensure_single_info = kwargs.pop('ensure_single_info', {})
         if ensure_single_info != {} and os.environ.get('RUNNING_UNITTESTS') != 'True':
             mode = ensure_single_info.pop('mode', None)
-            if mode is None:
-                raise ValueError('Mode is a mandatory keyword argument for the _ensure_single decorator')
             f = _ensure_single(task_name=kwargs['name'], mode=str(mode), **ensure_single_info)(f)
             kwargs['bind'] = True
-        f = celery.task(**kwargs)(f)
-        return f
+        return celery.task(**kwargs)(f)
     return wrapper
 
 
-def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300):
+def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, callback=None):
     """
     Decorator ensuring a new task cannot be started in case a certain task is
     running, scheduled or reserved.
@@ -127,6 +121,8 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300):
     :type mode: str
     :param global_timeout: Timeout before raising error (Only applicable in CHAINED mode)
     :type global_timeout: int
+    :param callback: Call back function which will be executed if identical task in progress
+    :type callback: func
     :return: Pointer to function
     :rtype: func
     """
@@ -201,8 +197,13 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300):
                     for task in task_names:
                         key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
                         if persistent_client.exists(key_to_check):
-                            log_message('Execution of task {0} discarded'.format(task_name))
-                            return None
+                            if callback is None:
+                                log_message('Execution of task {0} discarded'.format(task_name))
+                                return None
+                            else:
+                                log_message('Execution of task {0} in progress, executing callback function {1}'.format(task_name, callback.__name__))
+                                return callback(*args, **kwargs)
+
                     log_message('Setting key {0}'.format(persistent_key))
                     persistent_client.set(persistent_key, {'mode': mode})
 
@@ -221,8 +222,12 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300):
                         for task in extra_task_names:
                             key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
                             if persistent_client.exists(key_to_check):
-                                log_message('Execution of task {0} discarded'.format(task_name))
-                                return None
+                                if callback is None:
+                                    log_message('Execution of task {0} discarded'.format(task_name))
+                                    return None
+                                else:
+                                    log_message('Execution of task {0} in progress, executing callback function {1}'.format(task_name, callback.__name__))
+                                    return callback(*args, **kwargs)
                     log_message('Setting key {0}'.format(persistent_key))
 
                 # Update kwargs with args
@@ -245,8 +250,12 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300):
                         job_counter += 1
                         if job_counter == 2:  # 1st job with same params is being executed, 2nd is scheduled for execution ==> Discard current
                             if async_task is True:  # Not waiting for other jobs to finish since asynchronously
-                                log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
-                                return None
+                                if callback is None:
+                                    log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                                    return None
+                                else:
+                                    log_message('Execution of task {0} {1} in progress, executing callback function {2}'.format(task_name, params_info, callback.__name__))
+                                    return callback(*args, **kwargs)
 
                             # Let's wait for 2nd job in queue to have finished
                             counter = 0
@@ -330,8 +339,12 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300):
                 for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
                     if item['kwargs'] == kwargs_dict:
                         if async_task is True:  # Not waiting for other jobs to finish since asynchronously
-                            log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
-                            return None
+                            if callback is None:
+                                log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                                return None
+                            else:
+                                log_message('Execution of task {0} {1} in progress, executing callback function {2}'.format(task_name, params_info, callback.__name__))
+                                return callback(*args, **kwargs)
 
                         # Let's wait for 2nd job in queue to have finished
                         counter = 0
