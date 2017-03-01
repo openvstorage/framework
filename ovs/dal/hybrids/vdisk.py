@@ -357,7 +357,7 @@ class VDisk(DataObject):
         prev_key = '{0}_{1}'.format(key, 'statistics_previous')
         previous_stats = volatile.get(prev_key, default={})
         for key in current_stats.keys():
-            if key == 'timestamp'or '_latency' in key or '_distribution' in key:
+            if key == 'timestamp' or '_latency' in key or '_distribution' in key:
                 continue
             delta = current_stats['timestamp'] - previous_stats.get('timestamp', current_stats['timestamp'])
             if delta < 0:
