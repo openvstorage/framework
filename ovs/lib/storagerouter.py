@@ -551,7 +551,7 @@ class StorageRouterController(object):
         ##############################
         # Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
         # Once the free space on a mountpoint is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
-        # make sure that <backoff_gap> free space is available ==> backoff_gap must be >= size of the mountpoint
+        # make sure that <backoff_gap> free space is available ==> backoff_gap must be <= size of the partition
         # Both backoff_gap and trigger_gap apply to each mountpoint individually, but cannot be configured on a per mountpoint base
 
         # Calculate WRITE / FRAG cache

@@ -392,13 +392,11 @@ class Toolbox(object):
                  1024: ['B', 'KiB', 'MiB', 'GiB', 'TiB']}[multiplier]
 
         counter = 0
-        negative = size != abs(size)
+        negative = size < 0
         size = abs(size)
-        while size >= multiplier:
+        while size >= multiplier and counter < 4:
             size /= float(multiplier)
             counter += 1
-        if counter > 4:
-            raise ValueError('Only up until TiB is supported')
 
         size = size * -1 if negative is True else size * 1
         return '{{0:.{0}f}}{{1}}'.format(decimals).format(size, units[counter])
