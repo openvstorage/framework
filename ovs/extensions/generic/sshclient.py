@@ -202,7 +202,9 @@ class SSHClient(object):
         from paramiko import AuthenticationException
         try:
             try:
-                warnings.simplefilter('ignore')
+                warnings.filterwarnings(action='ignore',
+                                        message='.*CTR mode needs counter parameter.*',
+                                        category=FutureWarning)
                 self._client.connect(self.ip, username=self.username, password=self.password)
             except:
                 try:
@@ -210,8 +212,6 @@ class SSHClient(object):
                 except:
                     pass
                 raise
-            finally:
-                warnings.resetwarnings()
         except socket.error as ex:
             message = str(ex)
             if 'No route to host' in message or 'Unable to connect' in message:
