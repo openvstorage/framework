@@ -19,18 +19,17 @@ Celery beat module
 """
 
 import os
+import imp
 import time
 import cPickle
 import inspect
-import imp
-from celery.beat import Scheduler
 from celery import current_app
-from celery.schedules import crontab
-from celery.schedules import timedelta
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.exceptions import KeyNotFoundException
-from ovs.extensions.generic.volatilemutex import volatile_mutex
+from celery.beat import Scheduler
+from celery.schedules import crontab, timedelta
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.storage.exceptions import KeyNotFoundException
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 

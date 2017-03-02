@@ -24,7 +24,6 @@ import uuid
 import pickle
 import random
 from Queue import Queue
-from ovs.celery_run import celery
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.domain import Domain
@@ -43,7 +42,7 @@ from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volat
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        SRCObjectNotFoundException, StorageDriverClient, StorageDriverConfiguration
-from ovs.lib.helpers.decorators import ensure_single, log
+from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
@@ -61,7 +60,7 @@ class VDiskController(object):
     storagerouterclient.Logger.enableLogging()
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.list_volumes')
+    @ovs_task(name='ovs.vdisk.list_volumes')
     def list_volumes(vpool_guid=None):
         """
         List all known volumes on a specific vpool or on all
@@ -113,7 +112,7 @@ class VDiskController(object):
                 VDiskController.clean_vdisk_from_model(vdisk)
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.delete_from_voldrv')
+    @ovs_task(name='ovs.vdisk.delete_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(volume_id):
         """
@@ -131,7 +130,7 @@ class VDiskController(object):
                 VDiskController._logger.info('Volume {0} does not exist'.format(volume_id))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.delete')
+    @ovs_task(name='ovs.vdisk.delete')
     def delete(vdisk_guid):
         """
         Delete a vDisk through API
@@ -146,7 +145,7 @@ class VDiskController(object):
         VDiskController.delete_from_voldrv(vdisk.volume_id)
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.extend')
+    @ovs_task(name='ovs.vdisk.extend')
     def extend(vdisk_guid, volume_size):
         """
         Extend a vDisk through API
@@ -173,7 +172,7 @@ class VDiskController(object):
         VDiskController._logger.info('Extended vDisk {0} to {1}B'.format(vdisk.name, volume_size))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.resize_from_voldrv')
+    @ovs_task(name='ovs.vdisk.resize_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def resize_from_voldrv(volume_id, volume_size, volume_path, storagedriver_id):
         """
@@ -209,7 +208,7 @@ class VDiskController(object):
             VDiskController.vdisk_checkup(vdisk)
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.migrate_from_voldrv')
+    @ovs_task(name='ovs.vdisk.migrate_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def migrate_from_voldrv(volume_id, new_owner_id):
         """
@@ -231,7 +230,7 @@ class VDiskController(object):
             VDiskController.dtl_checkup(vdisk_guid=vdisk.guid)
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.rename_from_voldrv')
+    @ovs_task(name='ovs.vdisk.rename_from_voldrv')
     def rename_from_voldrv(old_path, new_path, storagedriver_id):
         """
         Processes a rename event from the volumedriver. At this point we only expect folder renames. These folders
@@ -265,7 +264,7 @@ class VDiskController(object):
                         VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.clone')
+    @ovs_task(name='ovs.vdisk.clone')
     def clone(vdisk_guid, name, snapshot_id=None, storagerouter_guid=None, pagecache_ratio=None):
         """
         Clone a vDisk
@@ -362,7 +361,7 @@ class VDiskController(object):
                 'backingdevice': devicename}
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.create_snapshot')
+    @ovs_task(name='ovs.vdisk.create_snapshot')
     def create_snapshot(vdisk_guid, metadata):
         """
         Create a vDisk snapshot
@@ -382,7 +381,7 @@ class VDiskController(object):
         return vdisk_result[1]
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.create_snapshots')
+    @ovs_task(name='ovs.vdisk.create_snapshots')
     def create_snapshots(vdisk_guids, metadata):
         """
         Create vDisk snapshots
@@ -420,7 +419,7 @@ class VDiskController(object):
         return results
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.delete_snapshot')
+    @ovs_task(name='ovs.vdisk.delete_snapshot')
     def delete_snapshot(vdisk_guid, snapshot_id):
         """
         Delete a vDisk snapshot
@@ -436,7 +435,7 @@ class VDiskController(object):
             raise RuntimeError(vdisk_result[1])
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.delete_snapshots')
+    @ovs_task(name='ovs.vdisk.delete_snapshots')
     def delete_snapshots(snapshot_mapping):
         """
         Delete vDisk snapshots
@@ -468,7 +467,7 @@ class VDiskController(object):
         return results
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.set_as_template')
+    @ovs_task(name='ovs.vdisk.set_as_template')
     def set_as_template(vdisk_guid):
         """
         Set a vDisk as template
@@ -494,7 +493,7 @@ class VDiskController(object):
         vdisk.invalidate_dynamics(['is_vtemplate', 'info'])
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.move')
+    @ovs_task(name='ovs.vdisk.move')
     def move(vdisk_guid, target_storagerouter_guid, force=False):
         """
         Move a vDisk to the specified StorageRouter
@@ -533,7 +532,7 @@ class VDiskController(object):
             VDiskController._logger.exception('Executing post-migrate actions failed for vDisk {0}'.format(vdisk.name))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.rollback')
+    @ovs_task(name='ovs.vdisk.rollback')
     def rollback(vdisk_guid, timestamp):
         """
         Rolls back a vDisk based on a given vDisk snapshot timestamp
@@ -555,7 +554,7 @@ class VDiskController(object):
         return True
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.create_from_template')
+    @ovs_task(name='ovs.vdisk.create_from_template')
     def create_from_template(vdisk_guid, name, storagerouter_guid=None, pagecache_ratio=None):
         """
         Create a vDisk from a template
@@ -629,7 +628,7 @@ class VDiskController(object):
                 'backingdevice': devicename}
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.create_new')
+    @ovs_task(name='ovs.vdisk.create_new')
     def create_new(volume_name, volume_size, storagedriver_guid, pagecache_ratio=1.0):
         """
         Create a new vDisk/volume using hypervisor calls
@@ -692,7 +691,7 @@ class VDiskController(object):
         return new_vdisk.guid
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.get_config_params')
+    @ovs_task(name='ovs.vdisk.get_config_params')
     def get_config_params(vdisk_guid):
         """
         Retrieve the configuration parameters for the given vDisk from the storagedriver.
@@ -738,7 +737,7 @@ class VDiskController(object):
                 'pagecache_ratio': vdisk.pagecache_ratio}
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.set_config_params')
+    @ovs_task(name='ovs.vdisk.set_config_params')
     def set_config_params(vdisk_guid, new_config_params):
         """
         Sets configuration parameters for a given vDisk.
@@ -912,8 +911,7 @@ class VDiskController(object):
             raise Exception('Failed to update the values for vDisk {0}'.format(vdisk.name))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.dtl_checkup', schedule=Schedule(minute='15', hour='0,4,8,12,16,20'))
-    @ensure_single(task_name='ovs.vdisk.dtl_checkup', mode='DEDUPED')
+    @ovs_task(name='ovs.vdisk.dtl_checkup', schedule=Schedule(minute='15', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'DEDUPED'})
     def dtl_checkup(vpool_guid=None, vdisk_guid=None, storagerouters_to_exclude=None):
         """
         Check DTL for all volumes, for all volumes of a vPool or for 1 specific volume
@@ -1191,7 +1189,7 @@ class VDiskController(object):
         VDiskController._logger.info('DTL checkup ended')
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.dtl_state_transition')
+    @ovs_task(name='ovs.vdisk.dtl_state_transition')
     @log('VOLUMEDRIVER_TASK')
     def dtl_state_transition(volume_id, old_state, new_state, storagedriver_id):
         """
@@ -1216,7 +1214,7 @@ class VDiskController(object):
                                             ensure_single_timeout=600)
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.schedule_backend_sync')
+    @ovs_task(name='ovs.vdisk.schedule_backend_sync')
     def schedule_backend_sync(vdisk_guid):
         """
         Schedule a backend sync on a vDisk
@@ -1234,7 +1232,7 @@ class VDiskController(object):
             raise Exception('Scheduling backend sync failed for vDisk {0}'.format(vdisk.name))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.is_volume_synced_up_to_tlog')
+    @ovs_task(name='ovs.vdisk.is_volume_synced_up_to_tlog')
     def is_volume_synced_up_to_tlog(vdisk_guid, tlog_name):
         """
         Verify if a volume is synced up to a specific tlog
@@ -1253,7 +1251,7 @@ class VDiskController(object):
             raise Exception('Verifying if vDisk {0} is synced up to tlog failed'.format(vdisk.name))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.is_volume_synced_up_to_snapshot')
+    @ovs_task(name='ovs.vdisk.is_volume_synced_up_to_snapshot')
     def is_volume_synced_up_to_snapshot(vdisk_guid, snapshot_id):
         """
         Verify if a volume is synced up to a specific snapshot
@@ -1272,7 +1270,7 @@ class VDiskController(object):
             raise Exception('Verifying if vDisk {0} is synced up to snapshot failed'.format(vdisk.name))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.scrub_single_vdisk')
+    @ovs_task(name='ovs.vdisk.scrub_single_vdisk')
     def scrub_single_vdisk(vdisk_guid, storagerouter_guid):
         """
         Scrubs a given vDisk on a given StorageRouter
@@ -1300,7 +1298,7 @@ class VDiskController(object):
             raise RuntimeError('Error when scrubbing vDisk {0}:\n- {1}'.format(vdisk.guid, '\n- '.join(error_messages)))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.restart')
+    @ovs_task(name='ovs.vdisk.restart')
     def restart(vdisk_guid, force):
         """
         Restart the given vDisk
@@ -1322,7 +1320,7 @@ class VDiskController(object):
         vdisk.invalidate_dynamics(['info', 'dtl_status'])
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.sync_with_reality')
+    @ovs_task(name='ovs.vdisk.sync_with_reality')
     def sync_with_reality(vpool_guid=None):
         """
         Syncs vDisks in the model with reality

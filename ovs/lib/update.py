@@ -21,14 +21,12 @@ import copy
 import time
 import inspect
 from subprocess import CalledProcessError
-from ovs.celery_run import celery
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.filemutex import file_mutex
-from ovs.extensions.generic.filemutex import NoLockAvailableException
+from ovs.extensions.generic.filemutex import file_mutex, NoLockAvailableException
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -37,9 +35,9 @@ from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.lib.helpers.decorators import add_hooks
-from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.generic import GenericController
+from ovs.lib.helpers.decorators import add_hooks, ovs_task
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 
 
@@ -440,7 +438,7 @@ class UpdateController(object):
     # CELERY TASKS #
     ################
     @staticmethod
-    @celery.task(name='ovs.update.merge_package_information')
+    @ovs_task(name='ovs.update.merge_package_information')
     def merge_package_information():
         """
         Retrieve the package information from the model for both StorageRouters and ALBA Nodes and merge it
@@ -458,7 +456,7 @@ class UpdateController(object):
         return package_info
 
     @staticmethod
-    @celery.task(name='ovs.update.get_update_metadata')
+    @ovs_task(name='ovs.update.get_update_metadata')
     def get_update_metadata(storagerouter_ip):
         """
         Returns metadata required for updating
@@ -505,7 +503,7 @@ class UpdateController(object):
                 'update_ongoing': update_ongoing}
 
     @staticmethod
-    @celery.task(name='ovs.update.get_update_information')
+    @ovs_task(name='ovs.update.get_update_information')
     def get_update_information_all():
         """
         Retrieve the update information for all StorageRouters
@@ -527,7 +525,7 @@ class UpdateController(object):
         return information
 
     @staticmethod
-    @celery.task(name='ovs.update.update_components')
+    @ovs_task(name='ovs.update.update_components')
     def update_components(components):
         """
         Initiate the update through commandline for all StorageRouters

@@ -295,7 +295,7 @@ class NodeTypeController(object):
             # Copy rabbitmq cookie
             rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
 
-            Toolbox.log(logger=NodeTypeController._logger, messages='Copying Rabbit MQ cookie')
+            Toolbox.log(logger=NodeTypeController._logger, messages='Copying RabbitMQ cookie')
             contents = master_client.file_read(rabbitmq_cookie_file)
             master_hostname, _ = master_client.get_hostname()
             target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
