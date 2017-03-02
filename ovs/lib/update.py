@@ -364,6 +364,17 @@ class UpdateController(object):
         return abort
 
     @staticmethod
+    @add_hooks('update', 'post_update_single')
+    def _post_update_async_migrator(components=None):
+        _ = components
+        try:
+            # noinspection PyUnresolvedReferences
+            from ovs.lib.migration import MigrationController
+            MigrationController.migrate.s().apply_async(countdown=30)
+        except ImportError:
+            UpdateController._logger.error('Could not import MigrationController.')
+
+    @staticmethod
     @add_hooks('update', 'post_update_multi')
     def _post_update_core(client, components):
         """
