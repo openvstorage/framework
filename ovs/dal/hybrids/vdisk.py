@@ -216,11 +216,8 @@ class VDisk(DataObject):
         Fetches the Statistics for the vDisk.
         """
         statistics = {}
-        for key in StorageDriverClient.STAT_KEYS:
-            statistics[key] = 0
-            statistics['{0}_ps'.format(key)] = 0
         for key, value in self.fetch_statistics().iteritems():
-            statistics[key] += value
+            statistics[key] = value
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
@@ -279,37 +276,73 @@ class VDisk(DataObject):
             except Exception as ex:
                 VDisk._logger.error('Error loading statistics_volume from {0}: {1}'.format(self.volume_id, ex))
         # Load volumedriver data in dictionary
-        vdiskstatsdict = {}
+        return VDisk.extract_statistics(vdiskstats, self)
+
+    @staticmethod
+    def extract_statistics(stats, vdisk):
+        statsdict = {}
         try:
-            pc = vdiskstats.performance_counters
-            vdiskstatsdict['backend_data_read'] = pc.backend_read_request_size.sum()
-            vdiskstatsdict['backend_data_written'] = pc.backend_write_request_size.sum()
-            vdiskstatsdict['backend_read_operations'] = pc.backend_read_request_size.events()
-            vdiskstatsdict['backend_write_operations'] = pc.backend_write_request_size.events()
-            vdiskstatsdict['data_read'] = pc.read_request_size.sum()
-            vdiskstatsdict['data_written'] = pc.write_request_size.sum()
-            vdiskstatsdict['read_operations'] = pc.read_request_size.events()
-            vdiskstatsdict['write_operations'] = pc.write_request_size.events()
+            pc = stats.performance_counters
+            for counter, info in {'backend_read_request_size': {'sum': 'backend_data_read',
+                                                                'events': 'backend_read_operations',
+                                                                'distribution': 'backend_read_operations_distribution'},
+                                  'backend_read_request_usecs': {'sum': 'backend_read_latency',
+                                                                 'distribution': 'backend_read_latency_distribution'},
+                                  'backend_write_request_size': {'sum': 'backend_data_written',
+                                                                 'events': 'backend_write_operations',
+                                                                 'distribution': 'backend_write_operations_distribution'},
+                                  'backend_write_request_usecs': {'sum': 'backend_write_latency',
+                                                                  'distribution': 'backend_write_latency_distribution'},
+                                  'read_request_size': {'sum': 'data_read',
+                                                        'events': 'read_operations',
+                                                        'distribution': 'read_operations_distribution'},
+                                  'read_request_usecs': {'sum': 'read_latency',
+                                                         'distribution': 'read_latency_distribution'},
+                                  'write_request_size': {'sum': 'data_written',
+                                                         'events': 'write_operations',
+                                                         'distribution': 'write_operations_distribution'},
+                                  'write_request_usecs': {'sum': 'write_latency',
+                                                          'distribution': 'write_latency_distribution'},
+                                  'unaligned_read_request_size': {'sum': 'unaligned_data_read',
+                                                                  'events': 'unaligned_read_operations',
+                                                                  'distribution': 'unaligned_read_operations_distribution'},
+                                  'unaligned_read_request_usecs': {'sum': 'unaligned_read_latency',
+                                                                   'distribution': 'unaligned_read_latency_distribution'},
+                                  'unaligned_write_request_size': {'sum': 'unaligned_data_written',
+                                                                   'events': 'unaligned_write_operations',
+                                                                   'distribution': 'unaligned_write_operations_distribution'},
+                                  'unaligned_write_request_usecs': {'sum': 'unaligned_write_latency',
+                                                                    'distribution': 'unaligned_write_latency_distribution'}}.iteritems():
+                if hasattr(pc, counter):
+                    counter_object = getattr(pc, counter)
+                    for method, target in info.iteritems():
+                        if hasattr(counter_object, method):
+                            statsdict[target] = getattr(counter_object, method)()
+
             for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
-                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored']:
-                vdiskstatsdict[key] = getattr(vdiskstats, key)
-            for key in ['partial_read_fast', 'partial_read_slow']:
-                if hasattr(vdiskstats, key):
-                    vdiskstatsdict[key] = getattr(vdiskstats, key)
+                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored',
+                        'partial_read_fast', 'partial_read_slow']:
+                if hasattr(stats, key):
+                    statsdict[key] = getattr(stats, key)
             # Do some more manual calculations
-            block_size = self.metadata.get('lba_size', 0) * self.metadata.get('cluster_multiplier', 0)
+            block_size = 0
+            if vdisk is not None:
+                block_size = vdisk.metadata.get('lba_size', 0) * vdisk.metadata.get('cluster_multiplier', 0)
             if block_size == 0:
                 block_size = 4096
-            vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size
-            vdiskstatsdict['4k_write_operations'] = vdiskstatsdict['data_written'] / block_size
+            for key, source in {'4k_read_operations': 'data_read',
+                                '4k_write_operations': 'data_written',
+                                '4k_unaligned_read_operations': 'unaligned_data_read',
+                                '4k_unaligned_write_operations': 'unaligned_data_written'}.iteritems():
+                statsdict[key] = statsdict.get(source, 0) / block_size
             # Pre-calculate sums
             for key, items in StorageDriverClient.STAT_SUMS.iteritems():
-                vdiskstatsdict[key] = 0
+                statsdict[key] = 0
                 for item in items:
-                    vdiskstatsdict[key] += vdiskstatsdict[item]
+                    statsdict[key] += statsdict[item]
         except:
             pass
-        return vdiskstatsdict
+        return statsdict
 
     @staticmethod
     def calculate_delta(key, dynamic, current_stats):
@@ -324,14 +357,15 @@ class VDisk(DataObject):
         prev_key = '{0}_{1}'.format(key, 'statistics_previous')
         previous_stats = volatile.get(prev_key, default={})
         for key in current_stats.keys():
-            if key in StorageDriverClient.STAT_KEYS:
-                delta = current_stats['timestamp'] - previous_stats.get('timestamp', current_stats['timestamp'])
-                if delta < 0:
-                    current_stats['{0}_ps'.format(key)] = 0
-                elif delta == 0:
-                    current_stats['{0}_ps'.format(key)] = previous_stats.get('{0}_ps'.format(key), 0)
-                else:
-                    current_stats['{0}_ps'.format(key)] = max(0, (current_stats[key] - previous_stats[key]) / delta)
+            if key == 'timestamp' or '_latency' in key or '_distribution' in key:
+                continue
+            delta = current_stats['timestamp'] - previous_stats.get('timestamp', current_stats['timestamp'])
+            if delta < 0:
+                current_stats['{0}_ps'.format(key)] = 0
+            elif delta == 0:
+                current_stats['{0}_ps'.format(key)] = previous_stats.get('{0}_ps'.format(key), 0)
+            else:
+                current_stats['{0}_ps'.format(key)] = max(0, (current_stats[key] - previous_stats[key]) / delta)
         volatile.set(prev_key, current_stats, dynamic.timeout * 10)
 
     def reload_client(self, client):

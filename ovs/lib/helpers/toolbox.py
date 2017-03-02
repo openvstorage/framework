@@ -368,6 +368,39 @@ class Toolbox(object):
             except:
                 Toolbox.log(logger=logger, messages='Password invalid or could not connect to this node')
 
+    @staticmethod
+    def convert_to_human_readable(size, multiplier=1024, decimals=0):
+        """
+        Convert the specified size (in bytes) to human readable format
+        :param size: Size to be converted
+        :type size: int
+        :param multiplier: Multiplier to use. Either 1000 or 1024
+        :type multiplier: int
+        :param decimals: Amount of decimals returned
+        :type decimals: int
+        :return: Human readable form of the size
+        :rtype: str
+        """
+        Toolbox.verify_required_params(actual_params={'size': size,
+                                                      'decimals': decimals,
+                                                      'multiplier': multiplier},
+                                       required_params={'size': (int, None),
+                                                        'decimals': (int, range(6)),
+                                                        'multiplier': (int, [1000, 1024])})
+
+        units = {1000: ['B', 'KB', 'MB', 'GB', 'TB'],
+                 1024: ['B', 'KiB', 'MiB', 'GiB', 'TiB']}[multiplier]
+
+        counter = 0
+        negative = size < 0
+        size = abs(size)
+        while size >= multiplier and counter < 4:
+            size /= float(multiplier)
+            counter += 1
+
+        size = size * -1 if negative is True else size * 1
+        return '{{0:.{0}f}}{{1}}'.format(decimals).format(size, units[counter])
+
 
 class Schedule(object):
     """

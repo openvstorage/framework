@@ -31,6 +31,7 @@ import select
 import socket
 import logging
 import tempfile
+import warnings
 import unicodedata
 from subprocess import CalledProcessError, PIPE, Popen
 from ovs.dal.helpers import Descriptor
@@ -201,6 +202,9 @@ class SSHClient(object):
         from paramiko import AuthenticationException
         try:
             try:
+                warnings.filterwarnings(action='ignore',
+                                        message='.*CTR mode needs counter parameter.*',
+                                        category=FutureWarning)
                 self._client.connect(self.ip, username=self.username, password=self.password)
             except:
                 try:
