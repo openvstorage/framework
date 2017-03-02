@@ -88,8 +88,7 @@ def ovs_task(**kwargs):
 
         ensure_single_info = kwargs.pop('ensure_single_info', {})
         if ensure_single_info != {} and os.environ.get('RUNNING_UNITTESTS') != 'True':
-            mode = ensure_single_info.pop('mode', None)
-            f = _ensure_single(task_name=kwargs['name'], mode=str(mode), **ensure_single_info)(f)
+            f = _ensure_single(task_name=kwargs['name'], **ensure_single_info)(f)
             kwargs['bind'] = True
         return celery.task(**kwargs)(f)
     return wrapper
@@ -197,11 +196,11 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                     for task in task_names:
                         key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
                         if persistent_client.exists(key_to_check):
-                            if callback is None:
+                            if async_task is True or callback is None:
                                 log_message('Execution of task {0} discarded'.format(task_name))
                                 return None
                             else:
-                                log_message('Execution of task {0} in progress, executing callback function {1}'.format(task_name, callback.__name__))
+                                log_message('Execution of task {0} in progress, executing callback function'.format(task_name))
                                 return callback(*args, **kwargs)
 
                     log_message('Setting key {0}'.format(persistent_key))
@@ -213,25 +212,17 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                     return output
                 finally:
                     with volatile_mutex(persistent_key, wait=5):
-                        if persistent_client.exists(persistent_key):
-                            log_message('Deleting key {0}'.format(persistent_key))
-                            persistent_client.delete(persistent_key)
+                        log_message('Deleting key {0}'.format(persistent_key))
+                        persistent_client.delete(persistent_key, must_exist=False)
+
             elif mode == 'DEDUPED':
-                with volatile_mutex(persistent_key, wait=5):
-                    if extra_task_names is not None:
-                        for task in extra_task_names:
-                            key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
-                            if persistent_client.exists(key_to_check):
-                                if callback is None:
-                                    log_message('Execution of task {0} discarded'.format(task_name))
-                                    return None
-                                else:
-                                    log_message('Execution of task {0} in progress, executing callback function {1}'.format(task_name, callback.__name__))
-                                    return callback(*args, **kwargs)
-                    log_message('Setting key {0}'.format(persistent_key))
+                if extra_task_names is not None:
+                    log_message('Extra tasks are not allowed in this mode',
+                                level='error')
+                    raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
 
                 # Update kwargs with args
-                timeout = kwargs.pop('ensure_single_timeout') if 'ensure_single_timeout' in kwargs else global_timeout
+                timeout = kwargs.pop('ensure_single_timeout', global_timeout)
                 function_info = inspect.getargspec(function)
                 kwargs_dict = {}
                 for index, arg in enumerate(args):
@@ -250,14 +241,15 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                         job_counter += 1
                         if job_counter == 2:  # 1st job with same params is being executed, 2nd is scheduled for execution ==> Discard current
                             if async_task is True:  # Not waiting for other jobs to finish since asynchronously
-                                if callback is None:
-                                    log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
-                                    return None
-                                else:
-                                    log_message('Execution of task {0} {1} in progress, executing callback function {2}'.format(task_name, params_info, callback.__name__))
-                                    return callback(*args, **kwargs)
+                                log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                                return None
 
-                            # Let's wait for 2nd job in queue to have finished
+                            # If executed inline (sync), execute callback if any provided
+                            if callback is not None:
+                                log_message('Execution of task {0} {1} in progress, executing callback function'.format(task_name, params_info))
+                                return callback(*args, **kwargs)
+
+                            # Let's wait for 2nd job in queue to have finished if no callback provided
                             counter = 0
                             while counter < timeout:
                                 log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
@@ -303,19 +295,20 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                 update_value(key=persistent_key,
                                              append=False,
                                              value_to_update=queued_jobs[0])
-                        counter += 1
-                        time.sleep(1)
-                        if counter == timeout:
-                            update_value(key=persistent_key,
-                                         append=False,
-                                         value_to_update={'kwargs': kwargs_dict,
-                                                          'timestamp': now})
-                            log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
-                                        level='error')
-                            raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
-                                                                                                                                                             now,
-                                                                                                                                                             task_name,
-                                                                                                                                                             timeout))
+                    counter += 1
+                    time.sleep(1)
+                    if counter == timeout:
+                        update_value(key=persistent_key,
+                                     append=False,
+                                     value_to_update={'kwargs': kwargs_dict,
+                                                      'timestamp': now})
+                        log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
+                                    level='error')
+                        raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                                         now,
+                                                                                                                                                         task_name,
+                                                                                                                                                         timeout))
+
             elif mode == 'CHAINED':
                 if extra_task_names is not None:
                     log_message('Extra tasks are not allowed in this mode',
@@ -323,7 +316,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                     raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
 
                 # Update kwargs with args
-                timeout = kwargs.pop('ensure_single_timeout') if 'ensure_single_timeout' in kwargs else global_timeout
+                timeout = kwargs.pop('ensure_single_timeout', global_timeout)
                 function_info = inspect.getargspec(function)
                 kwargs_dict = {}
                 for index, arg in enumerate(args):
@@ -339,14 +332,15 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
                     if item['kwargs'] == kwargs_dict:
                         if async_task is True:  # Not waiting for other jobs to finish since asynchronously
-                            if callback is None:
-                                log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
-                                return None
-                            else:
-                                log_message('Execution of task {0} {1} in progress, executing callback function {2}'.format(task_name, params_info, callback.__name__))
-                                return callback(*args, **kwargs)
+                            log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                            return None
 
-                        # Let's wait for 2nd job in queue to have finished
+                        # If executed inline (sync), execute callback if any provided
+                        if callback is not None:
+                            log_message('Execution of task {0} {1} in progress, executing callback function'.format(task_name, params_info))
+                            return callback(*args, **kwargs)
+
+                        # Let's wait for 2nd job in queue to have finished if no callback provided
                         counter = 0
                         while counter < timeout:
                             log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))

@@ -482,7 +482,16 @@ class StorageRouterController(object):
                 break
 
         if arakoon_service_found is False:
-            StorageDriverController.manual_voldrv_arakoon_checkup()
+            counter = 0
+            while counter < 120:
+                if StorageDriverController.manual_voldrv_arakoon_checkup() is True:
+                    break
+                counter += 1
+                time.sleep(1)
+                if counter == 120:
+                    vpool.status = VPool.STATUSES.FAILURE
+                    vpool.save()
+                    raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
 
         # Verify SD arakoon cluster is available and 'in_use'
         root_client = ip_client_map[storagerouter.ip]['root']

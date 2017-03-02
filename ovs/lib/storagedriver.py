@@ -174,9 +174,11 @@ class StorageDriverController(object):
     def manual_voldrv_arakoon_checkup():
         """
         Creates a new Arakoon Cluster if required and extends cluster if possible on all available master nodes
-        :return: None
+        :return: True if task completed, None if task was discarded (by decorator)
+        :rtype: bool|None
         """
         StorageDriverController._voldrv_arakoon_checkup(True)
+        return True
 
     @staticmethod
     @ovs_task(name='ovs.storagedriver.refresh_configuration')
