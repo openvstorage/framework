@@ -19,8 +19,7 @@ MigrationController module
 """
 import copy
 import json
-from ovs.celery_run import celery
-from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 
@@ -33,8 +32,7 @@ class MigrationController(object):
     _logger = LogHandler.get('lib', name='migrations')
 
     @staticmethod
-    @celery.task(name='ovs.migration.migrate', schedule=Schedule(minute='0', hour='6'))
-    @ensure_single(task_name='ovs.migration.migrate')
+    @ovs_task(name='ovs.migration.migrate', schedule=Schedule(minute='0', hour='6'), ensure_single_info={'mode': 'DEFAULT'})
     def migrate():
         """
         Executes async migrations. It doesn't matter too much when they are executed, as long as they get eventually
