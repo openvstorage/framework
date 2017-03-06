@@ -27,6 +27,7 @@ from requests.packages.urllib3 import disable_warnings
 from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import SNIMissingWarning
+from ovs.log.log_handler import LogHandler
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 
@@ -59,6 +60,7 @@ class OVSClient(object):
     """
     Represents the OVS client
     """
+    _logger = LogHandler.get('extensions', name='api')
 
     disable_warnings(InsecurePlatformWarning)
     disable_warnings(InsecureRequestWarning)
@@ -252,12 +254,19 @@ class OVSClient(object):
         """
         start = time.time()
         finished = False
+        previous_metadata = None
         while finished is False:
             if timeout is not None and timeout < (time.time() - start):
                 raise RuntimeError('Waiting for task {0} has timed out.'.format(task_id))
             task_metadata = self.get('/tasks/{0}/'.format(task_id))
             finished = task_metadata['status'] in ('FAILURE', 'SUCCESS')
             if finished is False:
+                if task_metadata != previous_metadata:
+                    OVSClient._logger.debug('Waiting for task {0}, got: {1}'.format(task_id, task_metadata))
+                    previous_metadata = task_metadata
+                else:
+                    OVSClient._logger.debug('Still waiting for task {0}...'.format(task_id))
                 time.sleep(1)
             else:
+                OVSClient._logger.debug('Task {0} finished, got: {1}'.format(task_id, task_metadata))
                 return task_metadata['successful'], task_metadata['result']
