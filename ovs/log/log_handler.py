@@ -106,12 +106,17 @@ class LogHandler(object):
         self._key = '{0}_{1}'.format(source, name)
 
     @staticmethod
-    def load_target_definition(source, allow_override=False):
+    def load_target_definition(source, allow_override=False, forced_target_type=None):
         """
         Load the logger target
         :param source: Source
+        :type source: str
         :param allow_override: Allow override
+        :type allow_override: bool
+        :param forced_target_type: Override target type
+        :type forced_target_type: str
         :return: Target definition
+        :rtype: dict
         """
         logging_target = {'type': 'console'}
         try:
@@ -123,6 +128,8 @@ class LogHandler(object):
         target_type = logging_target.get('type', 'console')
         if allow_override is True and 'OVS_LOGTYPE_OVERRIDE' in os.environ:
             target_type = os.environ['OVS_LOGTYPE_OVERRIDE']
+        if allow_override is True and forced_target_type is not None:
+            target_type = forced_target_type
 
         if target_type == 'redis':
             queue = logging_target.get('queue', '/ovs/logging')
@@ -138,14 +145,19 @@ class LogHandler(object):
         return {'type': 'console'}
 
     @staticmethod
-    def get_sink_path(source, allow_override=False):
+    def get_sink_path(source, allow_override=False, forced_target_type=None):
         """
         Retrieve the path to sink logs to
         :param source: Source
+        :type source: str
         :param allow_override: Allow override
+        :type allow_override: bool
+        :param forced_target_type: Override target type
+        :type forced_target_type: str
         :return: The path to sink to
+        :rtype: str
         """
-        target_definition = LogHandler.load_target_definition(source, allow_override)
+        target_definition = LogHandler.load_target_definition(source, allow_override, forced_target_type)
         if target_definition['type'] == 'redis':
             sink = 'redis://{0}:{1}{2}'.format(target_definition['host'], target_definition['port'], target_definition['queue'])
         elif target_definition['type'] == 'file':
