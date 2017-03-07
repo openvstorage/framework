@@ -126,6 +126,11 @@ class VDiskTest(unittest.TestCase):
         capacity = vdisk_1.storagedriver_client.get_metadata_cache_capacity(str(vdisk_1.volume_id))
         self.assertEqual(capacity, 2048)
 
+        # Small volumes and pagecache_ratio
+        vdisk_small = VDisk(VDiskController.create_new(volume_name='vdisk_small', volume_size=1024 * 8, storagedriver_guid=storagedrivers[1].guid))
+        capacity = vdisk_small.storagedriver_client.get_metadata_cache_capacity(str(vdisk_small.volume_id))
+        self.assertEqual(capacity, 1)
+
     def test_dtl_target(self):
         """
         Validates whether the DTL target is set to sane values, despite incorrect values being passed in

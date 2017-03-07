@@ -19,6 +19,7 @@ Module for VDiskController
 """
 import os
 import re
+import math
 import time
 import uuid
 import pickle
@@ -1414,7 +1415,7 @@ class VDiskController(object):
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
         metadata_page_size = float(StorageDriverClient.METADATA_PAGE_CAPACITY * cluster_size)
-        cache_capacity = int(vdisk.size / metadata_page_size * ratio)
+        cache_capacity = int(math.ceil(vdisk.size / metadata_page_size * ratio))
 
         max_cache_capacity = int(2 * 1024 ** 4 / metadata_page_size)
         cache_capacity = min(max_cache_capacity, cache_capacity)
