@@ -166,7 +166,10 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 """
                 if level not in ('info', 'warning', 'debug', 'error', 'exception'):
                     raise ValueError('Unsupported log level "{0}" specified'.format(level))
-                complete_message = 'Ensure single {0} mode - ID {1} - {2}'.format(mode, now, message)
+                if unittest_mode is False:
+                    complete_message = 'Ensure single {0} mode - ID {1} - {2}'.format(mode, now, message)
+                else:
+                    complete_message = 'Ensure single {0} mode - ID {1} - {2} - {3}'.format(mode, now, threading.current_thread().getName(), message)
                 getattr(logger, level)(complete_message)
 
             def update_value(key, append, value_to_update=None):
@@ -248,6 +251,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                     raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
 
                 # Update kwargs with args
+                sleep = 1 if unittest_mode is False else 0.1
                 timeout = kwargs.pop('ensure_single_timeout', 10 if unittest_mode is True else global_timeout)
                 function_info = inspect.getargspec(function)
                 kwargs_dict = {}
@@ -280,9 +284,9 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                 return callback(*args, **kwargs)
 
                             # Let's wait for 2nd job in queue to have finished if no callback provided
-                            counter = 0
-                            while counter < timeout:
-                                log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
+                            slept = 0
+                            while slept < timeout:
+                                log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, slept + sleep))
                                 values = list(persistent_client.get_multi([persistent_key], must_exist=False))
                                 if values[0] is None:
                                     if unittest_mode is True:
@@ -292,9 +296,9 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                     if unittest_mode is True:
                                         Decorators.unittest_thread_info_by_name[thread_name] = ('WAITED', None)
                                     return None  # Similar tasks have been executed, so sync task currently waiting can return without having been executed
-                                counter += 1
-                                time.sleep(1)
-                                if counter >= timeout:
+                                slept += sleep
+                                time.sleep(sleep)
+                                if slept >= timeout:
                                     log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
                                                 level='error')
                                     if unittest_mode is True:
@@ -314,8 +318,8 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                               'timestamp': now})
 
                 # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
-                counter = 0
-                while counter < timeout:
+                slept = 0
+                while slept < timeout:
                     values = list(persistent_client.get_multi([persistent_key], must_exist=False))
                     if values[0] is not None:
                         queued_jobs = [v for v in values[0]['values'] if v['kwargs'] == kwargs_dict]
@@ -325,12 +329,10 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                     Decorators.unittest_thread_info_by_state['WAITING'].append(thread_name)
                         else:
                             try:
-                                if counter != 0:
-                                    current_time = int(time.time())
-                                    starting_time = int(now.split('_')[0])
+                                if slept != 0:
                                     log_message('Task {0} {1} had to wait {2} seconds before being able to start'.format(task_name,
                                                                                                                          params_info,
-                                                                                                                         current_time - starting_time))
+                                                                                                                         slept))
                                 if unittest_mode is True:
                                     Decorators.unittest_thread_info_by_name[thread_name] = ('EXECUTING', None)
                                 output = function(*args, **kwargs)
@@ -343,9 +345,9 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                 update_value(key=persistent_key,
                                              append=False,
                                              value_to_update=queued_jobs[0])
-                    counter += 1
-                    time.sleep(1)
-                    if counter >= timeout:
+                    slept += sleep
+                    time.sleep(sleep)
+                    if slept >= timeout:
                         update_value(key=persistent_key,
                                      append=False,
                                      value_to_update={'kwargs': kwargs_dict,
@@ -427,11 +429,9 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                     if first_element == now:
                         try:
                             if counter != 0:
-                                current_time = int(time.time())
-                                starting_time = int(now.split('_')[0])
                                 log_message('Task {0} {1} had to wait {2} seconds before being able to start'.format(task_name,
                                                                                                                      params_info,
-                                                                                                                     current_time - starting_time))
+                                                                                                                     counter))
                             output = function(*args, **kwargs)
                             log_message('Task {0} finished successfully'.format(task_name))
                         except Exception:

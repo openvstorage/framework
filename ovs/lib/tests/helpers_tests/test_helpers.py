@@ -59,11 +59,18 @@ class Helpers(unittest.TestCase):
             except Exception as ex:
                 exceptions.append(ex.message)
 
+    @staticmethod
+    def _wait_for(condition, timeout):
+        start = time.time()
+        while condition() is True:
+            time.sleep(0.01)
+            if time.time() > start + timeout:
+                raise RuntimeError('Waiting for condition timed out')
+
     def test_ensure_single_decorator_deduped(self):
         """
         Tests Helpers._ensure_single functionality in DEDUPED mode
         """
-
         # DECORATED FUNCTIONS
         @ovs_task(name='unittest_task', ensure_single_info={'mode': 'DEDUPED', 'extra_task_names': []})
         def _function_w_extra_task_names():
@@ -81,10 +88,10 @@ class Helpers(unittest.TestCase):
                 helpers['waiter'].wait()
             elif helpers['event'] is not None:
                 count = 0
-                while helpers['event'].is_set() is False and count < 100:
-                    time.sleep(0.05)
+                while helpers['event'].is_set() is False and count < 500:
+                    time.sleep(0.01)
                     count += 1
-                    if count == 100:
+                    if count == 500:
                         raise Exception('Event was not set in due time')
             else:
                 raise ValueError('At least 1 helper needs to be specified')
@@ -112,27 +119,17 @@ class Helpers(unittest.TestCase):
         thread9 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_wo_callback_sync_timeout', args=(_function_wo_callback, False), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
         thread10 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_sync_wait_for_async', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
 
-        # Start thread1
-        counter = 0
-        thread1.start()
-        while ('success_async_initial_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['success_async_initial_delayed'][0] != 'EXECUTING') and counter < 20:
-            time.sleep(0.05)
-            counter += 1
+        thread1.start()  # Start initial thread and wait for it to be EXECUTING
+        Helpers._wait_for(timeout=5, condition=lambda: ('finished_async_initial_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['finished_async_initial_delayed'][0] != 'EXECUTING'))
 
         # Start thread2, which should timeout because thread1 is still executing
-        counter = 0
-        thread2.start()  # Thread2 should timeout because thread1 is still executing
-        while ('exception_async_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['exception_async_delayed'][0] != 'EXCEPTION') and counter < 100:
-            time.sleep(0.05)
-            counter += 1
+        thread2.start()
+        Helpers._wait_for(timeout=5, condition=lambda: ('exception_async_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['exception_async_delayed'][0] != 'EXCEPTION'))
 
         # Start thread3, which should be put in the queue, waiting for thread1 to finish
         helpers['waiter'] = waiter
-        counter = 0
         thread3.start()
-        while 'finished_async_after_wait_delayed' not in Decorators.unittest_thread_info_by_state['WAITING'] and counter < 20:
-            time.sleep(0.05)
-            counter += 1
+        Helpers._wait_for(timeout=5, condition=lambda: ('finished_async_after_wait_delayed' not in Decorators.unittest_thread_info_by_state['WAITING']))
 
         # At this point, we have 2 tasks in queue, other tasks should be discarded. (Thread1 being executed and thread3 waiting for execution)
         thread4.start()   # Thread4 should succeed because of different params
@@ -142,6 +139,13 @@ class Helpers(unittest.TestCase):
         thread8.start()   # Thread8 should be discarded due to identical params and callback should be executed since its sync
         thread9.start()   # Thread9 should timeout (sync) while trying to wait for the a-sync tasks to complete
         thread10.start()  # Thread10 should wait for the a-sync tasks to complete
+
+        # Make sure every thread it at expected state before letting thread1 finish
+        Helpers._wait_for(timeout=5, condition=lambda: ('callback_w_callback_sync' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['callback_w_callback_sync'][0] != 'CALLBACK'))
+        Helpers._wait_for(timeout=5, condition=lambda: ('discarded_w_callback_async_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['discarded_w_callback_async_delayed'][0] != 'DISCARDED'))
+        Helpers._wait_for(timeout=5, condition=lambda: ('discarded_wo_callback_async_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['discarded_wo_callback_async_delayed'][0] != 'DISCARDED'))
+        Helpers._wait_for(timeout=5, condition=lambda: ('waited_wo_callback_sync' not in Decorators.unittest_thread_info_by_state['WAITING']))
+        Helpers._wait_for(timeout=5, condition=lambda: ('waited_sync_wait_for_async' not in Decorators.unittest_thread_info_by_state['WAITING']))
 
         event.set()  # Make sure thread1 now finishes, so thread3 can start executing
         waiter.wait()
@@ -200,7 +204,6 @@ class Helpers(unittest.TestCase):
         Whether the first task is being executed sync or async, the 2nd will always be discarded
         This is because the 2nd task is being executed by another worker (or mocked to invoke this behavior)
         """
-
         # DECORATED FUNCTIONS
         @ovs_task(name='unittest_task1', ensure_single_info={'mode': 'DEFAULT'})
         def _function(arg1):
@@ -245,7 +248,7 @@ class Helpers(unittest.TestCase):
 
             thread1.start()
             while waiter.get_counter() < 1:  # Wait for thread1 to be waiting, which will increase the counter to 1
-                time.sleep(0.05)
+                time.sleep(0.01)
             thread2.start()
             thread2.join()
             waiter.wait()
@@ -292,7 +295,7 @@ class Helpers(unittest.TestCase):
 
             thread1.start()
             while waiter.get_counter() < 1:  # Wait for thread1 to be waiting, which will increase the counter to 1
-                time.sleep(0.05)
+                time.sleep(0.01)
             thread2.start()
             thread2.join()
             waiter.wait()
