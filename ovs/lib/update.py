@@ -729,7 +729,7 @@ class UpdateController(object):
                                                        ssh_clients=ssh_clients,
                                                        action='start')
         finally:
-            UpdateController._refresh_package_information()
+            UpdateController._refresh_package_information(ssh_clients[0])
             filemutex.release()
             for ssh_client in ssh_clients:
                 for file_name in [UpdateController._update_file, UpdateController._update_ongoing_file]:
@@ -771,13 +771,14 @@ class UpdateController(object):
     # HELPERS #
     ###########
     @staticmethod
-    def _refresh_package_information():
+    def _refresh_package_information(client):
         # Refresh updates
         UpdateController._logger.debug('Refreshing update information')
         counter = 1
         while counter < 6:
             try:
-                GenericController.refresh_package_information()
+                with remote(client.ip, [GenericController]) as rem:
+                    rem.GenericController.refresh_package_information()
                 return
             except Exception:
                 UpdateController._logger.debug('Attempt {0}: Could not refresh the update information, trying again'.format(counter))
