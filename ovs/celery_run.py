@@ -23,17 +23,19 @@ import sys
 sys.path.append('/opt/OpenvStorage')
 
 import os
-from kombu import Queue
+import threading
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
-from ovs.lib.messaging import MessageController
-from ovs.log.log_handler import LogHandler
+from kombu import Queue
+from threading import Thread
 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.system import System
+from ovs.lib.messaging import MessageController
+from ovs.log.log_handler import LogHandler
 
 
 class CeleryMockup(object):
@@ -50,9 +52,26 @@ class CeleryMockup(object):
         def _wrapper(func):
             def _wrapped(*arguments, **kwarguments):
                 _ = arguments, kwarguments
+                if 'bind' in kwargs:
+                    return func(type('Task', (), {'request': type('Request', (), {'id': None})}), *arguments, **kwarguments)
                 return func(*arguments, **kwarguments)
-            _wrapped.delay = func
 
+            def _delayed(*arguments, **kwarguments):
+                def _catch_errors_in_function(*more_args, **more_kwargs):
+                    try:
+                        return func(*more_args, **more_kwargs)
+                    except Exception as ex:
+                        async_result['exception'] = ex
+
+                if 'bind' in kwargs:
+                    arguments = tuple([type('Task', (), {'request': type('Request', (), {'id': 0})})] + list(arguments))
+                thread = Thread(target=_catch_errors_in_function, name='{0}_delayed'.format(threading.current_thread().getName()), args=arguments, kwargs=kwarguments)
+                async_result = {'thread': thread,
+                                'exception': None}
+                thread.start()
+                return async_result
+
+            _wrapped.delay = _delayed
             _wrapped.__name__ = func.__name__
             _wrapped.__module__ = func.__module__
             return _wrapped
