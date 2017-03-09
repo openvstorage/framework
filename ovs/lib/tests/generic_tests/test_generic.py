@@ -25,15 +25,14 @@ import unittest
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.system import System
 from ovs.extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
-from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
 
@@ -46,19 +45,19 @@ class Generic(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        self.volatile, self.persistent = Helper.setup()
+        self.volatile, self.persistent = DalHelper.setup()
 
     def tearDown(self):
         """
         Clean up test suite
         """
-        Helper.teardown()
+        DalHelper.teardown()
 
     def test_snapshot_all_vdisks(self):
         """
         Tests GenericController.snapshot_all_vdisks functionality
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],
@@ -91,7 +90,7 @@ class Generic(unittest.TestCase):
         """
         # Setup
         # There are 2 disks, second one cloned from a snapshot of the first
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
@@ -112,8 +111,8 @@ class Generic(unittest.TestCase):
                                                       'is_consistent': True,
                                                       'timestamp': str(timestamp)})
 
-        structure = Helper.build_service_structure(structure={'vdisks': [(2, 1, 1, 1)]},
-                                                   previous_structure=structure)
+        structure = DalHelper.build_dal_structure(structure={'vdisks': [(2, 1, 1, 1)]},
+                                                  previous_structure=structure)
         clone_vdisk = structure['vdisks'][2]
         base_snapshot_guid = vdisk_1.snapshots[0]['guid']  # Oldest
         clone_vdisk.parentsnapshot = base_snapshot_guid
@@ -144,7 +143,7 @@ class Generic(unittest.TestCase):
         hour = minute * 60
 
         for scenario in range(5):
-            structure = Helper.build_service_structure(
+            structure = DalHelper.build_dal_structure(
                 {'vpools': [1],
                  'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
                  'mds_services': [(1, 1)],
@@ -194,15 +193,15 @@ class Generic(unittest.TestCase):
                                                               'timestamp': str(timestamp),
                                                               'is_automatic': scenario in [0, 1],
                                                               'is_consistent': len(consistent_hours) > 0})
-            self.persistent.clean()
-            self.volatile.clean()
+            self.persistent._clean()
+            self.volatile._clean()
 
     def test_happypath(self):
         """
         Validates the happy path; Hourly snapshots are taken with a few manual consistent
         every now and then. The delete policy is executed every day
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],
@@ -270,13 +269,10 @@ class Generic(unittest.TestCase):
                       Validate 6 threads will be spawned and used out of a potential of 15 (5 scrub roles * 3 vPools)
                       We limit max amount of threads spawned per vPool to 2 in case 3 to 5 vPools are present
         """
-        for i in xrange(1, 6):
-            Configuration.set('/ovs/framework/hosts/{0}/ports'.format(i), {'storagedriver': [10000, 10100]})
-
         ##############
         # Scenario 1 #
         ##############
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
@@ -286,7 +282,6 @@ class Generic(unittest.TestCase):
         vdisk = structure['vdisks'][1]
         vpool = structure['vpools'][1]
         storagerouter = structure['storagerouters'][1]
-        System._machine_id = {storagerouter.ip: '1'}
         Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         LockedClient.scrub_controller = {'possible_threads': None,
                                          'volumes': {},
@@ -325,9 +320,9 @@ class Generic(unittest.TestCase):
         ##############
         # Scenario 2 #
         ##############
-        self.volatile.clean()
-        self.persistent.clean()
-        structure = Helper.build_service_structure(
+        self.volatile._clean()
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
                         (6, 1, 1, 1), (7, 1, 1, 1), (8, 1, 1, 1), (9, 1, 1, 1), (10, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
@@ -340,7 +335,6 @@ class Generic(unittest.TestCase):
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
         storagerouter_3 = structure['storagerouters'][3]
-        System._machine_id = {storagerouter_1.ip: '1'}
         Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         LockedClient.scrub_controller = {'possible_threads': ['scrub_{0}_{1}'.format(vpool.guid, storagerouter_1.guid)],
                                          'volumes': {},
@@ -430,9 +424,9 @@ class Generic(unittest.TestCase):
         ##############
         # Scenario 3 #
         ##############
-        self.volatile.clean()
-        self.persistent.clean()
-        structure = Helper.build_service_structure(
+        self.volatile._clean()
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],  # vPool 2 has no vDisks attached to it
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
                         (6, 1, 1, 1), (7, 1, 1, 1), (8, 1, 1, 1), (9, 1, 1, 1), (10, 1, 1, 1),
@@ -448,7 +442,6 @@ class Generic(unittest.TestCase):
         vdisk_11.storagedriver_client.set_volume_as_template(volume_id=vdisk_11.volume_id)
 
         storagerouters = structure['storagerouters']
-        System._machine_id = dict((sr.ip, sr.machine_id) for sr in storagerouters.values())
         Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
 
         thread_names = ['scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid) for storagerouter in storagerouters.values()]
@@ -468,9 +461,9 @@ class Generic(unittest.TestCase):
         ##############
         # Scenario 4 #
         ##############
-        self.volatile.clean()
-        self.persistent.clean()
-        structure = Helper.build_service_structure(
+        self.volatile._clean()
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2, 3],
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 2, 2, 2), (5, 2, 2, 2),
                         (6, 2, 2, 2), (7, 3, 3, 3), (8, 3, 3, 3), (9, 3, 3, 3)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
@@ -512,13 +505,9 @@ class Generic(unittest.TestCase):
         Test the Arakoon collapse functionality
         """
         # Set up the test
-        structure = Helper.build_service_structure(structure={'storagerouters': [1, 2]})
+        structure = DalHelper.build_dal_structure(structure={'storagerouters': [1, 2]})
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
-        System._machine_id = {storagerouter_1.ip: '1',
-                              storagerouter_2.ip: '2'}
-        for sr in [storagerouter_1, storagerouter_2]:
-            Configuration.set('/ovs/framework/hosts/{0}/ports'.format(sr.machine_id), {'arakoon': [int(sr.machine_id) * 10000, int(sr.machine_id) * 10000 + 100]})
 
         # Make sure we cover all Arakoon cluster types
         clusters_to_create = {ServiceType.ARAKOON_CLUSTER_TYPES.SD: [{'name': 'unittest-voldrv', 'internal': True, 'success': True}],
@@ -540,19 +529,16 @@ class Generic(unittest.TestCase):
                 internal = cluster_info['internal']
                 cluster_name = cluster_info['name']
 
-                base_dir = Helper.CLUSTER_DIR.format(cluster_name)
+                base_dir = DalHelper.CLUSTER_DIR.format(cluster_name)
                 info = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
                                                        cluster_type=cluster_type,
                                                        ip=storagerouter_1.ip,
                                                        base_dir=base_dir,
                                                        internal=internal)
-                ArakoonInstaller.claim_cluster(cluster_name=cluster_name,
-                                               master_ip=storagerouter_1.ip,
-                                               filesystem=False,
-                                               metadata=info['metadata'])
-                ArakoonInstaller.extend_cluster(master_ip=storagerouter_1.ip,
+                ArakoonInstaller.start_cluster(metadata=info['metadata'])
+                ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
+                                                ip=storagerouter_1.ip if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG else None,
                                                 new_ip=storagerouter_2.ip,
-                                                cluster_name=cluster_name,
                                                 base_dir=base_dir)
 
                 service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
@@ -564,17 +550,17 @@ class Generic(unittest.TestCase):
                     service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON)
 
                 if internal is True:
-                    Helper.create_service(service_name=service_name,
-                                          service_type=service_type,
-                                          storagerouter=storagerouter_1,
-                                          ports=[info['client_port'], info['messaging_port']])
-                    Helper.create_service(service_name=service_name,
-                                          service_type=service_type,
-                                          storagerouter=storagerouter_2,
-                                          ports=[info['client_port'], info['messaging_port']])
+                    DalHelper.create_service(service_name=service_name,
+                                             service_type=service_type,
+                                             storagerouter=storagerouter_1,
+                                             ports=info['ports'])
+                    DalHelper.create_service(service_name=service_name,
+                                             service_type=service_type,
+                                             storagerouter=storagerouter_2,
+                                             ports=info['ports'])
                 else:
-                    Helper.create_service(service_name=service_name,
-                                          service_type=service_type)
+                    DalHelper.create_service(service_name=service_name,
+                                             service_type=service_type)
 
                     external_clusters.append(cluster_name)
                     continue
@@ -667,7 +653,7 @@ class Generic(unittest.TestCase):
         # StorageRouter 1 successfully updates its package info
         # StorageRouter 2 is inaccessible
         # StorageRouter 3 gets error in 2nd hook --> package_information is reset to {}
-        structure = Helper.build_service_structure(structure={'storagerouters': [1, 2, 3]})
+        structure = DalHelper.build_dal_structure(structure={'storagerouters': [1, 2, 3]})
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
         storagerouter_3 = structure['storagerouters'][3]

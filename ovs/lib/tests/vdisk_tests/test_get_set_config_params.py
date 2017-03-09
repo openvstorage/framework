@@ -20,10 +20,10 @@ Test module for vDisk set and get configuration params functionality
 import copy
 import unittest
 from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
-from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 
 
@@ -35,7 +35,7 @@ class VDiskTest(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        Helper.setup(fake_sleep=True)
+        DalHelper.setup(fake_sleep=True)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
         Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
@@ -44,7 +44,7 @@ class VDiskTest(unittest.TestCase):
         """
         Clean up the unittest
         """
-        Helper.teardown(fake_sleep=True)
+        DalHelper.teardown(fake_sleep=True)
 
     def test_set_and_get_config_params(self):
         """
@@ -54,7 +54,7 @@ class VDiskTest(unittest.TestCase):
             - Attempt to sync and async mode without specifying DTL target
             - Set SCO size
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -126,11 +126,16 @@ class VDiskTest(unittest.TestCase):
         capacity = vdisk_1.storagedriver_client.get_metadata_cache_capacity(str(vdisk_1.volume_id))
         self.assertEqual(capacity, 2048)
 
+        # Small volumes and pagecache_ratio
+        vdisk_small = VDisk(VDiskController.create_new(volume_name='vdisk_small', volume_size=1024 * 8, storagedriver_guid=storagedrivers[1].guid))
+        capacity = vdisk_small.storagedriver_client.get_metadata_cache_capacity(str(vdisk_small.volume_id))
+        self.assertEqual(capacity, 1)
+
     def test_dtl_target(self):
         """
         Validates whether the DTL target is set to sane values, despite incorrect values being passed in
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2, 3],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 3)],  # (<id>, <vpool_id>, <storagerouter_id>)

@@ -158,15 +158,9 @@ class OVSMigrator(object):
             from ovs.dal.helpers import HybridRunner, Descriptor
             from ovs.dal.hybrids.diskpartition import DiskPartition
             from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
-            from ovs.dal.lists.storagedriverlist import StorageDriverList
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.extensions.generic.configuration import Configuration
-            from ovs.extensions.generic.sshclient import SSHClient
-            from ovs.extensions.generic.toolbox import ExtensionsToolbox
-            from ovs.extensions.services.service import ServiceManager
-            from ovs.extensions.services.systemd import Systemd
             from ovs.extensions.storage.persistentfactory import PersistentFactory
-            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 
             # Migrate unique constraints & indexes
             client = PersistentFactory.get_client()
@@ -205,9 +199,6 @@ class OVSMigrator(object):
                                 client.set(ikey, index + [key], transaction=transaction)
                             client.apply_transaction(transaction)
 
-            ####################
-            # Multiple Proxies #
-            ####################
             # Clean up - removal of obsolete 'cfgdir'
             paths = Configuration.get(key='/ovs/framework/paths')
             if 'cfgdir' in paths:
@@ -226,105 +217,6 @@ class OVSMigrator(object):
                     persistent_client.delete(key=old_key, transaction=transaction)
             if changes is True:
                 persistent_client.apply_transaction(transaction=transaction)
-
-            sr_client_map = {}
-            for storagedriver in StorageDriverList.get_storagedrivers():
-                vpool = storagedriver.vpool
-                if storagedriver.storagerouter_guid not in sr_client_map:
-                    sr_client_map[storagedriver.storagerouter_guid] = SSHClient(endpoint=storagedriver.storagerouter.ip, username='root')
-                root_client = sr_client_map[storagedriver.storagerouter_guid]
-                for alba_proxy in storagedriver.alba_proxies:
-                    # Rename alba_proxy service in model
-                    service = alba_proxy.service
-                    old_service_name = 'albaproxy_{0}'.format(vpool.name)
-                    new_service_name = 'albaproxy_{0}_0'.format(vpool.name)
-                    if old_service_name != service.name:
-                        continue
-                    service.name = new_service_name
-                    service.save()
-
-                    # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
-                    if not ServiceManager.has_service(name=old_service_name, client=root_client):
-                        continue
-                    old_configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(storagedriver.storagerouter.machine_id, old_service_name)
-                    if not Configuration.exists(key=old_configuration_key):
-                        continue
-
-                    ExtensionsToolbox.edit_version_file(client=root_client, package_name='alba', old_service_name=old_service_name, new_service_name=new_service_name)
-
-                    # Register new service and remove old service
-                    ServiceManager.add_service(name='ovs-albaproxy',
-                                               client=root_client,
-                                               params=Configuration.get(old_configuration_key),
-                                               target_name='ovs-{0}'.format(new_service_name))
-
-                    # Update scrub proxy config
-                    proxy_config_key = '/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)
-                    proxy_config = None if Configuration.exists(key=proxy_config_key) is False else Configuration.get(proxy_config_key)
-                    if proxy_config is not None:
-                        fragment_cache = proxy_config.get('fragment_cache', ['none', {}])
-                        if fragment_cache[0] == 'alba' and fragment_cache[1].get('cache_on_write') is True:  # Accelerated ALBA configured
-                            fragment_cache_scrub_info = copy.deepcopy(fragment_cache)
-                            fragment_cache_scrub_info[1]['cache_on_read'] = False
-                            proxy_scrub_config_key = '/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid)
-                            proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
-                            if proxy_scrub_config is not None and proxy_scrub_config['fragment_cache'] == ['none']:
-                                proxy_scrub_config['fragment_cache'] = fragment_cache_scrub_info
-                                Configuration.set(proxy_scrub_config_key, json.dumps(proxy_scrub_config, indent=4), raw=True)
-
-                # Update 'backend_connection_manager' section
-                changes = False
-                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-                storagedriver_config.load()
-                if 'backend_connection_manager' not in storagedriver_config.configuration:
-                    continue
-
-                current_config = storagedriver_config.configuration['backend_connection_manager']
-                if current_config.get('backend_type') != 'MULTI':
-                    changes = True
-                    backend_connection_manager = {'backend_type': 'MULTI'}
-                    for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
-                        backend_connection_manager[str(index)] = copy.deepcopy(current_config)
-                        # noinspection PyUnresolvedReferences
-                        backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
-                        # noinspection PyUnresolvedReferences
-                        backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 16 * 1024 ** 3
-                        # noinspection PyUnresolvedReferences
-                        for key, value in backend_connection_manager[str(index)].items():
-                            if key.startswith('backend_interface'):
-                                backend_connection_manager[key] = value
-                                # noinspection PyUnresolvedReferences
-                                del backend_connection_manager[str(index)][key]
-                    for key, value in {'backend_interface_retries_on_error': 5,
-                                       'backend_interface_retry_interval_secs': 1,
-                                       'backend_interface_retry_backoff_multiplier': 2.0}.iteritems():
-                        if key not in backend_connection_manager:
-                            backend_connection_manager[key] = value
-                else:
-                    backend_connection_manager = current_config
-                    for value in backend_connection_manager.values():
-                        if isinstance(value, dict):
-                            for key, val in value.items():
-                                if key.startswith('backend_interface'):
-                                    backend_connection_manager[key] = val
-                                    changes = True
-                                    del value[key]
-                    for key, value in {'backend_interface_retries_on_error': 5,
-                                       'backend_interface_retry_interval_secs': 1,
-                                       'backend_interface_retry_backoff_multiplier': 2.0}.iteritems():
-                        if key not in backend_connection_manager:
-                            changes = True
-                            backend_connection_manager[key] = value
-
-                if changes is True:
-                    storagedriver_config.clear_backend_connection_manager()
-                    storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
-                    storagedriver_config.save(root_client)
-
-                    # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
-                    ExtensionsToolbox.edit_version_file(client=root_client, package_name='volumedriver', old_service_name='volumedriver_{0}'.format(vpool.name))
-                    if ServiceManager.ImplementationClass == Systemd:
-                        root_client.run(['systemctl', 'daemon-reload'])
 
             # Introduction of DTL role (Replaces DTL sub_role)
             for vpool in VPoolList.get_vpools():

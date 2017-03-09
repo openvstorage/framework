@@ -36,7 +36,7 @@ from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.user import User
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.lists.userlist import UserList
-from ovs.lib.tests.helpers import Helper
+from ovs.dal.tests.helpers import DalHelper
 
 
 class Decorators(unittest.TestCase):
@@ -49,7 +49,7 @@ class Decorators(unittest.TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        Helper.setup(fake_sleep=True)
+        DalHelper.setup(fake_sleep=True)
 
         admin_group = Group()
         admin_group.name = 'administrators'
@@ -155,7 +155,7 @@ class Decorators(unittest.TestCase):
         """
         Clean up the unittest
         """
-        Helper.teardown(fake_sleep=True)
+        DalHelper.teardown(fake_sleep=True)
 
     def test_ratelimit(self):
         """

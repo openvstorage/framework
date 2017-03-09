@@ -25,7 +25,6 @@ from datetime import datetime, timedelta
 from Queue import Empty, Queue
 from threading import Thread
 from time import mktime
-from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.vdisk import VDisk
@@ -41,7 +40,7 @@ from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
-from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
@@ -56,8 +55,7 @@ class GenericController(object):
     _logger = LogHandler.get('lib', name='generic tasks')
 
     @staticmethod
-    @celery.task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'))
-    @ensure_single(task_name='ovs.generic.snapshot_all_vdisks', extra_task_names=['ovs.generic.delete_snapshots'])
+    @ovs_task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'), ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['ovs.generic.delete_snapshots']})
     def snapshot_all_vdisks():
         """
         Snapshots all vDisks
@@ -66,6 +64,8 @@ class GenericController(object):
         success = []
         fail = []
         for vdisk in VDiskList.get_vdisks():
+            if vdisk.is_vtemplate is True:
+                continue
             try:
                 metadata = {'label': '',
                             'is_consistent': False,
@@ -82,8 +82,7 @@ class GenericController(object):
         return success, fail
 
     @staticmethod
-    @celery.task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'))
-    @ensure_single(task_name='ovs.generic.delete_snapshots')
+    @ovs_task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'), ensure_single_info={'mode': 'DEFAULT'})
     def delete_snapshots(timestamp=None):
         """
         Delete snapshots & scrubbing policy
@@ -197,8 +196,7 @@ class GenericController(object):
         GenericController._logger.info('Delete snapshots finished')
 
     @staticmethod
-    @celery.task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'))
-    @ensure_single(task_name='ovs.generic.execute_scrub')
+    @ovs_task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), ensure_single_info={'mode': 'DEFAULT'})
     def execute_scrub():
         """
         Retrieve and execute scrub work
@@ -400,7 +398,7 @@ class GenericController(object):
                             for work_unit in work_units:
                                 res = locked_client.scrub(work_unit=work_unit,
                                                           scratch_dir=scrub_directory,
-                                                          log_sinks=[LogHandler.get_sink_path('scrubber', allow_override=True)],
+                                                          log_sinks=[LogHandler.get_sink_path('scrubber', allow_override=True, forced_target_type='file')],
                                                           backend_config=Configuration.get_configuration_path(backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                             if work_units:
@@ -440,8 +438,7 @@ class GenericController(object):
             GenericController._logger.exception(message)
 
     @staticmethod
-    @celery.task(name='ovs.generic.collapse_arakoon', schedule=Schedule(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'))
-    @ensure_single(task_name='ovs.generic.collapse_arakoon')
+    @ovs_task(name='ovs.generic.collapse_arakoon', schedule=Schedule(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'), ensure_single_info={'mode': 'DEFAULT'})
     def collapse_arakoon():
         """
         Collapse Arakoon's Tlogs
@@ -453,7 +450,7 @@ class GenericController(object):
         cluster_info = []
         storagerouters = StorageRouterList.get_storagerouters()
         if os.environ.get('RUNNING_UNITTESTS') != 'True':
-            cluster_info = [('cacc', storagerouters[0], True)]
+            cluster_info = [('cacc', storagerouters[0])]
 
         cluster_names = []
         for service in ServiceList.get_services():
@@ -464,31 +461,28 @@ class GenericController(object):
                 if cluster in cluster_names:
                     continue
                 cluster_names.append(cluster)
-                cluster_info.append((cluster, service.storagerouter, False))
+                cluster_info.append((cluster, service.storagerouter))
         workload = {}
-        for cluster, storagerouter, filesystem in cluster_info:
+        for cluster, storagerouter in cluster_info:
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
-            config = ArakoonClusterConfig(cluster, filesystem=filesystem)
-            config.load_config(storagerouter.ip)
+            ip = storagerouter.ip if cluster == 'cacc' else None
+            config = ArakoonClusterConfig(cluster, source_ip=ip)
             for node in config.nodes:
                 if node.ip not in workload:
                     workload[node.ip] = {'node_id': node.name,
                                          'clusters': []}
-                workload[node.ip]['clusters'].append((cluster, filesystem))
+                workload[node.ip]['clusters'].append((cluster, ip))
         for storagerouter in storagerouters:
             try:
                 if storagerouter.ip not in workload:
                     continue
                 node_workload = workload[storagerouter.ip]
                 client = SSHClient(storagerouter)
-                for cluster, filesystem in node_workload['clusters']:
+                for cluster, ip in node_workload['clusters']:
                     try:
                         GenericController._logger.debug('  Collapsing cluster {0} on {1}'.format(cluster, storagerouter.ip))
-                        if filesystem is True:
-                            config_path = ArakoonClusterConfig.CONFIG_FILE.format(cluster)
-                        else:
-                            config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster))
-                        client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config_path])
+                        config = ArakoonClusterConfig(cluster_id=cluster, source_ip=ip)
+                        client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config.external_config_path])
                         GenericController._logger.debug('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
                     except:
                         GenericController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))
@@ -497,8 +491,7 @@ class GenericController(object):
         GenericController._logger.info('Arakoon collapse finished')
 
     @staticmethod
-    @celery.task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'))
-    @ensure_single(task_name='ovs.generic.refresh_package_information', mode='DEDUPED')
+    @ovs_task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'), ensure_single_info={'mode': 'DEDUPED'})
     def refresh_package_information():
         """
         Retrieve and store the package information of all StorageRouters
@@ -550,7 +543,7 @@ class GenericController(object):
             raise Exception(' - {0}'.format('\n - '.join(errors)))
 
     @staticmethod
-    @celery.task(name='ovs.generic.run_backend_domain_hooks')
+    @ovs_task(name='ovs.generic.run_backend_domain_hooks')
     def run_backend_domain_hooks(backend_guid):
         """
         Run hooks when the Backend Domains have been updated

@@ -24,7 +24,6 @@ import time
 from ConfigParser import RawConfigParser
 from subprocess import CalledProcessError
 from StringIO import StringIO
-from ovs.celery_run import celery
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
@@ -53,7 +52,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
-from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
@@ -74,7 +73,7 @@ class StorageRouterController(object):
     storagerouterclient.Logger.enableLogging()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.ping')
+    @ovs_task(name='ovs.storagerouter.ping')
     def ping(storagerouter_guid, timestamp):
         """
         Update a Storage Router's celery heartbeat
@@ -90,7 +89,7 @@ class StorageRouterController(object):
                 storagerouter.save()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_metadata')
+    @ovs_task(name='ovs.storagerouter.get_metadata')
     def get_metadata(storagerouter_guid):
         """
         Gets physical information about the machine this task is running on
@@ -117,7 +116,7 @@ class StorageRouterController(object):
                     claimed_space_by_fwk += storagedriver_partition.size if storagedriver_partition.size is not None else 0
                     if client.dir_exists(storagedriver_partition.path):
                         try:
-                            used_space_by_system += int(client.run(['du', '-B', '1', '-d', '0', storagedriver_partition.path]).split('\t')[0])
+                            used_space_by_system += int(client.run(['du', '-B', '1', '-d', '0', storagedriver_partition.path], timeout=5).split('\t')[0])
                         except Exception as ex:
                             StorageRouterController._logger.warning('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
 
@@ -126,7 +125,7 @@ class StorageRouterController(object):
                         StorageRouterController._logger.info('Verifying disk partition usage by checking path {0}'.format(alias))
                         disk_partition_device = client.file_read_link(path=alias)
                         try:
-                            available_space_by_system = int(client.run(['df', '-B', '1', '--output=avail', disk_partition_device]).splitlines()[-1])
+                            available_space_by_system = int(client.run(['df', '-B', '1', '--output=avail', disk_partition_device], timeout=5).splitlines()[-1])
                             break
                         except Exception as ex:
                             StorageRouterController._logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
@@ -170,7 +169,7 @@ class StorageRouterController(object):
                 'scrub_available': StorageRouterController._check_scrub_partition_present()}
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.add_vpool')
+    @ovs_task(name='ovs.storagerouter.add_vpool')
     def add_vpool(parameters):
         """
         Add a vPool to the machine this task is running on
@@ -293,6 +292,8 @@ class StorageRouterController(object):
 
         # Check mountpoints are mounted
         for role, part_info in partition_info.iteritems():
+            if role not in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]:
+                continue
             for part in part_info:
                 if not client.is_mounted(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
                     error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
@@ -481,7 +482,16 @@ class StorageRouterController(object):
                 break
 
         if arakoon_service_found is False:
-            StorageDriverController.manual_voldrv_arakoon_checkup()
+            counter = 0
+            while counter < 120:
+                if StorageDriverController.manual_voldrv_arakoon_checkup() is True:
+                    break
+                counter += 1
+                time.sleep(1)
+                if counter == 120:
+                    vpool.status = VPool.STATUSES.FAILURE
+                    vpool.save()
+                    raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
 
         # Verify SD arakoon cluster is available and 'in_use'
         root_client = ip_client_map[storagerouter.ip]['root']
@@ -520,8 +530,7 @@ class StorageRouterController(object):
         storagedriver.save()
 
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-        config.load_config()
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
         arakoon_nodes = []
         for node in config.nodes:
             arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})
@@ -548,12 +557,18 @@ class StorageRouterController(object):
         ##############################
         # CREATE PARTITIONS IN MODEL #
         ##############################
+        # Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
+        # Once the free space on a mountpoint is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
+        # make sure that <backoff_gap> free space is available ==> backoff_gap must be <= size of the partition
+        # Both backoff_gap and trigger_gap apply to each mountpoint individually, but cannot be configured on a per mountpoint base
+
         # Calculate WRITE / FRAG cache
         frag_size = None
         sdp_frags = []
         dirs2create = []
         writecaches = []
         writecache_information = partition_info[DiskPartition.ROLES.WRITE]
+        smallest_write_partition = 2 * 1024 ** 3  # Default back off gap
         total_available = sum([part['available'] for part in writecache_information])
         for writecache_info in writecache_information:
             available = writecache_info['available']
@@ -583,6 +598,8 @@ class StorageRouterController(object):
             writecaches.append({'path': sdp_write.path,
                                 'size': '{0}KiB'.format(w_size)})
             dirs2create.append(sdp_write.path)
+            if w_size * 1024 < smallest_write_partition:
+                smallest_write_partition = w_size * 1024  # 'w_size' is in KiB and 'smallest_write_partition' is in bytes
 
         sdp_fd = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                     'role': DiskPartition.ROLES.WRITE,
@@ -766,8 +783,8 @@ class StorageRouterController(object):
         storagedriver_config.configure_content_addressed_cache(serialize_read_cache=False,
                                                                read_cache_serialization_path=[])
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
-                                                trigger_gap='1GB',
-                                                backoff_gap='2GB')
+                                                trigger_gap=Toolbox.convert_to_human_readable(size=smallest_write_partition / 2),
+                                                backoff_gap=Toolbox.convert_to_human_readable(size=smallest_write_partition))
         storagedriver_config.configure_distributed_transaction_log(dtl_path=sdp_dtl.path,  # Not used, but required
                                                                    dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
         storagedriver_config.configure_filesystem(**filesystem_config)
@@ -884,7 +901,7 @@ class StorageRouterController(object):
         StorageRouterController._logger.info('Add vPool {0} ended successfully'.format(vpool_name))
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.remove_storagedriver')
+    @ovs_task(name='ovs.storagerouter.remove_storagedriver')
     def remove_storagedriver(storagedriver_guid, offline_storage_router_guids=None):
         """
         Removes a Storage Driver (if its the last Storage Driver for a vPool, the vPool is removed as well)
@@ -1186,7 +1203,7 @@ class StorageRouterController(object):
             vpool.save()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_version_info')
+    @ovs_task(name='ovs.storagerouter.get_version_info')
     def get_version_info(storagerouter_guid):
         """
         Returns version information regarding a given StorageRouter
@@ -1200,7 +1217,7 @@ class StorageRouterController(object):
                 'versions': PackageManager.get_installed_versions(client)}
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_support_info')
+    @ovs_task(name='ovs.storagerouter.get_support_info')
     def get_support_info(storagerouter_guid):
         """
         Returns support information regarding a given StorageRouter
@@ -1216,7 +1233,7 @@ class StorageRouterController(object):
                 'enablesupport': Configuration.get('ovs/framework/support|enablesupport')}
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_support_metadata')
+    @ovs_task(name='ovs.storagerouter.get_support_metadata')
     def get_support_metadata():
         """
         Returns support metadata for a given storagerouter. This should be a routed task!
@@ -1224,7 +1241,7 @@ class StorageRouterController(object):
         return SupportAgent().get_heartbeat_data()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_logfiles')
+    @ovs_task(name='ovs.storagerouter.get_logfiles')
     def get_logfiles(local_storagerouter_guid):
         """
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
@@ -1247,7 +1264,7 @@ class StorageRouterController(object):
         return logfilename
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.configure_support')
+    @ovs_task(name='ovs.storagerouter.configure_support')
     def configure_support(enable, enable_support):
         """
         Configures support on all StorageRouters
@@ -1281,7 +1298,7 @@ class StorageRouterController(object):
         return True
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.mountpoint_exists')
+    @ovs_task(name='ovs.storagerouter.mountpoint_exists')
     def mountpoint_exists(name, storagerouter_guid):
         """
         Checks whether a given mountpoint for a vPool exists
@@ -1296,7 +1313,7 @@ class StorageRouterController(object):
         return client.dir_exists(directory='/mnt/{0}'.format(name))
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.refresh_hardware')
+    @ovs_task(name='ovs.storagerouter.refresh_hardware')
     def refresh_hardware(storagerouter_guid):
         """
         Refreshes all hardware related information
@@ -1336,8 +1353,7 @@ class StorageRouterController(object):
         storagerouter.save()
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.configure_disk')
-    @ensure_single(task_name='ovs.storagerouter.configure_disk', mode='CHAINED', global_timeout=1800)
+    @ovs_task(name='ovs.storagerouter.configure_disk', ensure_single_info={'mode': 'CHAINED', 'global_timeout': 1800})
     def configure_disk(storagerouter_guid, disk_guid, partition_guid, offset, size, roles):
         """
         Configures a partition

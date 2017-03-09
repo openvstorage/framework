@@ -52,12 +52,19 @@ class StorageRouter(DataObject):
         """
         from ovs.dal.hybrids.vdisk import VDisk
         statistics = {}
-        for key in StorageDriverClient.STAT_KEYS:
-            statistics[key] = 0
-            statistics['{0}_ps'.format(key)] = 0
         for storagedriver in self.storagedrivers:
             for key, value in storagedriver.fetch_statistics().iteritems():
-                statistics[key] += value
+                if isinstance(value, dict):
+                    if key not in statistics:
+                        statistics[key] = {}
+                        for subkey, subvalue in value.iteritems():
+                            if subkey not in statistics[key]:
+                                statistics[key][subkey] = 0
+                            statistics[key][subkey] += subvalue
+                else:
+                    if key not in statistics:
+                        statistics[key] = 0
+                    statistics[key] += value
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics

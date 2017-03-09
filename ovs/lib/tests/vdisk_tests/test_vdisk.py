@@ -26,11 +26,11 @@ from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
-from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 
 
@@ -42,7 +42,7 @@ class VDiskTest(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        Helper.setup(fake_sleep=True)
+        DalHelper.setup(fake_sleep=True)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
         Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
@@ -51,7 +51,7 @@ class VDiskTest(unittest.TestCase):
         """
         Clean up the unittest
         """
-        Helper.teardown(fake_sleep=True)
+        DalHelper.teardown(fake_sleep=True)
 
     @staticmethod
     def _roll_out_dtl_services(vpool, storagerouters):
@@ -75,7 +75,7 @@ class VDiskTest(unittest.TestCase):
             - Attempt to create a vDisk with identical devicename
             - Create a vDisk with identical name on another vPool
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -145,7 +145,7 @@ class VDiskTest(unittest.TestCase):
             - Create from template on another Storage Router
             - Create from template without specifying a Storage Router
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1, 2, 3],
              'storagedrivers': [(1, 1, 1), (2, 1, 2)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -235,7 +235,7 @@ class VDiskTest(unittest.TestCase):
             - Delete 1st vDisk and verify other still remains on correct vPool
             - Delete 2nd vDisk and verify no more volumes left
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              'domains': [1],
              'storagerouters': [1],
@@ -285,7 +285,7 @@ class VDiskTest(unittest.TestCase):
             - Clone the vDisk on another Storage Router
             - Clone another vDisk with name 'clone1' linked to another vPool
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2, 3],
              'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -453,7 +453,7 @@ class VDiskTest(unittest.TestCase):
             - Attempt to create a snapshot providing incorrect parameters
             - Create a snapshot and make some assertions
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -499,7 +499,7 @@ class VDiskTest(unittest.TestCase):
             - Create a vDisk and take a snapshot
             - Attempt to delete a non-existing snapshot
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -533,7 +533,7 @@ class VDiskTest(unittest.TestCase):
             - List the volumes on vPool1
             - List the volumes on vPool2
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -586,7 +586,7 @@ class VDiskTest(unittest.TestCase):
             - Create a vDisk
             - Set it as template and make some assertions
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -629,7 +629,7 @@ class VDiskTest(unittest.TestCase):
         Test migrate from volumedriver event
         """
         _ = self
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -651,7 +651,7 @@ class VDiskTest(unittest.TestCase):
             - Create a vDisk using the resize event
             - Resize the created vDisk using the same resize event
         """
-        structure = Helper.build_service_structure(
+        structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -664,7 +664,7 @@ class VDiskTest(unittest.TestCase):
         # Create volume using resize from voldrv
         device_name = '/vdisk.raw'
         srclient = StorageRouterClient(vpools[1].guid, None)
-        mds_backend_config = Helper._generate_mdsmetadatabackendconfig([mds_service])
+        mds_backend_config = DalHelper.generate_mds_metadata_backend_config([mds_service])
         volume_id = srclient.create_volume(device_name, mds_backend_config, 1024 ** 4, str(storagedrivers[1].storagedriver_id))
         VDiskController.resize_from_voldrv(volume_id=volume_id,
                                            volume_size=1024 ** 4,

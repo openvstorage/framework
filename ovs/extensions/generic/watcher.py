@@ -72,7 +72,7 @@ class Watcher(object):
                 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
                 with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
                     contents = config_file.read()
-                config = ArakoonClusterConfig(cluster_id='cacc', filesystem=True)
+                config = ArakoonClusterConfig(cluster_id='cacc', load_config=False)
                 config.read_config(contents)
                 client = ArakoonInstaller.build_client(config)
                 contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())

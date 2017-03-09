@@ -21,6 +21,7 @@ StorageDriver module
 import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
+from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -66,11 +67,8 @@ class StorageDriver(DataObject):
         """
         from ovs.dal.hybrids.vdisk import VDisk
         statistics = {}
-        for key in StorageDriverClient.STAT_KEYS:
-            statistics[key] = 0
-            statistics['{0}_ps'.format(key)] = 0
         for key, value in self.fetch_statistics().iteritems():
-            statistics[key] += value
+            statistics[key] = value
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
@@ -107,46 +105,14 @@ class StorageDriver(DataObject):
         Loads statistics from this vDisk - returns unprocessed data
         """
         # Load data from volumedriver
+        sdstats = StorageDriverClient.EMPTY_STATISTICS()
         if self.storagedriver_id and self.vpool:
             try:
                 sdstats = self.vpool.storagedriver_client.statistics_node(str(self.storagedriver_id), req_timeout_secs=2)
             except Exception as ex:
                 StorageDriver._logger.error('Error loading statistics_node from {0}: {1}'.format(self.storagedriver_id, ex))
-                sdstats = StorageDriverClient.EMPTY_STATISTICS()
-        else:
-            sdstats = StorageDriverClient.EMPTY_STATISTICS()
         # Load volumedriver data in dictionary
-        sdstatsdict = {}
-        try:
-            pc = sdstats.performance_counters
-            sdstatsdict['backend_data_read'] = pc.backend_read_request_size.sum()
-            sdstatsdict['backend_data_written'] = pc.backend_write_request_size.sum()
-            sdstatsdict['backend_read_operations'] = pc.backend_read_request_size.events()
-            sdstatsdict['backend_write_operations'] = pc.backend_write_request_size.events()
-            sdstatsdict['data_read'] = pc.read_request_size.sum()
-            sdstatsdict['data_written'] = pc.write_request_size.sum()
-            sdstatsdict['read_operations'] = pc.read_request_size.events()
-            sdstatsdict['write_operations'] = pc.write_request_size.events()
-            for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
-                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored']:
-                sdstatsdict[key] = getattr(sdstats, key)
-            # Do some more manual calculations
-            block_size = 0
-            if len(self.vpool.vdisks) > 0:
-                vdisk = self.vpool.vdisks[0]
-                block_size = vdisk.metadata.get('lba_size', 0) * vdisk.metadata.get('cluster_multiplier', 0)
-            if block_size == 0:
-                block_size = 4096
-            sdstatsdict['4k_read_operations'] = sdstatsdict['data_read'] / block_size
-            sdstatsdict['4k_write_operations'] = sdstatsdict['data_written'] / block_size
-            # Pre-calculate sums
-            for key, items in StorageDriverClient.STAT_SUMS.iteritems():
-                sdstatsdict[key] = 0
-                for item in items:
-                    sdstatsdict[key] += sdstatsdict[item]
-        except:
-            pass
-        return sdstatsdict
+        return VDisk.extract_statistics(sdstats, None if len(self.vpool.vdisks) == 0 else self.vpool.vdisks[0])
 
     def _vpool_backend_info(self):
         """
