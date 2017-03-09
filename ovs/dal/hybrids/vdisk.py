@@ -293,6 +293,8 @@ class VDisk(DataObject):
                                                                  'distribution': 'backend_write_operations_distribution'},
                                   'backend_write_request_usecs': {'sum': 'backend_write_latency',
                                                                   'distribution': 'backend_write_latency_distribution'},
+                                  'sync_request_usecs': {'sum': 'sync_latency',
+                                                         'distribution': 'sync_latency_distribution'},
                                   'read_request_size': {'sum': 'data_read',
                                                         'events': 'read_operations',
                                                         'distribution': 'read_operations_distribution'},
