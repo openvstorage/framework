@@ -46,6 +46,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import LocalStorageRouterClient, MDSClient, StorageRouterClient
+from ovs.lib.helpers.decorators import Decorators
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.log.log_handler import LogHandler
@@ -97,6 +98,8 @@ class DalHelper(object):
         Systemd._clean()
         # noinspection PyProtectedMember
         MDSClient._clean()
+        # noinspection PyProtectedMember
+        Decorators._clean()
         # noinspection PyProtectedMember
         StorageRouterClient._clean()
 
