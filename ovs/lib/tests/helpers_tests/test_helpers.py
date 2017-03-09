@@ -20,6 +20,7 @@ Helpers test module
 
 import time
 import unittest
+import threading
 from threading import Event, Thread
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.threadhelpers import Waiter
@@ -60,12 +61,173 @@ class Helpers(unittest.TestCase):
                 exceptions.append(ex.message)
 
     @staticmethod
-    def _wait_for(condition, timeout):
+    def _wait_for(condition):
         start = time.time()
-        while condition() is True:
+        while condition() is False:
             time.sleep(0.01)
-            if time.time() > start + timeout:
+            if time.time() > start + 5:
                 raise RuntimeError('Waiting for condition timed out')
+
+    def test_ensure_single_decorator_chained(self):
+        """
+        Tests Helpers._ensure_single functionality in CHAINED mode
+        """
+        # DECORATED FUNCTIONS
+        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'CHAINED', 'extra_task_names': []})
+        def _function_w_extra_task_names():
+            pass
+
+        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'CHAINED', 'callback': Callback.call_back_function})
+        def _function_w_callback(arg1):
+            _ = arg1
+
+        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'CHAINED', 'callback': Callback.call_back_function2})
+        def _function_w_callback_incorrect_args(arg1):
+            _ = arg1
+
+        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'CHAINED'})
+        def _function_wo_callback(arg1):
+            _ = arg1
+            threadname = threading.current_thread().getName()
+            if threadname == 'finished_async_initial_delayed':
+                waiter = helpers['1']
+            elif threadname == 'finished_async_after_wait_delayed':
+                waiter = helpers['2']
+            else:
+                waiter = helpers['3']
+            waiter.wait()
+
+        # Use extra task names, which is not allowed in CHAINED mode
+        with self.assertRaises(ValueError) as raise_info:
+            _function_w_extra_task_names()
+        self.assertIn(member='Extra tasks are not allowed in this mode',
+                      container=raise_info.exception.message)
+
+        # Discarding and Queueing of tasks
+        global helpers, exceptions
+        waiter1 = Waiter(2)
+        waiter2 = Waiter(2)
+        waiter3 = Waiter(2)
+        helpers = {'1': waiter1,
+                   '2': waiter2,
+                   '3': waiter3}
+        exceptions = []
+
+        thread1 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_initial', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread2 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
+        thread3 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_after_wait', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread4 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_other_args', args=(_function_wo_callback, True), kwargs={'arg1': 'other_arg'})
+        thread5 = Thread(target=Helpers._execute_delayed_or_inline, name='discarded_wo_callback_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread6 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_wo_callback_sync', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
+        thread7 = Thread(target=Helpers._execute_delayed_or_inline, name='discarded_w_callback_async', args=(_function_w_callback, True), kwargs={'arg1': 'arg'})
+        thread8 = Thread(target=Helpers._execute_delayed_or_inline, name='callback_w_callback_sync', args=(_function_w_callback, False), kwargs={'arg1': 'arg'})
+        thread9 = Thread(target=Helpers._execute_delayed_or_inline, name='callback_w_callback_sync_incorrect_args', args=(_function_w_callback_incorrect_args, False), kwargs={'arg1': 'arg'})
+        thread10 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_wo_callback_sync_timeout', args=(_function_wo_callback, False), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
+        thread11 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_sync_wait_for_async', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
+
+        thread1.start()  # Start initial thread and wait for it to be EXECUTING
+        Helpers._wait_for(condition=lambda: ('finished_async_initial_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['finished_async_initial_delayed'][0] == 'EXECUTING'))
+
+        thread2.start()  # Start thread2, which should timeout because thread1 is still executing
+        Helpers._wait_for(condition=lambda: ('exception_async_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['exception_async_delayed'][0] == 'EXCEPTION'))
+
+        thread3.start()  # Start thread3, which should be put in the queue, waiting for thread1 to finish
+        thread4.start()  # Start thread4 with different params, which should be put in the queue, waiting for thread1 to finish
+        Helpers._wait_for(condition=lambda: ('finished_async_after_wait_delayed' in Decorators.unittest_thread_info_by_state['WAITING']))
+        Helpers._wait_for(condition=lambda: ('finished_async_other_args_delayed' in Decorators.unittest_thread_info_by_state['WAITING']))
+
+        # At this point, we have 1 task executing and 2 tasks in queue, other tasks should be discarded. (Thread1 being executed and thread3 and thread4 waiting for execution)
+        thread5.start()   # Thread5 should be discarded due to identical params (a-sync)
+        thread6.start()   # Thread6 should be discarded due to identical params (sync)
+        thread7.start()   # Thread7 should be discarded due to identical params and callback should not be executed since its a-sync
+        thread8.start()   # Thread8 should be discarded due to identical params and callback should be executed since its sync
+        thread9.start()   # Thread9 should be discarded due to identical params and callback should be executed since its sync, but fail due to incorrect arguments
+        thread10.start()  # Thread10 should timeout (sync) while trying to wait for the a-sync tasks to complete
+        thread11.start()  # Thread11 should wait for the a-sync tasks to complete
+
+        # Make sure every thread is at expected state before letting thread1 finish
+        Helpers._wait_for(condition=lambda: ('callback_w_callback_sync' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['callback_w_callback_sync'][0] == 'CALLBACK'))
+        Helpers._wait_for(condition=lambda: ('callback_w_callback_sync_incorrect_args' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['callback_w_callback_sync_incorrect_args'][0] == 'CALLBACK'))
+        Helpers._wait_for(condition=lambda: ('discarded_w_callback_async_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['discarded_w_callback_async_delayed'][0] == 'DISCARDED'))
+        Helpers._wait_for(condition=lambda: ('discarded_wo_callback_async_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['discarded_wo_callback_async_delayed'][0] == 'DISCARDED'))
+        Helpers._wait_for(condition=lambda: ('waited_wo_callback_sync' in Decorators.unittest_thread_info_by_state['WAITING']))
+        Helpers._wait_for(condition=lambda: ('waited_sync_wait_for_async' in Decorators.unittest_thread_info_by_state['WAITING']))
+
+        waiter1.wait()  # Make sure thread1 finishes its task
+
+        # Either thread3 or thread4 should now start executing, the other should still wait in queue
+        Helpers._wait_for(condition=lambda: ('finished_async_after_wait_delayed' in Decorators.unittest_thread_info_by_name))
+        Helpers._wait_for(condition=lambda: ('finished_async_other_args_delayed' in Decorators.unittest_thread_info_by_name))
+        Helpers._wait_for(condition=lambda: (['EXECUTING', 'WAITING'] == sorted([Decorators.unittest_thread_info_by_name['finished_async_after_wait_delayed'][0],
+                                                                                 Decorators.unittest_thread_info_by_name['finished_async_other_args_delayed'][0]])))
+
+        # Make sure currently executing thread finishes its task
+        if Decorators.unittest_thread_info_by_name['finished_async_after_wait_delayed'][0] == 'EXECUTING':
+            waiter2.wait()
+        else:
+            waiter3.wait()
+
+        Helpers._wait_for(condition=lambda: (['EXECUTING', 'FINISHED'] == sorted([Decorators.unittest_thread_info_by_name['finished_async_after_wait_delayed'][0],
+                                                                                  Decorators.unittest_thread_info_by_name['finished_async_other_args_delayed'][0]])))
+        # Make sure last executing thread finishes its task
+        if Decorators.unittest_thread_info_by_name['finished_async_after_wait_delayed'][0] == 'FINISHED':
+            waiter3.wait()
+        else:
+            waiter2.wait()
+
+        thread3.join()
+        thread4.join()
+        thread6.join()
+        thread9.join()
+        thread10.join()
+        thread11.join()
+
+        # Validations
+        # Validate the individual state for each thread
+        for thread_name in ['finished_async_initial_delayed', 'finished_async_after_wait_delayed', 'finished_async_other_args_delayed',
+                            'discarded_wo_callback_async_delayed', 'discarded_w_callback_async_delayed',
+                            'waited_sync_wait_for_async', 'waited_wo_callback_sync',
+                            'exception_async_delayed', 'exception_wo_callback_sync_timeout',
+                            'callback_w_callback_sync', 'callback_w_callback_sync_incorrect_args']:
+            if thread_name.startswith('finished'):
+                value = 'FINISHED'
+            elif thread_name.startswith('discarded'):
+                value = 'DISCARDED'
+            elif thread_name.startswith('waited'):
+                value = 'WAITED'
+            elif thread_name.startswith('exception'):
+                value = 'EXCEPTION'
+            else:
+                value = 'CALLBACK'
+
+            self.assertIn(member=thread_name,
+                          container=Decorators.unittest_thread_info_by_name)
+            self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name][0],
+                             second=value)
+
+            if thread_name == 'exception_async_delayed':
+                self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name][1],
+                                 second='Could not start within timeout of 0.1s while queued')
+            elif thread_name == 'exception_wo_callback_sync_timeout':
+                self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name][1],
+                                 second='Could not start within timeout of 0.1s while waiting for other tasks')
+
+        # Validate total amount of exceptions, 3 expected (2 timeouts and 1 incorrect callback)
+        self.assertEqual(first=len(exceptions),
+                         second=3)
+        self.assertIn(member='call_back_function2() takes exactly 2 arguments (1 given)',
+                      container=exceptions)
+
+        # Validate the expected tasks which should have been waiting at some point
+        self.assertListEqual(list1=sorted(Decorators.unittest_thread_info_by_state['WAITING']),
+                             list2=sorted(['exception_async_delayed', 'finished_async_after_wait_delayed', 'finished_async_other_args_delayed', 'waited_wo_callback_sync', 'waited_sync_wait_for_async']))
+
+        # Validate initial task has been executed before another in queue with identical params
+        self.assertLess(a=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_initial_delayed'),  # Since thread3 waits for thread1 to finish, index should be lower for thread1
+                        b=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_after_wait_delayed'))
+        # Validate initial task has been executed before another in queue with different params
+        self.assertLess(a=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_initial_delayed'),  # Since thread4 waits for thread1 to finish, index should be lower for thread1
+                        b=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_other_args_delayed'))
 
     def test_ensure_single_decorator_deduped(self):
         """
@@ -80,6 +242,10 @@ class Helpers(unittest.TestCase):
         def _function_w_callback(arg1):
             _ = arg1
             helpers['waiter'].wait()
+
+        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'DEDUPED', 'callback': Callback.call_back_function2})
+        def _function_w_callback_incorrect_args(arg1):
+            _ = arg1
 
         @ovs_task(name='unittest_task', ensure_single_info={'mode': 'DEDUPED'})
         def _function_wo_callback(arg1):
@@ -116,20 +282,19 @@ class Helpers(unittest.TestCase):
         thread6 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_wo_callback_sync', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
         thread7 = Thread(target=Helpers._execute_delayed_or_inline, name='discarded_w_callback_async', args=(_function_w_callback, True), kwargs={'arg1': 'arg'})
         thread8 = Thread(target=Helpers._execute_delayed_or_inline, name='callback_w_callback_sync', args=(_function_w_callback, False), kwargs={'arg1': 'arg'})
-        thread9 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_wo_callback_sync_timeout', args=(_function_wo_callback, False), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
-        thread10 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_sync_wait_for_async', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
+        thread9 = Thread(target=Helpers._execute_delayed_or_inline, name='callback_w_callback_sync_incorrect_args', args=(_function_w_callback_incorrect_args, False), kwargs={'arg1': 'arg'})
+        thread10 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_wo_callback_sync_timeout', args=(_function_wo_callback, False), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
+        thread11 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_sync_wait_for_async', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
 
         thread1.start()  # Start initial thread and wait for it to be EXECUTING
-        Helpers._wait_for(timeout=5, condition=lambda: ('finished_async_initial_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['finished_async_initial_delayed'][0] != 'EXECUTING'))
+        Helpers._wait_for(condition=lambda: ('finished_async_initial_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['finished_async_initial_delayed'][0] == 'EXECUTING'))
 
-        # Start thread2, which should timeout because thread1 is still executing
-        thread2.start()
-        Helpers._wait_for(timeout=5, condition=lambda: ('exception_async_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['exception_async_delayed'][0] != 'EXCEPTION'))
+        thread2.start()  # Start thread2, which should timeout because thread1 is still executing
+        Helpers._wait_for(condition=lambda: ('exception_async_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['exception_async_delayed'][0] == 'EXCEPTION'))
 
-        # Start thread3, which should be put in the queue, waiting for thread1 to finish
         helpers['waiter'] = waiter
-        thread3.start()
-        Helpers._wait_for(timeout=5, condition=lambda: ('finished_async_after_wait_delayed' not in Decorators.unittest_thread_info_by_state['WAITING']))
+        thread3.start()  # Start thread3, which should be put in the queue, waiting for thread1 to finish
+        Helpers._wait_for(condition=lambda: ('finished_async_after_wait_delayed' in Decorators.unittest_thread_info_by_state['WAITING']))
 
         # At this point, we have 2 tasks in queue, other tasks should be discarded. (Thread1 being executed and thread3 waiting for execution)
         thread4.start()   # Thread4 should succeed because of different params
@@ -137,15 +302,24 @@ class Helpers(unittest.TestCase):
         thread6.start()   # Thread6 should be discarded due to identical params (sync)
         thread7.start()   # Thread7 should be discarded due to identical params and callback should not be executed since its a-sync
         thread8.start()   # Thread8 should be discarded due to identical params and callback should be executed since its sync
-        thread9.start()   # Thread9 should timeout (sync) while trying to wait for the a-sync tasks to complete
-        thread10.start()  # Thread10 should wait for the a-sync tasks to complete
+        thread9.start()   # Thread9 should be discarded due to identical params and callback should be executed since its sync, but fail due to incorrect arguments
+        thread10.start()  # Thread10 should timeout (sync) while trying to wait for the a-sync tasks to complete
+        thread11.start()  # Thread11 should wait for the a-sync tasks to complete
 
         # Make sure every thread it at expected state before letting thread1 finish
-        Helpers._wait_for(timeout=5, condition=lambda: ('callback_w_callback_sync' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['callback_w_callback_sync'][0] != 'CALLBACK'))
-        Helpers._wait_for(timeout=5, condition=lambda: ('discarded_w_callback_async_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['discarded_w_callback_async_delayed'][0] != 'DISCARDED'))
-        Helpers._wait_for(timeout=5, condition=lambda: ('discarded_wo_callback_async_delayed' not in Decorators.unittest_thread_info_by_name or Decorators.unittest_thread_info_by_name['discarded_wo_callback_async_delayed'][0] != 'DISCARDED'))
-        Helpers._wait_for(timeout=5, condition=lambda: ('waited_wo_callback_sync' not in Decorators.unittest_thread_info_by_state['WAITING']))
-        Helpers._wait_for(timeout=5, condition=lambda: ('waited_sync_wait_for_async' not in Decorators.unittest_thread_info_by_state['WAITING']))
+        Helpers._wait_for(condition=lambda: ('finished_async_other_args_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['finished_async_other_args_delayed'][0] == 'EXECUTING'))
+        Helpers._wait_for(condition=lambda: ('callback_w_callback_sync_incorrect_args' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['callback_w_callback_sync_incorrect_args'][0] == 'CALLBACK'))
+        Helpers._wait_for(condition=lambda: ('callback_w_callback_sync' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['callback_w_callback_sync'][0] == 'CALLBACK'))
+        Helpers._wait_for(condition=lambda: ('discarded_w_callback_async_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['discarded_w_callback_async_delayed'][0] == 'DISCARDED'))
+        Helpers._wait_for(condition=lambda: ('discarded_wo_callback_async_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['discarded_wo_callback_async_delayed'][0] == 'DISCARDED'))
+        Helpers._wait_for(condition=lambda: ('waited_wo_callback_sync' in Decorators.unittest_thread_info_by_state['WAITING']))
+        Helpers._wait_for(condition=lambda: ('waited_sync_wait_for_async' in Decorators.unittest_thread_info_by_state['WAITING']))
+
+        # Important difference between DEDUPED and CHAINED: Tasks with different params will run simultaneously, so both 'initial' and 'other_args' should be executing at this point
+        self.assertEqual(first=Decorators.unittest_thread_info_by_name['finished_async_initial_delayed'][0],
+                         second='EXECUTING')
+        self.assertEqual(first=Decorators.unittest_thread_info_by_name['finished_async_other_args_delayed'][0],
+                         second='EXECUTING')
 
         event.set()  # Make sure thread1 now finishes, so thread3 can start executing
         waiter.wait()
@@ -155,6 +329,7 @@ class Helpers(unittest.TestCase):
         thread6.join()
         thread9.join()
         thread10.join()
+        thread11.join()
 
         # Validations
         # Validate the individual state for each thread
@@ -162,7 +337,7 @@ class Helpers(unittest.TestCase):
                             'discarded_wo_callback_async_delayed', 'discarded_w_callback_async_delayed',
                             'waited_sync_wait_for_async', 'waited_wo_callback_sync',
                             'exception_async_delayed', 'exception_wo_callback_sync_timeout',
-                            'callback_w_callback_sync']:
+                            'callback_w_callback_sync', 'callback_w_callback_sync_incorrect_args']:
             if thread_name.startswith('finished'):
                 value = 'FINISHED'
             elif thread_name.startswith('discarded'):
@@ -186,16 +361,18 @@ class Helpers(unittest.TestCase):
                 self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name][1],
                                  second='Could not start within timeout of 0.1s while waiting for other tasks')
 
-        # Validate total amount of exceptions, 2 expected
+        # Validate total amount of exceptions, 3 expected (2 timeouts and 1 incorrect callback)
         self.assertEqual(first=len(exceptions),
-                         second=2)
+                         second=3)
+        self.assertIn(member='call_back_function2() takes exactly 2 arguments (1 given)',
+                      container=exceptions)
 
         # Validate the expected tasks which should have been waiting at some point
         self.assertListEqual(list1=sorted(Decorators.unittest_thread_info_by_state['WAITING']),
                              list2=sorted(['exception_async_delayed', 'finished_async_after_wait_delayed', 'waited_wo_callback_sync', 'waited_sync_wait_for_async']))
 
         # Validate initial task has been executed before another in queue with identical params
-        self.assertLess(a=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_initial_delayed'),  # Since thread7 waits for thread1 to finish, index should be lower for thread1
+        self.assertLess(a=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_initial_delayed'),  # Since thread3 waits for thread1 to finish, index should be lower for thread1
                         b=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_after_wait_delayed'))
 
     def test_ensure_single_decorator_default(self):
@@ -352,3 +529,10 @@ class Callback(object):
         Call back function (Needs to have identical parameters as first function trying to be executed)
         """
         _ = arg1
+
+    @staticmethod
+    def call_back_function2(arg1, arg2):
+        """
+        Call back function with different amount of required arguments, to invoke error in unittests
+        """
+        _ = arg1, arg2

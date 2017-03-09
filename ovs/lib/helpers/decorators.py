@@ -127,8 +127,11 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
      - DEDUPED: De-duplication based on the task's name and arguments. If a new task with the same name and arguments
                 is scheduled while the first one is currently being executed, it will be allowed on the queue (to make
                 sure there will be at least one new execution). All subsequent identical tasks will be discarded.
-                Tasks with different arguments will be executed in parallel
-     - CHAINED: Identical as DEDUPED with the exception that all tasks will be executed in serial.
+                 - Tasks with identical arguments will be executed in serial (Subsequent tasks with same params will be discarded if 1 waiting task with these params already in queue)
+                 - Tasks with different arguments will be executed in parallel
+     - CHAINED: Identical as DEDUPED with the exception that tasks will be executed in serial.
+                 - Tasks with identical arguments will be executed in serial (Subsequent tasks with same params will be discarded if 1 waiting task with these params already in queue)
+                 - Tasks with different arguments will be executed in serial
 
     :param task_name: Name of the task to ensure its singularity
     :type task_name: str
@@ -299,7 +302,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                 slept += sleep
                                 time.sleep(sleep)
                                 if slept >= timeout:
-                                    log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
+                                    log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, slept),
                                                 level='error')
                                     if unittest_mode is True:
                                         Decorators.unittest_thread_info_by_name[thread_name] = ('EXCEPTION', 'Could not start within timeout of {0}s while waiting for other tasks'.format(timeout))
@@ -368,6 +371,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                     raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
 
                 # Update kwargs with args
+                sleep = 1 if unittest_mode is False else 0.1
                 timeout = kwargs.pop('ensure_single_timeout', 10 if unittest_mode is True else global_timeout)
                 function_info = inspect.getargspec(function)
                 kwargs_dict = {}
@@ -385,31 +389,44 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                     if item['kwargs'] == kwargs_dict:
                         if async_task is True:  # Not waiting for other jobs to finish since asynchronously
                             log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                            if unittest_mode is True:
+                                Decorators.unittest_thread_info_by_name[thread_name] = ('DISCARDED', None)
                             return None
 
                         # If executed inline (sync), execute callback if any provided
                         if callback is not None:
                             log_message('Execution of task {0} {1} in progress, executing callback function'.format(task_name, params_info))
+                            if unittest_mode is True:
+                                Decorators.unittest_thread_info_by_name[thread_name] = ('CALLBACK', None)
                             return callback(*args, **kwargs)
 
                         # Let's wait for 2nd job in queue to have finished if no callback provided
-                        counter = 0
-                        while counter < timeout:
-                            log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, counter + 1))
+                        slept = 0
+                        while slept < timeout:
+                            log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, slept + sleep))
                             values = list(persistent_client.get_multi([persistent_key], must_exist=False))
                             if values[0] is None:
+                                if unittest_mode is True:
+                                    Decorators.unittest_thread_info_by_name[thread_name] = ('WAITED', None)
                                 return None  # All pending jobs have been deleted in the meantime, no need to wait
                             if item['timestamp'] not in [value['timestamp'] for value in values[0]['values']]:
+                                if unittest_mode is True:
+                                    Decorators.unittest_thread_info_by_name[thread_name] = ('WAITED', None)
                                 return None  # Similar tasks have been executed, so sync task currently waiting can return without having been executed
-                            counter += 1
-                            time.sleep(1)
-                            if counter >= timeout:
-                                log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, timeout),
+                            slept += sleep
+                            time.sleep(sleep)
+                            if slept >= timeout:
+                                log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, slept),
                                             level='error')
+                                if unittest_mode is True:
+                                    Decorators.unittest_thread_info_by_name[thread_name] = ('EXCEPTION', 'Could not start within timeout of {0}s while waiting for other tasks'.format(timeout))
                                 raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
                                                                                                                                                                  now,
                                                                                                                                                                  task_name,
                                                                                                                                                                  timeout))
+                            if unittest_mode is True:
+                                if thread_name not in Decorators.unittest_thread_info_by_state['WAITING']:
+                                    Decorators.unittest_thread_info_by_state['WAITING'].append(thread_name)
 
                 log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
                 update_value(key=persistent_key,
@@ -419,8 +436,8 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
 
                 # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
                 first_element = None
-                counter = 0
-                while counter < timeout:
+                slept = 0
+                while slept < timeout:
                     values = list(persistent_client.get_multi([persistent_key], must_exist=False))
                     if values[0] is not None:
                         value = values[0]
@@ -428,28 +445,38 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
 
                     if first_element == now:
                         try:
-                            if counter != 0:
+                            if slept > 0:
                                 log_message('Task {0} {1} had to wait {2} seconds before being able to start'.format(task_name,
                                                                                                                      params_info,
-                                                                                                                     counter))
+                                                                                                                     slept))
+                            if unittest_mode is True:
+                                Decorators.unittest_thread_info_by_name[thread_name] = ('EXECUTING', None)
                             output = function(*args, **kwargs)
+                            if unittest_mode is True:
+                                Decorators.unittest_thread_info_by_name[thread_name] = ('FINISHED', None)
+                                Decorators.unittest_thread_info_by_state['FINISHED'].append(thread_name)
                             log_message('Task {0} finished successfully'.format(task_name))
-                        except Exception:
-                            log_message('Task {0} {1} failed'.format(task_name, params_info), level='exception')
-                            raise
+                            return output
                         finally:
                             update_value(key=persistent_key,
                                          append=False)
-                        return output
-                    counter += 1
-                    time.sleep(1)
-                    if counter >= timeout:
+                    else:
+                        if unittest_mode is True:
+                            if thread_name not in Decorators.unittest_thread_info_by_state['WAITING']:
+                                Decorators.unittest_thread_info_by_name[thread_name] = ('WAITING', None)
+                                Decorators.unittest_thread_info_by_state['WAITING'].append(thread_name)
+
+                    slept += sleep
+                    time.sleep(sleep)
+                    if slept >= timeout:
                         update_value(key=persistent_key,
                                      append=False,
                                      value_to_update={'kwargs': kwargs_dict,
                                                       'timestamp': now})
                         log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
                                     level='error')
+                        if unittest_mode is True:
+                            Decorators.unittest_thread_info_by_name[thread_name] = ('EXCEPTION', 'Could not start within timeout of {0}s while queued'.format(timeout))
                         raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
                                                                                                                                                          now,
                                                                                                                                                          task_name,
