@@ -729,6 +729,7 @@
                 "invalid_size": "Maximum size of __amount__ __unit__ exceeded",
                 "invalid_storagerouter": "No valid storagerouter selected",
                 "invalid_vpool": "No valid vPool selected",
+                "loading_information": "Loading information",
                 "name": "Name:",
                 "name_exists": "The devicename already exists",
                 "size": "Size:",
