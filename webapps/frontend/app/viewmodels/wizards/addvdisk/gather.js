@@ -35,9 +35,8 @@ define([
         self.loadVPoolsHandle         = undefined;
 
         // Observables
-        self.loading               = ko.observable(false);
-        self.preValidateResult     = ko.observable({ valid: true, reasons: [], fields: [] });
-        self.storageRoutersByVpool = ko.observable();
+        self.loading           = ko.observable(false);
+        self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
         self.canContinue = ko.computed(function() {
