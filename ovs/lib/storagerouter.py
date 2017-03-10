@@ -575,26 +575,24 @@ class StorageRouterController(object):
             partition = DiskPartition(writecache_info['guid'])
             proportion = available * 100.0 / total_available
             size_to_be_used = proportion * writecache_size_requested / 100
+            write_cache_percentage = 0.98
             if mountpoint_fragment_cache is not None and partition == mountpoint_fragment_cache:
-                frag_size = int(size_to_be_used * 0.10)  # Bytes
-                w_size = int(size_to_be_used * 0.88 / 1024 / 4096) * 4096  # KiB
-                sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
-                                                                                               'role': DiskPartition.ROLES.WRITE,
-                                                                                               'sub_role': StorageDriverPartition.SUBROLE.SCO,
-                                                                                               'partition': DiskPartition(writecache_info['guid'])})
+                if fragment_cache_on_read is True or fragment_cache_on_write is True:  # Only in this case we actually make use of the fragment caching
+                    frag_size = int(size_to_be_used * 0.10)  # Bytes
+                    write_cache_percentage = 0.88
                 for _ in xrange(amount_of_proxies):
                     sdp_frag = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                                   'role': DiskPartition.ROLES.WRITE,
                                                                                                   'sub_role': StorageDriverPartition.SUBROLE.FCACHE,
-                                                                                                  'partition': DiskPartition(writecache_info['guid'])})
+                                                                                                  'partition': partition})
                     dirs2create.append(sdp_frag.path)
                     sdp_frags.append(sdp_frag)
-            else:
-                w_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096
-                sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
-                                                                                               'role': DiskPartition.ROLES.WRITE,
-                                                                                               'sub_role': StorageDriverPartition.SUBROLE.SCO,
-                                                                                               'partition': DiskPartition(writecache_info['guid'])})
+
+            w_size = int(size_to_be_used * write_cache_percentage / 1024 / 4096) * 4096
+            sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                           'role': DiskPartition.ROLES.WRITE,
+                                                                                           'sub_role': StorageDriverPartition.SUBROLE.SCO,
+                                                                                           'partition': partition})
             writecaches.append({'path': sdp_write.path,
                                 'size': '{0}KiB'.format(w_size)})
             dirs2create.append(sdp_write.path)
@@ -628,7 +626,7 @@ class StorageRouterController(object):
         dirs2create.append(sdp_dtl.path)
         dirs2create.append(storagedriver.mountpoint)
 
-        if frag_size is None and use_accelerated_alba is False:
+        if frag_size is None and use_accelerated_alba is False and (fragment_cache_on_read is True or fragment_cache_on_write is True):
             vpool.status = VPool.STATUSES.FAILURE
             vpool.save()
             raise ValueError('Something went wrong trying to calculate the fragment cache size')
