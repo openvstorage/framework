@@ -503,13 +503,13 @@ class ArakoonInstaller(object):
         :return: IPs of the remaining nodes in the cluster
         :rtype: list
         """
+        if offline_nodes is None:
+            offline_nodes = []
+
         cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=remaining_ip)['cluster_type']
         filesystem, remaining_ip = ArakoonInstaller._is_filesystem_cluster(cluster_type=cluster_type, ip=remaining_ip)
         if remaining_ip is not None and remaining_ip in offline_nodes:
             raise ValueError('The specified remaining IP must be the IP of an online node')
-
-        if offline_nodes is None:
-            offline_nodes = []
 
         # Shrink the cluster
         ArakoonInstaller._logger.debug('Shrinking cluster {0} of type {1} from {2}'.format(cluster_name, cluster_type, ip))
