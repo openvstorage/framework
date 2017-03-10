@@ -38,7 +38,9 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('vpool') }">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.vpool"></label>
         <div class="col-lg-7">
-            <span data-bind="dropdown: {
+            <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: loading() === true"></span>
+            <span data-bind="visible: loading() === false,
+                             dropdown: {
                                 key: 'guid',
                                 keyisfunction: true,
                                 items: data.vPools,
@@ -55,10 +57,12 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageouter') }">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.storagerouter"></label>
         <div class="col-lg-7">
-            <span data-bind="dropdown: {
+            <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: loading() === true"></span>
+            <span data-bind="visible: loading() === false,
+                             dropdown: {
                                 key: 'guid',
                                 keyisfunction: true,
-                                items: data.storageRoutersByVpool,
+                                items: storageRoutersByVpool,
                                 target: data.storageRouter,
                                 text: function(item) {
                                     if (item !== undefined) {
@@ -69,7 +73,10 @@ but WITHOUT ANY WARRANTY of any kind.
             </span>
         </div>
     </div>
-    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
+    <div class="alert alert-info" data-bind="visible: loading() === true" style="margin-bottom: -10px;">
+        <span data-i18n="ovs:wizards.add_vdisk.gather.loading_information"></span>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: (!canContinue().value || canContinue().showErrors) && loading() === false" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
         <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
         <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">

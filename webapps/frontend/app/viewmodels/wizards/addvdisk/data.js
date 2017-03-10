@@ -30,21 +30,6 @@ define(['jquery', 'knockout'], function($, ko){
         wizardData.size = ko.computed(function () {
             return wizardData.sizeEntry() * Math.pow(1024, 3);
         });
-
-        wizardData.storageRoutersByVpool = ko.computed(function() {
-            var guids = [], result = [];
-            $.each(wizardData.storageRouters(), function(index, storageRouter) {
-                if (wizardData.vPool() !== undefined &&
-                    storageRouter.vPoolGuids().contains(wizardData.vPool().guid())) {
-                    result.push(storageRouter);
-                    guids.push(storageRouter.guid());
-                }
-            });
-            if (result.length > 0 && wizardData.storageRouter() && !guids.contains(wizardData.storageRouter().guid())) {
-                wizardData.storageRouter(result[0]);
-            }
-            return result;
-        });
         return wizardData;
     };
     return singleton();
