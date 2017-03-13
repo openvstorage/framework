@@ -69,6 +69,7 @@ class LogHandler(object):
     cache = {}
     counter = itertools.count()
     propagate_cache = {}
+    defaults = {'logging_target': {'type': 'console'}}
 
     def __init__(self, source, name, propagate):
         """
@@ -118,7 +119,7 @@ class LogHandler(object):
         :return: Target definition
         :rtype: dict
         """
-        logging_target = {'type': 'console'}
+        logging_target = LogHandler.defaults['logging_target']
         try:
             from ovs.extensions.generic.configuration import Configuration
             logging_target = Configuration.get('/ovs/framework/logging')
