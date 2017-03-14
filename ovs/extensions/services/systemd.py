@@ -129,8 +129,7 @@ class Systemd(object):
         if startup_dependency == '':
             startup_dependency = None
         else:
-            startup_dependency = '.'.join(
-                startup_dependency.split('.')[:-1])  # Remove .service from startup dependency
+            startup_dependency = '.'.join(startup_dependency.split('.')[:-1])  # Remove .service from startup dependency
         output = Systemd.add_service(name=name,
                                      client=client,
                                      params=service_params,
