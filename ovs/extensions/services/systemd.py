@@ -31,7 +31,6 @@ class Systemd(object):
     Contains all logic related to Systemd services
     """
     _logger = LogHandler.get('extensions', name='service-manager')
-    SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
 
     @staticmethod
     def _service_exists(name, client, path):
@@ -129,8 +128,7 @@ class Systemd(object):
         if startup_dependency == '':
             startup_dependency = None
         else:
-            startup_dependency = '.'.join(
-                startup_dependency.split('.')[:-1])  # Remove .service from startup dependency
+            startup_dependency = '.'.join(startup_dependency.split('.')[:-1])  # Remove .service from startup dependency
         output = Systemd.add_service(name=name,
                                      client=client,
                                      params=service_params,
