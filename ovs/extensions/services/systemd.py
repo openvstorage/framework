@@ -31,7 +31,6 @@ class Systemd(object):
     Contains all logic related to Systemd services
     """
     _logger = LogHandler.get('extensions', name='service-manager')
-    SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
 
     @staticmethod
     def _service_exists(name, client, path):

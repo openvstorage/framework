@@ -64,6 +64,7 @@ class ServiceManager(object):
                     except Exception as ex:
                         ServiceManager._logger.exception('Error loading ServiceManager: {0}'.format(ex))
                         raise
+            ServiceManager.ImplementationClass.SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
             return getattr(ServiceManager.ImplementationClass, item)
 
     __metaclass__ = MetaClass
