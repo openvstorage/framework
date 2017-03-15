@@ -18,11 +18,16 @@
 Systemd Mock module
 """
 
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
+
 
 class Systemd(object):
     """
     Contains all logic related to Systemd Mock services
     """
+    SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
     services = {}
 
     @staticmethod
@@ -30,35 +35,48 @@ class Systemd(object):
         """
         Adds a mocked service
         """
-        _ = params, startup_dependency, delay_registration
+        if params is None:
+            params = {}
+
         key = 'None' if client is None else client.ip
         name = name if target_name is None else target_name
-        Systemd.services[key] = {name: 'HALTED'}
+        params.update({'SERVICE_NAME': ExtensionsToolbox.remove_prefix(name, 'ovs-'),
+                       'STARTUP_DEPENDENCY': '' if startup_dependency is None else '{0}.service'.format(startup_dependency)})
+        if Systemd.has_service(name=name, client=client) is False:
+            Systemd.services[key] = {name: 'HALTED'}
+        if delay_registration is False:
+            Systemd.register_service(node_name=System.get_my_machine_id(client), service_metadata=params)
+        return params
 
     @staticmethod
     def get_service_status(name, client):
         """
         Retrieve the mocked service status
         """
+        name = Systemd._get_name(name, client)
         key = 'None' if client is None else client.ip
         output = 'active' if name in Systemd.services[key] else 'inactive'
         status = Systemd.services[key].get(name, 'HALTED') == 'RUNNING'
         return status, output
 
     @staticmethod
-    def remove_service(name, client):
+    def remove_service(name, client, delay_unregistration=False):
         """
         Remove a mocked service
         """
+        name = Systemd._get_name(name, client)
         key = 'None' if client is None else client.ip
         if name in Systemd.services[key]:
             Systemd.services[key].pop(name)
+        if delay_unregistration is False:
+            Systemd.unregister_service(service_name=name, node_name=System.get_my_machine_id(client))
 
     @staticmethod
     def start_service(name, client):
         """
         Start a mocked service
         """
+        name = Systemd._get_name(name, client)
         key = 'None' if client is None else client.ip
         if name not in Systemd.services[key]:
             raise RuntimeError('Service {0} does not exist'.format(name))
@@ -73,6 +91,7 @@ class Systemd(object):
         """
         Stop a mocked service
         """
+        name = Systemd._get_name(name, client)
         key = 'None' if client is None else client.ip
         if name not in Systemd.services[key]:
             raise RuntimeError('Service {0} does not exist'.format(name))
@@ -87,6 +106,7 @@ class Systemd(object):
         """
         Restart a mocked service
         """
+        name = Systemd._get_name(name, client)
         Systemd.stop_service(name, client)
         return Systemd.start_service(name, client)
 
@@ -95,22 +115,38 @@ class Systemd(object):
         """
         Verify whether a mocked service exists
         """
-        key = 'None' if client is None else client.ip
-        return name in Systemd.services.get(key, {})
+        try:
+            name = Systemd._get_name(name, client)
+            key = 'None' if client is None else client.ip
+            return name in Systemd.services[key]
+        except ValueError:
+            return False
 
     @staticmethod
     def register_service(node_name, service_metadata):
         """
-        Register a service in the configuration management
+        Register the metadata of the service to the configuration management
+        :param node_name: Name of the node on which the service is running
+        :type node_name: str
+        :param service_metadata: Metadata of the service
+        :type service_metadata: dict
+        :return: None
         """
-        _ = node_name, service_metadata
+        service_name = service_metadata['SERVICE_NAME']
+        Configuration.set(key=Systemd.SERVICE_CONFIG_KEY.format(node_name, ExtensionsToolbox.remove_prefix(service_name, 'ovs-')),
+                          value=service_metadata)
 
     @staticmethod
     def unregister_service(node_name, service_name):
         """
-        Un-register a service from the configuration management
+        Un-register the metadata of a service from the configuration management
+        :param node_name: Name of the node on which to un-register the service
+        :type node_name: str
+        :param service_name: Name of the service to clean from the configuration management
+        :type service_name: str
+        :return: None
         """
-        _ = node_name, service_name
+        Configuration.delete(key=Systemd.SERVICE_CONFIG_KEY.format(node_name, ExtensionsToolbox.remove_prefix(service_name, 'ovs-')))
 
     @staticmethod
     def _service_exists(name, client, path):
@@ -119,15 +155,22 @@ class Systemd(object):
         """
         _ = path
         key = 'None' if client is None else client.ip
-        return name in Systemd.services[key]
+        return name in Systemd.services.get(key, {})
 
     @staticmethod
-    def _get_name(name, client, path=None):
+    def _get_name(name, client, path=None, log=True):
         """
-        Return the name of the mocked service
+        Make sure that for e.g. 'ovs-workers' the given service name can be either 'ovs-workers' as just 'workers'
         """
-        _ = client, path
-        return name
+        _ = log
+        if Systemd._service_exists(name, client, path):
+            return name
+        if Systemd._service_exists(name, client, '/lib/systemd/system/'):
+            return name
+        name = 'ovs-{0}'.format(name)
+        if Systemd._service_exists(name, client, path):
+            return name
+        raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
     def _clean():

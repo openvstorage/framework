@@ -81,7 +81,7 @@ class System(object):
         """
         for ip, hostnames in ip_hostname_map.iteritems():
             if re.match(r'^localhost$|^127(?:\.[0-9]{1,3}){3}$|^::1$', ip):
-                # Never update loopback addresses
+                # Never update loop-back addresses
                 continue
 
             contents = client.file_read('/etc/hosts').strip() + '\n'
@@ -136,7 +136,7 @@ class System(object):
         :return: sorted incrementing list of nr of free ports
         :rtype: list
         """
-
+        unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
         requested_range = []
         for port_range in selected_range:
             if isinstance(port_range, list):
@@ -152,15 +152,21 @@ class System(object):
             exclude = []
         exclude_list = list(exclude)
 
-        ports_in_use = System.ports_in_use(client)
+        if unittest_mode is True:
+            ports_in_use = []
+        else:
+            ports_in_use = System.ports_in_use(client)
         exclude_list += ports_in_use
 
-        cmd = 'cat /proc/sys/net/ipv4/ip_local_port_range'
-        if client is None:
-            output = check_output(cmd, shell=True)
+        if unittest_mode is True:
+            start_end = [0, 0]
         else:
-            output = client.run(cmd.split())
-        start_end = map(int, output.split())
+            cmd = 'cat /proc/sys/net/ipv4/ip_local_port_range'
+            if client is None:
+                output = check_output(cmd, shell=True)
+            else:
+                output = client.run(cmd.split())
+            start_end = map(int, output.split())
         ephemeral_port_range = xrange(min(start_end), max(start_end))
 
         for possible_free_port in requested_range:
