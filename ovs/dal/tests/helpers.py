@@ -41,6 +41,7 @@ from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs.extensions.services.tests.systemd import Systemd
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -100,6 +101,8 @@ class DalHelper(object):
         MDSClient._clean()
         # noinspection PyProtectedMember
         Decorators._clean()
+        # noinspection PyProtectedMember
+        MockedSSHClient._clean()
         # noinspection PyProtectedMember
         StorageRouterClient._clean()
 

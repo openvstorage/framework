@@ -458,15 +458,21 @@ class GenericController(object):
                                                                      ServiceType.SERVICE_TYPES.NS_MGR,
                                                                      ServiceType.SERVICE_TYPES.ALBA_MGR):
                 cluster = ExtensionsToolbox.remove_prefix(service.name, 'arakoon-')
-                if cluster in cluster_names:
+                if cluster in cluster_names and cluster not in ['cacc', 'unittest-cacc']:
                     continue
                 cluster_names.append(cluster)
                 cluster_info.append((cluster, service.storagerouter))
         workload = {}
+        cluster_config_map = {}
         for cluster, storagerouter in cluster_info:
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
-            ip = storagerouter.ip if cluster == 'cacc' else None
-            config = ArakoonClusterConfig(cluster, source_ip=ip)
+            ip = storagerouter.ip if cluster in ['cacc', 'unittest-cacc'] else None
+            try:
+                config = ArakoonClusterConfig(cluster, source_ip=ip)
+                cluster_config_map[cluster] = config
+            except:
+                GenericController._logger.exception('  Retrieving cluster information on {0} for {1} failed'.format(storagerouter.ip, cluster))
+                continue
             for node in config.nodes:
                 if node.ip not in workload:
                     workload[node.ip] = {'node_id': node.name,
@@ -481,8 +487,7 @@ class GenericController(object):
                 for cluster, ip in node_workload['clusters']:
                     try:
                         GenericController._logger.debug('  Collapsing cluster {0} on {1}'.format(cluster, storagerouter.ip))
-                        config = ArakoonClusterConfig(cluster_id=cluster, source_ip=ip)
-                        client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config.external_config_path])
+                        client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', cluster_config_map[cluster].external_config_path])
                         GenericController._logger.debug('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
                     except:
                         GenericController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))

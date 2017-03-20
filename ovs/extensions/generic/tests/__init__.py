@@ -15,5 +15,5 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-This package contains various modules used for unit-testing
+This package contains generic test modules
 """

@@ -18,6 +18,7 @@
 Module for testing the ArakoonInstaller
 """
 import os
+import copy
 import json
 import shutil
 import unittest
@@ -27,8 +28,8 @@ from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.tests.helpers import ExtensionsHelper
 
 
 class ArakoonInstallerTester(unittest.TestCase):
@@ -37,6 +38,32 @@ class ArakoonInstallerTester(unittest.TestCase):
     """
     cluster_name = None
     arakoon_client = None
+
+    EXPECTED_STRUCTURE = {'dirs': {'arakoon': {'dirs': {'cluster_name': {'dirs': {'db': {'dirs': {},
+                                                                                         'files': {},
+                                                                                         'info': {'group': 'ovs',
+                                                                                                  'mode': '493',
+                                                                                                  'user': 'ovs'}},
+                                                                                  'tlogs': {'dirs': {},
+                                                                                            'files': {},
+                                                                                            'info': {'group': 'ovs',
+                                                                                                     'mode': '493',
+                                                                                                     'user': 'ovs'}}},
+                                                                         'files': {},
+                                                                         'info': {}}},
+                                               'files': {},
+                                               'info': {}}},
+                          'files': {},
+                          'info': {}}
+
+    EXPECTED_STRUCTURE_AFTER_REMOVAL = {'dirs': {'arakoon': {'dirs': {'cluster_name': {'dirs': {},
+                                                                                       'info': {},
+                                                                                       'files': {}}},
+                                                             'info': {},
+                                                             'files': {}}},
+                                        'info': {},
+                                        'files': {}}
+
     EXPECTED_CLUSTER_CONFIG = """[global]
 cluster = {node_names}
 cluster_id = {cluster_id}
@@ -73,10 +100,21 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         """
         DalHelper.teardown()
 
-    def _validate_dir_structure(self, expected_structure, directories):
-        for directory in directories:
-            self.assertDictEqual(d1=ExtensionsHelper.extract_dir_structure(directory),
-                                 d2=expected_structure)
+    def _validate_dir_structure(self, structure):
+        for client, directory, status in structure:
+            actual = MockedSSHClient.traverse_file_system(client=client, path=directory)
+            if status == 'missing':
+                self.assertIsNone(obj=actual)
+            elif status == 'removed':
+                expected = copy.deepcopy(ArakoonInstallerTester.EXPECTED_STRUCTURE_AFTER_REMOVAL)
+                expected['dirs']['arakoon']['dirs'][cluster_name] = expected['dirs']['arakoon']['dirs'].pop('cluster_name')
+                self.assertDictEqual(d1=actual,
+                                     d2=expected)
+            else:
+                expected = copy.deepcopy(ArakoonInstallerTester.EXPECTED_STRUCTURE)
+                expected['dirs']['arakoon']['dirs'][cluster_name] = expected['dirs']['arakoon']['dirs'].pop('cluster_name')
+                self.assertDictEqual(d1=actual,
+                                     d2=expected)
 
     def _validate_config(self, node_info, plugins=None, filesystem=False):
         expected_config = ArakoonInstallerTester.EXPECTED_CLUSTER_CONFIG.format(node_names=','.join(node['name'] for node in node_info),
@@ -133,6 +171,19 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                  'in_use': in_use,
                                  'internal': internal})
 
+    def _restart_cluster(self, node_id, client, ips, file_system=False):
+        if file_system is False:
+            config = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster_name))
+        else:
+            config = ArakoonClusterConfig.CONFIG_FILE.format(cluster_name)
+        catchup_command = 'arakoon --node {0} -config {1} -catchup-only'.format(node_id, config)
+        MockedSSHClient._run_returns[client.ip] = {catchup_command: None}
+        MockedSSHClient._run_recordings[client.ip] = []
+        ArakoonInstaller.restart_cluster_add(cluster_name=str(cluster_name),
+                                             current_ips=ips,
+                                             new_ip=client.ip)
+        self.assertIn(catchup_command, MockedSSHClient._run_recordings[client.ip])
+
     def test_internal_not_on_filesystem(self):
         """
         Validates whether a cluster of type FWK can be correctly created, extended, shrunken and deleted
@@ -155,19 +206,13 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         base_dir_1 = '{0}/base_dir_internal_fwk'.format(mountpoint_1)
         base_dir_2 = '{0}/base_dir_internal_fwk_extend'.format(mountpoint_2)
         base_dir_3 = '{0}/base_dir_internal_fwk_extend_port_range'.format(mountpoint_3)
+        client_1 = SSHClient(endpoint=storagerouter_1.ip)
+        client_2 = SSHClient(endpoint=storagerouter_2.ip)
+        client_3 = SSHClient(endpoint=storagerouter_3.ip)
 
         for mountpoint in [mountpoint_1, mountpoint_2, mountpoint_3]:
             if os.path.exists(mountpoint) and mountpoint != '/':
                 shutil.rmtree(mountpoint)
-
-        expected_structure = {'files': [],
-                              'dirs': {'arakoon': {'files': [],
-                                                   'dirs': {cluster_name: {'files': [],
-                                                                           'dirs': {'db': {'dirs': {}, 'files': []},
-                                                                                    'tlogs': {'dirs': {}, 'files': []}}}}}}}
-        expected_structure_after_removal = {'files': [],
-                                            'dirs': {'arakoon': {'files': [],
-                                                                 'dirs': {cluster_name: {'dirs': {}, 'files': []}}}}}
 
         # Basic validations
         with self.assertRaises(ValueError) as raise_info:
@@ -213,8 +258,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         self.assertIn(member='"{0}" already exists'.format(cluster_name),
                       container=raise_info.exception.message)
 
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'missing'),
+                                                (client_3, base_dir_3, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'halted', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
@@ -254,21 +300,16 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         extend_info_1 = ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
                                                         new_ip=storagerouter_2.ip,
                                                         base_dir=base_dir_2)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'halted', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
 
         # Restart cluster
-        catchup_command = 'arakoon --node 2 -config file://opt/OpenvStorage/config/framework.json?key=/ovs/arakoon/{0}/config -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip],
-                                             new_ip=storagerouter_2.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='2', client=client_2, ips=[storagerouter_1.ip])
         self._validate_config(node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']}])
         self._validate_services(name=service_name,
@@ -292,21 +333,16 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                         new_ip=storagerouter_3.ip,
                                                         base_dir=base_dir_3,
                                                         port_range=[30000])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'halted', 'service_metadata': extend_info_2['service_metadata']}])
 
         # Restart cluster
-        catchup_command = 'arakoon --node 3 -config file://opt/OpenvStorage/config/framework.json?key=/ovs/arakoon/{0}/config -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip, storagerouter_2.ip],
-                                             new_ip=storagerouter_3.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='3', client=client_3, ips=[storagerouter_1.ip, storagerouter_2.ip])
         self._validate_config(node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']},
                                          {'name': '3', 'ip': storagerouter_3.ip, 'base_dir': base_dir_3, 'ports': extend_info_2['ports']}])
@@ -322,10 +358,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         ##########
         ArakoonInstaller.shrink_cluster(cluster_name=cluster_name,
                                         ip=storagerouter_1.ip)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
@@ -339,8 +374,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         # DELETE #
         ##########
         ArakoonInstaller.delete_cluster(cluster_name=cluster_name)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1, base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'removed'),
+                                                (client_3, base_dir_3, 'removed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
@@ -371,19 +407,13 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         base_dir_1 = '{0}/base_dir_external_sd'.format(mountpoint_1)
         base_dir_2 = '{0}/base_dir_external_sd_extend'.format(mountpoint_2)
         base_dir_3 = '{0}/base_dir_external_sd_extend_port_range'.format(mountpoint_3)
+        client_1 = SSHClient(endpoint=storagerouter_1.ip)
+        client_2 = SSHClient(endpoint=storagerouter_2.ip)
+        client_3 = SSHClient(endpoint=storagerouter_3.ip)
 
         for mountpoint in [mountpoint_1, mountpoint_2, mountpoint_3]:
             if os.path.exists(mountpoint) and mountpoint != '/':
                 shutil.rmtree(mountpoint)
-
-        expected_structure = {'files': [],
-                              'dirs': {'arakoon': {'files': [],
-                                                   'dirs': {cluster_name: {'files': [],
-                                                                           'dirs': {'db': {'dirs': {}, 'files': []},
-                                                                                    'tlogs': {'dirs': {}, 'files': []}}}}}}}
-        expected_structure_after_removal = {'files': [],
-                                            'dirs': {'arakoon': {'files': [],
-                                                                 'dirs': {cluster_name: {'dirs': {}, 'files': []}}}}}
 
         ##########
         # CREATE #
@@ -401,9 +431,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                             base_dir=base_dir_2)
         self.assertIn(member='"{0}" already exists'.format(cluster_name),
                       container=raise_info.exception.message)
-
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'missing'),
+                                                (client_3, base_dir_3, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'halted', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
@@ -437,21 +467,16 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         extend_info_1 = ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
                                                         new_ip=storagerouter_2.ip,
                                                         base_dir=base_dir_2)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'halted', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
 
         # Restart cluster
-        catchup_command = 'arakoon --node 2 -config file://opt/OpenvStorage/config/framework.json?key=/ovs/arakoon/{0}/config -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip, storagerouter_2.ip],
-                                             new_ip=storagerouter_2.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='2', client=client_2, ips=[storagerouter_1.ip, storagerouter_2.ip])
         self._validate_config(node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']}])
         self._validate_services(name=service_name,
@@ -476,21 +501,16 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                         new_ip=storagerouter_3.ip,
                                                         base_dir=base_dir_3,
                                                         port_range=[30000])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'halted', 'service_metadata': extend_info_2['service_metadata']}])
 
         # Restart cluster
-        catchup_command = 'arakoon --node 3 -config file://opt/OpenvStorage/config/framework.json?key=/ovs/arakoon/{0}/config -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip, storagerouter_2.ip],
-                                             new_ip=storagerouter_3.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='3', client=client_3, ips=[storagerouter_1.ip, storagerouter_2.ip])
         self._validate_config(node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']},
                                          {'name': '3', 'ip': storagerouter_3.ip, 'base_dir': base_dir_3, 'ports': extend_info_2['ports']}])
@@ -507,10 +527,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         ##########
         ArakoonInstaller.shrink_cluster(cluster_name=cluster_name,
                                         ip=storagerouter_1.ip)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
@@ -525,8 +544,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         # DELETE #
         ##########
         ArakoonInstaller.delete_cluster(cluster_name=cluster_name)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1, base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'removed'),
+                                                (client_3, base_dir_3, 'removed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
@@ -554,19 +574,12 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         mountpoint_2 = storagerouter_2.disks[0].partitions[0].mountpoint
         base_dir_1 = '{0}/base_dir_internal_abm_plugins'.format(mountpoint_1)
         base_dir_2 = '{0}/base_dir_internal_abm_plugins_extend'.format(mountpoint_2)
+        client_1 = SSHClient(endpoint=storagerouter_1.ip)
+        client_2 = SSHClient(endpoint=storagerouter_2.ip)
 
         for mountpoint in [mountpoint_1, mountpoint_2]:
             if os.path.exists(mountpoint) and mountpoint != '/':
                 shutil.rmtree(mountpoint)
-
-        expected_structure = {'files': [],
-                              'dirs': {'arakoon': {'files': [],
-                                                   'dirs': {cluster_name: {'files': [],
-                                                                           'dirs': {'db': {'dirs': {}, 'files': []},
-                                                                                    'tlogs': {'dirs': {}, 'files': []}}}}}}}
-        expected_structure_after_removal = {'files': [],
-                                            'dirs': {'arakoon': {'files': [],
-                                                                 'dirs': {cluster_name: {'dirs': {}, 'files': []}}}}}
 
         ##########
         # CREATE #
@@ -578,8 +591,8 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                       ip=storagerouter_1.ip,
                                                       base_dir=base_dir_1,
                                                       plugins=plugins)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'halted', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'}])
@@ -606,20 +619,14 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                       new_ip=storagerouter_2.ip,
                                                       base_dir=base_dir_2,
                                                       plugins=plugins)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'halted', 'service_metadata': extend_info['service_metadata']}])
 
         # Restart cluster
-        catchup_command = 'arakoon --node 2 -config file://opt/OpenvStorage/config/framework.json?key=/ovs/arakoon/{0}/config -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip],
-                                             new_ip=storagerouter_2.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='2', client=client_2, ips=[storagerouter_1.ip])
         self._validate_config(plugins=','.join(plugins.keys()),
                               node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info['ports']}])
@@ -638,10 +645,8 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         ##########
         ArakoonInstaller.shrink_cluster(cluster_name=cluster_name,
                                         ip=storagerouter_1.ip)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info['service_metadata']}])
@@ -654,8 +659,8 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         # DELETE #
         ##########
         ArakoonInstaller.delete_cluster(cluster_name=cluster_name)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1, base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'removed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'}])
@@ -682,19 +687,12 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         mountpoint_2 = storagerouter_2.disks[0].partitions[0].mountpoint
         base_dir_1 = '{0}/base_dir_internal_nsm_plugins'.format(mountpoint_1)
         base_dir_2 = '{0}/base_dir_internal_nsm_plugins_extend'.format(mountpoint_2)
+        client_1 = SSHClient(endpoint=storagerouter_1.ip)
+        client_2 = SSHClient(endpoint=storagerouter_2.ip)
 
         for mountpoint in [mountpoint_1, mountpoint_2]:
             if os.path.exists(mountpoint) and mountpoint != '/':
                 shutil.rmtree(mountpoint)
-
-        expected_structure = {'files': [],
-                              'dirs': {'arakoon': {'files': [],
-                                                   'dirs': {cluster_name: {'files': [],
-                                                                           'dirs': {'db': {'dirs': {}, 'files': []},
-                                                                                    'tlogs': {'dirs': {}, 'files': []}}}}}}}
-        expected_structure_after_removal = {'files': [],
-                                            'dirs': {'arakoon': {'files': [],
-                                                                 'dirs': {cluster_name: {'dirs': {}, 'files': []}}}}}
 
         ##########
         # CREATE #
@@ -707,8 +705,8 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                       base_dir=base_dir_1,
                                                       plugins=plugins,
                                                       internal=False)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'halted', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'}])
@@ -736,20 +734,14 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                       new_ip=storagerouter_2.ip,
                                                       base_dir=base_dir_2,
                                                       plugins=plugins)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'halted', 'service_metadata': extend_info['service_metadata']}])
 
         # Restart cluster
-        catchup_command = 'arakoon --node 2 -config file://opt/OpenvStorage/config/framework.json?key=/ovs/arakoon/{0}/config -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip],
-                                             new_ip=storagerouter_2.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='2', client=client_2, ips=[storagerouter_1.ip])
         self._validate_config(plugins=','.join(plugins.keys()),
                               node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info['ports']}])
@@ -769,10 +761,8 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         ##########
         ArakoonInstaller.shrink_cluster(cluster_name=cluster_name,
                                         ip=storagerouter_1.ip)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info['service_metadata']}])
@@ -786,8 +776,8 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         # DELETE #
         ##########
         ArakoonInstaller.delete_cluster(cluster_name=cluster_name)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1, base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'removed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'}])
@@ -804,8 +794,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
           - File System: True
           - Cluster type: CFG
         """
-        import time
-        start = time.time()
         global cluster_name, arakoon_client
         structure = DalHelper.build_dal_structure(structure={'storagerouters': [1, 2, 3]})
         cluster_name = 'unittest_internal_cfg'
@@ -819,21 +807,13 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         base_dir_1 = '{0}/base_dir_internal_cfg'.format(mountpoint_1)
         base_dir_2 = '{0}/base_dir_internal_cfg_extend'.format(mountpoint_2)
         base_dir_3 = '{0}/base_dir_internal_cfg_extend_port_range'.format(mountpoint_3)
+        client_1 = SSHClient(endpoint=storagerouter_1.ip)
+        client_2 = SSHClient(endpoint=storagerouter_2.ip)
+        client_3 = SSHClient(endpoint=storagerouter_3.ip)
 
         for mountpoint in [mountpoint_1, mountpoint_2, mountpoint_3]:
             if os.path.exists(mountpoint) and mountpoint != '/':
                 shutil.rmtree(mountpoint)
-
-        expected_structure = {'files': [],
-                              'dirs': {'arakoon': {'files': [],
-                                                   'dirs': {cluster_name: {'files': [],
-                                                                           'dirs': {'db': {'dirs': {}, 'files': []},
-                                                                                    'tlogs': {'dirs': {}, 'files': []}}}}}}}
-        expected_structure_after_removal = {'files': [],
-                                            'dirs': {'arakoon': {'files': [],
-                                                                 'dirs': {cluster_name: {'dirs': {}, 'files': []}}}}}
-
-        print '1: {0}'.format(time.time() - start)
 
         # Basic validations
         with self.assertRaises(ValueError) as raise_info:
@@ -844,7 +824,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                             port_range=[[20000, 20000]])
         self.assertEqual(first='Unable to find requested nr of free ports',  # 2 free ports are required
                          second=raise_info.exception.message)
-        print '2: {0}'.format(time.time() - start)
         ##########
         # CREATE #
         ##########
@@ -852,63 +831,49 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                       cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                                       ip=storagerouter_1.ip,
                                                       base_dir=base_dir_1)
-        print '3: {0}'.format(time.time() - start)
         # Attempt to recreate a cluster with the same name
         with self.assertRaises(ValueError) as raise_info:
             ArakoonInstaller.create_cluster(cluster_name=cluster_name,
                                             cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
-                                            ip=storagerouter_2.ip,
-                                            base_dir=base_dir_2)
+                                            ip=storagerouter_1.ip,
+                                            base_dir=base_dir_1)
         self.assertIn(member='"{0}" already exists'.format(cluster_name),
                       container=raise_info.exception.message)
-        print '4: {0}'.format(time.time() - start)
 
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1])
-        print '5: {0}'.format(time.time() - start)
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'missing'),
+                                                (client_3, base_dir_3, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'halted'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
-        print '6: {0}'.format(time.time() - start)
 
         # Start cluster
         ArakoonInstaller.start_cluster(metadata=create_info['metadata'], ip=storagerouter_1.ip)
-        print '7: {0}'.format(time.time() - start)
         arakoon_client = ArakoonInstaller.build_client(ArakoonClusterConfig(cluster_id=cluster_name, source_ip=storagerouter_1.ip))
-        print '8: {0}'.format(time.time() - start)
         self._validate_config(filesystem=True,
                               node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']}])
-        print '9: {0}'.format(time.time() - start)
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
-        print '10: {0}'.format(time.time() - start)
         self._validate_metadata(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                 in_use=True)
-        print '11: {0}'.format(time.time() - start)
         # Register the service
         ServiceManager.register_service(node_name=storagerouter_1.machine_id,
                                         service_metadata=create_info['service_metadata'])
-        print '12: {0}'.format(time.time() - start)
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
-        print '13: {0}'.format(time.time() - start)
 
         # Un-claim and claim
         ArakoonInstaller.unclaim_cluster(cluster_name=cluster_name, ip=storagerouter_1.ip)
-        print '14: {0}'.format(time.time() - start)
         self._validate_metadata(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                 in_use=False)
-        print '15: {0}'.format(time.time() - start)
         ArakoonInstaller.claim_cluster(cluster_name=cluster_name, ip=storagerouter_1.ip)
-        print '16: {0}'.format(time.time() - start)
         self._validate_metadata(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                 in_use=True)
-        print '17: {0}'.format(time.time() - start)
 
         ##########
         # EXTEND #
@@ -917,52 +882,37 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
             ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
                                             new_ip=storagerouter_2.ip,
                                             base_dir=base_dir_2)
-        print '18: {0}'.format(time.time() - start)
 
         extend_info_1 = ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
                                                         new_ip=storagerouter_2.ip,
                                                         base_dir=base_dir_2,
                                                         ip=storagerouter_1.ip)
-        print '19: {0}'.format(time.time() - start)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2])
-        print '20: {0}'.format(time.time() - start)
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'halted'},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
-        print '21: {0}'.format(time.time() - start)
         # Register the service
         ServiceManager.register_service(node_name=storagerouter_2.machine_id,
                                         service_metadata=extend_info_1['service_metadata'])
-        print '22: {0}'.format(time.time() - start)
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'halted', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
-        print '23: {0}'.format(time.time() - start)
 
         # Restart cluster
-        catchup_command = 'arakoon --node 2 -config /opt/OpenvStorage/config/arakoon_{0}.ini -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip],
-                                             new_ip=storagerouter_2.ip)
-        print '24: {0}'.format(time.time() - start)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='2', client=client_2, ips=[storagerouter_1.ip], file_system=True)
         self._validate_config(filesystem=True,
                               node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']}])
-        print '25: {0}'.format(time.time() - start)
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
-        print '26: {0}'.format(time.time() - start)
         self._validate_metadata(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                 in_use=True)
-        print '27: {0}'.format(time.time() - start)
 
         # Try to extend with specific port_range
         with self.assertRaises(ValueError) as raise_info:
@@ -971,7 +921,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                             base_dir=base_dir_3,
                                             ip=storagerouter_1.ip,
                                             port_range=[[30000, 30000]])
-        print '28: {0}'.format(time.time() - start)
         self.assertEqual(first='Unable to find requested nr of free ports',  # 2 free ports are required and with this range, only 1 is available
                          second=raise_info.exception.message)
 
@@ -981,35 +930,24 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                         base_dir=base_dir_3,
                                                         ip=storagerouter_1.ip,
                                                         port_range=[30000])
-        print '29: {0}'.format(time.time() - start)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2, base_dir_3])
-        print '30: {0}'.format(time.time() - start)
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'halted'}])
-        print '31: {0}'.format(time.time() - start)
 
         # Restart cluster
-        catchup_command = 'arakoon --node 3 -config /opt/OpenvStorage/config/arakoon_{0}.ini -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip, storagerouter_2.ip, storagerouter_3.ip],  # Restart should be able to coop with 'new_ip' inside 'current_ips'
-                                             new_ip=storagerouter_3.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
-        print '32: {0}'.format(time.time() - start)
+        self._restart_cluster(node_id='3', client=client_3, ips=[storagerouter_1.ip, storagerouter_2.ip, storagerouter_3.ip], file_system=True)
         self._validate_config(filesystem=True,
                               node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']},
                                          {'name': '3', 'ip': storagerouter_3.ip, 'base_dir': base_dir_3, 'ports': extend_info_2['ports']}])
-        print '33: {0}'.format(time.time() - start)
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'running'}])
-        print '34: {0}'.format(time.time() - start)
         # Register the service
         ServiceManager.register_service(node_name=storagerouter_3.machine_id,
                                         service_metadata=extend_info_2['service_metadata'])
@@ -1019,7 +957,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                               {'storagerouter': storagerouter_3, 'status': 'running', 'service_metadata': extend_info_2['service_metadata']}])
         self._validate_metadata(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                 in_use=True)
-        print '35: {0}'.format(time.time() - start)
 
         ##########
         # SHRINK #
@@ -1027,51 +964,40 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         with self.assertRaises(NotFoundException):  # Not specifying a remaining IP to shrink a cluster of type CFG should raise
             ArakoonInstaller.shrink_cluster(cluster_name=cluster_name,
                                             ip=storagerouter_1.ip)
-        print '36: {0}'.format(time.time() - start)
 
         ArakoonInstaller.shrink_cluster(cluster_name=cluster_name,
                                         ip=storagerouter_1.ip,
                                         remaining_ip=storagerouter_2.ip)
-        print '37: {0}'.format(time.time() - start)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_2, base_dir_3])
-        print '38: {0}'.format(time.time() - start)
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'running', 'service_metadata': extend_info_2['service_metadata']}])
-        print '39: {0}'.format(time.time() - start)
         self._validate_config(filesystem=True,
                               node_info=[{'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']},
                                          {'name': '3', 'ip': storagerouter_3.ip, 'base_dir': base_dir_3, 'ports': extend_info_2['ports']}])
-        print '40: {0}'.format(time.time() - start)
         self._validate_metadata(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                 in_use=True)
-        print '41: {0}'.format(time.time() - start)
 
         ##########
         # DELETE #
         ##########
         with self.assertRaises(NotFoundException):  # Not specifying an IP to delete a cluster of type CFG should raise
             ArakoonInstaller.delete_cluster(cluster_name=cluster_name)
-        print '42: {0}'.format(time.time() - start)
 
         ArakoonInstaller.delete_cluster(cluster_name=cluster_name,
                                         ip=storagerouter_2.ip)
-        print '43: {0}'.format(time.time() - start)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1, base_dir_2, base_dir_3])
-        print '44: {0}'.format(time.time() - start)
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'removed'),
+                                                (client_3, base_dir_3, 'removed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
-        print '45: {0}'.format(time.time() - start)
         client = SSHClient(endpoint=storagerouter_2.ip)
         self.assertFalse(expr=client.file_exists('/opt/OpenvStorage/config/arakoon_{0}.ini'.format(cluster_name)))
-        print '46: {0}'.format(time.time() - start)
 
     def test_external_on_filesystem(self):
         """
@@ -1095,19 +1021,13 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         base_dir_1 = '{0}/base_dir_external_cfg'.format(mountpoint_1)
         base_dir_2 = '{0}/base_dir_external_cfg_extend'.format(mountpoint_2)
         base_dir_3 = '{0}/base_dir_external_cfg_extend_port_range'.format(mountpoint_3)
+        client_1 = SSHClient(endpoint=storagerouter_1.ip)
+        client_2 = SSHClient(endpoint=storagerouter_2.ip)
+        client_3 = SSHClient(endpoint=storagerouter_3.ip)
 
         for mountpoint in [mountpoint_1, mountpoint_2, mountpoint_3]:
             if os.path.exists(mountpoint) and mountpoint != '/':
                 shutil.rmtree(mountpoint)
-
-        expected_structure = {'files': [],
-                              'dirs': {'arakoon': {'files': [],
-                                                   'dirs': {cluster_name: {'files': [],
-                                                                           'dirs': {'db': {'dirs': {}, 'files': []},
-                                                                                    'tlogs': {'dirs': {}, 'files': []}}}}}}}
-        expected_structure_after_removal = {'files': [],
-                                            'dirs': {'arakoon': {'files': [],
-                                                                 'dirs': {cluster_name: {'dirs': {}, 'files': []}}}}}
 
         # Basic validations
         with self.assertRaises(ValueError) as raise_info:
@@ -1132,14 +1052,15 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         with self.assertRaises(ValueError) as raise_info:
             ArakoonInstaller.create_cluster(cluster_name=cluster_name,
                                             cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
-                                            ip=storagerouter_2.ip,
-                                            base_dir=base_dir_2,
+                                            ip=storagerouter_1.ip,
+                                            base_dir=base_dir_1,
                                             internal=False)
         self.assertIn(member='"{0}" already exists'.format(cluster_name),
                       container=raise_info.exception.message)
 
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'missing'),
+                                                (client_3, base_dir_3, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'halted'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},
@@ -1187,8 +1108,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                         new_ip=storagerouter_2.ip,
                                                         base_dir=base_dir_2,
                                                         ip=storagerouter_1.ip)
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'missing')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'halted'},
@@ -1202,13 +1124,7 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                               {'storagerouter': storagerouter_3, 'status': 'missing'}])
 
         # Restart cluster
-        catchup_command = 'arakoon --node 2 -config /opt/OpenvStorage/config/arakoon_{0}.ini -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip],
-                                             new_ip=storagerouter_2.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='2', client=client_2, ips=[storagerouter_1.ip], file_system=True)
         self._validate_config(filesystem=True,
                               node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']}])
@@ -1236,21 +1152,16 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                                         base_dir=base_dir_3,
                                                         ip=storagerouter_1.ip,
                                                         port_range=[30000])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_1, base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'installed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'running', 'service_metadata': create_info['service_metadata']},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
                                               {'storagerouter': storagerouter_3, 'status': 'halted'}])
 
         # Restart cluster
-        catchup_command = 'arakoon --node 3 -config /opt/OpenvStorage/config/arakoon_{0}.ini -catchup-only'.format(cluster_name)
-        SSHClient._run_returns[catchup_command] = None
-        SSHClient._run_recordings = []
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=[storagerouter_1.ip, storagerouter_2.ip, storagerouter_3.ip],  # Restart should be able to coop with 'new_ip' inside 'current_ips'
-                                             new_ip=storagerouter_3.ip)
-        self.assertIn(catchup_command, SSHClient._run_recordings)
+        self._restart_cluster(node_id='3', client=client_3, ips=[storagerouter_1.ip, storagerouter_2.ip, storagerouter_3.ip], file_system=True)
         self._validate_config(filesystem=True,
                               node_info=[{'name': '1', 'ip': storagerouter_1.ip, 'base_dir': base_dir_1, 'ports': create_info['ports']},
                                          {'name': '2', 'ip': storagerouter_2.ip, 'base_dir': base_dir_2, 'ports': extend_info_1['ports']},
@@ -1280,10 +1191,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         ArakoonInstaller.shrink_cluster(cluster_name=cluster_name,
                                         ip=storagerouter_1.ip,
                                         remaining_ip=storagerouter_2.ip)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1])
-        self._validate_dir_structure(expected_structure=expected_structure,
-                                     directories=[base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'installed'),
+                                                (client_3, base_dir_3, 'installed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'running', 'service_metadata': extend_info_1['service_metadata']},
@@ -1303,8 +1213,9 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
 
         ArakoonInstaller.delete_cluster(cluster_name=cluster_name,
                                         ip=storagerouter_2.ip)
-        self._validate_dir_structure(expected_structure=expected_structure_after_removal,
-                                     directories=[base_dir_1, base_dir_2, base_dir_3])
+        self._validate_dir_structure(structure=[(client_1, base_dir_1, 'removed'),
+                                                (client_2, base_dir_2, 'removed'),
+                                                (client_3, base_dir_3, 'removed')])
         self._validate_services(name=service_name,
                                 service_info=[{'storagerouter': storagerouter_1, 'status': 'missing'},
                                               {'storagerouter': storagerouter_2, 'status': 'missing'},

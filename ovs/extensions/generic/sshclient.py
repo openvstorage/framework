@@ -33,9 +33,11 @@ import logging
 import tempfile
 import warnings
 import unicodedata
+from functools import wraps
 from subprocess import CalledProcessError, PIPE, Popen
 from ovs.dal.helpers import Descriptor
 from ovs.extensions.generic.remote import remote
+from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs.log.log_handler import LogHandler
 
 
@@ -70,6 +72,25 @@ def connected():
         return inner_function
 
     return wrap
+
+
+def mocked(mock_function):
+    """
+    Mock decorator
+    """
+    def wrapper(f):
+        """
+        Wrapper function
+        """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            @wraps(f)
+            def mock_wrapper(client, *args, **kwargs):
+                """ Wrapper to be able to add the original function to the wrapped function """
+                client.original_function = f
+                return mock_function(client, *args, **kwargs)
+            return mock_wrapper
+        return f
+    return wrapper
 
 
 def is_connected(self):
@@ -108,8 +129,6 @@ class SSHClient(object):
     IP_REGEX = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
 
     _logger = LogHandler.get('extensions', name='sshclient')
-    _run_returns = {}  # Used by unit tests
-    _run_recordings = []  # Used by unit tests
     _raise_exceptions = {}  # Used by unit tests
 
     client_cache = {}
@@ -235,8 +254,6 @@ class SSHClient(object):
         """
         Clean everything up related to the unittests
         """
-        SSHClient._run_returns = {}
-        SSHClient._run_recordings = []
         SSHClient._raise_exceptions = {}
 
     @staticmethod
@@ -272,6 +289,7 @@ class SSHClient(object):
             raise
 
     @connected()
+    @mocked(MockedSSHClient.run)
     def run(self, command, debug=False, suppress_logging=False, allow_nonzero=False, allow_insecure=False, return_stderr=False, timeout=None):
         """
         Executes a shell command
@@ -292,17 +310,6 @@ class SSHClient(object):
         :return: The command's stdout or tuple for stdout and stderr
         :rtype: str or tuple(str, str)
         """
-
-        if self._unittest_mode is True:
-            _command = command
-            if isinstance(command, list):
-                _command = ' '.join(command)
-            SSHClient._logger.debug('Executing: {0}'.format(_command))
-            SSHClient._run_recordings.append(_command)
-            if _command in SSHClient._run_returns:
-                SSHClient._logger.debug('Emulating return value')
-                return SSHClient._run_returns[_command]
-
         if not isinstance(command, list) and not allow_insecure:
             raise RuntimeError('The given command must be a list, or the allow_insecure flag must be set')
         if isinstance(command, list):
@@ -359,6 +366,7 @@ class SSHClient(object):
             else:
                 return output
 
+    @mocked(MockedSSHClient.dir_create)
     def dir_create(self, directories):
         """
         Ensures a directory exists on the remote end
@@ -373,6 +381,7 @@ class SSHClient(object):
             else:
                 self.run(['mkdir', '-p', directory])
 
+    @mocked(MockedSSHClient.dir_delete)
     def dir_delete(self, directories, follow_symlinks=False):
         """
         Remove a directory (or multiple directories) from the remote filesystem recursively
@@ -399,6 +408,7 @@ class SSHClient(object):
                     if self.dir_exists(directory):
                         self.run(['rm', '-rf', directory])
 
+    @mocked(MockedSSHClient.dir_exists)
     def dir_exists(self, directory):
         """
         Checks if a directory exists on a remote host
@@ -411,6 +421,7 @@ class SSHClient(object):
 print json.dumps(os.path.isdir('{0}'))""".format(directory)
             return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
+    @mocked(MockedSSHClient.dir_chmod)
     def dir_chmod(self, directories, mode, recursive=False):
         """
         Chmod a or multiple directories
@@ -437,6 +448,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(directory)
                     command.insert(1, '-R')
                 self.run(command)
 
+    @mocked(MockedSSHClient.dir_chown)
     def dir_chown(self, directories, user, group, recursive=False):
         """
         Chown a or multiple directories
@@ -474,6 +486,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(directory)
                     command.insert(1, '-R')
                 self.run(command)
 
+    @mocked(MockedSSHClient.dir_list)
     def dir_list(self, directory):
         """
         List contents of a directory on a remote host
@@ -486,6 +499,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(directory)
 print json.dumps(os.listdir('{0}'))""".format(directory)
             return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
+    @mocked(MockedSSHClient.symlink)
     def symlink(self, links):
         """
         Create symlink
@@ -499,6 +513,7 @@ print json.dumps(os.listdir('{0}'))""".format(directory)
             for link_name, source in links.iteritems():
                 self.run(['ln', '-s', source, link_name])
 
+    @mocked(MockedSSHClient.file_create)
     def file_create(self, filenames):
         """
         Create a or multiple files
@@ -521,6 +536,7 @@ print json.dumps(os.listdir('{0}'))""".format(directory)
                 self.dir_create(directory)
                 self.run(['touch', filename])
 
+    @mocked(MockedSSHClient.file_delete)
     def file_delete(self, filenames):
         """
         Remove a file (or multiple files) from the remote filesystem
@@ -546,6 +562,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
                     if self.file_exists(filename):
                         self.run(['rm', '-f', filename])
 
+    @mocked(MockedSSHClient.file_unlink)
     def file_unlink(self, path):
         """
         Unlink a file
@@ -558,6 +575,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         else:
             self.run(['unlink', path])
 
+    @mocked(MockedSSHClient.file_read_link)
     def file_read_link(self, path):
         """
         Read the symlink of the specified path
@@ -577,6 +595,7 @@ if os.path.islink('{0}'):
             except ValueError:
                 pass
 
+    @mocked(MockedSSHClient.file_read)
     def file_read(self, filename):
         """
         Load a file from the remote end
@@ -589,6 +608,7 @@ if os.path.islink('{0}'):
             return self.run(['cat', filename])
 
     @connected()
+    @mocked(MockedSSHClient.file_write)
     def file_write(self, filename, contents):
         """
         Writes into a file to the remote end
@@ -623,6 +643,7 @@ if os.path.islink('{0}'):
                 os.remove(local_temp_filename)
 
     @connected()
+    @mocked(MockedSSHClient.file_upload)
     def file_upload(self, remote_filename, local_filename):
         """
         Uploads a file to a remote end
@@ -639,6 +660,7 @@ if os.path.islink('{0}'):
             sftp.close()
             self.run(['mv', '-f', temp_remote_filename, remote_filename])
 
+    @mocked(MockedSSHClient.file_exists)
     def file_exists(self, filename):
         """
         Checks if a file exists on a remote host
@@ -651,6 +673,7 @@ if os.path.islink('{0}'):
 print json.dumps(os.path.isfile('{0}'))""".format(filename)
             return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
+    @mocked(MockedSSHClient.file_chmod)
     def file_chmod(self, filename, mode):
         """
         Sets the mode of a remote file
@@ -659,6 +682,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(filename)
         """
         self.run(['chmod', oct(mode), filename])
 
+    @mocked(MockedSSHClient.file_chown)
     def file_chown(self, filenames, user, group):
         """
         Sets the ownership of a remote file
@@ -690,6 +714,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(filename)
             else:
                 self.run(['chown', '{0}:{1}'.format(user, group), filename])
 
+    @mocked(MockedSSHClient.file_list)
     def file_list(self, directory, abs_path=False, recursive=False):
         """
         List all files in directory
