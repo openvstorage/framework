@@ -770,6 +770,10 @@ class VDiskTest(unittest.TestCase):
         self.assertRegexpMatches(results[vdisk.guid][1], '^Snapshot (.*?) does not belong to vDisk')
         vdisk.invalidate_dynamics(['snapshots'])
         self.assertEqual(len(vdisk.snapshots), 9)
+        results = VDiskController.delete_snapshots({'foo': snapshot_id})
+        expected = {'foo': [False, results['foo'][1]]}
+        self.assertDictEqual(results, expected)
+        self.assertRegexpMatches(results['foo'][1], 'VDisk with guid (.*?) could not be found')
 
         # New format
         snapshot_id1 = snapshots[1]
@@ -793,3 +797,19 @@ class VDiskTest(unittest.TestCase):
         self.assertRegexpMatches(results[vdisk.guid]['results'][snapshot_id1][1], '^Snapshot (.*?) does not belong to vDisk')
         vdisk.invalidate_dynamics(['snapshots'])
         self.assertEqual(len(vdisk.snapshots), 6)
+        results = VDiskController.delete_snapshots({'foo': [snapshot_id1]})
+        expected = {'foo': {'success': False,
+                            'error': results['foo']['error'],
+                            'results': {}}}
+        self.assertDictEqual(results, expected)
+        self.assertRegexpMatches(results['foo']['error'], 'VDisk with guid (.*?) could not be found')
+
+        snapshot_id = snapshots[4]
+        VDiskController.clone(vdisk.guid, 'clone', snapshot_id)
+        results = VDiskController.delete_snapshots({vdisk.guid: [snapshot_id]})
+        expected = {vdisk.guid: {'success': False,
+                                 'error': results[vdisk.guid]['error'],
+                                 'results': {snapshot_id: [False, results[vdisk.guid]['results'][snapshot_id][1]]}}}
+        self.assertDictEqual(results, expected)
+        self.assertEquals(results[vdisk.guid]['error'], 'One or more snapshots could not be removed')
+        self.assertRegexpMatches(results[vdisk.guid]['results'][snapshot_id][1], '^Snapshot (.*?) has [0-9]+ volume(.?) cloned from it, cannot remove$')

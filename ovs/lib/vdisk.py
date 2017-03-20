@@ -455,11 +455,16 @@ class VDiskController(object):
             results[vdisk_guid] = {'success': True,
                                    'error': None,
                                    'results': {}}
+
             try:
                 vdisk = VDisk(vdisk_guid)
             except Exception as ex:
                 results[vdisk_guid].update({'success': False,
                                             'error': ex.message})
+                if bcompat is True:
+                    results[vdisk_guid] = [False, ex.message]
+                continue
+
             for snapshot_id in snapshot_ids:
                 try:
                     vdisk.invalidate_dynamics(['snapshots'])
