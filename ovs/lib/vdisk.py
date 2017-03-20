@@ -440,31 +440,58 @@ class VDiskController(object):
     def delete_snapshots(snapshot_mapping):
         """
         Delete vDisk snapshots
-        :param snapshot_mapping: Mapping of VDisk guid and Snapshot ID
+        :param snapshot_mapping: Mapping of VDisk guid and Snapshot ID(s)
         :type snapshot_mapping: dict
         :return: Information about the deleted snapshots, whether they succeeded or not
         :rtype: dict
         """
         results = {}
-        for vdisk_guid, snapshot_id in snapshot_mapping.iteritems():
+        for vdisk_guid, snapshot_ids in snapshot_mapping.iteritems():
+            bcompat = False
+            if not isinstance(snapshot_ids, list):
+                snapshot_ids = [snapshot_ids]
+                bcompat = True
+
+            results[vdisk_guid] = {'success': True,
+                                   'error': None,
+                                   'results': {}}
+
             try:
                 vdisk = VDisk(vdisk_guid)
-                vdisk.invalidate_dynamics(['snapshots'])
-                if snapshot_id not in [snap['guid'] for snap in vdisk.snapshots]:
-                    results[vdisk_guid] = [False, 'Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name)]
-                    continue
-
-                clones_of_snapshot = VDiskList.get_by_parentsnapshot(snapshot_id)
-                if len(clones_of_snapshot) > 0:
-                    results[vdisk_guid] = [False, 'Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(snapshot_id, len(clones_of_snapshot), '' if len(clones_of_snapshot) == 1 else 's')]
-                    continue
-
-                VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
-                vdisk.storagedriver_client.delete_snapshot(str(vdisk.volume_id), str(snapshot_id), req_timeout_secs=10)
-                vdisk.invalidate_dynamics(['snapshots'])
-                results[vdisk_guid] = [True, snapshot_id]
             except Exception as ex:
-                results[vdisk_guid] = [False, ex.message]
+                results[vdisk_guid].update({'success': False,
+                                            'error': ex.message})
+                if bcompat is True:
+                    results[vdisk_guid] = [False, ex.message]
+                continue
+
+            for snapshot_id in snapshot_ids:
+                try:
+                    vdisk.invalidate_dynamics(['snapshots'])
+                    if snapshot_id not in [snap['guid'] for snap in vdisk.snapshots]:
+                        raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
+
+                    clones_of_snapshot = VDiskList.get_by_parentsnapshot(snapshot_id)
+                    if len(clones_of_snapshot) > 0:
+                        raise RuntimeError('Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(
+                            snapshot_id,
+                            len(clones_of_snapshot),
+                            '' if len(clones_of_snapshot) == 1 else 's')
+                        )
+
+                    VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
+                    vdisk.storagedriver_client.delete_snapshot(str(vdisk.volume_id), str(snapshot_id),
+                                                               req_timeout_secs=10)
+                    result = [True, snapshot_id]
+                except Exception as ex:
+                    result = [False, ex.message]
+                results[vdisk_guid]['results'][snapshot_id] = result
+                if result[0] is False:
+                    results[vdisk_guid].update({'success': False,
+                                                'error': 'One or more snapshots could not be removed'})
+            vdisk.invalidate_dynamics(['snapshots'])
+            if bcompat is True:
+                results[vdisk_guid] = results[vdisk_guid]['results'][snapshot_ids[0]]
         return results
 
     @staticmethod
