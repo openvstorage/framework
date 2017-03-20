@@ -401,3 +401,26 @@ class StorageDriverController(object):
                                                                           dls_arakoon_cluster_id=cluster_name,
                                                                           dls_arakoon_cluster_nodes=arakoon_nodes)
                     storagedriver_config.save()
+
+    @staticmethod
+    def generate_backoff_gap_settings(cache_size):
+        """
+        Generates decent gap sizes for a given cache size
+        :param cache_size: Size of the cache on which the gap sizes should be based
+        :type cache_size: int
+        :return: Dictionary with keys 'trigger' and 'backoff', containing their sizes in bytes
+        :rtype: dict
+        """
+        if cache_size is None:
+            StorageDriverController._logger.warning('Got request to calculate gaps for None as cache size. Returned default (2/1GiB)'.format(cache_size))
+            return {'backoff': 2 * 1024 ** 3,
+                    'trigger': 1 * 1024 ** 3}
+        gap_configuration = {}
+        # Below "settings" = [factor of smallest parition size, maximum size in GiB, minimum size in bytes]
+        for gap, gap_settings in {'backoff': [0.1, 50, 2],
+                                  'trigger': [0.08, 40, 1]}.iteritems():
+            current_config = int(cache_size * gap_settings[0])
+            current_config = min(current_config, gap_settings[1] * 1024 ** 3)
+            current_config = max(current_config, gap_settings[2])
+            gap_configuration[gap] = current_config
+        return gap_configuration
