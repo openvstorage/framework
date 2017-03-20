@@ -171,7 +171,7 @@ class VPoolViewSet(viewsets.ViewSet):
     def remove_snapshots(self, snapshot_mapping):
         """
         Remove a snapshot from a list of VDisks
-        :param snapshot_mapping: Dict containing vDisk guid / Snapshot ID pairs
+        :param snapshot_mapping: Dict containing vDisk guid / Snapshot ID(s) pairs
         :type snapshot_mapping: dict
         """
         return VDiskController.delete_snapshots.delay(snapshot_mapping=snapshot_mapping)
