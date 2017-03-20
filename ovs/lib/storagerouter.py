@@ -568,7 +568,7 @@ class StorageRouterController(object):
         dirs2create = []
         writecaches = []
         writecache_information = partition_info[DiskPartition.ROLES.WRITE]
-        smallest_write_partition = 2 * 1024 ** 3  # Default back off gap
+        smallest_write_partition = None
         total_available = sum([part['available'] for part in writecache_information])
         for writecache_info in writecache_information:
             available = writecache_info['available']
@@ -598,8 +598,8 @@ class StorageRouterController(object):
             writecaches.append({'path': sdp_write.path,
                                 'size': '{0}KiB'.format(w_size)})
             dirs2create.append(sdp_write.path)
-            if w_size * 1024 < smallest_write_partition:
-                smallest_write_partition = w_size * 1024  # 'w_size' is in KiB and 'smallest_write_partition' is in bytes
+            if smallest_write_partition is None or (w_size * 1024) < smallest_write_partition:
+                smallest_write_partition = w_size * 1024
 
         sdp_fd = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                     'role': DiskPartition.ROLES.WRITE,
@@ -627,6 +627,8 @@ class StorageRouterController(object):
                                                                                      'partition': DiskPartition(dtl_info['guid'])})
         dirs2create.append(sdp_dtl.path)
         dirs2create.append(storagedriver.mountpoint)
+
+        gap_configuration = StorageDriverController.generate_backoff_gap_settings(smallest_write_partition)
 
         if frag_size is None and use_accelerated_alba is False:
             vpool.status = VPool.STATUSES.FAILURE
@@ -783,8 +785,8 @@ class StorageRouterController(object):
         storagedriver_config.configure_content_addressed_cache(serialize_read_cache=False,
                                                                read_cache_serialization_path=[])
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
-                                                trigger_gap=Toolbox.convert_to_human_readable(size=smallest_write_partition / 2),
-                                                backoff_gap=Toolbox.convert_to_human_readable(size=smallest_write_partition))
+                                                trigger_gap=Toolbox.convert_to_human_readable(size=gap_configuration['trigger']),
+                                                backoff_gap=Toolbox.convert_to_human_readable(size=gap_configuration['backoff']))
         storagedriver_config.configure_distributed_transaction_log(dtl_path=sdp_dtl.path,  # Not used, but required
                                                                    dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
         storagedriver_config.configure_filesystem(**filesystem_config)
