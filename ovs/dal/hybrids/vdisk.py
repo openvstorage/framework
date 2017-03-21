@@ -374,12 +374,12 @@ class VDisk(DataObject):
             if key == 'timestamp' or '_latency' in key or '_distribution' in key:
                 continue
             delta = current_stats['timestamp'] - previous_stats.get('timestamp', current_stats['timestamp'])
-            if delta < 0:
-                current_stats['{0}_ps'.format(key)] = 0
-            elif delta == 0:
+            if delta == 0:
                 current_stats['{0}_ps'.format(key)] = previous_stats.get('{0}_ps'.format(key), 0)
-            else:
+            elif delta > 0 and key in previous_stats:
                 current_stats['{0}_ps'.format(key)] = max(0, (current_stats[key] - previous_stats[key]) / delta)
+            else:
+                current_stats['{0}_ps'.format(key)] = 0
         volatile.set(prev_key, current_stats, dynamic.timeout * 10)
 
     def reload_client(self, client):
