@@ -633,8 +633,7 @@ class VDiskController(object):
             volume_id = vdisk.storagedriver_client.create_clone_from_template(target_path=devicename,
                                                                               metadata_backend_config=MDSMetaDataBackendConfig([backend_config]),
                                                                               parent_volume_id=str(vdisk.volume_id),
-                                                                              node_id=str(storagedriver.storagedriver_id),
-                                                                              req_timeout_secs=30)
+                                                                              node_id=str(storagedriver.storagedriver_id))
         except Exception as ex:
             VDiskController._logger.error('Cloning vTemplate {0} failed: {1}'.format(vdisk.name, str(ex)))
             raise
