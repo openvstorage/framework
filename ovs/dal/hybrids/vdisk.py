@@ -25,11 +25,11 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.structures import Property, Relation, Dynamic
-from ovs.extensions.storageserver.storagedriver import \
-    MaxRedirectsExceededException, VolumeRestartInProgressException, \
-    FSMetaDataClient, ObjectRegistryClient, StorageDriverClient
+from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient,\
+                                                       SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
+
 from ovs.log.log_handler import LogHandler
 
 
@@ -157,8 +157,11 @@ class VDisk(DataObject):
         Fetches the information of all snapshots for this vDisk
         """
         snapshots = []
-        for snap_id in self.snapshot_ids:
-            snapshot = self.storagedriver_client.info_snapshot(str(self.volume_id), snap_id, req_timeout_secs=2)
+        for snap_id in self._snapshot_ids():
+            try:
+                snapshot = self.storagedriver_client.info_snapshot(str(self.volume_id), snap_id, req_timeout_secs=2)
+            except SnapshotNotFoundException:
+                continue
             if snapshot.metadata:
                 metadata = pickle.loads(snapshot.metadata)
                 if isinstance(metadata, dict):
