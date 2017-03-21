@@ -102,7 +102,10 @@ class VDiskController(object):
         :type vdisk: ovs.dal.hybrids.vdisk.VDisk
         :return: None
         """
-        VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
+        try:
+            VDiskController.dtl_checkup(vdisk_guid=vdisk.guid)
+        except Exception:
+            VDiskController._logger.exception('Error during vDisk checkup (DTL)')
         try:
             VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
             MDSServiceController.ensure_safety(vdisk)
@@ -888,6 +891,7 @@ class VDiskController(object):
                     for sd in sorted(storagerouter.storagedrivers, key=lambda i: i.guid):  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
                         if sd.vpool_guid != vdisk.vpool_guid:
                             continue
+                        VDiskController._logger.info('Setting DTL to {0}:{1} for vDisk {2}'.format(sd.storage_ip, sd.ports['dtl'], vdisk.name))
                         dtl_config = DTLConfig(str(sd.storage_ip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
                         vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config, req_timeout_secs=10)
                         vdisk.invalidate_dynamics(['dtl_status'])
