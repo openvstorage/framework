@@ -406,17 +406,16 @@ class VDiskController(object):
                 vdisk = VDisk(guid)
                 VDiskController._logger.info('Create {0} snapshot for vDisk {1}'.format('consistent' if consistent is True else 'inconsistent', vdisk.name))
                 snapshot_id = str(uuid.uuid4())
-                vdisk.invalidate_dynamics(['snapshots'])
-                if len(vdisk.snapshots) > 0:
-                    most_recent_snap = sorted(vdisk.snapshots, key=lambda k: k['timestamp'], reverse=True)[0]  # Most recent first
-                    if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=most_recent_snap['guid']) is False:
+                vdisk.invalidate_dynamics(['snapshot_ids'])
+                if len(vdisk.snapshot_ids) > 0:
+                    if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=vdisk.snapshot_ids[-1]) is False:  # Most recent last in list
                         results[guid] = [False, 'Previously created snapshot did not make it to the backend yet']
                         continue
                 vdisk.storagedriver_client.create_snapshot(volume_id=str(vdisk.volume_id),
                                                            snapshot_id=str(snapshot_id),
                                                            metadata=metadata,
                                                            req_timeout_secs=10)
-                vdisk.invalidate_dynamics(['snapshots'])
+                vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
                 results[guid] = [True, snapshot_id]
             except Exception as ex:
                 results[guid] = [False, ex.message]
@@ -450,10 +449,10 @@ class VDiskController(object):
         """
         results = {}
         for vdisk_guid, snapshot_ids in snapshot_mapping.iteritems():
-            bcompat = False
+            backwards_compat = False  # Snapshot_mapping and return value of this function used to be different in older versions
             if not isinstance(snapshot_ids, list):
                 snapshot_ids = [snapshot_ids]
-                bcompat = True
+                backwards_compat = True
 
             results[vdisk_guid] = {'success': True,
                                    'error': None,
@@ -464,26 +463,23 @@ class VDiskController(object):
             except Exception as ex:
                 results[vdisk_guid].update({'success': False,
                                             'error': ex.message})
-                if bcompat is True:
+                if backwards_compat is True:
                     results[vdisk_guid] = [False, ex.message]
                 continue
 
             for snapshot_id in snapshot_ids:
                 try:
-                    vdisk.invalidate_dynamics(['snapshots'])
-                    if snapshot_id not in [snap['guid'] for snap in vdisk.snapshots]:
+                    vdisk.invalidate_dynamics(['snapshot_ids'])
+                    if snapshot_id not in vdisk.snapshot_ids:
                         raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
 
-                    clones_of_snapshot = VDiskList.get_by_parentsnapshot(snapshot_id)
-                    if len(clones_of_snapshot) > 0:
-                        raise RuntimeError('Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(
-                            snapshot_id,
-                            len(clones_of_snapshot),
-                            '' if len(clones_of_snapshot) == 1 else 's')
-                        )
+                    nr_clones = len(VDiskList.get_by_parentsnapshot(snapshot_id))
+                    if nr_clones > 0:
+                        raise RuntimeError('Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(snapshot_id, nr_clones, '' if nr_clones == 1 else 's'))
 
                     VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
-                    vdisk.storagedriver_client.delete_snapshot(str(vdisk.volume_id), str(snapshot_id),
+                    vdisk.storagedriver_client.delete_snapshot(volume_id=str(vdisk.volume_id),
+                                                               snapshot_id=str(snapshot_id),
                                                                req_timeout_secs=10)
                     result = [True, snapshot_id]
                 except Exception as ex:
@@ -492,8 +488,8 @@ class VDiskController(object):
                 if result[0] is False:
                     results[vdisk_guid].update({'success': False,
                                                 'error': 'One or more snapshots could not be removed'})
-            vdisk.invalidate_dynamics(['snapshots'])
-            if bcompat is True:
+            vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
+            if backwards_compat is True:
                 results[vdisk_guid] = results[vdisk_guid]['results'][snapshot_ids[0]]
         return results
 
@@ -521,7 +517,7 @@ class VDiskController(object):
         except Exception:
             VDiskController._logger.exception('Failed to convert vDisk {0} into vTemplate'.format(vdisk.name))
             raise Exception('Converting vDisk {0} into vTemplate failed'.format(vdisk.name))
-        vdisk.invalidate_dynamics(['is_vtemplate', 'info'])
+        vdisk.invalidate_dynamics(['is_vtemplate', 'info', 'snapshots', 'snapshot_ids'])
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.move')

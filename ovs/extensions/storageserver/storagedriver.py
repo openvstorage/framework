@@ -36,7 +36,7 @@ from volumedriver.storagerouter.storagerouterclient import \
     DTLConfig, DTLConfigMode, DTLMode, Logger, \
     MaxRedirectsExceededException, MDSMetaDataBackendConfig,  MDSNodeConfig, \
     ObjectNotFoundException as SRCObjectNotFoundException, \
-    ReadCacheBehaviour, ReadCacheMode, \
+    ReadCacheBehaviour, ReadCacheMode, SnapshotNotFoundException, \
     Role, Statistics, VolumeInfo
 try:
     from volumedriver.storagerouter.storagerouterclient import VolumeRestartInProgressException
