@@ -55,9 +55,9 @@ function show_help {
     echo "    - ovs start framework [ip|all]               Start Open vStorage Framework services on this node, on all nodes, or on the given ip"
     echo ""
     echo "  * Unit tests:"
-    echo "    - ovs unittest                               Execute all unittests"
+    echo "    - ovs unittest [--averages]                  Execute all unittests (and optionally add some averages)"
     echo "    - ovs unittest list                          List all unittests"
-    echo "    - ovs unittest <filepath>                    Run the unittests in <filepath>"
+    echo "    - ovs unittest <filepath> [--averages]       Run the unittests in <filepath> (and optionally add some averages)"
     echo ""
     echo "  * Configuration editing:"
     echo "    - ovs config edit some/key                   Opens the contents of 'some/key' in your EDITOR, and updates it after editing"
@@ -210,10 +210,12 @@ elif [ "$1" = "collect" ] ; then
 elif [ "$1" = "unittest" ] ; then
     if [ "$#" -eq 1 ]; then
         python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests()"
-    elif [ "$#" -ge 3 ]; then
-        show_help
-    elif [ "$2" = "list" ]; then
+    elif [ "$2" = "list" ] && [ "$#" -eq 2 ]; then
         python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.list_tests(print_tests=True)"
+    elif [ "$2" = "--averages" ] && [ "$#" -eq 2 ]; then
+        python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests(add_averages=True)"
+    elif [ "$#" -ge 4 ]; then
+        show_help
     else
         if [[ "$2" == *.py ]]; then
             directory=$(dirname "$2")
@@ -223,7 +225,15 @@ elif [ "$1" = "unittest" ] ; then
         else
             filename="$2"
         fi
-        python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests('$filename')"
+        if [ "$#" -eq 3 ] && [ "$3" != "--averages" ]; then
+            show_help
+        else
+            if [ "$3" = "--averages" ]; then
+                python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests('$filename', add_averages=True)"
+            else
+                python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests('$filename', add_averages=False)"
+            fi
+        fi
     fi
 elif [ "$1" = "config" ] ; then
     if [ "$2" = "edit" ] ; then

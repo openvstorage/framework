@@ -330,7 +330,7 @@ class ArakoonInstaller(object):
         :rtype: dict
         """
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
-            raise ValueError('Cluster type {0} is not supported. Please choose from {1}'.format(cluster_type, ', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
+            raise ValueError('Cluster type {0} is not supported. Please choose from {1}'.format(cluster_type, ', '.join(sorted(ServiceType.ARAKOON_CLUSTER_TYPES))))
         if plugins is not None and not isinstance(plugins, dict):
             raise ValueError('Plugins should be a dict')
 
@@ -576,7 +576,7 @@ class ArakoonInstaller(object):
         :rtype: dict
         """
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
-            raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
+            raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(sorted(ServiceType.ARAKOON_CLUSTER_TYPES))))
         if not Configuration.dir_exists(ArakoonClusterConfig.CONFIG_ROOT):
             return None
 
@@ -602,13 +602,11 @@ class ArakoonInstaller(object):
                 mutex.release()
 
     @staticmethod
-    def get_unused_arakoon_clusters(cluster_type, ip=None):
+    def get_unused_arakoon_clusters(cluster_type):
         """
         Retrieve all unclaimed clusters of type <cluster_type>
-        :param cluster_type: Type of the cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
+        :param cluster_type: Type of the cluster (See ServiceType.ARAKOON_CLUSTER_TYPES w/o type CFG, since this is not available in the configuration management)
         :type cluster_type: str
-        :param ip: The IP address of one of the nodes containing the configuration file (Only required for filesystem Arakoons)
-        :type ip: str
         :return: All unclaimed clusters of specified type
         :rtype: list
         """
@@ -616,12 +614,13 @@ class ArakoonInstaller(object):
         if not Configuration.dir_exists(ArakoonClusterConfig.CONFIG_ROOT):
             return clusters
 
-        if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
-            raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
-        _, ip = ArakoonInstaller._is_filesystem_cluster(cluster_type=cluster_type, ip=ip)
+        supported_types = ServiceType.ARAKOON_CLUSTER_TYPES.keys()
+        supported_types.remove(ServiceType.ARAKOON_CLUSTER_TYPES.CFG)
+        if cluster_type not in supported_types:
+            raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(sorted(supported_types))))
 
         for cluster_name in Configuration.list(ArakoonClusterConfig.CONFIG_ROOT):
-            metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)
+            metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
             if metadata['cluster_type'] == cluster_type and metadata['in_use'] is False:
                 clusters.append(metadata)
         return clusters
@@ -873,7 +872,10 @@ class ArakoonInstaller(object):
         :rtype: NoneType
         """
         ArakoonInstaller._logger.debug('Restarting cluster {0} with current IPs: {1} and newly added IP {2}'.format(cluster_name, ', '.join(current_ips), new_ip))
-        filesystem = cluster_name == 'config'
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            filesystem = 'config' in cluster_name or 'cfg' in cluster_name
+        else:
+            filesystem = cluster_name == 'config'
         client = SSHClient(endpoint=new_ip, username=ArakoonInstaller.SSHCLIENT_USER)
         if ArakoonInstaller.is_running(cluster_name=cluster_name, client=client):
             ArakoonInstaller._logger.info('Arakoon service for {0} is already running'.format(cluster_name))

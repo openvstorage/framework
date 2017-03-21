@@ -46,21 +46,22 @@ class UnitTest(object):
         raise Exception('Static class, cannot be instantiated')
 
     @staticmethod
-    def _sec_to_readable(seconds):
+    def _sec_to_readable(seconds, precision=0):
         """
         Parse the seconds to hours, minutes, seconds
         :param seconds: Amount of seconds
         :type seconds: float
+        :param precision: Amount of digits after comma
+        :type precision: int
         :return: Human readable string
         :rtype: str
         """
-        seconds = int(seconds)
         if seconds < 1:
             return '< 1 second'
-        hours = seconds / 3600
+        hours = int(seconds / 3600)
         rest = seconds % 3600
-        minutes = rest / 60
-        seconds = rest % 60
+        minutes = int(rest / 60)
+        seconds = '{{0:.{0}f}}'.format(precision).format(rest % 60)
         if hours > 0:
             return '{0} hour{1}, {2} minute{3} and {4} second{5}'.format(hours, '' if hours == 1 else 's', minutes, '' if minutes == 1 else 's', seconds, '' if seconds == 1 else 's')
         elif minutes > 0:
@@ -74,8 +75,10 @@ class UnitTest(object):
         Retrieve all test classes recursively in the specified directories
         :param directories: Directories to recursively check
         :type directories: list
-
+        :param silent_invalid_modules: Ignore output for invalid modules
+        :type silent_invalid_modules: bool
         :return: None
+        :rtype: NoneType
         """
         os.environ['RUNNING_UNITTESTS'] = 'True'
         if directories is None:
@@ -134,7 +137,6 @@ class UnitTest(object):
         List all test cases for a test class
         :param file_path: Class to list the tests for
         :type file_path: TestCaseClass
-
         :return: All test cases
         :rtype: list
         """
@@ -150,10 +152,10 @@ class UnitTest(object):
         List all the tests found on the system or in the directories specified
         :param directories: Directories to check for tests
         :type directories: list
-
         :param print_tests: Print the tests (Used by /usr/bin/ovs)
         :type print_tests: bool
-
+        :param silent_invalid_modules: Ignore output for invalid modules
+        :type silent_invalid_modules: bool
         :return: All tests found
         :rtype: list
         """
@@ -165,7 +167,7 @@ class UnitTest(object):
         return tests
 
     @staticmethod
-    def run_tests(tests=None):
+    def run_tests(tests=None, add_averages=False):
         """
         Execute the tests specified or all if no tests provided
         :param tests: Tests to execute
@@ -173,8 +175,10 @@ class UnitTest(object):
                       /opt/OpenvStorage/ovs/dal/tests/test_basic.Basic
                       /opt/OpenvStorage/ovs/dal/tests/test_basic.Basic:test_recursive
         :type tests: list
-
+        :param add_averages: Add average timings for each test module
+        :type add_averages: bool
         :return: None
+        :rtype: NoneType
         """
         failed_modules = []
         if tests is None:  # Put all test files and their classes in custom dict
@@ -217,6 +221,7 @@ class UnitTest(object):
 
         # Execute the tests
         test_results = ['############', '# OVERVIEW #', '############', '']
+        averages = {}
         start_all = time.time()
         total_tests = 0.0
         total_error = 0
@@ -225,13 +230,16 @@ class UnitTest(object):
         for test in tests_to_execute:
             start_test = time.time()
             text_string = '# Processing {0} {1} #'.format(UnitTest._test_info[test]['use_case'], test)
-            print '\n\n\n{0}\n{1}\n{0}\n'.format(len(text_string) * '#', text_string, len(text_string) * '#')
+            print '\n\n\n{0}\n{1}\n{0}\n'.format(len(text_string) * '#', text_string)
             tests_to_run = UnitTest._test_info[test]['tests']
             test_amount = tests_to_run.countTestCases()
             result = unittest.TextTestRunner(verbosity=2).run(tests_to_run)
+            duration = time.time() - start_test
             specification = 'TestCase' if ':' in test else 'TestClass' if '.' in test else 'TestModule'
-            test_results.append('  - {0}: {1}  ({2} test{3})'.format(specification, test, test_amount, '' if test_amount == 1 else 's'))
-            test_results.append('    - DURATION: {0}'.format(UnitTest._sec_to_readable(time.time() - start_test)))
+            test_line = '  - {0}: {1}  ({2} test{3})'.format(specification, test, test_amount, '' if test_amount == 1 else 's')
+            averages[test_line] = duration / test_amount if test_amount > 0 else 0
+            test_results.append(test_line)
+            test_results.append('    - DURATION: {0}'.format(UnitTest._sec_to_readable(duration)))
             test_results.append('    - {0}: {1}'.format(UnitTest._SUCCESS, test_amount - len(result.errors) - len(result.failures)))
 
             total_tests += test_amount
@@ -265,6 +273,19 @@ class UnitTest(object):
             if len(failed_modules) > 1:
                 test_results.append('  - {0}: {1} invalid test modules'.format(UnitTest._ERROR, len(failed_modules)))
             test_results.append('')
+
+        if add_averages is True:
+            longest_duration = max(averages.values())
+            for index, line in enumerate(test_results[:]):
+                if line in averages:
+                    average_duration = averages[line]
+                    if average_duration > 1:
+                        new_line = '{0} - {1} per test)'.format(line[:-1], UnitTest._sec_to_readable(average_duration, 2))
+                        if average_duration == longest_duration and len(averages) > 1:
+                            new_line = '{0}   \033[91mSLOWEST\033[0m'.format(new_line)
+                        test_results.remove(line)
+                        test_results.insert(index, new_line)
+
         print '\n\n\n{0}'.format('\n'.join(test_results))
         os.environ['RUNNING_UNITTESTS'] = 'False'
         success = total_tests == total_success and len(failed_modules) == 0
