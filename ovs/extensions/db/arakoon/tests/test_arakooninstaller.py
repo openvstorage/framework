@@ -17,10 +17,9 @@
 """
 Module for testing the ArakoonInstaller
 """
-import os
+
 import copy
 import json
-import shutil
 import unittest
 from threading import Thread
 from ovs.dal.hybrids.servicetype import ServiceType
@@ -209,10 +208,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         client_1 = SSHClient(endpoint=storagerouter_1.ip)
         client_2 = SSHClient(endpoint=storagerouter_2.ip)
         client_3 = SSHClient(endpoint=storagerouter_3.ip)
-
-        for mountpoint in [mountpoint_1, mountpoint_2, mountpoint_3]:
-            if os.path.exists(mountpoint) and mountpoint != '/':
-                shutil.rmtree(mountpoint)
 
         # Basic validations
         with self.assertRaises(ValueError) as raise_info:
@@ -411,10 +406,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         client_2 = SSHClient(endpoint=storagerouter_2.ip)
         client_3 = SSHClient(endpoint=storagerouter_3.ip)
 
-        for mountpoint in [mountpoint_1, mountpoint_2, mountpoint_3]:
-            if os.path.exists(mountpoint) and mountpoint != '/':
-                shutil.rmtree(mountpoint)
-
         ##########
         # CREATE #
         ##########
@@ -577,10 +568,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         client_1 = SSHClient(endpoint=storagerouter_1.ip)
         client_2 = SSHClient(endpoint=storagerouter_2.ip)
 
-        for mountpoint in [mountpoint_1, mountpoint_2]:
-            if os.path.exists(mountpoint) and mountpoint != '/':
-                shutil.rmtree(mountpoint)
-
         ##########
         # CREATE #
         ##########
@@ -689,10 +676,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         base_dir_2 = '{0}/base_dir_internal_nsm_plugins_extend'.format(mountpoint_2)
         client_1 = SSHClient(endpoint=storagerouter_1.ip)
         client_2 = SSHClient(endpoint=storagerouter_2.ip)
-
-        for mountpoint in [mountpoint_1, mountpoint_2]:
-            if os.path.exists(mountpoint) and mountpoint != '/':
-                shutil.rmtree(mountpoint)
 
         ##########
         # CREATE #
@@ -810,10 +793,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         client_1 = SSHClient(endpoint=storagerouter_1.ip)
         client_2 = SSHClient(endpoint=storagerouter_2.ip)
         client_3 = SSHClient(endpoint=storagerouter_3.ip)
-
-        for mountpoint in [mountpoint_1, mountpoint_2, mountpoint_3]:
-            if os.path.exists(mountpoint) and mountpoint != '/':
-                shutil.rmtree(mountpoint)
 
         # Basic validations
         with self.assertRaises(ValueError) as raise_info:
@@ -1025,10 +1004,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         client_2 = SSHClient(endpoint=storagerouter_2.ip)
         client_3 = SSHClient(endpoint=storagerouter_3.ip)
 
-        for mountpoint in [mountpoint_1, mountpoint_2, mountpoint_3]:
-            if os.path.exists(mountpoint) and mountpoint != '/':
-                shutil.rmtree(mountpoint)
-
         # Basic validations
         with self.assertRaises(ValueError) as raise_info:
             ArakoonInstaller.create_cluster(cluster_name=cluster_name,
@@ -1234,8 +1209,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         structure = DalHelper.build_dal_structure(structure={'storagerouters': [1]})
         storagerouter = structure['storagerouters'][1]
         mountpoint = storagerouter.disks[0].partitions[0].mountpoint
-        if os.path.exists(mountpoint) and mountpoint != '/':
-            shutil.rmtree(mountpoint)
 
         # Create less clusters than threads. Due to locking, this shouldn't invoke any error and all clusters should be claimed
         cluster_map = {}
@@ -1329,8 +1302,6 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
         structure = DalHelper.build_dal_structure(structure={'storagerouters': [1]})
         storagerouter = structure['storagerouters'][1]
         mountpoint = storagerouter.disks[0].partitions[0].mountpoint
-        if os.path.exists(mountpoint) and mountpoint != '/':
-            shutil.rmtree(mountpoint)
 
         # Create some clusters for 2 types
         cluster_map = {}

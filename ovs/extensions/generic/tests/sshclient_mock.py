@@ -1,4 +1,4 @@
-# Copyright (C) 2016 iNuron NV
+# Copyright (C) 2017 iNuron NV
 #
 # This file is part of Open vStorage Open Source Edition (OSE),
 # as available from
@@ -19,7 +19,6 @@ Mocked SSHClient Module
 
 import re
 import copy
-import json
 from subprocess import CalledProcessError
 from ovs.log.log_handler import LogHandler
 
@@ -219,6 +218,7 @@ class MockedSSHClient(object):
         Mocked symlink method
         """
         _ = client, links
+        raise NotImplementedError('Symlink method has not been mocked yet')
 
     @staticmethod
     def file_create(client, filenames):
@@ -290,6 +290,7 @@ class MockedSSHClient(object):
         Mocked file_unlink method
         """
         _ = client, path
+        raise NotImplementedError('file_unlink method has not been mocked yet')
 
     @staticmethod
     def file_read_link(client, path):
@@ -297,6 +298,7 @@ class MockedSSHClient(object):
         Mocked file_read_link method
         """
         _ = client, path
+        raise NotImplementedError('file_read_link method has not been mocked yet')
 
     @staticmethod
     def file_read(client, filename):
@@ -309,11 +311,7 @@ class MockedSSHClient(object):
         if pointer is None or last_part not in pointer['files']:
             raise OSError("No such file or directory: '{0}'".format(filename))
 
-        contents = pointer['files'][last_part]['contents']
-        try:
-            return json.loads(contents)
-        except ValueError:
-            return contents
+        return pointer['files'][last_part]['contents']
 
     @staticmethod
     def file_write(client, filename, contents):
@@ -328,8 +326,8 @@ class MockedSSHClient(object):
 
         parts = [part for part in filename.strip('/').split('/') if part]
         pointer = MockedSSHClient._file_system[client.ip]
-        if isinstance(contents, list) or isinstance(contents, dict):
-            contents = json.dumps(contents, indent=4, sort_keys=True)
+        if type(contents) not in [str, unicode, basestring]:
+            raise TypeError('expected a string or other character buffer object')
 
         for index, part in enumerate(parts):
             if index == len(parts) - 1:
@@ -349,6 +347,7 @@ class MockedSSHClient(object):
         Mocked file_upload method
         """
         _ = client, remote_filename, local_filename
+        raise NotImplementedError('file_upload method has not been mocked yet')
 
     @staticmethod
     def file_exists(client, filename):
