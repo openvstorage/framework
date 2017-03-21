@@ -306,7 +306,7 @@ class VDiskTest(unittest.TestCase):
         vdisks = VDiskList.get_vdisks()
         self.assertTrue(expr=len(vdisks) == 2, msg='Expected to find 2 vDisks')
 
-        clones = VDiskList.get_by_parentsnapshot(vdisk1.snapshots[0]['guid'])
+        clones = VDiskList.get_by_parentsnapshot(vdisk1.snapshot_ids[0])
         self.assertTrue(expr=len(clones) == 1, msg='Expected to find 1 vDisk with parent snapshot')
         self.assertTrue(expr=len(vdisk1.child_vdisks) == 1, msg='Expected to find 1 child vDisk')
 
@@ -362,6 +362,7 @@ class VDiskTest(unittest.TestCase):
 
         # Attempt to clone by providing snapshot_id not synced to backend
         self.assertTrue(expr=len(vdisk1.snapshots) == 1, msg='Expected to find only 1 snapshot before cloning')
+        self.assertTrue(expr=len(vdisk1.snapshot_ids) == 1, msg='Expected to find only 1 snapshot ID before cloning')
         metadata = {'label': 'label1',
                     'timestamp': int(time.time()),
                     'is_sticky': False,
@@ -370,6 +371,7 @@ class VDiskTest(unittest.TestCase):
                     'is_consistent': True}
         snapshot_id = VDiskController.create_snapshot(vdisk_guid=vdisk1.guid, metadata=metadata)
         self.assertTrue(expr=len(vdisk1.snapshots) == 2, msg='Expected to find 2 snapshots')
+        self.assertTrue(expr=len(vdisk1.snapshot_ids) == 2, msg='Expected to find 2 snapshot IDs')
         with self.assertRaises(RuntimeError):
             VDiskController.clone(vdisk_guid=vdisk1.guid,
                                   name='clone2',
@@ -379,7 +381,7 @@ class VDiskTest(unittest.TestCase):
 
         # Update backend synced flag and retry
         vdisk1.storagedriver_client._set_snapshot_in_backend(vdisk1.volume_id, snapshot_id, True)
-        vdisk1.invalidate_dynamics('snapshots')
+        vdisk1.invalidate_dynamics(['snapshots', 'snapshot_ids'])
         VDiskController.clone(vdisk_guid=vdisk1.guid,
                               name='clone2',
                               snapshot_id=snapshot_id)
@@ -388,6 +390,7 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len(vdisks) == 3, msg='Expected to find 3 vDisks')
         self.assertTrue(expr=len(vdisk1.child_vdisks) == 2, msg='Expected to find 2 child vDisks')
         self.assertTrue(expr=len(vdisk1.snapshots) == 2, msg='Expected to find 2 snapshots after cloning from a specified snapshot')
+        self.assertTrue(expr=len(vdisk1.snapshot_ids) == 2, msg='Expected to find 2 snapshot IDs after cloning from a specified snapshot')
 
         # Attempt to delete the snapshot that has clones
         with self.assertRaises(RuntimeError):
@@ -443,6 +446,7 @@ class VDiskTest(unittest.TestCase):
                                   name='clone4')
         vdisk2.invalidate_dynamics()
         self.assertTrue(expr=len(vdisk2.snapshots) == 0, msg='Expected to find 0 snapshots after clone failure')
+        self.assertTrue(expr=len(vdisk2.snapshot_ids) == 0, msg='Expected to find 0 snapshot IDs after clone failure')
         self.assertTrue(expr=len(vdisk2.child_vdisks) == 0, msg='Expected to find 0 children after clone failure')
         StorageRouterClient.synced = True
 
@@ -473,8 +477,8 @@ class VDiskTest(unittest.TestCase):
                                                                                         'is_consistent': True,
                                                                                         'is_automatic': True,
                                                                                         'is_sticky': False})
-        self.assertTrue(expr=len(vdisk1.snapshots) == 1,
-                        msg='Expected to find 1 snapshot')
+        self.assertTrue(expr=len(vdisk1.snapshots) == 1, msg='Expected to find 1 snapshot')
+        self.assertTrue(expr=len(vdisk1.snapshot_ids) == 1, msg='Expected to find 1 snapshot ID')
         snapshot = vdisk1.snapshots[0]
         expected_keys = {'guid', 'timestamp', 'label', 'is_consistent', 'is_automatic', 'is_sticky', 'in_backend', 'stored'}
         self.assertEqual(first=expected_keys,
@@ -513,17 +517,16 @@ class VDiskTest(unittest.TestCase):
                                                                           'is_consistent': True,
                                                                           'is_automatic': True,
                                                                           'is_sticky': False})
-        snapshot = vdisk1.snapshots[0]
-        self.assertTrue(expr=len(vdisk1.snapshots) == 1,
-                        msg='Expected to find 1 snapshot')
+        self.assertTrue(expr=len(vdisk1.snapshots) == 1, msg='Expected to find 1 snapshot')
+        self.assertTrue(expr=len(vdisk1.snapshot_ids) == 1, msg='Expected to find 1 snapshot ID')
         with self.assertRaises(RuntimeError):
             VDiskController.delete_snapshot(vdisk_guid=vdisk1.guid,
                                             snapshot_id='non-existing')
 
         VDiskController.delete_snapshot(vdisk_guid=vdisk1.guid,
-                                        snapshot_id=snapshot['guid'])
-        self.assertTrue(expr=len(vdisk1.snapshots) == 0,
-                        msg='Expected to find no more snapshots')
+                                        snapshot_id=vdisk1.snapshot_ids[0])
+        self.assertTrue(expr=len(vdisk1.snapshots) == 0, msg='Expected to find no more snapshots')
+        self.assertTrue(expr=len(vdisk1.snapshot_ids) == 0, msg='Expected to find no more snapshot IDs')
 
     def test_list_volumes(self):
         """
@@ -603,13 +606,14 @@ class VDiskTest(unittest.TestCase):
             metadata['timestamp'] = int(time.time())
             VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid, metadata=metadata)
         self.assertTrue(expr=len(vdisk_1.snapshots) == 5, msg='Expected to find 5 snapshots')
+        self.assertTrue(expr=len(vdisk_1.snapshot_ids) == 5, msg='Expected to find 5 snapshot IDs')
 
         # Set as template and validate the model
         self.assertFalse(expr=vdisk_1.is_vtemplate, msg='Dynamic property "is_vtemplate" should be False')
         VDiskController.set_as_template(vdisk_guid=vdisk_1.guid)
-        vdisk_1.invalidate_dynamics('snapshots')
         self.assertTrue(expr=vdisk_1.is_vtemplate, msg='Dynamic property "is_vtemplate" should be True')
         self.assertTrue(expr=len(vdisk_1.snapshots) == 1, msg='Expected to find only 1 snapshot after converting to template')
+        self.assertTrue(expr=len(vdisk_1.snapshot_ids) == 1, msg='Expected to find only 1 snapshot ID after converting to template')
 
         # Try again and verify job succeeds, previously we raised error when setting as template an additional time
         VDiskController.set_as_template(vdisk_1.guid)
@@ -754,22 +758,23 @@ class VDiskTest(unittest.TestCase):
                         'is_automatic': True,
                         'is_consistent': True}
             snapshots.append(VDiskController.create_snapshot(vdisk_guid=vdisk.guid, metadata=metadata))
-        vdisk.invalidate_dynamics(['snapshots'])
+        vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
         self.assertEqual(len(vdisk.snapshots), 10)
+        self.assertEqual(len(vdisk.snapshot_ids), 10)
         snapshot_id = snapshots[0]
 
         # Old format
         results = VDiskController.delete_snapshots({vdisk.guid: snapshot_id})
         expected = {vdisk.guid: [True, snapshot_id]}
         self.assertDictEqual(results, expected)
-        vdisk.invalidate_dynamics(['snapshots'])
         self.assertEqual(len(vdisk.snapshots), 9)
+        self.assertEqual(len(vdisk.snapshot_ids), 9)
         results = VDiskController.delete_snapshots({vdisk.guid: snapshot_id})
         expected = {vdisk.guid: [False, results[vdisk.guid][1]]}
         self.assertDictEqual(results, expected)
         self.assertRegexpMatches(results[vdisk.guid][1], '^Snapshot (.*?) does not belong to vDisk')
-        vdisk.invalidate_dynamics(['snapshots'])
         self.assertEqual(len(vdisk.snapshots), 9)
+        self.assertEqual(len(vdisk.snapshot_ids), 9)
         results = VDiskController.delete_snapshots({'foo': snapshot_id})
         expected = {'foo': [False, results['foo'][1]]}
         self.assertDictEqual(results, expected)
@@ -784,8 +789,8 @@ class VDiskTest(unittest.TestCase):
                                  'results': {snapshot_id1: [True, snapshot_id1],
                                              snapshot_id2: [True, snapshot_id2]}}}
         self.assertDictEqual(results, expected)
-        vdisk.invalidate_dynamics(['snapshots'])
         self.assertEqual(len(vdisk.snapshots), 7)
+        self.assertEqual(len(vdisk.snapshot_ids), 7)
         snapshot_id2 = snapshots[3]
         results = VDiskController.delete_snapshots({vdisk.guid: [snapshot_id1, snapshot_id2]})
         expected = {vdisk.guid: {'success': False,
@@ -795,8 +800,8 @@ class VDiskTest(unittest.TestCase):
         self.assertDictEqual(results, expected)
         self.assertEquals(results[vdisk.guid]['error'], 'One or more snapshots could not be removed')
         self.assertRegexpMatches(results[vdisk.guid]['results'][snapshot_id1][1], '^Snapshot (.*?) does not belong to vDisk')
-        vdisk.invalidate_dynamics(['snapshots'])
         self.assertEqual(len(vdisk.snapshots), 6)
+        self.assertEqual(len(vdisk.snapshot_ids), 6)
         results = VDiskController.delete_snapshots({'foo': [snapshot_id1]})
         expected = {'foo': {'success': False,
                             'error': results['foo']['error'],

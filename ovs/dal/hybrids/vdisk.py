@@ -53,6 +53,7 @@ class VDisk(DataObject):
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),
                   Dynamic('snapshots', list, 30),
+                  Dynamic('snapshot_ids', list, 30),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
@@ -134,45 +135,50 @@ class VDisk(DataObject):
             return sd_status
         return 'checkup_required'
 
+    def _snapshot_ids(self):
+        """
+        Fetches the snapshot IDs for this vDisk
+        """
+        if not self.volume_id or not self.vpool:
+            return []
+
+        volume_id = str(self.volume_id)
+        try:
+            try:
+                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+            except VolumeRestartInProgressException:
+                time.sleep(0.5)
+                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+        except:
+            return []
+
     def _snapshots(self):
         """
-        Fetches a list of Snapshots for the vDisk
+        Fetches the information of all snapshots for this vDisk
         """
         snapshots = []
-        if self.volume_id and self.vpool:
-            volume_id = str(self.volume_id)
-            voldrv_snapshots = []
-            try:
-                try:
-                    voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
-                except VolumeRestartInProgressException:
-                    time.sleep(0.5)
-                    voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
-            except:
-                pass
-
-            for snap_id in voldrv_snapshots:
-                snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id, req_timeout_secs=2)
-                if snapshot.metadata:
-                    metadata = pickle.loads(snapshot.metadata)
-                    if isinstance(metadata, dict):
-                        snapshots.append({'guid': snap_id,
-                                          'timestamp': metadata['timestamp'],
-                                          'label': metadata['label'],
-                                          'is_consistent': metadata['is_consistent'],
-                                          'is_automatic': metadata.get('is_automatic', True),
-                                          'is_sticky': metadata.get('is_sticky', False),
-                                          'in_backend': snapshot.in_backend,
-                                          'stored': int(snapshot.stored)})
-                else:
+        for snap_id in self.snapshot_ids:
+            snapshot = self.storagedriver_client.info_snapshot(str(self.volume_id), snap_id, req_timeout_secs=2)
+            if snapshot.metadata:
+                metadata = pickle.loads(snapshot.metadata)
+                if isinstance(metadata, dict):
                     snapshots.append({'guid': snap_id,
-                                      'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
-                                      'label': snap_id,
-                                      'is_consistent': False,
-                                      'is_automatic': False,
-                                      'is_sticky': False,
+                                      'timestamp': metadata['timestamp'],
+                                      'label': metadata['label'],
+                                      'is_consistent': metadata['is_consistent'],
+                                      'is_automatic': metadata.get('is_automatic', True),
+                                      'is_sticky': metadata.get('is_sticky', False),
                                       'in_backend': snapshot.in_backend,
                                       'stored': int(snapshot.stored)})
+            else:
+                snapshots.append({'guid': snap_id,
+                                  'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
+                                  'label': snap_id,
+                                  'is_consistent': False,
+                                  'is_automatic': False,
+                                  'is_sticky': False,
+                                  'in_backend': snapshot.in_backend,
+                                  'stored': int(snapshot.stored)})
         return snapshots
 
     def _info(self):
@@ -280,6 +286,9 @@ class VDisk(DataObject):
 
     @staticmethod
     def extract_statistics(stats, vdisk):
+        """
+        Extract the statistics useful for the framework from all statistics passed in by StorageDriver
+        """
         statsdict = {}
         try:
             pc = stats.performance_counters
