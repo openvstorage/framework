@@ -25,11 +25,11 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.structures import Property, Relation, Dynamic
-from ovs.extensions.storageserver.storagedriver import \
-    MaxRedirectsExceededException, VolumeRestartInProgressException, \
-    FSMetaDataClient, ObjectRegistryClient, StorageDriverClient
+from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient,\
+                                                       SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
+
 from ovs.log.log_handler import LogHandler
 
 
@@ -53,6 +53,7 @@ class VDisk(DataObject):
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),
                   Dynamic('snapshots', list, 30),
+                  Dynamic('snapshot_ids', list, 30),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
@@ -134,45 +135,53 @@ class VDisk(DataObject):
             return sd_status
         return 'checkup_required'
 
+    def _snapshot_ids(self):
+        """
+        Fetches the snapshot IDs for this vDisk
+        """
+        if not self.volume_id or not self.vpool:
+            return []
+
+        volume_id = str(self.volume_id)
+        try:
+            try:
+                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+            except VolumeRestartInProgressException:
+                time.sleep(0.5)
+                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+        except:
+            return []
+
     def _snapshots(self):
         """
-        Fetches a list of Snapshots for the vDisk
+        Fetches the information of all snapshots for this vDisk
         """
         snapshots = []
-        if self.volume_id and self.vpool:
-            volume_id = str(self.volume_id)
-            voldrv_snapshots = []
+        for snap_id in self._snapshot_ids():
             try:
-                try:
-                    voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
-                except VolumeRestartInProgressException:
-                    time.sleep(0.5)
-                    voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
-            except:
-                pass
-
-            for snap_id in voldrv_snapshots:
-                snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id, req_timeout_secs=2)
-                if snapshot.metadata:
-                    metadata = pickle.loads(snapshot.metadata)
-                    if isinstance(metadata, dict):
-                        snapshots.append({'guid': snap_id,
-                                          'timestamp': metadata['timestamp'],
-                                          'label': metadata['label'],
-                                          'is_consistent': metadata['is_consistent'],
-                                          'is_automatic': metadata.get('is_automatic', True),
-                                          'is_sticky': metadata.get('is_sticky', False),
-                                          'in_backend': snapshot.in_backend,
-                                          'stored': int(snapshot.stored)})
-                else:
+                snapshot = self.storagedriver_client.info_snapshot(str(self.volume_id), snap_id, req_timeout_secs=2)
+            except SnapshotNotFoundException:
+                continue
+            if snapshot.metadata:
+                metadata = pickle.loads(snapshot.metadata)
+                if isinstance(metadata, dict):
                     snapshots.append({'guid': snap_id,
-                                      'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
-                                      'label': snap_id,
-                                      'is_consistent': False,
-                                      'is_automatic': False,
-                                      'is_sticky': False,
+                                      'timestamp': metadata['timestamp'],
+                                      'label': metadata['label'],
+                                      'is_consistent': metadata['is_consistent'],
+                                      'is_automatic': metadata.get('is_automatic', True),
+                                      'is_sticky': metadata.get('is_sticky', False),
                                       'in_backend': snapshot.in_backend,
                                       'stored': int(snapshot.stored)})
+            else:
+                snapshots.append({'guid': snap_id,
+                                  'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
+                                  'label': snap_id,
+                                  'is_consistent': False,
+                                  'is_automatic': False,
+                                  'is_sticky': False,
+                                  'in_backend': snapshot.in_backend,
+                                  'stored': int(snapshot.stored)})
         return snapshots
 
     def _info(self):
@@ -280,6 +289,9 @@ class VDisk(DataObject):
 
     @staticmethod
     def extract_statistics(stats, vdisk):
+        """
+        Extract the statistics useful for the framework from all statistics passed in by StorageDriver
+        """
         statsdict = {}
         try:
             pc = stats.performance_counters
@@ -362,12 +374,12 @@ class VDisk(DataObject):
             if key == 'timestamp' or '_latency' in key or '_distribution' in key:
                 continue
             delta = current_stats['timestamp'] - previous_stats.get('timestamp', current_stats['timestamp'])
-            if delta < 0:
-                current_stats['{0}_ps'.format(key)] = 0
-            elif delta == 0:
+            if delta == 0:
                 current_stats['{0}_ps'.format(key)] = previous_stats.get('{0}_ps'.format(key), 0)
-            else:
+            elif delta > 0 and key in previous_stats:
                 current_stats['{0}_ps'.format(key)] = max(0, (current_stats[key] - previous_stats[key]) / delta)
+            else:
+                current_stats['{0}_ps'.format(key)] = 0
         volatile.set(prev_key, current_stats, dynamic.timeout * 10)
 
     def reload_client(self, client):

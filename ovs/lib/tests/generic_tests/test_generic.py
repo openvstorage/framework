@@ -29,6 +29,7 @@ from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs.extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
@@ -71,6 +72,8 @@ class Generic(unittest.TestCase):
         success, fail = GenericController.snapshot_all_vdisks()
         self.assertEqual(first=len(fail), second=0, msg='Expected 0 failed snapshots')
         self.assertEqual(first=len(success), second=2, msg='Expected 2 successful snapshots')
+        self.assertEqual(first=len(vdisk_1.snapshot_ids), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_1.name))
+        self.assertEqual(first=len(vdisk_2.snapshot_ids), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_2.name))
         self.assertEqual(first=len(vdisk_1.snapshots), second=1, msg='Expected 1 snapshot for vDisk {0}'.format(vdisk_1.name))
         self.assertEqual(first=len(vdisk_2.snapshots), second=1, msg='Expected 1 snapshot for vDisk {0}'.format(vdisk_2.name))
 
@@ -81,6 +84,8 @@ class Generic(unittest.TestCase):
         self.assertEqual(first=fail[0], second=vdisk_1.guid, msg='Expected vDisk {0} to have failed'.format(vdisk_1.name))
         self.assertEqual(first=len(success), second=1, msg='Expected 1 successful snapshot')
         self.assertEqual(first=success[0], second=vdisk_2.guid, msg='Expected vDisk {0} to have succeeded'.format(vdisk_2.name))
+        self.assertEqual(first=len(vdisk_1.snapshot_ids), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_1.name))
+        self.assertEqual(first=len(vdisk_2.snapshot_ids), second=2, msg='Expected 2 snapshot IDs for vDisk {0}'.format(vdisk_2.name))
         self.assertEqual(first=len(vdisk_1.snapshots), second=1, msg='Expected 1 snapshot for vDisk {0}'.format(vdisk_1.name))
         self.assertEqual(first=len(vdisk_2.snapshots), second=2, msg='Expected 2 snapshots for vDisk {0}'.format(vdisk_2.name))
 
@@ -114,7 +119,7 @@ class Generic(unittest.TestCase):
         structure = DalHelper.build_dal_structure(structure={'vdisks': [(2, 1, 1, 1)]},
                                                   previous_structure=structure)
         clone_vdisk = structure['vdisks'][2]
-        base_snapshot_guid = vdisk_1.snapshots[0]['guid']  # Oldest
+        base_snapshot_guid = vdisk_1.snapshot_ids[0]  # Oldest
         clone_vdisk.parentsnapshot = base_snapshot_guid
         clone_vdisk.save()
 
@@ -128,7 +133,7 @@ class Generic(unittest.TestCase):
                                                           'timestamp': str(timestamp)})
             base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * 2)
             GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
-        self.assertIn(base_snapshot_guid, [snap['guid'] for snap in vdisk_1.snapshots], 'Snapshot was deleted while there are still clones of it')
+        self.assertIn(base_snapshot_guid, vdisk_1.snapshot_ids, 'Snapshot was deleted while there are still clones of it')
 
     def test_different_snapshot_flags(self):
         """
@@ -500,7 +505,7 @@ class Generic(unittest.TestCase):
                              second=3,
                              msg='Unexpected amount of threads left for vPool {0}'.format(vpool.name))
 
-    def arakoon_collapse_test(self):
+    def test_arakoon_collapse(self):
         """
         Test the Arakoon collapse functionality
         """
@@ -508,6 +513,8 @@ class Generic(unittest.TestCase):
         structure = DalHelper.build_dal_structure(structure={'storagerouters': [1, 2]})
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
+        MockedSSHClient._run_returns[storagerouter_1.ip] = {}
+        MockedSSHClient._run_returns[storagerouter_2.ip] = {}
 
         # Make sure we cover all Arakoon cluster types
         clusters_to_create = {ServiceType.ARAKOON_CLUSTER_TYPES.SD: [{'name': 'unittest-voldrv', 'internal': True, 'success': True}],
@@ -525,6 +532,7 @@ class Generic(unittest.TestCase):
         external_clusters = []
         successful_clusters = []
         for cluster_type, cluster_infos in clusters_to_create.iteritems():
+            filesystem = cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG
             for cluster_info in cluster_infos:
                 internal = cluster_info['internal']
                 cluster_name = cluster_info['name']
@@ -535,9 +543,10 @@ class Generic(unittest.TestCase):
                                                        ip=storagerouter_1.ip,
                                                        base_dir=base_dir,
                                                        internal=internal)
-                ArakoonInstaller.start_cluster(metadata=info['metadata'])
+                ArakoonInstaller.start_cluster(metadata=info['metadata'],
+                                               ip=storagerouter_1.ip if filesystem is True else None)
                 ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
-                                                ip=storagerouter_1.ip if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG else None,
+                                                ip=storagerouter_1.ip if filesystem is True else None,
                                                 new_ip=storagerouter_2.ip,
                                                 base_dir=base_dir)
 
@@ -566,9 +575,12 @@ class Generic(unittest.TestCase):
                     continue
 
                 if cluster_info['success'] is True:
-                    config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster_name))
-                    SSHClient._run_returns['arakoon --collapse-local 1 2 -config {0}'.format(config_path)] = None
-                    SSHClient._run_returns['arakoon --collapse-local 2 2 -config {0}'.format(config_path)] = None
+                    if filesystem is True:
+                        config_path = ArakoonClusterConfig.CONFIG_FILE.format(cluster_name)
+                    else:
+                        config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster_name))
+                    MockedSSHClient._run_returns[storagerouter_1.ip]['arakoon --collapse-local 1 2 -config {0}'.format(config_path)] = None
+                    MockedSSHClient._run_returns[storagerouter_2.ip]['arakoon --collapse-local 2 2 -config {0}'.format(config_path)] = None
                     successful_clusters.append(cluster_name)
                 else:  # For successful False clusters we don't emulate the collapse, thus making it fail
                     failed_clusters.append(cluster_name)
@@ -624,7 +636,7 @@ class Generic(unittest.TestCase):
                           container=generic_logs,
                           msg='Expected to find log message: {0}'.format(general_message))
 
-    def refresh_package_information_test(self):
+    def test_refresh_package_information(self):
         """
         Test the refresh package information functionality
         """

@@ -15,21 +15,27 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/api', 'ovs/generic', 'ovs/shared', './data', '../../containers/vpool', '../../containers/storagerouter'
-], function($, ko, api, generic, shared, data, VPool, StorageRouter) {
+    'jquery', 'knockout',
+    'ovs/api', 'ovs/generic', 'ovs/refresher', 'ovs/shared',
+    './data', '../../containers/vpool', '../../containers/storagerouter'
+], function($, ko,
+            api, generic, Refresher, shared,
+            data, VPool, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.data   = data;
-        self.shared = shared;
+        self.data      = data;
+        self.refresher = new Refresher();
+        self.shared    = shared;
 
         // Handles
         self.loadStorageRoutersHandle = undefined;
-        self.loadvPoolsHandle         = undefined;
+        self.loadVPoolsHandle         = undefined;
 
         // Observables
+        self.loading           = ko.observable(false);
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
@@ -66,6 +72,27 @@ define([
         self.cleanedName = ko.computed(function() {
             return generic.cleanDeviceName(self.data.name());
         });
+        self.storageRoutersByVpool = ko.computed(function() {
+            if (self.data.vPool() === undefined) {
+                self.data.storageRouter(undefined);
+                return [];
+            }
+            var guids = [], result = [];
+            $.each(self.data.storageRouters(), function(index, storageRouter) {
+                if (storageRouter.vPoolGuids().contains(self.data.vPool().guid())) {
+                    result.push(storageRouter);
+                    guids.push(storageRouter.guid());
+                }
+            });
+            if (self.data.storageRouter() !== undefined) {
+                if (result.length > 0 && !guids.contains(self.data.storageRouter().guid())) {
+                    self.data.storageRouter(result[0]);
+                } else if (result.length === 0) {
+                    self.data.storageRouter(undefined);
+                }
+            }
+            return result;
+        });
 
         // Functions
         self.preValidate = function() {
@@ -90,21 +117,17 @@ define([
                     })
             }).promise();
         };
-
-        // Durandal
-        self.activate = function() {
-            generic.xhrAbort(self.loadVPoolsHandle);
-            if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                self.loadVPoolsHandle = api.get('vpools', {
-                        queryparams: {
-                        contents: ''
-                    }
-                })
+        self.loadVPools = function() {
+            return $.Deferred(function(deferred) {
+                generic.xhrAbort(self.loadVPoolsHandle);
+                self.loadVPoolsHandle = api.get('vpools', {queryparams: {contents: ''}})
                     .done(function (data) {
                         var guids = [], vpData = {};
                         $.each(data.data, function (index, item) {
-                            guids.push(item.guid);
-                            vpData[item.guid] = item;
+                            if (item.status === 'RUNNING') {
+                                guids.push(item.guid);
+                                vpData[item.guid] = item;
+                            }
                         });
                         generic.crossFiller(
                             guids, self.data.vPools,
@@ -115,15 +138,25 @@ define([
                         $.each(self.data.vPools(), function (index, vpool) {
                             if (guids.contains(vpool.guid())) {
                                 vpool.fillData(vpData[vpool.guid()]);
+                                if (self.data.vPool() === undefined) {
+                                    self.data.vPool(self.data.vPools()[0]);
+                                } else if (!guids.contains(self.data.vPool().guid())) {
+                                    self.data.vPool(self.data.vPools[0]);
+                                }
                             }
                         });
-                    });
-                self.loadStorageRoutersHandle = api.get('storagerouters', {
-                    queryparams: {
-                        contents: 'vpools_guids',
-                        sort: 'name'
-                    }
-                })
+                        if (self.data.vPools().length === 0) {
+                            self.data.vPool(undefined);
+                        }
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            });
+        };
+        self.loadStorageRouters = function() {
+            return $.Deferred(function(deferred) {
+                generic.xhrAbort(self.loadStorageRoutersHandle);
+                self.loadStorageRoutersHandle = api.get('storagerouters', {queryparams: {contents: 'vpools_guids', sort: 'name'}})
                     .done(function(data) {
                         var guids = [], srdata = {};
                         $.each(data.data, function(index, item) {
@@ -139,10 +172,31 @@ define([
                         $.each(self.data.storageRouters(), function(index, storageRouter) {
                             if (guids.contains(storageRouter.guid())) {
                                 storageRouter.fillData(srdata[storageRouter.guid()]);
+                                if (self.data.storageRouter() === undefined && self.data.vPool() !== undefined) {
+                                    self.data.storageRouter(self.data.storageRouters()[0]);
+                                }
                             }
                         });
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            });
+        };
+
+        // Durandal
+        self.activate = function() {
+            self.loading(true);
+            self.refresher.init(function() {
+                return self.loadVPools()
+                    .then(self.loadStorageRouters)
+                    .then(function() {
+                        if (self.loading() === true) {
+                            self.loading(false);
+                        }
                     });
-            }
+            }, 5000);
+            self.refresher.run();
+            self.refresher.start();
         };
         self.finish = function() {
             return $.Deferred(function(deferred) {

@@ -88,4 +88,3 @@ class ExtensionsToolbox(object):
             except ValueError:
                 pass
         return tuple(entries)
-
