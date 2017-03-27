@@ -18,6 +18,7 @@
 StorageRouter module
 """
 import os
+import re
 import copy
 import json
 import time
@@ -1262,6 +1263,128 @@ class StorageRouterController(object):
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
         client.run(['chmod', '666', '{0}/{1}'.format(webpath, logfilename)])
         return logfilename
+
+    @staticmethod
+    @ovs_task(name='ovs.storagerouter.create_hprm_config_files')
+    def create_hprm_config_files(storagerouter_guid, local_storagerouter_guid, parameters):
+        """
+        Create the required configuration files to be able to make use of HPRM (aka PRACC)
+        These configuration will be zipped and made available for download
+        :param storagerouter_guid: The guid of the StorageRouter for which a HPRM manager needs to be deployed
+        :type storagerouter_guid: str
+        :param local_storagerouter_guid: The guid of the StorageRouter this call is executed on
+        :type local_storagerouter_guid: str
+        :param parameters: Additional information required for the HPRM configuration files
+        :type parameters: dict
+        :return: Name of the zipfile containing the configuration files
+        :rtype: str
+        """
+        # Validations
+        required_params = {'port': (int, {'min': 1, 'max': 65535}),
+                           'vpool_guid': (str, Toolbox.regex_guid),
+                           'fragment_cache_on_read': (bool, None),
+                           'fragment_cache_on_write': (bool, None)}
+        Toolbox.verify_required_params(actual_params=parameters,
+                                       required_params=required_params)
+        vpool = VPool(parameters['vpool_guid'])
+        config_path = None
+        storagerouter = StorageRouter(storagerouter_guid)
+        local_storagerouter = StorageRouter(local_storagerouter_guid)
+        for sd in vpool.storagedrivers:
+            if sd.storagerouter_guid == storagerouter.guid:
+                if len(sd.alba_proxies) == 0:
+                    raise ValueError('No ALBA proxies configured for vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
+                config_path = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, sd.alba_proxies[0].guid)
+
+        if config_path is None:
+            raise ValueError('vPool {0} has not been extended to StorageRouter {1}'.format(vpool.name, storagerouter.name))
+
+        alba_backend_name = None
+        fragment_cache_on_read = parameters['fragment_cache_on_read']
+        fragment_cache_on_write = parameters['fragment_cache_on_write']
+        if fragment_cache_on_read is True or fragment_cache_on_write is True:
+            if 'path' in parameters:  # Local caching
+                required_params.update({'path': (str, re.compile('^/$|/.*[^.]$')),
+                                        'size': (int, {'min': 1, 'max': 10 * 1024})})
+                Toolbox.verify_required_params(actual_params=parameters,
+                                               required_params=required_params)
+            else:  # Accelerated ALBA
+                required_params.update({'backend_info': (dict, {'preset': (str, Toolbox.regex_preset),
+                                                                'alba_backend_name': (str, Toolbox.regex_backend)}),
+                                        'connection_info': (dict, {'host': (str, Toolbox.regex_ip, False),
+                                                                   'port': (int, {'min': 1, 'max': 65535}, False),
+                                                                   'client_id': (str, Toolbox.regex_guid, False),
+                                                                   'client_secret': (str, None, False)})})
+                Toolbox.verify_required_params(actual_params=parameters,
+                                               required_params=required_params)
+                alba_backend_name = parameters['backend_info']['alba_backend_name']
+                if Configuration.dir_exists(key='/ovs/arakoon/{0}-abm'.format(alba_backend_name)) is False:
+                    raise ValueError('Arakoon cluster for ALBA Backend {0} could not be retrieved'.format(alba_backend_name))
+
+        # Create the configurations
+        proxy_cfg = Configuration.get(key=config_path.format('main'))
+        if fragment_cache_on_read is False and fragment_cache_on_write is False:
+            fragment_cache_info = ['none']
+        elif 'path' in parameters:
+            fragment_cache_info = ['local', {'path': parameters['path'],
+                                             'max_size': parameters['size'] * 1024 ** 3,
+                                             'cache_on_read': fragment_cache_on_read,
+                                             'cache_on_write': fragment_cache_on_write}]
+        else:
+            fragment_cache_info = ['alba', {'albamgr_cfg_url': '/etc/hprm/{0}/accelerated_arakoon.ini'.format(vpool.name),
+                                            'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
+                                                                           'preset': parameters['backend_info']['preset']}],
+                                            'manifest_cache_size': proxy_cfg['manifest_cache_size'],
+                                            'cache_on_read': fragment_cache_on_read,
+                                            'cache_on_write': fragment_cache_on_write}]
+
+        tgz_name = 'hprm_config_files_{0}_{1}.tgz'.format(vpool.name, storagerouter.name)
+        config = json.dumps(indent=4,
+                            obj={'ips': ['127.0.0.1'],
+                                 'port': parameters['port'],
+                                 'pracc': {'uds_path': '/var/run/hprm/{0}/uds_path'.format(vpool.name),
+                                           'max_clients': 1000,
+                                           'max_read_buf_size': 64 * 1024,  # Buffer size for incoming requests (in bytes)
+                                           'thread_pool_size': 64},  # Amount of threads
+                                 'transport': 'tcp',
+                                 'log_level': 'info',
+                                 'fragment_cache': fragment_cache_info,
+                                 'read_preference': proxy_cfg['read_preference'],
+                                 'albamgr_cfg_url': '/etc/hprm/{0}/arakoon.ini'.format(vpool.name),
+                                 'manifest_cache_size': proxy_cfg['manifest_cache_size']})
+        file_contents_map = {'/opt/OpenvStorage/config/{0}/config.json'.format(vpool.name): config,
+                             '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(vpool.name): Configuration.get(key=config_path.format('abm'), raw=True)}
+        if fragment_cache_info[0] == 'alba':
+            file_contents_map['/opt/OpenvStorage/config/{0}/accelerated_arakoon.ini'.format(vpool.name)] = Configuration.get(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name), raw=True)
+
+        local_client = SSHClient(endpoint=local_storagerouter)
+        local_client.dir_create(directories='/opt/OpenvStorage/config/{0}'.format(vpool.name))
+        local_client.dir_create(directories='/opt/OpenvStorage/webapps/frontend/downloads')
+        for file_name, contents in file_contents_map.iteritems():
+            local_client.file_write(contents=contents,
+                                    filename=file_name)
+        local_client.run(command='tar --transform "s#^config/{0}#{0}#" -czf /opt/OpenvStorage/webapps/frontend/downloads/{1} config/{0}'.format(vpool.name, tgz_name), allow_insecure=True)
+        local_client.dir_delete(directories='/opt/OpenvStorage/config/{0}'.format(vpool.name))
+        return tgz_name
+
+    @staticmethod
+    @ovs_task(name='ovs.storagerouter.get_proxy_config')
+    def get_proxy_config(vpool_guid, storagerouter_guid):
+        """
+        Gets the ALBA proxy for a given Storage Router and vPool
+        :param storagerouter_guid: Guid of the StorageRouter on which the ALBA proxy is configured
+        :type storagerouter_guid: str
+        :param vpool_guid: Guid of the vPool for which the proxy is configured
+        :type vpool_guid: str
+        """
+        vpool = VPool(vpool_guid)
+        storagerouter = StorageRouter(storagerouter_guid)
+        for sd in vpool.storagedrivers:
+            if sd.storagerouter_guid == storagerouter.guid:
+                if len(sd.alba_proxies) == 0:
+                    raise ValueError('No ALBA proxies configured for vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
+                return Configuration.get('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, sd.alba_proxies[0].guid))
+        raise ValueError('vPool {0} has not been extended to StorageRouter {1}'.format(vpool.name, storagerouter.name))
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.configure_support')

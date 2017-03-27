@@ -666,6 +666,8 @@
         "cluster_size": "Cluster Size",
         "configuration": "Configuration",
         "detail": {
+            "generate_configs": "Generate HPRM configuration files",
+            "generating_configs": "Generating HPRM configuration files",
             "extend": "Extend",
             "refresh": {
                 "failed_msg": "Refreshing configuration on StorageRouter __sr__ for vPool __vpool__ failed: __why__",
@@ -927,6 +929,63 @@
                 "started": "Create started",
                 "success": "Creating from vTemplate __what__ was successful"
             }
+        },
+        "create_hprm_configs": {
+            "confirm": {
+                "alba_backend": "Accelerated Backend:",
+                "alba_client_id": "Client ID:",
+                "alba_host": "Host:",
+                "alba_port": "Port:",
+                "alba_preset": "Preset:",
+                "basic_info": "Validate the information",
+                "cache": "Fragment Cache:",
+                "cache_behavior": "Fragment Cache Behavior:",
+                "cache_info": {
+                    "true": "Active",
+                    "false": "Inactive"
+                },
+                "cache_read": "On Read:",
+                "cache_write": "On Write:",
+                "failure_msg": "Failed to generate configuration files for vPool __vpool__ on StorageRouter __storagerouter__: __why__",
+                "instructions": "Instructions",
+                "instruction_steps": "<ul><li><b>Copy</b> the .tgz file to the correct node</li><li><b>Extract</b> the .tgz <code>(tar xzvf &lt;filename&gt; -C /etc/hprm)</code></li><li><b>Enable</b> the HPRM service <code>(systemctl enable hprm@&lt;vpool_name&gt;.service)</code></li><li><b>Start</b> the HPRM service <code>(systemctl start hprm@&lt;vpool_name&gt;.service)</code></li></ul>",
+                "local_path": "Local Path:",
+                "local_size": "Local Size:",
+                "port": "Port:",
+                "started": "Generating",
+                "started_msg": "Generating HPRM configuration files for vPool __vpool__ on StorageRouter __storagerouter__",
+                "success": "Generated",
+                "success_msg": "Successfully generated configuration files for vPool __vpool__ on StorageRouter __storagerouter__"
+            },
+            "gather": {
+                "accelerated_info": "Accelerated Backend information",
+                "alba_backend": "Backend:",
+                "alba_preset": "Preset:",
+                "caching_info": "Fragment caching information",
+                "client_id": "Client ID:",
+                "client_secret": "Client Secret:",
+                "choose_backend": "Choose one of the available Backends",
+                "choose_preset": "Choose one of the available presets",
+                "fragment_cache_behavior": "Cache:",
+                "fragment_cache_local_path": "Local Path:",
+                "fragment_cache_local_size": "Size:",
+                "general_info": "General information",
+                "host": "Host (FQDN/IP):",
+                "hprm_port": "Port:",
+                "invalid_alba_info": "The entered connection info and credentials are invalid",
+                "invalid_host": "Invalid host (should be a FQDN or IP address)",
+                "invalid_local_path": "Invalid local path",
+                "load_config_failure": "Failed to load the proxy configuration. Please fill out the fields manually or try again",
+                "loading_backend_information": "Loading Backend information",
+                "loading_config_information": "Loading proxy configuration",
+                "local_host": "Use local Open vStorage Backend",
+                "no_backends": "No Backends found",
+                "no_credentials": "No credentials were entered",
+                "port": "Port:",
+                "use_backend_aa": "Use a Backend cache",
+                "use_local": "Use local disk"
+            },
+            "title": "Generate HPRM configuration files"
         },
         "extend_vpool": {
             "confirm": {

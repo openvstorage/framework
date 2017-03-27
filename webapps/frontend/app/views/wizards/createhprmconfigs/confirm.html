@@ -1,0 +1,73 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <p data-i18n="ovs:wizards.create_hprm_configs.confirm.basic_info"></p>
+    <ul>
+        <li><b data-i18n="ovs:wizards.create_hprm_configs.confirm.port"></b> <span data-bind="text: data.hprmPort"></span></li>
+        <li>
+            <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_behavior"></b>
+            <ul>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_read"></b>
+                    <span data-bind="translate: 'ovs:wizards.create_hprm_configs.confirm.cache_info.' + data.cacheOnRead()"></span>
+                </li>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_write"></b>
+                    <span data-bind="translate: 'ovs:wizards.create_hprm_configs.confirm.cache_info.' + data.cacheOnWrite()"></span>
+                </li>
+            </ul>
+        </li>
+        <li data-bind="visible: !data.cacheUseAlba() && (data.cacheOnRead() || data.cacheOnWrite())">
+            <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache"></b>
+            <ul>
+                <li><b data-i18n="ovs:wizards.create_hprm_configs.confirm.local_path"></b> <span data-bind="text: data.localPath()"></span></li>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.local_size"></b>
+                    <span data-bind="text: data.localSize()"></span>
+                    <span data-i18n="ovs:generic.units.gib"></span>
+                </li>
+            </ul>
+        </li>
+        <li data-bind="visible: data.cacheUseAlba() && (data.cacheOnRead() || data.cacheOnWrite())">
+            <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache"></b>
+            <ul>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.alba_backend"></b>
+                    <span data-bind="text: data.albaBackend() !== undefined ? data.albaBackend().name : ''"></span>
+                </li>
+                <li data-bind="visible: !data.albaUseLocalBackend()">
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.alba_host"></b>
+                    <span data-bind="text: data.albaHost"></span>
+                </li>
+                <li data-bind="visible: !data.albaUseLocalBackend()">
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.alba_port"></b>
+                    <span data-bind="text: data.albaPort"></span>
+                </li>
+                <li data-bind="visible: !data.albaUseLocalBackend()">
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.alba_client_id"></b> <span data-bind="text: data.albaClientID"></span>
+                </li>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.alba_preset"></b>
+                    <span data-bind="text: data.albaPreset() !== undefined ? data.albaPreset().name : ''"></span>
+                </li>
+            </ul>
+        </li>
+    </ul>
+    <p data-i18n="ovs:wizards.create_hprm_configs.confirm.instructions"></p>
+    <p data-i18n="[html]ovs:wizards.create_hprm_configs.confirm.instruction_steps"></p>
+</div>
