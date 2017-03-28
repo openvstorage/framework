@@ -21,6 +21,7 @@ Generic system module, executing statements on local node
 import os
 import re
 from subprocess import check_output
+from ovs.extensions.packages.package import PackageManager
 
 
 class System(object):
@@ -29,6 +30,7 @@ class System(object):
     """
 
     OVS_ID_FILE = '/etc/openvstorage_id'
+    RELEASE_NAME_FILE = '/opt/OpenvStorage/config/release_name'
     _machine_id = {}
 
     def __init__(self):
@@ -53,6 +55,16 @@ class System(object):
             return client.run(['cat', System.OVS_ID_FILE]).strip()
         with open(System.OVS_ID_FILE, 'r') as the_file:
             return the_file.read().strip()
+
+    @staticmethod
+    def get_release_name(client=None):
+        try:
+            if client is not None:
+                return client.run(['cat', System.RELEASE_NAME_FILE]).strip()
+            with open(System.RELEASE_NAME_FILE, 'r') as the_file:
+                return the_file.read().strip()
+        except:
+            return PackageManager.get_release_name()
 
     @staticmethod
     def get_my_storagerouter():

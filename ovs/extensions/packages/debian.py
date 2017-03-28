@@ -30,6 +30,22 @@ class DebianPackage(object):
     _logger = LogHandler.get('update', name='package-manager-debian')
 
     @staticmethod
+    def get_release_name(client=None):
+        """
+        Retrieve currently installed versions of the packages provided (or all if none provided)
+        :param client: Client on which to check the installed versions
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :return: Release name
+        :rtype: str
+        """
+        command = "cat /etc/apt/sources.list.d/ovsaptrepo.list | grep openvstorage | cut -d ' ' -f 3"
+        if client is None:
+            output = check_output(command, shell=True).strip()
+        else:
+            output = client.run(command, allow_insecure=True).strip()
+        return output.replace('-', ' ').title()
+
+    @staticmethod
     def get_installed_versions(client=None, package_names=None):
         """
         Retrieve currently installed versions of the packages provided (or all if none provided)

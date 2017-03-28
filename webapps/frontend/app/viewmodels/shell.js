@@ -78,6 +78,7 @@ define([
                                 self.shared.user.username(metadata.username);
                                 self.shared.user.guid(metadata.userguid);
                                 self.shared.user.roles(metadata.roles);
+                                self.shared.releaseName = metadata.release.name;
                                 mdDeferred.resolve();
                             }).promise();
                         })
