@@ -93,7 +93,7 @@ class UpdateController(object):
             candidate = PackageManager.get_candidate_versions(client=client, package_names=UpdateController.packages_core_all)
             installed_difference = set(UpdateController.packages_core_all) - set(installed.keys())
             candidate_difference = set(UpdateController.packages_core_all) - set(candidate.keys())
-            if len(installed_difference | candidate_difference) != 2 or any(['volumedriver' not in package for package in installed_difference | candidate_difference]):
+            if len(installed_difference | candidate_difference) > 3 or any(['volumedriver' not in package and 'alba' not in package for package in installed_difference | candidate_difference]):
                 raise RuntimeError('Failed to retrieve the installed and candidate versions for packages: {0}'.format(', '.join(UpdateController.packages_core_all)))
 
             # Retrieve Arakoon information
