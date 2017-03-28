@@ -46,9 +46,11 @@ class DebianPackage(object):
         for package_name in package_names:
             command = "dpkg -s '{0}' | grep Version | awk '{{print $2}}'".format(package_name.replace(r"'", r"'\''"))
             if client is None:
-                versions[package_name] = check_output(command, shell=True).strip()
+                output = check_output(command, shell=True).strip()
             else:
-                versions[package_name] = client.run(command, allow_insecure=True).strip()
+                output = client.run(command, allow_insecure=True).strip()
+            if output:
+                versions[package_name] = output
         return versions
 
     @staticmethod
@@ -67,9 +69,10 @@ class DebianPackage(object):
         DebianPackage.update(client=client)
         versions = {}
         for package_name in package_names:
-            versions[package_name] = ''
             for line in client.run(['apt-cache', 'policy', package_name, DebianPackage.APT_CONFIG_STRING]).splitlines():
                 line = line.strip()
+                if 'Unable to locate package' in line:
+                    continue
                 if line.startswith('Candidate:'):
                     candidate = ExtensionsToolbox.remove_prefix(line, 'Candidate:').strip()
                     if candidate == '(none)':
@@ -91,11 +94,12 @@ class DebianPackage(object):
         """
         versions = {}
         for package_name in package_names:
-            if package_name == 'alba':
+            if package_name in ['alba', 'alba-ee']:
                 versions[package_name] = client.run(DebianPackage.GET_VERSION_ALBA, allow_insecure=True)
             elif package_name == 'arakoon':
                 versions[package_name] = client.run(DebianPackage.GET_VERSION_ARAKOON, allow_insecure=True)
-            elif package_name in ['volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']:
+            elif package_name in ['volumedriver-no-dedup-base', 'volumedriver-no-dedup-server',
+                                  'volumedriver-ee-base', 'volumedriver-ee-server']:
                 versions[package_name] = client.run(DebianPackage.GET_VERSION_STORAGEDRIVER, allow_insecure=True)
             else:
                 raise ValueError('Only the following packages in the OpenvStorage repository have a binary file: "{0}"'.format('", "'.join(DebianPackage.OVS_PACKAGES_WITH_BINARIES)))
@@ -114,8 +118,8 @@ class DebianPackage(object):
         if client.username != 'root':
             raise RuntimeError('Only the "root" user can install packages')
 
-        installed = DebianPackage.get_installed_versions(client=client, package_names=[package_name])[package_name]
-        candidate = DebianPackage.get_candidate_versions(client=client, package_names=[package_name])[package_name]
+        installed = DebianPackage.get_installed_versions(client=client, package_names=[package_name]).get(package_name)
+        candidate = DebianPackage.get_candidate_versions(client=client, package_names=[package_name]).get(package_name)
 
         if installed == candidate:
             return

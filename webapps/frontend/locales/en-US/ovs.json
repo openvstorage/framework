@@ -502,8 +502,8 @@
         "nodes": "Storage Routers:",
         "noheartbeat": "never",
         "openvstorage": "Open vStorage",
-        "openvstorage-backend": "Open vStorage - Backend",
-        "openvstorage-sdm": "Open vStorage - SDM",
+        "openvstorage-backend": "Open vStorage Backend",
+        "openvstorage-sdm": "Storage Device Manager",
         "product": "Open vStorage",
         "projectwebsite": "Project Website:",
         "projectwebsiteurl": "http://www.openvstorage.org",
@@ -517,7 +517,9 @@
         "sourcecodeurl": "https://github.com/openvstorage",
         "title": "Support",
         "volumedriver-no-dedup-base": "Storage Driver - Base",
-        "volumedriver-no-dedup-server": "Storage Driver - Server"
+        "volumedriver-no-dedup-server": "Storage Driver - Server",
+        "volumedriver-ee-base": "Storage Driver Enterprise Edition - Base",
+        "volumedriver-ee-server": "Storage Driver Enterprise Edition - Server"
     },
     "title": "Open vStorage",
     "updates": {
