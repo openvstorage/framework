@@ -24,9 +24,8 @@ define([
         var self = this;
 
         // Variables
-        self.data          = data;
-        self.shared        = shared;
-        self.vPoolMetadata = data.vPool().metadata();
+        self.data   = data;
+        self.shared = shared;
 
         // Handles
         self.loadBackendsHandle    = undefined;
@@ -81,7 +80,8 @@ define([
             }
             if (self.data.cacheOnRead() || self.data.cacheOnWrite()) {
                 if (self.data.cacheUseAlba() === false ) {
-                    if (!self.data.localPath.valid()) {
+                    var path = self.data.localPath();
+                    if (path === '' || path.endsWith('/.') || path.includes('..') || path.includes('/./')) {
                         fields.push('local_path');
                         reasons.push($.t('ovs:wizards.create_hprm_configs.gather.invalid_local_path'));
                     }
@@ -117,30 +117,36 @@ define([
 
         // Functions
         self.loadProxyConfig = function() {
-            if (self.proxyConfigLoaded()) {
-                return;
-            }
             return $.Deferred(function(deferred) {
-                generic.xhrAbort(self.loadProxyConfigHandle);
-                self.loadingProxyConfig(true);
-                self.loadProxyConfigHandle = api.get('storagerouters/' + self.data.storageRouter().guid() + '/get_proxy_config', {queryparams: {vpool_guid: self.data.vPool().guid()}})
-                    .then(self.shared.tasks.wait)
-                    .done(function(data) {
-                        self.data.hprmPort(data.port);
-                        self.data.cacheUseAlba(data.fragment_cache[0] === 'alba');
-                        if (data.fragment_cache[0] !== 'none') {
-                            self.data.cacheOnRead(data.fragment_cache[1].cache_on_read);
-                            self.data.cacheOnWrite(data.fragment_cache[1].cache_on_write);
-                        }
-                    })
-                    .fail(function() {
-                        self.loadingProxyConfigFailed(true);
-                    })
-                    .always(function() {
-                        self.loadingProxyConfig(false);
-                        self.proxyConfigLoaded(true);
-                        deferred.resolve();
-                    });
+                if (!self.proxyConfigLoaded()) {
+                    generic.xhrAbort(self.loadProxyConfigHandle);
+                    self.loadingProxyConfig(true);
+                    self.loadProxyConfigHandle = api.get('storagerouters/' + self.data.storageRouter().guid() + '/get_proxy_config', {queryparams: {vpool_guid: self.data.vPool().guid()}})
+                        .then(self.shared.tasks.wait)
+                        .done(function(data) {
+                            self.data.hprmPort(data.port);
+                            self.data.cacheUseAlba(data.fragment_cache[0] === 'alba');
+                            if (data.fragment_cache[0] !== 'none') {
+                                self.data.cacheOnRead(data.fragment_cache[1].cache_on_read);
+                                self.data.cacheOnWrite(data.fragment_cache[1].cache_on_write);
+                            }
+                            if (self.data.cacheUseAlba() === true) {
+                                $.each(self.data.vPool().metadata(), function(key, value) {
+                                    if (key === 'backend_aa_' + self.data.storageRouter().guid()) {
+                                        self.data.albaUseLocalBackend(value.connection_info.local);
+                                    }
+                                })
+                            }
+                        })
+                        .fail(function() {
+                            self.loadingProxyConfigFailed(true);
+                        })
+                        .always(function() {
+                            self.loadingProxyConfig(false);
+                            self.proxyConfigLoaded(true);
+                            deferred.resolve();
+                        });
+                }
             }).promise();
         };
         self.loadBackends = function() {
@@ -186,8 +192,8 @@ define([
                                         self.localBackendsAvailable(true);
                                     }
                                     // Fill out ALBA Backend and ALBA preset
-                                    if (self.vPoolMetadata.hasOwnProperty('backend_aa_' + self.data.storageRouter().guid())) {
-                                        var backendInfo = self.vPoolMetadata['backend_aa_' + self.data.storageRouter().guid()].backend_info;
+                                    if (self.data.vPool().metadata().hasOwnProperty('backend_aa_' + self.data.storageRouter().guid())) {
+                                        var backendInfo = self.data.vPool().metadata()['backend_aa_' + self.data.storageRouter().guid()].backend_info;
                                         $.each(available_backends, function(_, alba_backend) {
                                             if (alba_backend.guid === backendInfo.alba_backend_guid) {
                                                 self.data.albaBackend(alba_backend);
@@ -239,7 +245,7 @@ define([
         };
         self.reloadBackends = function() {
             self.reloadingBackends(true);
-            $.when.apply($, [self.loadBackends()])
+            self.loadBackends()
                 .always(function() {
                     self.reloadingBackends(false);
                 });
@@ -269,8 +275,8 @@ define([
             self.albaUseLocalBackendSubscription = self.data.albaUseLocalBackend.subscribe(function(local) {
                 self.albaBackends([]);
                 self.data.albaBackend(undefined);
-                if (self.vPoolMetadata.hasOwnProperty('backend_aa_' + self.data.storageRouter().guid())) {
-                    var connectionInfo = self.vPoolMetadata['backend_aa_' + self.data.storageRouter().guid()].connection_info;
+                if (self.data.vPool().metadata().hasOwnProperty('backend_aa_' + self.data.storageRouter().guid())) {
+                    var connectionInfo = self.data.vPool().metadata()['backend_aa_' + self.data.storageRouter().guid()].connection_info;
                     self.data.albaHost(connectionInfo.host);
                     self.data.albaPort(connectionInfo.port);
                     self.data.albaClientID(connectionInfo.client_id);

@@ -23,6 +23,7 @@ ArakoonInstaller class
 import os
 import json
 from ConfigParser import RawConfigParser
+from StringIO import StringIO
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import CalledProcessError, SSHClient
@@ -30,7 +31,6 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.log.log_handler import LogHandler
-from StringIO import StringIO
 
 
 class ArakoonNodeConfig(object):
@@ -200,6 +200,38 @@ class ArakoonClusterConfig(object):
         config_io = StringIO()
         contents.write(config_io)
         return str(config_io.getvalue())
+
+    @staticmethod
+    def convert_format(config):
+        """
+        Convert an Arakoon Cluster Config to another format (JSON or INI)
+        :param config: Arakoon Cluster Config object
+        :type config: dict|str
+        :return: If config is JSON, INI format is returned
+        """
+        # JSON --> INI
+        if isinstance(config, dict):
+            rcp = RawConfigParser()
+            for section in config:
+                rcp.add_section(section)
+                for key, value in config[section].iteritems():
+                    rcp.set(section, key, value)
+            config_io = StringIO()
+            rcp.write(config_io)
+            return config_io.getvalue()
+
+        # INI --> JSON
+        if isinstance(config, basestring):
+            converted = {}
+            rcp = RawConfigParser()
+            rcp.readfp(StringIO(config))
+            for section in rcp.sections():
+                converted[section] = {}
+                for option in rcp.options(section):
+                    converted[section][option] = rcp.get(section, option)
+            return converted
+
+        raise ValueError('Unknown config format specified')
 
     def write_config(self, ip=None):
         """

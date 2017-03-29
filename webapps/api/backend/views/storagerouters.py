@@ -164,8 +164,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :param vpool_guid: Guid of the vPool for which the proxy is configured
         :type vpool_guid: str
         """
-        return StorageRouterController.get_proxy_config.s(vpool_guid=vpool_guid,
-                                                          storagerouter_guid=storagerouter.guid).apply_async()
+        return StorageRouterController.get_proxy_config.delay(vpool_guid=vpool_guid,
+                                                              storagerouter_guid=storagerouter.guid)
 
     @link()
     @log()
@@ -185,9 +185,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
-        return StorageRouterController.create_hprm_config_files.s(parameters=parameters,
-                                                                  storagerouter_guid=storagerouter.guid,
-                                                                  local_storagerouter_guid=local_storagerouter.guid).apply_async()
+        return StorageRouterController.create_hprm_config_files.delay(parameters=parameters,
+                                                                      storagerouter_guid=storagerouter.guid,
+                                                                      local_storagerouter_guid=local_storagerouter.guid)
 
     @link()
     @log()

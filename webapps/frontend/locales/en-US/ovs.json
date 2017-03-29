@@ -759,7 +759,7 @@
                 "fragment_cache_read": "Fragment cache on read:",
                 "fragment_cache_write": "Fragment cache on write:",
                 "host": "Host (FQDN/IP):",
-                "in_progress": "Creation of vPool __what__ is started.",
+                "in_progress": "Creation of vPool __what__ has started.",
                 "initial_storagerouter": "Storage Router:",
                 "ip_address": "Storage IP:",
                 "name": "Name:",

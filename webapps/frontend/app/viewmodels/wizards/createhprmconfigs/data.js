@@ -16,11 +16,9 @@
 /*global define */
 define(['jquery', 'knockout'], function($, ko){
     "use strict";
-    var pathRegex, hostRegex, singleton, parsePresets;
+    var hostRegex, singleton, parsePresets;
 
-    pathRegex = /^\/$|\/.*[^.]$/;
     hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
-
     parsePresets = function(backend) {
         var presets = [], policies, newPolicy, isAvailable, isActive, inUse,
             policyMapping = ['grey', 'black', 'green'], worstPolicy, replication, policyObject;
@@ -90,7 +88,7 @@ define(['jquery', 'knockout'], function($, ko){
             cacheOnWrite:        ko.observable(false),
             cacheUseAlba:        ko.observable(false),
             hprmPort:            ko.observable().extend({ numeric: {min: 1, max: 65535}}),
-            localPath:           ko.observable('').extend({regex: pathRegex}),
+            localPath:           ko.observable(''),
             localSize:           ko.observable().extend({ numeric: {min: 1, max: 10 * 1024}}),
             storageRouter:       ko.observable(),
             vPool:               ko.observable()

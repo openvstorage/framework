@@ -18,13 +18,10 @@
 StorageRouter module
 """
 import os
-import re
 import copy
 import json
 import time
-from ConfigParser import RawConfigParser
 from subprocess import CalledProcessError
-from StringIO import StringIO
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
@@ -429,7 +426,7 @@ class StorageRouterController(object):
             preset_name = metadata['backend_info']['preset']
             alba_backend_guid = metadata['backend_info']['alba_backend_guid']
             try:
-                arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(backend_guid=alba_backend_guid, ovs_client=ovs_client)
+                arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
                 backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
@@ -658,15 +655,8 @@ class StorageRouterController(object):
             metadata_keys = {'backend': 'abm'} if use_accelerated_alba is False else {'backend': 'abm',
                                                                                       'backend_aa_{0}'.format(storagerouter.guid): 'abm_aa'}
             for metadata_key in metadata_keys:
-                arakoon_config = vpool.metadata[metadata_key]['arakoon_config']
-                config = RawConfigParser()
-                for section in arakoon_config:
-                    config.add_section(section)
-                    for key, value in arakoon_config[section].iteritems():
-                        config.set(section, key, value)
-                config_io = StringIO()
-                config.write(config_io)
-                Configuration.set(config_tree.format(metadata_keys[metadata_key]), config_io.getvalue(), raw=True)
+                ini_format = ArakoonClusterConfig.convert_format(config=vpool.metadata[metadata_key]['arakoon_config'])
+                Configuration.set(config_tree.format(metadata_keys[metadata_key]), ini_format, raw=True)
 
             fragment_cache_scrub_info = ['none']
             if fragment_cache_on_read is False and fragment_cache_on_write is False:
@@ -1272,7 +1262,7 @@ class StorageRouterController(object):
         These configuration will be zipped and made available for download
         :param storagerouter_guid: The guid of the StorageRouter for which a HPRM manager needs to be deployed
         :type storagerouter_guid: str
-        :param local_storagerouter_guid: The guid of the StorageRouter this call is executed on
+        :param local_storagerouter_guid: The guid of the StorageRouter the API was requested on
         :type local_storagerouter_guid: str
         :param parameters: Additional information required for the HPRM configuration files
         :type parameters: dict
@@ -1299,17 +1289,22 @@ class StorageRouterController(object):
         if config_path is None:
             raise ValueError('vPool {0} has not been extended to StorageRouter {1}'.format(vpool.name, storagerouter.name))
 
-        alba_backend_name = None
+        path = parameters.get('path')
+        arakoon_config_ini = None
         fragment_cache_on_read = parameters['fragment_cache_on_read']
         fragment_cache_on_write = parameters['fragment_cache_on_write']
         if fragment_cache_on_read is True or fragment_cache_on_write is True:
-            if 'path' in parameters:  # Local caching
-                required_params.update({'path': (str, re.compile('^/$|/.*[^.]$')),
+            if path is not None:  # Local caching
+                path = path.strip()
+                if not path or path.endswith('/.') or '..' in path or '/./' in path:
+                    raise ValueError('Invalid path specified')
+                required_params.update({'path': (str, None),
                                         'size': (int, {'min': 1, 'max': 10 * 1024})})
                 Toolbox.verify_required_params(actual_params=parameters,
                                                required_params=required_params)
             else:  # Accelerated ALBA
                 required_params.update({'backend_info': (dict, {'preset': (str, Toolbox.regex_preset),
+                                                                'alba_backend_guid': (str, Toolbox.regex_guid),
                                                                 'alba_backend_name': (str, Toolbox.regex_backend)}),
                                         'connection_info': (dict, {'host': (str, Toolbox.regex_ip, False),
                                                                    'port': (int, {'min': 1, 'max': 65535}, False),
@@ -1317,16 +1312,31 @@ class StorageRouterController(object):
                                                                    'client_secret': (str, None, False)})})
                 Toolbox.verify_required_params(actual_params=parameters,
                                                required_params=required_params)
-                alba_backend_name = parameters['backend_info']['alba_backend_name']
-                if Configuration.dir_exists(key='/ovs/arakoon/{0}-abm'.format(alba_backend_name)) is False:
-                    raise ValueError('Arakoon cluster for ALBA Backend {0} could not be retrieved'.format(alba_backend_name))
+                connection_info = parameters['connection_info']
+                if connection_info['host']:
+                    alba_backend_guid = parameters['backend_info']['alba_backend_guid']
+                    ovs_client = OVSClient(ip=connection_info['host'],
+                                           port=connection_info['port'],
+                                           credentials=(connection_info['client_id'], connection_info['client_secret']),
+                                           version=2)
+                    arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid,
+                                                                                           ovs_client=ovs_client)
+                    arakoon_config_ini = ArakoonClusterConfig.convert_format(arakoon_config)
+                else:
+                    alba_backend_name = parameters['backend_info']['alba_backend_name']
+                    if Configuration.dir_exists(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name)) is False:
+                        raise ValueError('Arakoon cluster for ALBA Backend {0} could not be retrieved'.format(alba_backend_name))
+                    arakoon_config_ini = Configuration.get(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name), raw=True)
 
         # Create the configurations
         proxy_cfg = Configuration.get(key=config_path.format('main'))
         if fragment_cache_on_read is False and fragment_cache_on_write is False:
             fragment_cache_info = ['none']
         elif 'path' in parameters:
-            fragment_cache_info = ['local', {'path': parameters['path'],
+            path = parameters['path'].strip()
+            while '//' in path:
+                path = path.replace('//', '/')
+            fragment_cache_info = ['local', {'path': path,
                                              'max_size': parameters['size'] * 1024 ** 3,
                                              'cache_on_read': fragment_cache_on_read,
                                              'cache_on_write': fragment_cache_on_write}]
@@ -1355,7 +1365,7 @@ class StorageRouterController(object):
         file_contents_map = {'/opt/OpenvStorage/config/{0}/config.json'.format(vpool.name): config,
                              '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(vpool.name): Configuration.get(key=config_path.format('abm'), raw=True)}
         if fragment_cache_info[0] == 'alba':
-            file_contents_map['/opt/OpenvStorage/config/{0}/accelerated_arakoon.ini'.format(vpool.name)] = Configuration.get(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name), raw=True)
+            file_contents_map['/opt/OpenvStorage/config/{0}/accelerated_arakoon.ini'.format(vpool.name)] = arakoon_config_ini
 
         local_client = SSHClient(endpoint=local_storagerouter)
         local_client.dir_create(directories='/opt/OpenvStorage/config/{0}'.format(vpool.name))
@@ -1623,17 +1633,17 @@ class StorageRouterController(object):
         return mountpoints
 
     @staticmethod
-    def _retrieve_alba_arakoon_config(backend_guid, ovs_client):
+    def _retrieve_alba_arakoon_config(alba_backend_guid, ovs_client):
         """
         Retrieve the ALBA Arakoon configuration
-        :param backend_guid: Guid of the ALBA Backend
-        :type backend_guid: str
+        :param alba_backend_guid: Guid of the ALBA Backend
+        :type alba_backend_guid: str
         :param ovs_client: OVS client object
         :type ovs_client: OVSClient
         :return: Arakoon configuration information
         :rtype: dict
         """
-        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(backend_guid))
+        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(alba_backend_guid))
         successful, arakoon_config = ovs_client.wait_for_task(task_id, timeout=300)
         if successful is False:
             raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))

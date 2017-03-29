@@ -59,6 +59,7 @@ define([
                         };
                         parameters.backend_info = {
                             preset: self.data.albaPreset().name,
+                            alba_backend_guid: self.data.albaBackend().guid,
                             alba_backend_name: self.data.albaBackend().name
                         };
                     }
