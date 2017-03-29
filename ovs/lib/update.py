@@ -91,10 +91,33 @@ class UpdateController(object):
             binaries = PackageManager.get_binary_versions(client=client, package_names=UpdateController._packages_core['storagedriver'])
             installed = PackageManager.get_installed_versions(client=client, package_names=UpdateController.packages_core_all)
             candidate = PackageManager.get_candidate_versions(client=client, package_names=UpdateController.packages_core_all)
-            installed_difference = set(UpdateController.packages_core_all) - set(installed.keys())
+            not_installed = set(UpdateController.packages_core_all) - set(installed.keys())
             candidate_difference = set(UpdateController.packages_core_all) - set(candidate.keys())
-            if len(installed_difference | candidate_difference) > 3 or any(['volumedriver' not in package and 'alba' not in package for package in installed_difference | candidate_difference]):
-                raise RuntimeError('Failed to retrieve the installed and candidate versions for packages: {0}'.format(', '.join(UpdateController.packages_core_all)))
+
+            mutual_excl = [['volumedriver-ee-server', 'volumedriver-no-dedup-server'],
+                           ['volumedriver-ee-base', 'volumedriver-no-dedup-base'],
+                           ['alba', 'alba-ee']]
+            matches = [['volumedriver-ee-server', 'volumedriver-ee-base'],
+                       ['volumedriver-no-dedup-server', 'volumedriver-no-dedup-base']]
+            found = False
+            for package_name in not_installed:
+                for entry in mutual_excl:
+                    if package_name in entry:
+                        found = True
+                        if entry[1 - entry.index(package_name)] in not_installed:
+                            raise RuntimeError('Conflicting packages installed: {0}'.format(entry))
+                if found is False:
+                    raise RuntimeError('Missing non-installed package: {0}'.format(package_name))
+                for match in matches:
+                    if package_name in match:
+                        other_package = match[1 - match.index(package_name)]
+                        if other_package not in not_installed:
+                            raise RuntimeError('Unexpected installed package: {0}'.format(other_package))
+                if package_name not in candidate_difference:
+                    raise RuntimeError('Unexpected difference in missing installed/candidates: {0}'.format(package_name))
+                candidate_difference.remove(package_name)
+            if len(candidate_difference) > 0:
+                raise RuntimeError('No candidates available for some packages: {0}'.format(candidate_difference))
 
             # Retrieve Arakoon information
             framework_arakoons = []
