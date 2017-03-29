@@ -1349,3 +1349,28 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
                                      'cluster_type': cluster_map[cl_name]['cluster_type'],
                                      'in_use': False,
                                      'internal': False})
+
+    def test_convert_cluster_config_format(self):
+        """
+        Test the ArakoonClusterConfig.convert_format method
+        """
+        cl_name = 'unittest_cluster_convert_format'
+        structure = DalHelper.build_dal_structure(structure={'storagerouters': [1]})
+        storagerouter = structure['storagerouters'][1]
+        mountpoint = storagerouter.disks[0].partitions[0].mountpoint
+        ArakoonInstaller.create_cluster(cluster_name=cl_name,
+                                        cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
+                                        ip=storagerouter.ip,
+                                        base_dir='{0}/convert_format'.format(mountpoint))
+        config = ArakoonClusterConfig(cluster_id=cl_name)
+        ini_format = config.export_ini()
+        json_format = config.export()
+        self.assertEqual(first=sorted(ini_format.splitlines()),
+                         second=sorted(ArakoonClusterConfig.convert_format(json_format).splitlines()))
+        self.assertDictEqual(d1=json_format,
+                             d2=ArakoonClusterConfig.convert_format(ini_format))
+
+        self.assertDictEqual(d1=json_format,
+                             d2=ArakoonClusterConfig.convert_format(ArakoonClusterConfig.convert_format(json_format)))
+        self.assertEqual(first=sorted(ini_format.splitlines()),
+                         second=sorted(ArakoonClusterConfig.convert_format(ArakoonClusterConfig.convert_format(ini_format)).splitlines()))

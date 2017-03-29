@@ -228,7 +228,10 @@ class ArakoonClusterConfig(object):
             for section in rcp.sections():
                 converted[section] = {}
                 for option in rcp.options(section):
-                    converted[section][option] = rcp.get(section, option)
+                    if option in ['client_port', 'messaging_port']:
+                        converted[section][option] = rcp.getint(section, option)
+                    else:
+                        converted[section][option] = rcp.get(section, option)
             return converted
 
         raise ValueError('Unknown config format specified')

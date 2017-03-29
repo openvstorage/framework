@@ -1294,7 +1294,7 @@ class StorageRouterController(object):
         fragment_cache_on_read = parameters['fragment_cache_on_read']
         fragment_cache_on_write = parameters['fragment_cache_on_write']
         if fragment_cache_on_read is True or fragment_cache_on_write is True:
-            if path is not None:  # Local caching
+            if path is not None:  # Local path for caching
                 path = path.strip()
                 if not path or path.endswith('/.') or '..' in path or '/./' in path:
                     raise ValueError('Invalid path specified')
@@ -1302,7 +1302,7 @@ class StorageRouterController(object):
                                         'size': (int, {'min': 1, 'max': 10 * 1024})})
                 Toolbox.verify_required_params(actual_params=parameters,
                                                required_params=required_params)
-            else:  # Accelerated ALBA
+            else:  # Accelerated Backend for caching
                 required_params.update({'backend_info': (dict, {'preset': (str, Toolbox.regex_preset),
                                                                 'alba_backend_guid': (str, Toolbox.regex_guid),
                                                                 'alba_backend_name': (str, Toolbox.regex_backend)}),
@@ -1313,7 +1313,7 @@ class StorageRouterController(object):
                 Toolbox.verify_required_params(actual_params=parameters,
                                                required_params=required_params)
                 connection_info = parameters['connection_info']
-                if connection_info['host']:
+                if connection_info['host']:  # Remote Backend for accelerated Backend
                     alba_backend_guid = parameters['backend_info']['alba_backend_guid']
                     ovs_client = OVSClient(ip=connection_info['host'],
                                            port=connection_info['port'],
@@ -1322,7 +1322,7 @@ class StorageRouterController(object):
                     arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid,
                                                                                            ovs_client=ovs_client)
                     arakoon_config_ini = ArakoonClusterConfig.convert_format(arakoon_config)
-                else:
+                else:  # Local Backend for accelerated Backend
                     alba_backend_name = parameters['backend_info']['alba_backend_name']
                     if Configuration.dir_exists(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name)) is False:
                         raise ValueError('Arakoon cluster for ALBA Backend {0} could not be retrieved'.format(alba_backend_name))
@@ -1332,8 +1332,8 @@ class StorageRouterController(object):
         proxy_cfg = Configuration.get(key=config_path.format('main'))
         if fragment_cache_on_read is False and fragment_cache_on_write is False:
             fragment_cache_info = ['none']
-        elif 'path' in parameters:
-            path = parameters['path'].strip()
+        elif path is not None:
+            path = path.strip()
             while '//' in path:
                 path = path.replace('//', '/')
             fragment_cache_info = ['local', {'path': path,
@@ -1364,7 +1364,7 @@ class StorageRouterController(object):
                                  'manifest_cache_size': proxy_cfg['manifest_cache_size']})
         file_contents_map = {'/opt/OpenvStorage/config/{0}/config.json'.format(vpool.name): config,
                              '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(vpool.name): Configuration.get(key=config_path.format('abm'), raw=True)}
-        if fragment_cache_info[0] == 'alba':
+        if arakoon_config_ini is not None:
             file_contents_map['/opt/OpenvStorage/config/{0}/accelerated_arakoon.ini'.format(vpool.name)] = arakoon_config_ini
 
         local_client = SSHClient(endpoint=local_storagerouter)
