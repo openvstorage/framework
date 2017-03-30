@@ -99,8 +99,8 @@ class UpdateController(object):
             not_installed = set(UpdateController.packages_core_all) - set(installed.keys())
             candidate_difference = set(UpdateController.packages_core_all) - set(candidate.keys())
 
-            found = False
             for package_name in not_installed:
+                found = False
                 for entry in UpdateController._packages_mutual_excl:
                     if package_name in entry:
                         found = True
