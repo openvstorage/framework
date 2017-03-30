@@ -18,7 +18,6 @@
 Generic test module
 """
 import os
-import json
 import time
 import datetime
 import unittest
@@ -276,6 +275,7 @@ class Generic(unittest.TestCase):
         * Scenario 5: 2 vPools, 4 vDisks, 2 scrub roles
                       Validate correct vDisks are scrubbed on expected location when specifying vpool_guids and/or vdisk_guids
         """
+
         ##############
         # Scenario 1 #
         ##############
@@ -287,7 +287,6 @@ class Generic(unittest.TestCase):
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vdisk = structure['vdisks'][1]
-        vpool = structure['vpools'][1]
         storagerouter = structure['storagerouters'][1]
         LockedClient.scrub_controller = {'possible_threads': None,
                                          'volumes': {},
