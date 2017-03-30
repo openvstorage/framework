@@ -42,7 +42,6 @@ from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
@@ -419,6 +418,7 @@ class GenericController(object):
                 while True:
                     vdisk = None
                     vdisk_guid = queue.get(False)  # Raises Empty Exception when queue is empty, so breaking the while True loop
+                    volatile_key = 'ovs_scrubbing_vdisk_{0}'.format(vdisk_guid)
                     try:
                         # Check MDS master is local. Trigger MDS handover if necessary
                         vdisk = rem.VDisk(vdisk_guid)
@@ -434,12 +434,9 @@ class GenericController(object):
                                 continue
 
                         # Check if vDisk is already being scrubbed
-                        with volatile_mutex('execute_scrub_work', wait=5):
-                            volatile_key = 'scrub_vdisk_{0}'.format(vdisk_guid)
-                            if volatile_client.get(volatile_key) is not None:
-                                GenericController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because vDisk is already being scrubbed'.format(vpool.name, storagerouter.name, vdisk.name))
-                                continue
-                            volatile_client.set(key=volatile_key, value=volatile_key, time=24 * 60 * 60)
+                        if volatile_client.add(key=volatile_key, value=volatile_key, time=24 * 60 * 60) is False:
+                            GenericController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because vDisk is already being scrubbed'.format(vpool.name, storagerouter.name, vdisk.name))
+                            continue
 
                         # Do the actual scrubbing
                         with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
@@ -464,8 +461,7 @@ class GenericController(object):
                         GenericController._logger.exception(message)
                     finally:
                         # Remove vDisk from volatile memory
-                        with volatile_mutex('execute_scrub_work', wait=5):
-                            volatile_client.delete(volatile_key)
+                        volatile_client.delete(volatile_key)
 
         except Empty:  # Raised when all items have been fetched from the queue
             GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Queue completely processed'.format(vpool.name, storagerouter.name))
