@@ -51,8 +51,15 @@ class UpdateController(object):
     _update_ongoing_file = '/etc/update_ongoing'
 
     _packages_core = {'framework': {'arakoon', 'openvstorage'},
-                      'storagedriver': {'alba', 'arakoon', 'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'}}
+                      'storagedriver': {'alba', 'alba-ee', 'arakoon',
+                                        'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server',
+                                        'volumedriver-ee-base', 'volumedriver-ee-server'}}
     _packages_core_blocking = _packages_core['framework'].difference(_packages_core['storagedriver'])
+    _packages_mutual_excl = [['volumedriver-ee-server', 'volumedriver-no-dedup-server'],
+                             ['volumedriver-ee-base', 'volumedriver-no-dedup-base'],
+                             ['alba', 'alba-ee']]
+    _packages_matches = [['volumedriver-ee-server', 'volumedriver-ee-base'],
+                         ['volumedriver-no-dedup-server', 'volumedriver-no-dedup-base']]
 
     packages_core_all = _packages_core['framework'].union(_packages_core['storagedriver'])
 
@@ -89,8 +96,28 @@ class UpdateController(object):
             binaries = PackageManager.get_binary_versions(client=client, package_names=UpdateController._packages_core['storagedriver'])
             installed = PackageManager.get_installed_versions(client=client, package_names=UpdateController.packages_core_all)
             candidate = PackageManager.get_candidate_versions(client=client, package_names=UpdateController.packages_core_all)
-            if set(installed.keys()) != set(UpdateController.packages_core_all) or set(candidate.keys()) != set(UpdateController.packages_core_all):
-                raise RuntimeError('Failed to retrieve the installed and candidate versions for packages: {0}'.format(', '.join(UpdateController.packages_core_all)))
+            not_installed = set(UpdateController.packages_core_all) - set(installed.keys())
+            candidate_difference = set(UpdateController.packages_core_all) - set(candidate.keys())
+
+            for package_name in not_installed:
+                found = False
+                for entry in UpdateController._packages_mutual_excl:
+                    if package_name in entry:
+                        found = True
+                        if entry[1 - entry.index(package_name)] in not_installed:
+                            raise RuntimeError('Conflicting packages installed: {0}'.format(entry))
+                if found is False:
+                    raise RuntimeError('Missing non-installed package: {0}'.format(package_name))
+                for match in UpdateController._packages_matches:
+                    if package_name in match:
+                        other_package = match[1 - match.index(package_name)]
+                        if other_package not in not_installed:
+                            raise RuntimeError('Unexpected installed package: {0}'.format(other_package))
+                if package_name not in candidate_difference:
+                    raise RuntimeError('Unexpected difference in missing installed/candidates: {0}'.format(package_name))
+                candidate_difference.remove(package_name)
+            if len(candidate_difference) > 0:
+                raise RuntimeError('No candidates available for some packages: {0}'.format(candidate_difference))
 
             # Retrieve Arakoon information
             framework_arakoons = []
@@ -124,6 +151,14 @@ class UpdateController(object):
                 storagedriver_services.append('dtl_{0}'.format(sd.vpool.name))
                 storagedriver_services.append('volumedriver_{0}'.format(sd.vpool.name))
 
+            alba_package = 'alba' if 'alba' in installed.keys() else 'alba-ee'
+            volumedriver_base_package = 'volumedriver-no-dedup-base' if 'volumedriver-no-dedup-base' in installed.keys() else 'volumedriver-ee-base'
+            volumedriver_server_package = 'volumedriver-no-dedup-server' if 'volumedriver-no-dedup-server' in installed.keys() else 'volumedriver-ee-server'
+
+            version_mapping = {'volumedriver-server': ['volumedriver-no-dedup-server', 'volumedriver-ee-server'],
+                               'volumedriver-no-dedup-server': ['volumedriver-no-dedup-server', 'volumedriver-ee-server'],
+                               'alba': ['alba', 'alba-ee']}
+
             default_entry = {'candidate': None,
                              'installed': None,
                              'services_to_restart': []}
@@ -131,10 +166,10 @@ class UpdateController(object):
             #                       component:    package_name: services_with_run_file
             for component, info in {'framework': {'arakoon': framework_arakoons,
                                                   'openvstorage': []},
-                                    'storagedriver': {'alba': alba_proxies,
+                                    'storagedriver': {alba_package: alba_proxies,
                                                       'arakoon': storagedriver_arakoons,
-                                                      'volumedriver-no-dedup-base': [],
-                                                      'volumedriver-no-dedup-server': storagedriver_services}}.iteritems():
+                                                      volumedriver_base_package: [],
+                                                      volumedriver_server_package: storagedriver_services}}.iteritems():
                 component_info = {}
                 for package, services in info.iteritems():
                     for service in services:
@@ -165,17 +200,23 @@ class UpdateController(object):
                             elif version:
                                 running_version = version
 
-                            if package_name not in UpdateController.packages_core_all:
-                                raise ValueError('Unknown package dependency found in {0}'.format(version_file))
-                            if package_name not in binaries:
-                                raise RuntimeError('Binary version for package {0} was not retrieved'.format(package_name))
+                            did_check = False
+                            for mapped_package_name in version_mapping.get(package_name, [package_name]):
+                                if mapped_package_name not in UpdateController.packages_core_all:
+                                    raise ValueError('Unknown package dependency found in {0}'.format(version_file))
+                                if mapped_package_name not in binaries or mapped_package_name not in installed:
+                                    continue
 
-                            if running_version is not None and running_version != binaries[package_name]:
-                                if package_name not in component_info:
-                                    component_info[package_name] = copy.deepcopy(default_entry)
-                                component_info[package_name]['installed'] = running_version
-                                component_info[package_name]['candidate'] = binaries[package_name]
-                                component_info[package_name]['services_to_restart'].append(service)
+                                did_check = True
+                                if running_version is not None and running_version != binaries[mapped_package_name]:
+                                    if package_name not in component_info:
+                                        component_info[mapped_package_name] = copy.deepcopy(default_entry)
+                                    component_info[mapped_package_name]['installed'] = running_version
+                                    component_info[mapped_package_name]['candidate'] = binaries[mapped_package_name]
+                                    component_info[mapped_package_name]['services_to_restart'].append(service)
+                                    break
+                            if did_check is False:
+                                raise RuntimeError('Binary version for package {0} was not retrieved'.format(package_name))
 
                     if installed[package] != candidate[package] and package not in component_info:
                         component_info[package] = copy.deepcopy(default_entry)
@@ -298,17 +339,17 @@ class UpdateController(object):
                         if ['api', None] not in information[key]['downtime']:
                             information[key]['downtime'].append(['api', None])
                         information[key]['services_stop_start'].update({'watcher-framework', 'memcached'})
-                    elif package_name == 'alba':
+                    elif package_name in ['alba', 'alba-ee']:
                         for down in alba_downtime:
                             if down not in information[key]['downtime']:
                                 information[key]['downtime'].append(down)
                         information[key]['services_post_update'].update(alba_services)
-                    elif package_name == 'volumedriver-no-dedup-base':
+                    elif package_name in ['volumedriver-no-dedup-base', 'volumedriver-ee-base']:
                         for down in storagedriver_downtime:
                             if down not in information[key]['downtime']:
                                 information[key]['downtime'].append(down)
                         information[key]['services_post_update'].update(storagedriver_services)
-                    elif package_name == 'volumedriver-no-dedup-server':
+                    elif package_name in ['volumedriver-no-dedup-server', 'volumedriver-ee-server']:
                         for down in storagedriver_downtime:
                             if down not in information[key]['downtime']:
                                 information[key]['downtime'].append(down)
@@ -402,7 +443,7 @@ class UpdateController(object):
             contents = client.file_read(filename='/opt/OpenvStorage/run/{0}'.format(version_file))
             for part in contents.split(';'):
                 packages.add(part.split('=')[0])
-            if packages.issubset(UpdateController._packages_core['storagedriver']) and 'storagedriver' in components:
+            if packages.issubset(UpdateController._packages_core['storagedriver'] | {'volumedriver-server'}) and 'storagedriver' in components:
                 service_name = version_file.replace('.remove', '').replace('.version', '')
                 UpdateController._logger.debug('{0}: Removing service {1}'.format(client.ip, service_name))
                 ServiceManager.stop_service(name=service_name, client=client)
@@ -457,8 +498,8 @@ class UpdateController(object):
         :rtype: dict
         """
         package_info = dict((storagerouter.ip, storagerouter.package_information) for storagerouter in StorageRouterList.get_storagerouters())
-        for function in Toolbox.fetch_hooks('update', 'merge_package_info'):
-            output = function()
+        for _function in Toolbox.fetch_hooks('update', 'merge_package_info'):
+            output = _function()
             for ip in output:
                 if ip in package_info:
                     package_info[ip].update(output[ip])
@@ -527,8 +568,8 @@ class UpdateController(object):
         :rtype: dict
         """
         information = {}
-        for function in Toolbox.fetch_hooks('update', 'information'):
-            function(information=information)
+        for _function in Toolbox.fetch_hooks('update', 'information'):
+            _function(information=information)
 
         for component, info in copy.deepcopy(information).iteritems():
             if len(info['packages']) == 0:
@@ -632,16 +673,16 @@ class UpdateController(object):
             # Install each package on all StorageRouters
             if packages_to_update:
                 for client in ssh_clients:
-                    for function in package_install_multi_hooks:
-                        abort |= function(client=client, package_info=packages_to_update, components=components)
+                    for _function in package_install_multi_hooks:
+                        abort |= _function(client=client, package_info=packages_to_update, components=components)
 
             # Install packages on all ALBA nodes
             if set(components).difference(set(UpdateController._packages_core.keys())):
-                for function in package_install_single_hooks:
+                for _function in package_install_single_hooks:
                     try:
-                        abort |= function(package_info=None, components=components)
+                        abort |= _function(package_info=None, components=components)
                     except Exception as ex:
-                        UpdateController._logger.exception('Package installation hook {0} failed with error: {1}'.format(function.__name__, ex))
+                        UpdateController._logger.exception('Package installation hook {0} failed with error: {1}'.format(_function.__name__, ex))
 
             if abort is True:
                 raise Exception('Installing the packages failed on 1 or more nodes')
@@ -702,18 +743,18 @@ class UpdateController(object):
             for client in ssh_clients:
                 UpdateController._logger.debug('{0}: Executing post-update actions'.format(client.ip))
                 with remote(client.ip, [Toolbox]) as rem:
-                    for function in rem.Toolbox.fetch_hooks('update', 'post_update_multi'):
+                    for _function in rem.Toolbox.fetch_hooks('update', 'post_update_multi'):
                         try:
-                            function(client=client, components=components)
+                            _function(client=client, components=components)
                         except Exception as ex:
-                            UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
+                            UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, _function.__name__, ex))
 
             with remote(local_ip, [Toolbox]) as rem:
-                for function in rem.Toolbox.fetch_hooks('update', 'post_update_single'):
+                for _function in rem.Toolbox.fetch_hooks('update', 'post_update_single'):
                     try:
-                        function(components=components)
+                        _function(components=components)
                     except Exception as ex:
-                        UpdateController._logger.exception('Post update hook {0} failed with error: {1}'.format(function.__name__, ex))
+                        UpdateController._logger.exception('Post update hook {0} failed with error: {1}'.format(_function.__name__, ex))
 
             # Start services
             UpdateController.change_services_state(services=services_stop_start,

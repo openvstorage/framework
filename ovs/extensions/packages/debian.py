@@ -30,6 +30,22 @@ class DebianPackage(object):
     _logger = LogHandler.get('update', name='package-manager-debian')
 
     @staticmethod
+    def get_release_name(client=None):
+        """
+        Get the release name based on the name of the repository
+        :param client: Client on which to check the release name
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :return: Release name
+        :rtype: str
+        """
+        command = "cat /etc/apt/sources.list.d/ovsaptrepo.list | grep openvstorage | cut -d ' ' -f 3"
+        if client is None:
+            output = check_output(command, shell=True).strip()
+        else:
+            output = client.run(command, allow_insecure=True).strip()
+        return output.replace('-', ' ').title()
+
+    @staticmethod
     def get_installed_versions(client=None, package_names=None):
         """
         Retrieve currently installed versions of the packages provided (or all if none provided)
@@ -46,9 +62,11 @@ class DebianPackage(object):
         for package_name in package_names:
             command = "dpkg -s '{0}' | grep Version | awk '{{print $2}}'".format(package_name.replace(r"'", r"'\''"))
             if client is None:
-                versions[package_name] = check_output(command, shell=True).strip()
+                output = check_output(command, shell=True).strip()
             else:
-                versions[package_name] = client.run(command, allow_insecure=True).strip()
+                output = client.run(command, allow_insecure=True).strip()
+            if output:
+                versions[package_name] = output
         return versions
 
     @staticmethod
@@ -67,9 +85,10 @@ class DebianPackage(object):
         DebianPackage.update(client=client)
         versions = {}
         for package_name in package_names:
-            versions[package_name] = ''
             for line in client.run(['apt-cache', 'policy', package_name, DebianPackage.APT_CONFIG_STRING]).splitlines():
                 line = line.strip()
+                if 'Unable to locate package' in line:
+                    continue
                 if line.startswith('Candidate:'):
                     candidate = ExtensionsToolbox.remove_prefix(line, 'Candidate:').strip()
                     if candidate == '(none)':
@@ -91,11 +110,12 @@ class DebianPackage(object):
         """
         versions = {}
         for package_name in package_names:
-            if package_name == 'alba':
+            if package_name in ['alba', 'alba-ee']:
                 versions[package_name] = client.run(DebianPackage.GET_VERSION_ALBA, allow_insecure=True)
             elif package_name == 'arakoon':
                 versions[package_name] = client.run(DebianPackage.GET_VERSION_ARAKOON, allow_insecure=True)
-            elif package_name in ['volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']:
+            elif package_name in ['volumedriver-no-dedup-base', 'volumedriver-no-dedup-server',
+                                  'volumedriver-ee-base', 'volumedriver-ee-server']:
                 versions[package_name] = client.run(DebianPackage.GET_VERSION_STORAGEDRIVER, allow_insecure=True)
             else:
                 raise ValueError('Only the following packages in the OpenvStorage repository have a binary file: "{0}"'.format('", "'.join(DebianPackage.OVS_PACKAGES_WITH_BINARIES)))
@@ -114,8 +134,8 @@ class DebianPackage(object):
         if client.username != 'root':
             raise RuntimeError('Only the "root" user can install packages')
 
-        installed = DebianPackage.get_installed_versions(client=client, package_names=[package_name])[package_name]
-        candidate = DebianPackage.get_candidate_versions(client=client, package_names=[package_name])[package_name]
+        installed = DebianPackage.get_installed_versions(client=client, package_names=[package_name]).get(package_name)
+        candidate = DebianPackage.get_candidate_versions(client=client, package_names=[package_name]).get(package_name)
 
         if installed == candidate:
             return
