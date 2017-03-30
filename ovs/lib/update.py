@@ -55,6 +55,11 @@ class UpdateController(object):
                                         'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server',
                                         'volumedriver-ee-base', 'volumedriver-ee-server'}}
     _packages_core_blocking = _packages_core['framework'].difference(_packages_core['storagedriver'])
+    _packages_mutual_excl = [['volumedriver-ee-server', 'volumedriver-no-dedup-server'],
+                             ['volumedriver-ee-base', 'volumedriver-no-dedup-base'],
+                             ['alba', 'alba-ee']]
+    _packages_matches = [['volumedriver-ee-server', 'volumedriver-ee-base'],
+                         ['volumedriver-no-dedup-server', 'volumedriver-no-dedup-base']]
 
     packages_core_all = _packages_core['framework'].union(_packages_core['storagedriver'])
 
@@ -94,21 +99,16 @@ class UpdateController(object):
             not_installed = set(UpdateController.packages_core_all) - set(installed.keys())
             candidate_difference = set(UpdateController.packages_core_all) - set(candidate.keys())
 
-            mutual_excl = [['volumedriver-ee-server', 'volumedriver-no-dedup-server'],
-                           ['volumedriver-ee-base', 'volumedriver-no-dedup-base'],
-                           ['alba', 'alba-ee']]
-            matches = [['volumedriver-ee-server', 'volumedriver-ee-base'],
-                       ['volumedriver-no-dedup-server', 'volumedriver-no-dedup-base']]
             found = False
             for package_name in not_installed:
-                for entry in mutual_excl:
+                for entry in UpdateController._packages_mutual_excl:
                     if package_name in entry:
                         found = True
                         if entry[1 - entry.index(package_name)] in not_installed:
                             raise RuntimeError('Conflicting packages installed: {0}'.format(entry))
                 if found is False:
                     raise RuntimeError('Missing non-installed package: {0}'.format(package_name))
-                for match in matches:
+                for match in UpdateController._packages_matches:
                     if package_name in match:
                         other_package = match[1 - match.index(package_name)]
                         if other_package not in not_installed:
