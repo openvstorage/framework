@@ -648,6 +648,17 @@
             "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer be actively used.",
             "yes": "Convert into vTemplate"
         },
+        "scrub": {
+            "failed_message": "Scrubbing vDisk __vdisk__ failed: __why__",
+            "failed_title": "Failure",
+            "started_message": "Scrubbing vDisk __vdisk__ started",
+            "started_title": "Scrubbing",
+            "success_message": "Scrubbing vDisk __vdisk__ finished",
+            "success_title": "Success",
+            "title": "Scrub vDisk __vdisk__",
+            "title_message": "Are you sure you want to scrub vDisk __vdisk__?"
+        },
+
         "title": "vDisks"
     },
     "vpools": {
@@ -950,17 +961,6 @@
                 "inprogress": "Disk __what__ rollback in progress...",
                 "failed": "Disk __what__ rollback failed.",
                 "success": "Disk __what__ rollback successfully."
-            }
-        },
-        "scrub": {
-            "title": "Scrub a vDisk",
-            "gather": {
-                "basicinfo": "Select the Storage Router on which to execute the scrubbing.",
-                "failed": "Scrubbing failed",
-                "inprogress": "The selected vDisk is being scrubbed",
-                "nostoragerouter": "No Storage Router information found",
-                "scrubstarted": "Started",
-                "success": "Scrubbing finished"
             }
         },
         "shrink_vpool": {

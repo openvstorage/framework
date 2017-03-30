@@ -273,6 +273,8 @@ class Generic(unittest.TestCase):
         * Scenario 4: 3 vPools, 9 vDisks, 5 scrub roles
                       Validate 6 threads will be spawned and used out of a potential of 15 (5 scrub roles * 3 vPools)
                       We limit max amount of threads spawned per vPool to 2 in case 3 to 5 vPools are present
+        * Scenario 5: 2 vPools, 4 vDisks, 2 scrub roles
+                      Validate correct vDisks are scrubbed on expected location when specifying vpool_guids and/or vdisk_guids
         """
         ##############
         # Scenario 1 #
@@ -287,7 +289,6 @@ class Generic(unittest.TestCase):
         vdisk = structure['vdisks'][1]
         vpool = structure['vpools'][1]
         storagerouter = structure['storagerouters'][1]
-        Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         LockedClient.scrub_controller = {'possible_threads': None,
                                          'volumes': {},
                                          'waiter': Waiter(1)}
@@ -295,28 +296,40 @@ class Generic(unittest.TestCase):
                                                                      'scrub_work': [0]}
 
         # Remove SCRUB partition from StorageRouter and try to scrub on it
+        expected_log = 'Scrubber - Storage Router {0} is not reachable'.format(storagerouter.ip)
         storagerouter.disks[0].partitions[0].roles = []
         storagerouter.disks[0].partitions[0].save()
-        with self.assertRaises(RuntimeError) as raise_info:
-            VDiskController.scrub_single_vdisk(vdisk.guid, storagerouter.guid)
-        self.assertEqual(first='No scrub locations found on StorageRouter {0}'.format(storagerouter.name),
-                         second=raise_info.exception.message,
-                         msg='Incorrect error message caught')
+        with self.assertRaises(ValueError) as raise_info:
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid])
+        self.assertIn(member='No scrub locations found',
+                      container=raise_info.exception.message)
+        self.assertNotIn(member=expected_log,
+                         container=LogHandler._logs['lib_generic tasks'])
 
-        # Restore SCRUB partition and attempt to scrub
+        # Restore SCRUB partition and make sure StorageRouter is unreachable
         storagerouter.disks[0].partitions[0].roles = [DiskPartition.ROLES.SCRUB]
         storagerouter.disks[0].partitions[0].save()
         storagerouter.invalidate_dynamics('partition_config')
+        SSHClient._raise_exceptions[storagerouter.ip] = {'users': ['root'], 'exception': UnableToConnectException('No route to host')}
+        with self.assertRaises(ValueError):
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid])
+        logs = LogHandler._logs['lib_generic tasks']
+        self.assertIn(member=expected_log,
+                      container=logs)
+        self.assertEqual(first=logs[expected_log],
+                         second='warning')
+
+        # Now actually attempt to scrub
+        SSHClient._raise_exceptions = {}
         with self.assertRaises(Exception) as raise_info:
-            VDiskController.scrub_single_vdisk(vdisk.guid, storagerouter.guid)
-        self.assertIn(member='Error when scrubbing vDisk {0}'.format(vdisk.guid),
-                      container=raise_info.exception.message,
-                      msg='Incorrect error message caught')
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid)
+        self.assertIn(member='StorageRouter {0} - vDisk {1} - Scrubbing failed'.format(storagerouter.name, vdisk.name),
+                      container=raise_info.exception.message)
 
         # Make sure scrubbing succeeds now
         LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                      'scrub_work': [0]}
-        VDiskController.scrub_single_vdisk(vdisk.guid, storagerouter.guid)
+        GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid)
         with vdisk.storagedriver_client.make_locked_client(vdisk.volume_id) as locked_client:
             self.assertEqual(first=len(locked_client.get_scrubbing_workunits()),
                              second=0,
@@ -340,7 +353,6 @@ class Generic(unittest.TestCase):
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
         storagerouter_3 = structure['storagerouters'][3]
-        Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         LockedClient.scrub_controller = {'possible_threads': ['scrub_{0}_{1}'.format(vpool.guid, storagerouter_1.guid)],
                                          'volumes': {},
                                          'waiter': Waiter(1)}
@@ -447,7 +459,6 @@ class Generic(unittest.TestCase):
         vdisk_11.storagedriver_client.set_volume_as_template(volume_id=vdisk_11.volume_id)
 
         storagerouters = structure['storagerouters']
-        Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
 
         thread_names = ['scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid) for storagerouter in storagerouters.values()]
         LockedClient.scrub_controller = {'possible_threads': thread_names,
@@ -482,7 +493,6 @@ class Generic(unittest.TestCase):
 
         thread_names = []
         for vpool in vpools.values():
-            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
             for storagerouter in storagerouters.values():
                 thread_names.append('scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid))
         LockedClient.scrub_controller = {'possible_threads': thread_names,
@@ -504,6 +514,88 @@ class Generic(unittest.TestCase):
             self.assertEqual(first=len(threads_left),
                              second=3,
                              msg='Unexpected amount of threads left for vPool {0}'.format(vpool.name))
+
+        ##############
+        # Scenario 5 #
+        ##############
+        self.volatile._clean()
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1, 2],
+             'vdisks': [(1, 1, 1, 1), (2, 2, 1, 2), (3, 3, 2, 3), (4, 4, 2, 4)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)],  # (<id>, <storagedriver_id>)
+             'storagerouters': [1, 2],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        vpools = structure['vpools']
+        vdisks = structure['vdisks']
+        storagerouters = structure['storagerouters']
+
+        thread_names = []
+        for vpool in vpools.values():
+            for storagerouter in storagerouters.values():
+                thread_names.append('scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid))
+        LockedClient.scrub_controller = {'possible_threads': thread_names,
+                                         'volumes': {},
+                                         'waiter': Waiter(len(thread_names))}
+
+        # Scrub all volumes
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
+                                                                         'scrub_work': range(vdisk_id)}
+        GenericController.execute_scrub()
+        for vdisk in vdisks.values():
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=[])
+
+        # Scrub all volumes of vPool1
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
+        GenericController.execute_scrub(vpool_guids=[vpools[1].guid])
+        for vdisk_id, vdisk in vdisks.iteritems():
+            if vdisk.vpool == vpools[1]:
+                expected_work = []
+            else:
+                expected_work = range(vdisk_id)
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=expected_work)
+
+        # Scrub a specific vDisk
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
+        GenericController.execute_scrub(vdisk_guids=[vdisks[2].guid])
+        for vdisk_id, vdisk in vdisks.iteritems():
+            if vdisk == vdisks[2]:
+                expected_work = []
+            else:
+                expected_work = range(vdisk_id)
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=expected_work)
+
+        # Scrub a combination of a vPool and a vDisk
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
+        GenericController.execute_scrub(vpool_guids=[vpools[2].guid], vdisk_guids=[vdisks[2].guid])
+        for vdisk_id, vdisk in vdisks.iteritems():
+            if vdisk == vdisks[2] or vdisk.vpool == vpools[2]:
+                expected_work = []
+            else:
+                expected_work = range(vdisk_id)
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=expected_work)
+
+        # Scrub all volumes on specific StorageRouter
+        LogHandler._logs = {}
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
+        GenericController.execute_scrub(storagerouter_guid=storagerouters[2].guid)
+        for vdisk_id, vdisk in vdisks.iteritems():
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=[])
+        logs = LogHandler._logs['lib_generic tasks']
+        for log in logs:
+            self.assertNotRegexpMatches(text=log,
+                                        unexpected_regexp='.*Scrubber - vPool [{0}|{1}] - StorageRouter {2} - .*'.format(vpools[1].name, vpools[2].name, storagerouters[1].name))
 
     def test_arakoon_collapse(self):
         """

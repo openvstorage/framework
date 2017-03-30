@@ -28,6 +28,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.lib.generic import GenericController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
 
@@ -190,3 +191,23 @@ class VPoolViewSet(viewsets.ViewSet):
         :rtype: celery.result.AsyncResult
         """
         return VDiskController.sync_with_reality.delay(vpool_guid=vpool.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VPool)
+    def scrub_multiple_vdisks(self, vpool, vdisk_guids):
+        """
+        Scrubs the specified vDisks
+        :param vpool: The vPool to which the vDisks belong to scrub
+        :type vpool: ovs.dal.hybrids.vpool.VPool
+        :param vdisk_guids: The guids of the vDisks to scrub
+        :type vdisk_guids: list
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
+        """
+        if set(vdisk_guids).difference(set(vpool.vdisks_guids)):
+            raise HttpNotAcceptableException(error_description='Some of the vDisks specified do not belong to this vPool',
+                                             error='invalid_data')
+        return GenericController.execute_scrub.delay(vdisk_guids=vdisk_guids)

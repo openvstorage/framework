@@ -169,6 +169,7 @@ class DalHelper(object):
             else:
                 vpool = vpools[vpool_id]
             srclients[vpool_id] = StorageRouterClient(vpool.guid, None)
+            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         for sr_id in structure.get('storagerouters', []):
             if sr_id not in storagerouters:
                 storagerouter = StorageRouter()
