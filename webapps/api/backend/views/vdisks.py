@@ -30,6 +30,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
 
 
@@ -498,14 +499,14 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VDisk)
-    def scrub(self, vdisk, storagerouter_guid):
+    def scrub(self, vdisk, storagerouter_guid=None):
         """
         Scrubs a given vDisk on a given StorageRouter
         :param vdisk: the vDisk to scrub
         :type vdisk: VDisk
-        :param storagerouter_guid: The guid of the StorageRouter to scrub
+        :param storagerouter_guid: The guid of the StorageRouter to do the scrubbing on
         :type storagerouter_guid: str
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
-        return VDiskController.scrub_single_vdisk.delay(vdisk.guid, storagerouter_guid)
+        return GenericController.execute_scrub.delay(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter_guid)
