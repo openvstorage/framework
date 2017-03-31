@@ -197,9 +197,9 @@ class VPoolViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VPool)
-    def scrub_multiple_vdisks(self, vpool, vdisk_guids):
+    def scrub_multiple_vdisks(self, vpool, vdisk_guids=None):
         """
-        Scrubs the specified vDisks
+        Scrubs the specified vDisks or all vDisks of the vPool is no guids are passed in
         :param vpool: The vPool to which the vDisks belong to scrub
         :type vpool: ovs.dal.hybrids.vpool.VPool
         :param vdisk_guids: The guids of the vDisks to scrub
@@ -207,7 +207,9 @@ class VPoolViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
+        if vdisk_guids is None:
+            vdisk_guids = []
         if set(vdisk_guids).difference(set(vpool.vdisks_guids)):
             raise HttpNotAcceptableException(error_description='Some of the vDisks specified do not belong to this vPool',
                                              error='invalid_data')
-        return GenericController.execute_scrub.delay(vdisk_guids=vdisk_guids)
+        return GenericController.execute_scrub.delay(vdisk_guids=vdisk_guids or vpool.vdisks_guids)

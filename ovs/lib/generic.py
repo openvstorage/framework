@@ -395,7 +395,8 @@ class GenericController(object):
         :rtype: NoneType
         """
         if len(vpool.storagedrivers) == 0 or not vpool.storagedrivers[0].storagedriver_id:
-            raise ValueError('vPool {0} does not have any valid StorageDrivers configured'.format(vpool.name))
+            error_messages.append('vPool {0} does not have any valid StorageDrivers configured'.format(vpool.name))
+            return
 
         client = None
         lock_time = 5 * 60
@@ -476,7 +477,12 @@ class GenericController(object):
         threads = []
         threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(storagerouter.machine_id)
         amount_threads = Configuration.get(key=threads_key) if Configuration.exists(key=threads_key) else 2
-        amount_threads = min(min(queue.qsize(), amount_threads), 20)
+        if not isinstance(amount_threads, int):
+            error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(storagerouter.machine_id))
+            return
+
+        amount_threads = max(amount_threads, 1)  # Make sure amount_threads is at least 1
+        amount_threads = min(min(queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
         GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Spawning {2} threads for proxy service {3}'.format(vpool.name, storagerouter.name, amount_threads, alba_proxy_service))
         for index in range(amount_threads):
             thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index),
