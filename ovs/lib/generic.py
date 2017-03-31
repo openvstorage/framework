@@ -294,8 +294,7 @@ class GenericController(object):
                 scrub_target = scrub_locations[counter % len(scrub_locations)]
                 storage_router = scrub_target['storage_router']
                 proxy_name = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vp.name, storage_router.name, uuid.uuid4())
-                thread = Thread(target=GenericController._execute_scrub_work,
-                                name='scrub_{0}_{1}'.format(vp.guid, storage_router.guid),
+                thread = Thread(target=GenericController._deploy_proxy_and_scrub,
                                 args=(vpool_queue, vp, scrub_target, error_messages, proxy_name))
                 thread.start()
                 threads.append(thread)
@@ -308,7 +307,76 @@ class GenericController(object):
             raise Exception('Errors occurred while scrubbing:\n  - {0}'.format('\n  - '.join(error_messages)))
 
     @staticmethod
-    def _execute_scrub_work(queue, vpool, scrub_info, error_messages, alba_proxy_service):
+    def _execute_scrub(queue, vpool, storagerouter, scrub_dir, error_messages):
+        def _verify_mds_config(current_vdisk):
+            current_vdisk.invalidate_dynamics('info')
+            vdisk_configs = current_vdisk.info['metadata_backend_config']
+            if len(vdisk_configs) == 0:
+                raise RuntimeError('Could not load MDS configuration')
+            return vdisk_configs
+
+        volatile_client = VolatileFactory.get_client()
+        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, storagerouter.guid)
+        try:
+            # Empty the queue with vDisks to scrub
+            with remote(storagerouter.ip, [VDisk]) as rem:
+                while True:
+                    vdisk = None
+                    vdisk_guid = queue.get(False)  # Raises Empty Exception when queue is empty, so breaking the while True loop
+                    volatile_key = 'ovs_scrubbing_vdisk_{0}'.format(vdisk_guid)
+                    try:
+                        # Check MDS master is local. Trigger MDS handover if necessary
+                        vdisk = rem.VDisk(vdisk_guid)
+                        GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Started scrubbing at location {3}'.format(vpool.name, storagerouter.name, vdisk.name, scrub_dir))
+                        configs = _verify_mds_config(current_vdisk=vdisk)
+                        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+                        if configs[0].get('ip') != storagedriver.storagerouter.ip:
+                            GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - MDS master is not local, trigger handover'.format(vpool.name, storagerouter.name, vdisk.name))
+                            MDSServiceController.ensure_safety(VDisk(vdisk_guid))  # Do not use a remote VDisk instance here
+                            configs = _verify_mds_config(current_vdisk=vdisk)
+                            if configs[0].get('ip') != storagedriver.storagerouter.ip:
+                                GenericController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because master MDS still not local'.format(vpool.name, storagerouter.name, vdisk.name))
+                                continue
+
+                        # Check if vDisk is already being scrubbed
+                        if volatile_client.add(key=volatile_key, value=volatile_key, time=24 * 60 * 60) is False:
+                            GenericController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because vDisk is already being scrubbed'.format(vpool.name, storagerouter.name, vdisk.name))
+                            continue
+
+                        # Do the actual scrubbing
+                        with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
+                            GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Retrieve and apply scrub work'.format(vpool.name, storagerouter.name, vdisk.name))
+                            work_units = locked_client.get_scrubbing_workunits()
+                            for work_unit in work_units:
+                                res = locked_client.scrub(work_unit=work_unit,
+                                                          scratch_dir=scrub_dir,
+                                                          log_sinks=[LogHandler.get_sink_path('scrubber', allow_override=True, forced_target_type='file')],
+                                                          backend_config=Configuration.get_configuration_path(backend_config_key))
+                                locked_client.apply_scrubbing_result(scrubbing_work_result=res)
+                            if work_units:
+                                GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - {3} work units successfully applied'.format(vpool.name, storagerouter.name, vdisk.name, len(work_units)))
+                            else:
+                                GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - No scrubbing required'.format(vpool.name, storagerouter.name, vdisk.name))
+                    except Exception:
+                        if vdisk is None:
+                            message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk with guid {2} could not be found'.format(vpool.name, storagerouter.name, vdisk_guid)
+                        else:
+                            message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
+                        error_messages.append(message)
+                        GenericController._logger.exception(message)
+                    finally:
+                        # Remove vDisk from volatile memory
+                        volatile_client.delete(volatile_key)
+
+        except Empty:  # Raised when all items have been fetched from the queue
+            GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Queue completely processed'.format(vpool.name, storagerouter.name))
+        except Exception:
+            message = 'Scrubber - vPool {0} - StorageRouter {1} - Scrubbing failed'.format(vpool.name, storagerouter.name)
+            error_messages.append(message)
+            GenericController._logger.exception(message)
+
+    @staticmethod
+    def _deploy_proxy_and_scrub(queue, vpool, scrub_info, error_messages, alba_proxy_service):
         """
         Executes scrub work for a given vDisk queue and vPool, based on scrub_info
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
@@ -329,17 +397,9 @@ class GenericController(object):
         if len(vpool.storagedrivers) == 0 or not vpool.storagedrivers[0].storagedriver_id:
             raise ValueError('vPool {0} does not have any valid StorageDrivers configured'.format(vpool.name))
 
-        def _verify_mds_config(current_vdisk):
-            current_vdisk.invalidate_dynamics('info')
-            vdisk_configs = current_vdisk.info['metadata_backend_config']
-            if len(vdisk_configs) == 0:
-                raise RuntimeError('Could not load MDS configuration')
-            return vdisk_configs
-
         client = None
         lock_time = 5 * 60
         storagerouter = scrub_info['storage_router']
-        volatile_client = VolatileFactory.get_client()
         scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, storagerouter.name)
         scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, storagerouter.guid)
         backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, storagerouter.guid)
@@ -412,63 +472,20 @@ class GenericController(object):
             if Configuration.exists(scrub_config_key):
                 Configuration.delete(scrub_config_key)
 
-        try:
-            # Empty the queue with vDisks to scrub
-            with remote(storagerouter.ip, [VDisk]) as rem:
-                while True:
-                    vdisk = None
-                    vdisk_guid = queue.get(False)  # Raises Empty Exception when queue is empty, so breaking the while True loop
-                    volatile_key = 'ovs_scrubbing_vdisk_{0}'.format(vdisk_guid)
-                    try:
-                        # Check MDS master is local. Trigger MDS handover if necessary
-                        vdisk = rem.VDisk(vdisk_guid)
-                        GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Started scrubbing at location {3}'.format(vpool.name, storagerouter.name, vdisk.name, scrub_directory))
-                        configs = _verify_mds_config(current_vdisk=vdisk)
-                        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-                        if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                            GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - MDS master is not local, trigger handover'.format(vpool.name, storagerouter.name, vdisk.name))
-                            MDSServiceController.ensure_safety(VDisk(vdisk_guid))  # Do not use a remote VDisk instance here
-                            configs = _verify_mds_config(current_vdisk=vdisk)
-                            if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                                GenericController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because master MDS still not local'.format(vpool.name, storagerouter.name, vdisk.name))
-                                continue
-
-                        # Check if vDisk is already being scrubbed
-                        if volatile_client.add(key=volatile_key, value=volatile_key, time=24 * 60 * 60) is False:
-                            GenericController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because vDisk is already being scrubbed'.format(vpool.name, storagerouter.name, vdisk.name))
-                            continue
-
-                        # Do the actual scrubbing
-                        with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
-                            GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Retrieve and apply scrub work'.format(vpool.name, storagerouter.name, vdisk.name))
-                            work_units = locked_client.get_scrubbing_workunits()
-                            for work_unit in work_units:
-                                res = locked_client.scrub(work_unit=work_unit,
-                                                          scratch_dir=scrub_directory,
-                                                          log_sinks=[LogHandler.get_sink_path('scrubber', allow_override=True, forced_target_type='file')],
-                                                          backend_config=Configuration.get_configuration_path(backend_config_key))
-                                locked_client.apply_scrubbing_result(scrubbing_work_result=res)
-                            if work_units:
-                                GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - {3} work units successfully applied'.format(vpool.name, storagerouter.name, vdisk.name, len(work_units)))
-                            else:
-                                GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - No scrubbing required'.format(vpool.name, storagerouter.name, vdisk.name))
-                    except Exception:
-                        if vdisk is None:
-                            message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk with guid {2} could not be found'.format(vpool.name, storagerouter.name, vdisk_guid)
-                        else:
-                            message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
-                        error_messages.append(message)
-                        GenericController._logger.exception(message)
-                    finally:
-                        # Remove vDisk from volatile memory
-                        volatile_client.delete(volatile_key)
-
-        except Empty:  # Raised when all items have been fetched from the queue
-            GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Queue completely processed'.format(vpool.name, storagerouter.name))
-        except Exception:
-            message = 'Scrubber - vPool {0} - StorageRouter {1} - Scrubbing failed'.format(vpool.name, storagerouter.name)
-            error_messages.append(message)
-            GenericController._logger.exception(message)
+        # Execute the actual scrubbing
+        threads = []
+        threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(storagerouter.machine_id)
+        amount_threads = Configuration.get(key=threads_key) if Configuration.exists(key=threads_key) else 2
+        amount_threads = min(min(queue.qsize(), amount_threads), 20)
+        GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Spawning {2} threads for proxy service {3}'.format(vpool.name, storagerouter.name, amount_threads, alba_proxy_service))
+        for index in range(amount_threads):
+            thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index),
+                            target=GenericController._execute_scrub,
+                            args=(queue, vpool, storagerouter, scrub_directory, error_messages))
+            thread.start()
+            threads.append(thread)
+        for thread in threads:
+            thread.join()
 
         # Delete the proxy again
         try:
