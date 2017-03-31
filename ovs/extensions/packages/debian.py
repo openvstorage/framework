@@ -18,6 +18,7 @@
 Debian Package module
 """
 
+import re
 from subprocess import check_output, CalledProcessError
 from ovs.log.log_handler import LogHandler
 
@@ -80,21 +81,17 @@ class DebianPackage(object):
         :return: Package candidate versions
         :rtype: dict
         """
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
-
         DebianPackage.update(client=client)
         versions = {}
         for package_name in package_names:
-            for line in client.run(['apt-cache', 'policy', package_name, DebianPackage.APT_CONFIG_STRING]).splitlines():
-                line = line.strip()
-                if 'Unable to locate package' in line:
+            output = client.run(['apt-cache', 'policy', package_name, DebianPackage.APT_CONFIG_STRING]).strip()
+            match = re.match(".*Installed: (?P<installed>\S+).*Candidate: (?P<candidate>\S+).*",
+                             output, re.DOTALL)
+            if match is not None:
+                groups = match.groupdict()
+                if groups['candidate'] == '(none)' and groups['installed'] == '(none)':
                     continue
-                if line.startswith('Candidate:'):
-                    candidate = ExtensionsToolbox.remove_prefix(line, 'Candidate:').strip()
-                    if candidate == '(none)':
-                        candidate = ''
-                    versions[package_name] = candidate
-                    break
+                versions[package_name] = groups['candidate'] if groups['candidate'] != '(none)' else ''
         return versions
 
     @staticmethod
