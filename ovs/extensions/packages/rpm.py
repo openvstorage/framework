@@ -29,6 +29,22 @@ class RpmPackage(object):
     _logger = LogHandler.get('update', name='package-manager-rpm')
 
     @staticmethod
+    def get_release_name(client=None):
+        """
+        Get the release name based on the name of the repository
+        :param client: Client on which to check the release name
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :return: Release name
+        :rtype: str
+        """
+        command = "cat /etc/yum.repos.d/ovs.repo | grep url | awk -F/ '{print $NF}'"
+        if client is None:
+            output = check_output(command, shell=True).strip()
+        else:
+            output = client.run(command, allow_insecure=True).strip()
+        return output.replace('-', ' ').title()
+
+    @staticmethod
     def get_installed_versions(client=None, package_names=None):
         """
         Retrieve currently installed versions of all packages
@@ -48,7 +64,7 @@ class RpmPackage(object):
                 version_info = check_output(command, shell=True).strip()
             else:
                 version_info = client.run(command, allow_insecure=True).strip()
-            if version_info:
+            if version_info and 'No matching Packages to list' not in version_info:
                 versions[package_name] = version_info
         return versions
 
@@ -69,15 +85,18 @@ class RpmPackage(object):
             installed = None
             candidate = None
             versions[package_name] = ''
-            for line in client.run(['yum', 'list', package_name]).splitlines():
-                if line.startswith(package_name):
-                    version = line.split()
-                    if len(version) > 1:
-                        if installed is None:
-                            candidate = version[1]
-                        else:
-                            candidate = version[1]
-            versions[package_name] = candidate
+            try:
+                for line in client.run(['yum', 'list', package_name]).splitlines():
+                    if line.startswith(package_name):
+                        version = line.split()
+                        if len(version) > 1:
+                            if installed is None:
+                                candidate = version[1]
+                            else:
+                                candidate = version[1]
+                versions[package_name] = candidate
+            except CalledProcessError:
+                pass
         return versions
 
     @staticmethod
@@ -93,11 +112,12 @@ class RpmPackage(object):
         """
         versions = {}
         for package_name in package_names:
-            if package_name == 'alba':
+            if package_name in ['alba', 'alba-ee']:
                 versions[package_name] = client.run(RpmPackage.GET_VERSION_ALBA, allow_insecure=True)
             elif package_name == 'arakoon':
                 versions[package_name] = client.run(RpmPackage.GET_VERSION_ARAKOON, allow_insecure=True)
-            elif package_name in ['volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']:
+            elif package_name in ['volumedriver-no-dedup-base', 'volumedriver-no-dedup-server',
+                                  'volumedriver-ee-base', 'volumedriver-ee-no-server']:
                 versions[package_name] = client.run(RpmPackage.GET_VERSION_STORAGEDRIVER, allow_insecure=True)
             else:
                 raise ValueError('Only the following packages in the OpenvStorage repository have a binary file: "{0}"'.format('", "'.join(RpmPackage.OVS_PACKAGES_WITH_BINARIES)))

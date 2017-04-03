@@ -24,9 +24,7 @@ import time
 import uuid
 import pickle
 import random
-from Queue import Queue
 from ovs.dal.exceptions import ObjectNotFoundException
-from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
 from ovs.dal.hybrids.storagedriver import StorageDriver
@@ -1295,34 +1293,6 @@ class VDiskController(object):
         except Exception:
             VDiskController._logger.exception('Failed to verify whether vDisk {0} is synced up to snapshot'.format(vdisk.name))
             raise Exception('Verifying if vDisk {0} is synced up to snapshot failed'.format(vdisk.name))
-
-    @staticmethod
-    @ovs_task(name='ovs.vdisk.scrub_single_vdisk')
-    def scrub_single_vdisk(vdisk_guid, storagerouter_guid):
-        """
-        Scrubs a given vDisk on a given StorageRouter
-        :param vdisk_guid: The guid of the vDisk to scrub
-        :type vdisk_guid: str
-        :param storagerouter_guid: The guid of the StorageRouter to scrub on
-        :type storagerouter_guid: str
-        :return: None
-        """
-        from ovs.lib.generic import GenericController
-
-        vdisk = VDisk(vdisk_guid)
-        storagerouter = StorageRouter(storagerouter_guid)
-        scrub_partitions = storagerouter.partition_config.get(DiskPartition.ROLES.SCRUB, [])
-        if len(scrub_partitions) == 0:
-            raise RuntimeError('No scrub locations found on StorageRouter {0}'.format(storagerouter.name))
-        partition = DiskPartition(scrub_partitions[0])
-        queue = Queue()
-        queue.put(vdisk_guid)
-        scrub_info = {'scrub_path': str(partition.folder),
-                      'storage_router': storagerouter}
-        error_messages = []
-        GenericController.execute_scrub_work(queue, vdisk.vpool, scrub_info, error_messages)
-        if len(error_messages) > 0:
-            raise RuntimeError('Error when scrubbing vDisk {0}:\n- {1}'.format(vdisk.guid, '\n- '.join(error_messages)))
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.restart')

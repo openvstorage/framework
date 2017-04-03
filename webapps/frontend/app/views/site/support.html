@@ -16,7 +16,12 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <section>
-    <h2><span data-i18n="ovs:support.product"></span> <span data-i18n="ovs:support.release_name"></span> - <span data-i18n="ovs:support.title"></span></h2>
+    <h2>
+        <span data-i18n="ovs:support.product"></span>
+        <span data-bind="if: releaseName() !== '' && releaseName() !== undefined">&quot;<span data-bind="text: releaseName()"></span>&quot;</span>
+        -
+        <span data-i18n="ovs:support.title"></span>
+    </h2>
     <p>&nbsp;</p>
 
     <div class="row">

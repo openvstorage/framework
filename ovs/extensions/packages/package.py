@@ -28,10 +28,11 @@ class PackageManager(object):
     Factory class returning specialized classes
     """
     ImplementationClass = None
-    OVS_PACKAGE_NAMES = ['alba', 'arakoon',
+    OVS_PACKAGE_NAMES = ['alba', 'alba-ee', 'arakoon',
                          'openvstorage', 'openvstorage-backend', 'openvstorage-sdm',
-                         'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']
-    OVS_PACKAGES_WITH_BINARIES = ['alba', 'arakoon', 'volumedriver-no-dedup-server']
+                         'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server',
+                         'volumedriver-ee-base', 'volumedriver-ee-server']
+    OVS_PACKAGES_WITH_BINARIES = ['alba', 'alba-ee', 'arakoon', 'volumedriver-no-dedup-server', 'volumedriver-ee-server']
 
     GET_VERSION_ALBA = 'alba version --terse'
     GET_VERSION_ARAKOON = "arakoon --version | grep version: | awk '{print $2}'"

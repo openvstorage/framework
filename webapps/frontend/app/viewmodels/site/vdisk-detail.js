@@ -18,12 +18,11 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
-    '../wizards/clone/index', '../wizards/vdiskmove/index', '../wizards/rollback/index', '../wizards/snapshot/index',
-    '../wizards/scrub/index'
+    '../wizards/clone/index', '../wizards/vdiskmove/index', '../wizards/rollback/index', '../wizards/snapshot/index'
 ], function(
     $, app, dialog, ko, router, shared, generic, Refresher, api,
     VDisk, VPool, StorageRouter, Domain,
-    CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard, ScrubWizard
+    CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard
 ) {
     "use strict";
     return function() {
@@ -237,10 +236,35 @@ define([
         };
         self.scrub = function() {
             if (self.vDisk() !== undefined) {
-                dialog.show(new ScrubWizard({
-                    modal: true,
-                    vdisk: self.vDisk()
-                }));
+                var vd = self.vDisk();
+                app.showMessage(
+                        $.t('ovs:vdisks.scrub.title_message', {vdisk: vd.name()}),
+                        $.t('ovs:vdisks.scrub.title', {vdisk: vd.name()}),
+                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:generic.yes')) {
+                            generic.alertInfo(
+                                $.t('ovs:vdisks.scrub.started_title'),
+                                $.t('ovs:vdisks.scrub.started_message', {vdisk: vd.name()})
+                            );
+                            api.post('vdisks/' + vd.guid() + '/scrub')
+                                .then(self.shared.tasks.wait)
+                                .done(function() {
+                                    generic.alertSuccess(
+                                        $.t('ovs:vdisks.scrub.success_title'),
+                                        $.t('ovs:vdisks.scrub.success_message', {vdisk: vd.name()})
+                                    );
+                                })
+                                .fail(function(error) {
+                                    error = generic.extractErrorMessage(error);
+                                    generic.alertError(
+                                        $.t('ovs:vdisks.scrub.failed_title'),
+                                        $.t('ovs:vdisks.scrub.failed_message', {vdisk: vd.name(), why: error})
+                                    );
+                                });
+                        }
+                    });
             }
         };
         self.saveConfiguration = function() {

@@ -3,7 +3,7 @@
    This code is combined with third-party code that was originally released under licenses that the
    Free Software Foundation considers incompatible with the GNU AGPLv3, such as the OpenSSL license,
    Berkeley Software Distribution (BSD v4) and the Mozilla Public License (MPL).
-   (Please see the Open vStorage User Manual for a complete list of third-party code and their licenses.)
+   (Please see [NOTICE.txt](NOTICE.txt) for a complete list of third-party code and their licenses.)
    As a special exception to the terms and conditions of the AGPL listed below, iNuron gives you explicit
    permission to combine its GNU AGPLv3 code contained in Open vStorage OSE with third-party code under
    the aforementioned licenses.

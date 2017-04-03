@@ -24,16 +24,16 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.conf import settings
-from api.middleware import OVSMiddleware
 from api.backend.decorators import required_roles, load
 from api.backend.exceptions import HttpBadRequestException
+from api.middleware import OVSMiddleware
 from api.oauth2.decorators import auto_response, limit, authenticated
+from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.lists.backendtypelist import BackendTypeList
-from ovs.extensions.generic.system import System
-from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.api.client import OVSClient
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.log.log_handler import LogHandler
 
 
@@ -50,7 +50,8 @@ class MetadataView(View):
         Fetches metadata
         """
         _ = args, kwargs
-        data = {'authenticated': False,
+        data = {'release': {'name': ''},
+                'authenticated': False,
                 'authentication_state': None,
                 'authentication_metadata': {},
                 'username': None,
@@ -61,6 +62,12 @@ class MetadataView(View):
                 'versions': list(settings.VERSION),
                 'plugins': {}}
         try:
+            # Gather release name
+            try:
+                data['release']['name'] = System.get_release_name()
+            except:
+                MetadataView._logger.exception('Could not load releasename')
+
             # Gather plugin metadata
             plugins = {}
             # - Backends. BackendType plugins must set the has_plugin flag on True

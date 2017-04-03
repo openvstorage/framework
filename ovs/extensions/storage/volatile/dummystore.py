@@ -20,7 +20,7 @@ Dummy volatile module
 import os
 import copy
 import json
-import time
+import time as time_module
 
 
 class DummyVolatileStore(object):
@@ -70,27 +70,37 @@ class DummyVolatileStore(object):
         Retrieves a certain value for a given key
         """
         data = self._read()
-        if key in data['t'] and data['t'][key] > time.time():
+        if key in data['t'] and data['t'][key] > time_module.time():
             value = data['s'].get(key)
             return copy.deepcopy(value)
         return default
 
-    def set(self, key, value, timeout=99999999):
+    def gets(self, key, default=None):
+        """
+        Retrieves a certain value for a given key
+        """
+        data = self._read()
+        if key in data['t'] and data['t'][key] > time_module.time():
+            value = data['s'].get(key)
+            return copy.deepcopy(value)
+        return default
+
+    def set(self, key, value, time=99999999):
         """
         Sets the value for a key to a given value
         """
         data = self._read()
         data['s'][key] = copy.deepcopy(value)
-        data['t'][key] = time.time() + timeout
+        data['t'][key] = time_module.time() + time
         self._save(data)
 
-    def add(self, key, value, timeout=99999999):
+    def add(self, key, value, time=99999999):
         """
         Adds a given key to the store, expecting the key does not exists yet
         """
         data = self._read()
         if key not in data['s']:
-            self.set(key, value, timeout)
+            self.set(key, value, time)
             return True
         else:
             return False
