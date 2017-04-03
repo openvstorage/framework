@@ -500,7 +500,7 @@
         "metadata": "Heartbeat data",
         "nodeid": "Node ID",
         "nodes": "Storage Routers:",
-        "noheartbeat": "never",
+        "no_heartbeat": "never",
         "openvstorage": "Open vStorage",
         "openvstorage-backend": "Open vStorage Backend",
         "openvstorage-sdm": "Storage Device Manager",

@@ -106,7 +106,6 @@ class StorageRouterController(object):
         services_arakoon = [service for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services if service.name != 'arakoon-ovsdb' and service.is_internal is True]
 
         partitions = dict((role, []) for role in DiskPartition.ROLES)
-        writecache_size = 0
         for disk in storagerouter.disks:
             for disk_partition in disk.partitions:
                 claimed_space_by_fwk = 0
@@ -138,12 +137,6 @@ class StorageRouterController(object):
                     else:
                         available = size - claimed_space_by_fwk  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
 
-                    if available > 0:
-                        if role == DiskPartition.ROLES.WRITE:
-                            writecache_size += available
-                    else:
-                        available = 0
-
                     in_use = any(junction for junction in disk_partition.storagedrivers if junction.role == role)
                     if role == DiskPartition.ROLES.DB:
                         for service in services_arakoon:
@@ -159,13 +152,22 @@ class StorageRouterController(object):
                                              'guid': disk_partition.guid,
                                              'size': size,
                                              'in_use': in_use,
-                                             'available': available,
+                                             'usable': True,  # Sizes smaller than 1GiB and smaller than 5% of largest WRITE partition will be un-usable
+                                             'available': available if available > 0 else 0,
                                              'mountpoint': disk_partition.folder,  # Equals to mountpoint unless mountpoint is root ('/'), then we pre-pend mountpoint with '/mnt/storage'
                                              'storagerouter_guid': storagerouter_guid})
 
+        # Strip out WRITE caches which are smaller than 5% of largest write cache size and smaller than 1GiB
+        writecache_sizes = []
+        for partition_info in partitions[DiskPartition.ROLES.WRITE]:
+            writecache_sizes.append(partition_info['available'])
+        largest_write_cache = max(writecache_sizes) if len(writecache_sizes) > 0 else 0
+        for index, size in enumerate(writecache_sizes):
+            if size < largest_write_cache * 5 / 100 or size < 1024 ** 3:
+                partitions[DiskPartition.ROLES.WRITE][index]['usable'] = False
+
         return {'partitions': partitions,
                 'ipaddresses': ipaddresses,
-                'writecache_size': writecache_size,
                 'scrub_available': StorageRouterController._check_scrub_partition_present()}
 
     @staticmethod
@@ -340,7 +342,8 @@ class StorageRouterController(object):
                     error_messages.append(rte.message)
 
         # Check over-allocation for write cache
-        writecache_size_available = metadata['writecache_size']
+        usable_write_partitions = [part for part in partition_info[DiskPartition.ROLES.WRITE] if part['usable'] is True]
+        writecache_size_available = sum(part['available'] for part in usable_write_partitions)
         writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
         if writecache_size_requested > writecache_size_available:
             error_messages.append('Too much space requested for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.WRITE,
@@ -361,9 +364,7 @@ class StorageRouterController(object):
         largest_sata_write_partition = None
         largest_ssd = 0
         largest_sata = 0
-        total_available = 0
-        for info in partition_info.get(DiskPartition.ROLES.WRITE, []):
-            total_available += info['available']
+        for info in usable_write_partitions:
             if info['ssd'] is True and info['available'] > largest_ssd:
                 largest_ssd = info['available']
                 largest_ssd_write_partition = info['guid']
@@ -384,7 +385,7 @@ class StorageRouterController(object):
                 mountpoint_fragment_cache = largest_write_mountpoint
                 if fragment_cache_on_read is True or fragment_cache_on_write is True:  # Local fragment caching
                     one_gib = 1024 ** 3  # 1GiB
-                    proportion = float(largest_ssd or largest_sata) * 100.0 / total_available
+                    proportion = float(largest_ssd or largest_sata) * 100.0 / writecache_size_available
                     available = proportion * writecache_size_requested / 100 * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
                     fragment_size = available / amount_of_proxies
                     if fragment_size < one_gib:
@@ -567,13 +568,11 @@ class StorageRouterController(object):
         sdp_frags = []
         dirs2create = []
         writecaches = []
-        writecache_information = partition_info[DiskPartition.ROLES.WRITE]
         smallest_write_partition = None
-        total_available = sum([part['available'] for part in writecache_information])
-        for writecache_info in writecache_information:
+        for writecache_info in usable_write_partitions:
             available = writecache_info['available']
             partition = DiskPartition(writecache_info['guid'])
-            proportion = available * 100.0 / total_available
+            proportion = available * 100.0 / writecache_size_available
             size_to_be_used = proportion * writecache_size_requested / 100
             write_cache_percentage = 0.98
             if mountpoint_fragment_cache is not None and partition == mountpoint_fragment_cache:

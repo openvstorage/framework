@@ -73,12 +73,18 @@ class SupportAgent(object):
             data['errors'].append(str(ex))
         try:
             if self.servicemanager == 'upstart':
-                services = check_output("initctl list | grep ovs-", shell=True).strip().splitlines()
+                services = check_output('initctl list | grep ovs-', shell=True).strip().splitlines()
             else:
-                services = check_output("systemctl -l | grep ovs-", shell=True).strip().splitlines()
+                services = check_output('systemctl -l | grep ovs- | tr -s " "', shell=True).strip().splitlines()
             # Service status
-            servicedata = dict((service.strip().split(' ')[0].strip(), service.strip().split(' ', 1)[1].strip()) for service in services)
-            data['metadata']['services'] = servicedata
+            service_data = {}
+            for service in services:
+                split = service.strip().split(' ')
+                split = [part.strip() for part in split if part.strip()]
+                while split and not split[0].strip().startswith('ovs-'):
+                    split.pop(0)
+                service_data[split[0]] = ' '.join(split[1:])
+            data['metadata']['services'] = service_data
         except Exception, ex:
             data['errors'].append(str(ex))
         return data
@@ -159,7 +165,7 @@ class SupportAgent(object):
             raise
 
         try:
-            # Try to save the timestamp at which we last succefully send the heartbeat data
+            # Try to save the timestamp at which we last successfully send the heartbeat data
             from ovs.extensions.generic.system import System
             storagerouter = System.get_my_storagerouter()
             storagerouter.last_heartbeat = time.time()
