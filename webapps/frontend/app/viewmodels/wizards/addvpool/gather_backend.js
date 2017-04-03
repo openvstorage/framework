@@ -162,14 +162,7 @@ define([
                                     api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
                                         .then(function(data) {
                                             if (data.guid !== self.data.backend().guid) {
-                                                var asdsFound = false;
-                                                if (data.scaling === 'LOCAL') {
-                                                    $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
-                                                        asdsFound = true;
-                                                        return false;
-                                                    });
-                                                }
-                                                if (asdsFound === true || data.scaling === 'GLOBAL') {
+                                                if (Object.keys(data.asd_statistics).length > 0 || data.scaling === 'GLOBAL') {
                                                     available_backends.push(data);
                                                     self.albaPresetMap()[data.guid] = {};
                                                     $.each(data.presets, function (_, preset) {

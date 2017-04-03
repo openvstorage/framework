@@ -90,7 +90,9 @@ define([
                     fields.push('host');
                 }
             }
-            if (self.loadingMetadata() === false) {
+            if (self.loadingMetadata() === true) {
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
+            } else {
                 if (self.scrubAvailable() === false) {
                     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: 'SCRUB'}));
                 }
@@ -150,15 +152,19 @@ define([
             self.ipAddresses(srData.ipaddresses);
             self.data.partitions(srData.partitions);
             self.scrubAvailable(srData.scrub_available);
-            if (self.data.writeBufferGlobal() === 1) {
-                self.data.writeBufferGlobal(srData.writecache_size / 1024 / 1024 / 1024);
-            }
-            self.data.writeBufferGlobalMax(srData.writecache_size);
             if (srData.ipaddresses.length === 0) {
                 self.data.storageIP(undefined);
             } else if (self.data.storageIP() === undefined || !srData.ipaddresses.contains(self.data.storageIP())) {
                 self.data.storageIP(srData.ipaddresses[0]);
             }
+            var writeCacheSize = 0;
+            $.each(srData.partitions.WRITE, function(index, info) {
+                if (info['usable'] === true) {
+                    writeCacheSize += info['available'];
+                }
+            });
+            self.data.writeBufferGlobal(writeCacheSize / 1024 / 1024 / 1024);
+            self.data.writeBufferGlobalMax(writeCacheSize);
             self.loadingMetadata(false);
         };
         self.preValidate = function () {
@@ -213,14 +219,7 @@ define([
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.guid + '/', {queryparams: getData})
                                         .then(function (data) {
-                                            var asdsFound = false;
-                                            if (data.scaling === 'LOCAL') {
-                                                $.each(data.asd_statistics, function (key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
-                                                    asdsFound = true;
-                                                    return false;
-                                                });
-                                            }
-                                            if (asdsFound === true || data.scaling === 'GLOBAL') {
+                                            if (Object.keys(data.asd_statistics).length > 0 || data.scaling === 'GLOBAL') {
                                                 available_backends.push(data);
                                                 self.albaPresetMap()[data.guid] = {};
                                                 $.each(data.presets, function (_, preset) {
