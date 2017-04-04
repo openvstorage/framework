@@ -582,6 +582,8 @@
     "vdisks": {
         "add": "Add new vDisk",
         "detail": {
+            "client_ip": "Client IP",
+            "client_port": "Client Port",
             "clone": "Clone",
             "configuration": "vDisk configuration",
             "configuration_info": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
@@ -593,6 +595,8 @@
             "restart": "Restart",
             "rollback": "Rollback",
             "scrub": "Scrub",
+            "server_ip": "Server IP",
+            "server_port": "Server Port",
             "set_as_template": "Set as vTemplate",
             "snapshot": "Take snapshot",
             "snapshots": "Snapshots",
