@@ -83,9 +83,11 @@ class StorageDriver(DataObject):
                 clients.append({'key': '{0}:{1}'.format(item.ip, item.port),
                                 'object_id': item.object_id,
                                 'ip': item.ip,
-                                'port': item.port})
-        except Exception as ex:
-                StorageDriver._logger.error('Error loading edge clients from {0}: {1}'.format(self.storagedriver_id, ex))
+                                'port': item.port,
+                                'server_ip': self.storage_ip,
+                                'server_port': self.ports['edge']})
+        except Exception:
+            StorageDriver._logger.exception('Error loading edge clients from {0}'.format(self.storagedriver_id))
         clients.sort(key=lambda e: (e['ip'], e['port']))
         return clients
 

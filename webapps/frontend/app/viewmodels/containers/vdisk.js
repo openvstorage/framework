@@ -169,7 +169,7 @@ define([
                     clients.push($.t('ovs:generic.xmore', { amount: self.edgeClients().length - 5 }));
                     return false;
                 }
-                clients.push(client.ip() + ':' + client.port());
+                clients.push(client.clientIp() + ':' + client.clientPort());
             });
             return clients.join(', ')
         });

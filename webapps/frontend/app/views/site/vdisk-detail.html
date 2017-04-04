@@ -241,9 +241,11 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                                    <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                                 </span>
-                                <span data-bind="text: ip"></span>
+                                <span data-bind="text: clientIp"></span>
                             </td>
-                            <td><span data-bind="text: port"></span></td>
+                            <td><span data-bind="text: clientPort"></span></td>
+                            <td><span data-bind="text: serverIp"></span></td>
+                            <td><span data-bind="text: serverPort"></span></td>
                         </tr>
                     </table>
                 </div>

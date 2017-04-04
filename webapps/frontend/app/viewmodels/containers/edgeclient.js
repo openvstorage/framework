@@ -28,19 +28,22 @@ define([
         self.vDisk = ko.observable();
 
         // Observables
-        self.loading  = ko.observable(false);
-        self.loaded   = ko.observable(false);
-        self.key      = ko.observable(key);
-        self.objectId = ko.observable();
-        self.ip       = ko.observable();
-        self.port     = ko.observable();
+        self.clientIp   = ko.observable();
+        self.clientPort = ko.observable();
+        self.loading    = ko.observable(false);
+        self.loaded     = ko.observable(false);
+        self.key        = ko.observable(key);
+        self.objectId   = ko.observable();
+        self.serverIp   = ko.observable();
+        self.serverPort = ko.observable();
 
         // Functions
         self.fillData = function (data) {
             self.objectId(data.object_id);
-            self.ip(data.ip);
-            self.port(data.port);
-
+            self.clientIp(data.ip);
+            self.clientPort(data.port);
+            self.serverIp(data.server_ip);
+            self.serverPort(data.server_port);
             self.loaded(true);
             self.loading(false);
         };

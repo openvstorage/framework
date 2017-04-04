@@ -44,8 +44,10 @@ define([
             { key: undefined,       value: $.t('ovs:generic.actions'),     width: 60        }
         ];
         self.edgeClientHeaders = [
-            { key: 'ip',    value: $.t('ovs:generic.ip'),    width: 200       },
-            { key: 'port',  value: $.t('ovs:generic.port'),  width: undefined }
+            { key: 'clientIp',   value: $.t('ovs:vdisks.detail.client_ip'),   width: 150       },
+            { key: 'clientPort', value: $.t('ovs:vdisks.detail.client_port'), width: 100       },
+            { key: 'serverIp',   value: $.t('ovs:vdisks.detail.server_ip'),   width: 150       },
+            { key: 'serverPort', value: $.t('ovs:vdisks.detail.server_port'), width: undefined }
         ];
 
         // Observables
