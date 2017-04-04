@@ -53,6 +53,7 @@ class VDiskController(object):
     Contains all BLL regarding VDisks
     """
     _logger = LogHandler.get('lib', name='vdisk')
+    _VOLDRV_EVENT_KEY = 'voldrv_event_vdisk_{0}'
 
     storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
@@ -124,7 +125,7 @@ class VDiskController(object):
         :type volume_id: str
         :return: None
         """
-        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=20):
+        with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=20):
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if vdisk is not None:
                 VDiskController.clean_vdisk_from_model(vdisk)
@@ -192,7 +193,7 @@ class VDiskController(object):
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         vpool = storagedriver.vpool
-        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+        with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
             if vpool.objectregistry_client.find(str(volume_id)) is None:
                 VDiskController._logger.warning('Ignoring resize_from_voldrv event for non-existing volume {0}'.format(volume_id))
                 return
@@ -257,7 +258,7 @@ class VDiskController(object):
             devicename = vdisk.devicename
             if devicename.startswith(old_path):
                 volume_id = vdisk.volume_id
-                with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
                     vdisk.discard()
                     devicename = vdisk.devicename
                     if devicename.startswith(old_path):
@@ -342,7 +343,7 @@ class VDiskController(object):
             VDiskController._logger.error('Cloning snapshot to new vDisk {0} failed: {1}'.format(name, str(ex)))
             raise
 
-        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+        with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
                 new_vdisk = VDisk()
@@ -632,7 +633,7 @@ class VDiskController(object):
             VDiskController._logger.error('Cloning vTemplate {0} failed: {1}'.format(vdisk.name, str(ex)))
             raise
 
-        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+        with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
                 new_vdisk = VDisk()
@@ -697,7 +698,7 @@ class VDiskController(object):
             VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
             raise
 
-        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+        with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
                 new_vdisk = VDisk()
@@ -1317,7 +1318,7 @@ class VDiskController(object):
         vdisk.invalidate_dynamics(['info', 'dtl_status'])
 
     @staticmethod
-    @ovs_task(name='ovs.vdisk.sync_with_reality')
+    @ovs_task(name='ovs.vdisk.sync_with_reality', schedule=Schedule(minute='30', hour='*'))
     def sync_with_reality(vpool_guid=None):
         """
         Syncs vDisks in the model with reality
@@ -1337,10 +1338,10 @@ class VDiskController(object):
             for entry in vpool.objectregistry_client.get_all_registrations():
                 volume_id = entry.object_id()
                 if volume_id not in vdisks:
-                    with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                    with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
                         new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
                         if new_vdisk is None:
-                            VDiskController._logger.info('Adding missing vDisk in the model for {0}'.format(volume_id))
+                            VDiskController._logger.info('OVS_WARNING: Adding vDisk to model. ID: {0}'.format(volume_id))
                             new_vdisk = VDisk()
                             new_vdisk.volume_id = volume_id
                             new_vdisk.vpool = vpool
@@ -1364,9 +1365,9 @@ class VDiskController(object):
                 else:
                     del vdisks[volume_id]
             for volume_id, vdisk in vdisks.iteritems():
-                with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
                     if vpool.objectregistry_client.find(str(volume_id)) is None:
-                        VDiskController._logger.info('Removing obsolete vDisk {0} from model'.format(vdisk.guid))
+                        VDiskController._logger.info('OVS_WARNING: Removing vDisk from model. ID: {0} - Guid: {1}'.format(volume_id, vdisk.guid))
                         VDiskController.clean_vdisk_from_model(vdisk)
 
     @staticmethod
