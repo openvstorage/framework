@@ -208,7 +208,14 @@ class Systemd(object):
         except CalledProcessError as cpe:
             output = cpe.output
             Systemd._logger.exception('Start {0} failed, {1}'.format(name, output))
-        return output
+        counter = 0
+        while counter < 10:
+            if Systemd.get_service_status(name=name, client=client)[0] is True:
+                return output
+            counter += 1
+            time.sleep(0.1)
+        Systemd._logger.exception('Start {0} failed'.format(name))
+        return ''
 
     @staticmethod
     def stop_service(name, client):

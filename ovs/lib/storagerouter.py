@@ -46,7 +46,7 @@ from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
@@ -195,7 +195,7 @@ class StorageRouterController(object):
                            'backend_info_aa': (dict, {'preset': (str, Toolbox.regex_preset),
                                                       'alba_backend_guid': (str, Toolbox.regex_guid)}, False),
                            'connection_info': (dict, {'host': (str, Toolbox.regex_ip),
-                                                      'port': (int, None),
+                                                      'port': (int, {'min': 1, 'max': 65535}),
                                                       'client_id': (str, None),
                                                       'client_secret': (str, None),
                                                       'local': (bool, None, False)}),
@@ -285,6 +285,15 @@ class StorageRouterController(object):
         ########################
         # VALIDATIONS (PART 2) #
         ########################
+        # When 2 or more jobs simultaneously run on the same StorageRouter, we need to check and create the StorageDriver partitions in locked context
+        partitions_lock = volatile_mutex('add_vpool_partitions_{0}'.format(storagerouter.guid))
+        try:
+            partitions_lock.acquire(wait=120)
+        except NoLockAvailableException:
+            if new_vpool is True:
+                vpool.delete()
+            raise
+
         # Check mountpoint
         metadata = StorageRouterController.get_metadata(storagerouter.guid)
         error_messages = []
@@ -406,9 +415,11 @@ class StorageRouterController(object):
                 vpool.save()
             raise ValueError('Errors validating the specified parameters:\n - {0}'.format('\n - '.join(set(error_messages))))
 
-        ########################
-        # RENEW VPOOL METADATA #
-        ########################
+        ############
+        # MODELING #
+        ############
+
+        ### Renew vPool metadata
         StorageRouterController._logger.info('Add vPool {0} started'.format(vpool_name))
         if new_vpool is True:
             metadata_map = {'backend': {'backend_info': backend_info,
@@ -473,34 +484,7 @@ class StorageRouterController(object):
                                                                          'fragment_cache_on_write': fragment_cache_on_write}
         vpool.save()
 
-        ####################################
-        # ARAKOON SETUP AND CONFIGURATIONS #
-        ####################################
-        arakoon_service_found = False
-        for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:
-            if service.name == 'arakoon-voldrv':
-                arakoon_service_found = True
-                break
-
-        if arakoon_service_found is False:
-            counter = 0
-            while counter < 120:
-                if StorageDriverController.manual_voldrv_arakoon_checkup() is True:
-                    break
-                counter += 1
-                time.sleep(1)
-                if counter == 120:
-                    vpool.status = VPool.STATUSES.FAILURE
-                    vpool.save()
-                    raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
-
-        # Verify SD arakoon cluster is available and 'in_use'
-        root_client = ip_client_map[storagerouter.ip]['root']
-        watcher_volumedriver_service = 'watcher-volumedriver'
-        if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
-            ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
-            ServiceManager.start_service(watcher_volumedriver_service, client=root_client)
-
+        ### StorageDriver
         model_ports_in_use = []
         for port_storagedriver in StorageDriverList.get_storagedrivers():
             if port_storagedriver.storagerouter_guid == storagerouter.guid:
@@ -509,11 +493,9 @@ class StorageRouterController(object):
                 for proxy in port_storagedriver.alba_proxies:
                     model_ports_in_use.append(proxy.service.ports[0])
 
-        # Connection information is Storage Driver related information
         ports = StorageRouterController._get_free_ports(client, model_ports_in_use, 4)
         model_ports_in_use += ports
 
-        # Prepare the model
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
         storagedriver = StorageDriver()
         storagedriver.name = vrouter_id.replace('_', ' ')
@@ -530,40 +512,13 @@ class StorageRouterController(object):
         storagedriver.storagedriver_id = vrouter_id
         storagedriver.save()
 
-        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
-        arakoon_nodes = []
-        for node in config.nodes:
-            arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})
-        node_configs = []
-        existing_storagedrivers = []
-        for sd in vpool.storagedrivers:
-            if sd != storagedriver:
-                existing_storagedrivers.append(sd)
-            sd.invalidate_dynamics('cluster_node_config')
-            node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
+        ### StorageDriver Partitions
+        #     * Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
+        #     * Once the free space on a mountpoint is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
+        #     * make sure that <backoff_gap> free space is available ==> backoff_gap must be <= size of the partition
+        #     * Both backoff_gap and trigger_gap apply to each mountpoint individually, but cannot be configured on a per mountpoint base
 
-        try:
-            vpool.clusterregistry_client.set_node_configs(node_configs)
-            for sd in existing_storagedrivers:
-                vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
-        except:
-            storagedriver.delete()
-            vpool.status = VPool.STATUSES.FAILURE
-            vpool.save()
-            if new_vpool is True:
-                vpool.delete()
-            raise
-
-        ##############################
-        # CREATE PARTITIONS IN MODEL #
-        ##############################
-        # Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
-        # Once the free space on a mountpoint is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
-        # make sure that <backoff_gap> free space is available ==> backoff_gap must be <= size of the partition
-        # Both backoff_gap and trigger_gap apply to each mountpoint individually, but cannot be configured on a per mountpoint base
-
-        # Calculate WRITE / FRAG cache
+        # Assign WRITE / Fragment cache
         frag_size = None
         sdp_frags = []
         dirs2create = []
@@ -632,7 +587,54 @@ class StorageRouterController(object):
             vpool.save()
             raise ValueError('Something went wrong trying to calculate the fragment cache size')
 
+        root_client = ip_client_map[storagerouter.ip]['root']
         root_client.dir_create(dirs2create)
+        partitions_lock.release()
+
+        #################
+        # ARAKOON SETUP #
+        #################
+        counter = 0
+        while counter < 300:
+            try:
+                if StorageDriverController.manual_voldrv_arakoon_checkup() is True:
+                    break
+            except Exception:
+                StorageRouterController._logger.exception('Arakoon checkup for voldrv cluster failed')
+                vpool.status = VPool.STATUSES.FAILURE
+                vpool.save()
+                raise
+            counter += 1
+            time.sleep(1)
+            if counter == 300:
+                vpool.status = VPool.STATUSES.FAILURE
+                vpool.save()
+                raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
+
+        ####################
+        # CLUSTER REGISTRY #
+        ####################
+        node_configs = []
+        existing_storagedrivers = []
+        for sd in vpool.storagedrivers:
+            if sd != storagedriver:
+                existing_storagedrivers.append(sd)
+            sd.invalidate_dynamics('cluster_node_config')
+            node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
+
+        try:
+            vpool.clusterregistry_client.set_node_configs(node_configs)
+            for sd in existing_storagedrivers:
+                vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
+        except:
+            for sd_partition in storagedriver.partitions:
+                sd_partition.delete()
+            storagedriver.delete()
+            vpool.status = VPool.STATUSES.FAILURE
+            vpool.save()
+            if new_vpool is True:
+                vpool.delete()
+            raise
 
         ############################
         # CONFIGURATION MANAGEMENT #
@@ -657,13 +659,13 @@ class StorageRouterController(object):
                                                                                       'backend_aa_{0}'.format(storagerouter.guid): 'abm_aa'}
             for metadata_key in metadata_keys:
                 arakoon_config = vpool.metadata[metadata_key]['arakoon_config']
-                config = RawConfigParser()
+                rcp = RawConfigParser()
                 for section in arakoon_config:
-                    config.add_section(section)
+                    rcp.add_section(section)
                     for key, value in arakoon_config[section].iteritems():
-                        config.set(section, key, value)
+                        rcp.set(section, key, value)
                 config_io = StringIO()
-                config.write(config_io)
+                rcp.write(config_io)
                 Configuration.set(config_tree.format(metadata_keys[metadata_key]), config_io.getvalue(), raw=True)
 
             fragment_cache_scrub_info = ['none']
@@ -775,6 +777,11 @@ class StorageRouterController(object):
                          'vrouter_migrate_timeout_ms': 60000,
                          'vrouter_use_fencing': True}
 
+        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+        arakoon_nodes = [{'host': node.ip,
+                          'port': node.client_port,
+                          'node_id': node.name} for node in ArakoonClusterConfig(cluster_id=arakoon_cluster_name).nodes]
+
         # DTL path is not used, but a required parameter. The DTL transport should be the same as the one set in the DTL server.
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
         storagedriver_config.load()
@@ -828,6 +835,11 @@ class StorageRouterController(object):
 
         sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
+
+        watcher_volumedriver_service = 'watcher-volumedriver'
+        if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
+            ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
+            ServiceManager.start_service(watcher_volumedriver_service, client=root_client)
 
         ServiceManager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
         ServiceManager.start_service(dtl_service, client=root_client)
@@ -1467,7 +1479,8 @@ class StorageRouterController(object):
         """
         machine_id = System.get_my_machine_id(client)
         port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
-        ports = System.get_free_ports(port_range, ports_in_use, number, client)
+        with volatile_mutex('add_vpool_get_free_ports_{0}'.format(machine_id), wait=30):
+            ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]
 

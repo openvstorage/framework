@@ -763,9 +763,10 @@
                 "basic_info": "Validate the basic vPool information.",
                 "client_id": "Client ID:",
                 "configuration": "Validate the configuration settings.",
-                "creating": "creating the vPool",
                 "dtl_transport": "DTL Transport Mode:",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take several minutes.",
+                "failure_message": "Creation of vPool __what__ failed: __why__",
+                "failure_title": "Failure",
                 "fragment_cache_info": {
                     "true": "Active",
                     "false": "Inactive"
@@ -773,15 +774,16 @@
                 "fragment_cache_read": "Fragment cache on read:",
                 "fragment_cache_write": "Fragment cache on write:",
                 "host": "Host (FQDN/IP):",
-                "in_progress": "Creation of vPool __what__ is started.",
                 "initial_storagerouter": "Storage Router:",
                 "ip_address": "Storage IP:",
                 "name": "Name:",
                 "port": "Port:",
                 "proxy_amount": "Amount of proxies",
-                "started": "Started creating",
+                "started_message": "Creation of vPool __what__ has been started",
+                "started_title": "Started Creation",
                 "storagerouter_info": "Validate the Storage Router information.",
-                "success": "Creation of vPool __what__ finished."
+                "success_message": "Creation of vPool __what__ was successful",
+                "success_title": "Success"
             },
             "gather_backend": {
                 "accelerated_info": "Accelerated backend information",
@@ -946,10 +948,12 @@
         },
         "extend_vpool": {
             "confirm": {
-                "extending": "extending the vPool",
-                "in_progress": "Extending vPool __what__ has started.",
-                "started": "Started extending",
-                "success": "vPool __what__ was successfully extended."
+                "failure_message": "Extending vPool __what__ failed: __why__",
+                "failure_title": "Failure",
+                "started_message": "Extending vPool __what__ has been started",
+                "started_title": "Started Extending",
+                "success_message": "Extending vPool __what__ was successful",
+                "success_title": "Success"
             }
         },
         "rollback": {

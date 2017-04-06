@@ -72,6 +72,9 @@ class MDSServiceController(object):
         """
         from ovs.lib.storagedriver import StorageDriverController
 
+        prepare_mds_lock = volatile_mutex('prepare_mds_{0}'.format(storagerouter.guid))
+        prepare_mds_lock.acquire(30)
+
         # Fetch service sequence number based on MDS services for current vPool and current storage router
         service_number = -1
         for mds_service in vpool.mds_services:
@@ -157,6 +160,7 @@ class MDSServiceController(object):
         storagedriver_config.load()
         storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
         storagedriver_config.save(client)
+        prepare_mds_lock.release()
 
         return mds_service
 
