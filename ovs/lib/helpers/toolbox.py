@@ -213,25 +213,25 @@ class Toolbox(object):
         :param logger: LogHandler Object
         """
         action = None
-        status, _ = ServiceManager.get_service_status(name, client=client)
-        if status is False and state in ['start', 'restart']:
+        status = ServiceManager.get_service_status(name, client=client)
+        if status != 'active' and state in ['start', 'restart']:
             if logger is not None:
                 logger.debug('{0}: Starting service {1}'.format(client.ip, name))
             ServiceManager.start_service(name, client=client)
             action = 'Started'
-        elif status is True and state == 'stop':
+        elif status == 'active' and state == 'stop':
             if logger is not None:
                 logger.debug('{0}: Stopping service {1}'.format(client.ip, name))
             ServiceManager.stop_service(name, client=client)
             action = 'Stopped'
-        elif status is True and state == 'restart':
+        elif status == 'active' and state == 'restart':
             if logger is not None:
                 logger.debug('{0}: Restarting service {1}'.format(client.ip, name))
             ServiceManager.restart_service(name, client=client)
             action = 'Restarted'
 
         if action is None:
-            print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
+            print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status == 'active' else 'halted')
         else:
             if logger is not None:
                 logger.debug('{0}: {1} service {2}'.format(client.ip, action, name))
@@ -242,21 +242,26 @@ class Toolbox(object):
         """
         Wait for service to enter status
         :param client: SSHClient to run commands
-        :param name: name of service
-        :param status: True - running/False - not running
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param name: Name of service
+        :type name: str
+        :param status: 'active' if running, 'inactive' if halted
+        :type status: str
         :param logger: Logging object
+        :type logger: ovs.log.log_handler.LogHandler
+        :return: None
+        :rtype: NoneType
         """
         tries = 10
+        service_status = ServiceManager.get_service_status(name, client)
         while tries > 0:
-            service_status, _ = ServiceManager.get_service_status(name, client)
             if service_status == status:
-                break
+                return
             logger.debug('... waiting for service {0}'.format(name))
             tries -= 1
             time.sleep(10 - tries)
-        service_status, output = ServiceManager.get_service_status(name, client)
-        if service_status != status:
-            raise RuntimeError('Service {0} does not have expected status: {1}'.format(name, output))
+            service_status = ServiceManager.get_service_status(name, client)
+        raise RuntimeError('Service {0} does not have expected status: Expected: {1} - Actual: {2}'.format(name, status, service_status))
 
     @staticmethod
     def log(logger, messages, title=False, boxed=False, loglevel='info', silent=False):

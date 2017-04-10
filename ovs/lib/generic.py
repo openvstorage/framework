@@ -42,6 +42,7 @@ from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
@@ -412,13 +413,14 @@ class GenericController(object):
                 client = SSHClient(storagerouter, 'root')
                 client.dir_create(scrub_directory)
                 client.dir_chmod(scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
-                if ServiceManager.has_service(name=alba_proxy_service, client=client) is True and ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
+                if ServiceManager.has_service(name=alba_proxy_service, client=client) is True and ServiceManager.get_service_status(name=alba_proxy_service, client=client) == 'active':
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Re-using existing proxy service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
                     scrub_config = Configuration.get(scrub_config_key)
                 else:
                     machine_id = System.get_my_machine_id(client)
                     port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
-                    port = System.get_free_ports(selected_range=port_range, nr=1, client=client)[0]
+                    with volatile_mutex('deploy_proxy_for_scrub_{0}'.format(storagerouter.guid), wait=30):
+                        port = System.get_free_ports(selected_range=port_range, nr=1, client=client)[0]
                     # Scrub config
                     # {u'albamgr_cfg_url': u'arakoon://config/ovs/vpools/71e2f717-f270-4a41-bbb0-d4c8c084d43e/proxies/64759516-3471-4321-b912-fb424568fc5b/config/abm?ini=%2Fopt%2FOpenvStorage%2Fconfig%2Farakoon_cacc.ini',
                     #  u'fragment_cache': [u'none'],
@@ -467,7 +469,7 @@ class GenericController(object):
             error_messages.append(message)
             GenericController._logger.exception(message)
             if client is not None and ServiceManager.has_service(name=alba_proxy_service, client=client) is True:
-                if ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
+                if ServiceManager.get_service_status(name=alba_proxy_service, client=client) == 'active':
                     ServiceManager.stop_service(name=alba_proxy_service, client=client)
                 ServiceManager.remove_service(name=alba_proxy_service, client=client)
             if Configuration.exists(scrub_config_key):

@@ -80,34 +80,43 @@ define([
                         alba_backend_guid: (self.data.backendAA() !== undefined ? self.data.backendAA().guid : undefined)
                     };
                 }
-                if (data.vPool() === undefined) {
-                    generic.alertInfo($.t('ovs:wizards.add_vpool.confirm.started'), $.t('ovs:wizards.add_vpool.confirm.in_progress', { what: self.data.name() }));
-                } else {
-                    generic.alertInfo($.t('ovs:wizards.extend_vpool.confirm.started'), $.t('ovs:wizards.extend_vpool.confirm.in_progress', { what: self.data.name() }));
-                }
-                api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', { data: postData })
-                    .then(self.shared.tasks.wait)
-                    .done(function() {
-                        if (data.vPool() === undefined) {
-                            generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.add_vpool.confirm.success', { what: self.data.name() }));
-                        } else {
-                            generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.extend_vpool.confirm.success', { what: self.data.name() }));
-                        }
-                        if (self.data.completed !== undefined) {
-                            self.data.completed.resolve(true);
-                        }
-                    })
-                    .fail(function() {
-                        if (data.vPool() === undefined) {
-                            generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.add_vpool.confirm.creating') }));
-                        } else {
-                            generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.extend_vpool.confirm.extending') }));
-                        }
-                        if (self.data.completed !== undefined) {
-                            self.data.completed.resolve(false);
-                        }
-                    });
-                deferred.resolve();
+                (function(name, vpool, completed, dfd) {
+                    if (vpool === undefined) {
+                        generic.alertInfo($.t('ovs:wizards.add_vpool.confirm.started_title'),
+                                          $.t('ovs:wizards.add_vpool.confirm.started_message', { what: name }));
+                    } else {
+                        generic.alertInfo($.t('ovs:wizards.extend_vpool.confirm.started_title'),
+                                          $.t('ovs:wizards.extend_vpool.confirm.started_message', { what: name }));
+                    }
+                    api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', { data: postData })
+                        .then(self.shared.tasks.wait)
+                        .done(function() {
+                            if (vpool === undefined) {
+                                generic.alertSuccess($.t('ovs:wizards.add_vpool.confirm.success_title'),
+                                                     $.t('ovs:wizards.add_vpool.confirm.success_message', { what: name }));
+                            } else {
+                                generic.alertSuccess($.t('ovs:wizards.extend_vpool.confirm.success_title'),
+                                                     $.t('ovs:wizards.extend_vpool.confirm.success_message', { what: name }));
+                            }
+                            if (completed !== undefined) {
+                                completed.resolve(true);
+                            }
+                        })
+                        .fail(function(error) {
+                            error = generic.extractErrorMessage(error);
+                            if (vpool === undefined) {
+                                generic.alertError($.t('ovs:wizards.add_vpool.confirm.failure_title'),
+                                                   $.t('ovs:wizards.add_vpool.confirm.failure_message', { what: name, why: error }));
+                            } else {
+                                generic.alertError($.t('ovs:wizards.extend_vpool.confirm.failure_title'),
+                                                   $.t('ovs:wizards.extend_vpool.confirm.failure_message', { what: name, why: error }));
+                            }
+                            if (completed !== undefined) {
+                                completed.resolve(false);
+                            }
+                        });
+                    dfd.resolve();
+                })(self.data.name(), self.data.vPool(), self.data.completed, deferred);
             }).promise();
         };
     };

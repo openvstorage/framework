@@ -780,7 +780,7 @@ class ArakoonInstaller(object):
         """
         service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
         if ServiceManager.has_service(name=service_name, client=client):
-            return ServiceManager.get_service_status(name=service_name, client=client)[0]
+            return ServiceManager.get_service_status(name=service_name, client=client) == 'active'
         return False
 
     @staticmethod
