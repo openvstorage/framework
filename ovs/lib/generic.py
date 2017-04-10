@@ -413,7 +413,7 @@ class GenericController(object):
                 client = SSHClient(storagerouter, 'root')
                 client.dir_create(scrub_directory)
                 client.dir_chmod(scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
-                if ServiceManager.has_service(name=alba_proxy_service, client=client) is True and ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
+                if ServiceManager.has_service(name=alba_proxy_service, client=client) is True and ServiceManager.get_service_status(name=alba_proxy_service, client=client) == 'active':
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Re-using existing proxy service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
                     scrub_config = Configuration.get(scrub_config_key)
                 else:
@@ -469,7 +469,7 @@ class GenericController(object):
             error_messages.append(message)
             GenericController._logger.exception(message)
             if client is not None and ServiceManager.has_service(name=alba_proxy_service, client=client) is True:
-                if ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
+                if ServiceManager.get_service_status(name=alba_proxy_service, client=client) == 'active':
                     ServiceManager.stop_service(name=alba_proxy_service, client=client)
                 ServiceManager.remove_service(name=alba_proxy_service, client=client)
             if Configuration.exists(scrub_config_key):

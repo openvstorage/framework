@@ -121,8 +121,7 @@ class Upstart(object):
         if startup_dependency == '':
             startup_dependency = None
         else:
-            startup_dependency = '.'.join(
-                startup_dependency.split('.')[:-1])  # Remove .service from startup dependency
+            startup_dependency = '.'.join(startup_dependency.split('.')[:-1])  # Remove .service from startup dependency
         output = Upstart.add_service(name=name,
                                      client=client,
                                      params=service_params,
@@ -140,8 +139,8 @@ class Upstart(object):
         :type name: str
         :param client: Client on which to retrieve the status
         :type client: ovs.extensions.generic.sshclient.SSHClient
-        :return: The status of the service and the output of the command
-        :rtype: tuple
+        :return: The status of the service
+        :rtype: str
         """
         try:
             name = Upstart._get_name(name, client)
@@ -149,13 +148,15 @@ class Upstart(object):
             # Special cases (especially old SysV ones)
             if 'rabbitmq' in name:
                 status = re.search('\{pid,\d+?\}', output) is not None
-                return status, output
+                if status is True:
+                    return 'active'
+                return 'inactive'
             # Normal cases - or if the above code didn't yield an outcome
             if 'start/running' in output or 'is running' in output:
-                return True, output
+                return 'active'
             if 'stop' in output or 'not running' in output:
-                return False, output
-            return False, output
+                return 'inactive'
+            return output
         except CalledProcessError as ex:
             Upstart._logger.exception('Get {0}.service status failed: {1}'.format(name, ex))
             raise Exception('Retrieving status for service "{0}" failed'.format(name))
@@ -171,6 +172,7 @@ class Upstart(object):
         :param delay_unregistration: Un-register the service parameters in the config management right away or not
         :type delay_unregistration: bool
         :return: None
+        :rtype: NoneType
         """
         name = Upstart._get_name(name, client)
         run_file_name = '/opt/OpenvStorage/run/{0}.version'.format(ExtensionsToolbox.remove_prefix(name, 'ovs-'))
@@ -182,86 +184,82 @@ class Upstart(object):
             Upstart.unregister_service(service_name=name, node_name=System.get_my_machine_id(client))
 
     @staticmethod
-    def start_service(name, client):
+    def start_service(name, client, timeout=5):
         """
         Start a service
         :param name: Name of the service to start
         :type name: str
         :param client: Client on which to start the service
         :type client: ovs.extensions.generic.sshclient.SSHClient
-        :return: The output of the start command
-        :rtype: str
+        :param timeout: Timeout within to verify the service status (in seconds)
+        :type timeout: int
+        :return: None
+        :rtype: NoneType
         """
-        status, output = Upstart.get_service_status(name, client)
-        if status is True:
-            return output
+        if Upstart.get_service_status(name, client) == 'active':
+            return
+
+        name = Upstart._get_name(name, client)
+        timeout = timeout if timeout > 0 else 5
         try:
-            name = Upstart._get_name(name, client)
             client.run(['service', name, 'start'])
+            counter = 0
+            while counter < timeout * 4:
+                if Upstart.get_service_status(name=name, client=client) == 'active':
+                    return
+                time.sleep(0.25)
+                counter += 1
         except CalledProcessError as cpe:
-            output = cpe.output
-            Upstart._logger.exception('Start {0} failed, {1}'.format(name, output))
-            raise RuntimeError('Start {0} failed. {1}'.format(name, output))
-        tries = 10
-        while tries > 0:
-            status, output = Upstart.get_service_status(name, client)
-            if status is True:
-                return output
-            tries -= 1
-            time.sleep(10 - tries)
-        status, output = Upstart.get_service_status(name, client)
-        if status is True:
-            return output
-        Upstart._logger.error('Start {0} failed. {1}'.format(name, output))
-        raise RuntimeError('Start {0} failed. {1}'.format(name, output))
+            Upstart._logger.exception('Start {0} failed, {1}'.format(name, cpe.output))
+            raise
+        raise RuntimeError('Did not manage to start service {0} on node with IP {1}'.format(name, client.ip))
 
     @staticmethod
-    def stop_service(name, client):
+    def stop_service(name, client, timeout=5):
         """
         Stop a service
         :param name: Name of the service to stop
         :type name: str
         :param client: Client on which to stop the service
         :type client: ovs.extensions.generic.sshclient.SSHClient
-        :return: The output of the stop command
-        :rtype: str
+        :param timeout: Timeout within to verify the service status (in seconds)
+        :type timeout: int
+        :return: None
+        :rtype: NoneType
         """
-        status, output = Upstart.get_service_status(name, client)
-        if status is False:
-            return output
+        if Upstart.get_service_status(name, client) == 'inactive':
+            return
+
+        name = Upstart._get_name(name, client)
+        timeout = timeout if timeout > 0 else 5
         try:
-            name = Upstart._get_name(name, client)
             client.run(['service', name, 'stop'])
+            counter = 0
+            while counter < timeout * 4:
+                if Upstart.get_service_status(name=name, client=client) == 'inactive':
+                    return
+                time.sleep(0.25)
+                counter += 1
         except CalledProcessError as cpe:
-            output = cpe.output
-            Upstart._logger.exception('Stop {0} failed, {1}'.format(name, output))
-            raise RuntimeError('Stop {0} failed, {1}'.format(name, output))
-        tries = 10
-        while tries > 0:
-            status, output = Upstart.get_service_status(name, client)
-            if status is False:
-                return output
-            tries -= 1
-            time.sleep(10 - tries)
-        status, output = Upstart.get_service_status(name, client)
-        if status is False:
-            return output
-        Upstart._logger.error('Stop {0} failed. {1}'.format(name, output))
-        raise RuntimeError('Stop {0} failed. {1}'.format(name, output))
+            Upstart._logger.exception('Stop {0} failed, {1}'.format(name, cpe.output))
+            raise
+        raise RuntimeError('Did not manage to stop service {0} on node with IP {1}'.format(name, client.ip))
 
     @staticmethod
-    def restart_service(name, client):
+    def restart_service(name, client, timeout=5):
         """
         Restart a service
         :param name: Name of the service to restart
         :type name: str
         :param client: Client on which to restart the service
         :type client: ovs.extensions.generic.sshclient.SSHClient
-        :return: The output of the restart command
-        :rtype: str
+        :param timeout: Timeout within to verify the service status (in seconds)
+        :type timeout: int
+        :return: None
+        :rtype: NoneType
         """
-        Upstart.stop_service(name, client)
-        return Upstart.start_service(name, client)
+        Upstart.stop_service(name, client, timeout)
+        Upstart.start_service(name, client, timeout)
 
     @staticmethod
     def has_service(name, client):
@@ -276,9 +274,9 @@ class Upstart(object):
         """
         try:
             Upstart._get_name(name, client, log=False)
-            return True
         except ValueError:
             return False
+        return True
 
     @staticmethod
     def get_service_pid(name, client):
@@ -292,7 +290,7 @@ class Upstart(object):
         :rtype: int
         """
         name = Upstart._get_name(name, client)
-        if Upstart.get_service_status(name, client)[0] is True:
+        if Upstart.get_service_status(name, client) == 'active':
             output = client.run(['service', name, 'status'])
             if output:
                 # Special cases (especially old SysV ones)
@@ -318,6 +316,7 @@ class Upstart(object):
         :param client: Client on which to send a signal to the service
         :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: None
+        :rtype: NoneType
         """
         name = Upstart._get_name(name, client)
         pid = Upstart.get_service_pid(name, client)
@@ -343,6 +342,7 @@ class Upstart(object):
         """
         Monitor the local OVS services
         :return: None
+        :rtype: NoneType
         """
         try:
             previous_output = None
@@ -433,7 +433,7 @@ class Upstart(object):
                     rabbitmq_running = True
                     rabbitmq_pid_ctl = match_groups['pid']
 
-        if Upstart.has_service('rabbitmq-server', client) and Upstart.get_service_status('rabbitmq-server', client)[0] is True:
+        if Upstart.has_service('rabbitmq-server', client) and Upstart.get_service_status('rabbitmq-server', client) == 'active':
             rabbitmq_running = True
             rabbitmq_pid_sm = Upstart.get_service_pid('rabbitmq-server', client)
 

@@ -1116,7 +1116,7 @@ class VDiskController(object):
                                 try:
                                     root_client = SSHClient(storagerouter, username='root')
                                     service_name = 'dtl_{0}'.format(vpool.name)
-                                    if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client)[0] is True:
+                                    if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client) == 'active':
                                         root_client_map[storagerouter] = root_client
                                         possible_srs.append(storagerouter)
                                     else:

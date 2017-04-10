@@ -149,10 +149,10 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
             ssh_client = SSHClient(endpoint=storagerouter.ip, username='root')
             if status == 'running':
                 self.assertTrue(expr=ServiceManager.has_service(name=name, client=ssh_client))
-                self.assertTrue(expr=ServiceManager.get_service_status(name=name, client=ssh_client)[0])
+                self.assertTrue(expr=ServiceManager.get_service_status(name=name, client=ssh_client) == 'active')
             elif status == 'halted':
                 self.assertTrue(expr=ServiceManager.has_service(name=name, client=ssh_client))
-                self.assertFalse(expr=ServiceManager.get_service_status(name=name, client=ssh_client)[0])
+                self.assertTrue(expr=ServiceManager.get_service_status(name=name, client=ssh_client) == 'inactive')
             else:
                 self.assertFalse(expr=ServiceManager.has_service(name=name, client=ssh_client))
 
