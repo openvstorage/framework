@@ -481,35 +481,35 @@ class StorageRouterController(object):
                             model_ports_in_use.append(proxy.service.ports[0])
                 ports = System.get_free_ports(port_range, model_ports_in_use, 4 + amount_of_proxies, client)
 
-            vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
-            storagedriver = StorageDriver()
-            storagedriver.name = vrouter_id.replace('_', ' ')
-            storagedriver.ports = {'management': ports[0],
-                                   'xmlrpc': ports[1],
-                                   'dtl': ports[2],
-                                   'edge': ports[3]}
-            storagedriver.vpool = vpool
-            storagedriver.cluster_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
-            storagedriver.storage_ip = parameters['storage_ip']
-            storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
-            storagedriver.description = storagedriver.name
-            storagedriver.storagerouter = storagerouter
-            storagedriver.storagedriver_id = vrouter_id
-            storagedriver.save()
+                vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
+                storagedriver = StorageDriver()
+                storagedriver.name = vrouter_id.replace('_', ' ')
+                storagedriver.ports = {'management': ports[0],
+                                       'xmlrpc': ports[1],
+                                       'dtl': ports[2],
+                                       'edge': ports[3]}
+                storagedriver.vpool = vpool
+                storagedriver.cluster_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
+                storagedriver.storage_ip = parameters['storage_ip']
+                storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
+                storagedriver.description = storagedriver.name
+                storagedriver.storagerouter = storagerouter
+                storagedriver.storagedriver_id = vrouter_id
+                storagedriver.save()
 
-            ### ALBA Proxies
-            proxy_service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ALBA_PROXY)
-            for proxy_id in xrange(amount_of_proxies):
-                service = DalService()
-                service.storagerouter = storagerouter
-                service.ports = [ports[4 + proxy_id]]
-                service.name = 'albaproxy_{0}_{1}'.format(vpool_name, proxy_id)
-                service.type = proxy_service_type
-                service.save()
-                alba_proxy = AlbaProxy()
-                alba_proxy.service = service
-                alba_proxy.storagedriver = storagedriver
-                alba_proxy.save()
+                ### ALBA Proxies
+                proxy_service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ALBA_PROXY)
+                for proxy_id in xrange(amount_of_proxies):
+                    service = DalService()
+                    service.storagerouter = storagerouter
+                    service.ports = [ports[4 + proxy_id]]
+                    service.name = 'albaproxy_{0}_{1}'.format(vpool_name, proxy_id)
+                    service.type = proxy_service_type
+                    service.save()
+                    alba_proxy = AlbaProxy()
+                    alba_proxy.service = service
+                    alba_proxy.storagedriver = storagedriver
+                    alba_proxy.save()
 
             ### StorageDriver Partitions
             #     * Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
@@ -586,7 +586,7 @@ class StorageRouterController(object):
             root_client.dir_create(dirs2create)
         except Exception:
             StorageRouterController._logger.exception('Something went wrong during the validation or modeling of vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
-            StorageRouterController._revert_vpool_status(vpool=vpool, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
+            StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.RUNNING, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
             raise
         finally:
             partitions_mutex.release()
@@ -601,13 +601,13 @@ class StorageRouterController(object):
                     break
             except Exception:
                 StorageRouterController._logger.exception('Arakoon checkup for voldrv cluster failed')
-                StorageRouterController._revert_vpool_status(vpool=vpool, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
+                StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.RUNNING, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
                 raise
             counter += 1
             time.sleep(1)
             if counter == 300:
                 StorageRouterController._logger.warning('Arakoon checkup for the StorageDriver cluster could not be started')
-                StorageRouterController._revert_vpool_status(vpool=vpool, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
+                StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.RUNNING, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
                 raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
 
         ####################
@@ -627,7 +627,22 @@ class StorageRouterController(object):
                 vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
         except:
             StorageRouterController._logger.exception('Updating cluster node configurations failed')
-            StorageRouterController._revert_vpool_status(vpool=vpool, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
+            if new_vpool is True:
+                StorageRouterController._revert_vpool_status(vpool=vpool, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
+            else:
+                StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.FAILURE, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
+                node_configs = []
+                for sd in vpool.storagedrivers:
+                    if sd != storagedriver:
+                        sd.invalidate_dynamics('cluster_node_config')
+                        node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
+                try:
+                    vpool.clusterregistry_client.set_node_configs(node_configs)
+                    for sd in existing_storagedrivers:
+                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
+                except:
+                    StorageRouterController._logger.exception('Restoring cluster node configurations failed')
+                StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.RUNNING, storagedriver=storagedriver, client=root_client, dirs_created=dirs2create)
             raise
 
         ############################
