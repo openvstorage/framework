@@ -309,8 +309,11 @@ class LogFileTimeParser(object):
             if os.path.isfile(search_location):
                 LogFileTimeParser._search_file(since, until, search_location, search_patterns, host)
             else:
-                LogFileTimeParser._search_journal(since, until, search_location, search_patterns, host)
-
+                try:
+                    LogFileTimeParser._search_journal(since, until, search_location, search_patterns, host)
+                except RuntimeError as ex:
+                    if 'Failed to add filter for units: No data available'.lower() not in str(ex).lower():  # Means no unit file was found, ignore
+                        raise
         # Return the contents of the file
         if not suppress_return and host is not None:
             with open(LogFileTimeParser.FILE_PATH, 'r') as f:
@@ -344,8 +347,6 @@ class LogFileTimeParser(object):
 
         since = LogFileTimeParser._parse_date(since, to_string=True)
         until = LogFileTimeParser._parse_date(until, to_string=True)
-        print since
-        print until
         cmd = [
             "journalctl",
             "--unit",
