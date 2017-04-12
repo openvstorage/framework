@@ -29,7 +29,6 @@ from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient,\
                                                        SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
-
 from ovs.log.log_handler import LogHandler
 
 
