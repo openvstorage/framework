@@ -25,12 +25,14 @@ sys.path.append('/opt/OpenvStorage')
 import os
 import threading
 from celery import Celery
+from celery.task.control import inspect
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
 from kombu import Queue
 from threading import Thread
 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -150,14 +152,39 @@ def load_ovs_logger(**kwargs):
         kwargs['logger'] = LogHandler.get('celery', name='celery')
 
 
+def _clean_cache():
+    loghandler = LogHandler.get('celery', name='celery')
+    loghandler.info('Executing celery "clear_cache" startup script...')
+    from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
+    active = inspect().active()
+    active_tasks = []
+    if active is not None:
+        for tasks in active.itervalues():
+            active_tasks += [task['id'] for task in tasks]
+    cache = PersistentFactory.get_client()
+    for key in cache.prefix(ENSURE_SINGLE_KEY):
+        try:
+            with volatile_mutex(name=key, wait=5):
+                entry = cache.get(key)
+                values = entry.get('values', [])
+                new_values = []
+                for v in values:
+                    task_id = v.get('task_id')
+                    if task_id is not None and task_id in active_tasks:
+                        new_values.append(v)
+                if len(new_values) > 0:
+                    entry['values'] = new_values
+                    cache.set(key, entry)
+                    loghandler.info('Updated key {0}'.format(key))
+                else:
+                    cache.delete(key)
+                    loghandler.info('Deleted key {0}'.format(key))
+        except KeyNotFoundException:
+            pass
+    loghandler.info('Executing celery "clear_cache" startup script... done')
+
+
 if __name__ == '__main__':
     import sys
     if len(sys.argv) == 2 and sys.argv[1] == 'clear_cache':
-        from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
-
-        cache = PersistentFactory.get_client()
-        for key in cache.prefix(ENSURE_SINGLE_KEY):
-            try:
-                cache.delete(key)
-            except KeyNotFoundException:
-                pass
+        _clean_cache()

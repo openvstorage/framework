@@ -207,7 +207,8 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
 
             now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
-            async_task = self.request.id is not None  # Async tasks have an ID, inline executed tasks have None as ID
+            task_id = self.request.id
+            async_task = task_id is not None  # Async tasks have an ID, inline executed tasks have None as ID
             task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
             thread_name = threading.current_thread().getName()
             unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
@@ -231,7 +232,8 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                 return callback(*args, **kwargs)
 
                     log_message('Setting key {0}'.format(persistent_key))
-                    persistent_client.set(persistent_key, {'mode': mode})
+                    persistent_client.set(persistent_key, {'mode': mode,
+                                                           'values': [{'task_id': task_id}]})
 
                 try:
                     if unittest_mode is True:
@@ -318,6 +320,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 update_value(key=persistent_key,
                              append=True,
                              value_to_update={'kwargs': kwargs_dict,
+                                              'task_id': task_id,
                                               'timestamp': now})
 
                 # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
@@ -354,6 +357,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                         update_value(key=persistent_key,
                                      append=False,
                                      value_to_update={'kwargs': kwargs_dict,
+                                                      'task_id': task_id,
                                                       'timestamp': now})
                         log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
                                     level='error')
@@ -432,6 +436,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 update_value(key=persistent_key,
                              append=True,
                              value_to_update={'kwargs': kwargs_dict,
+                                              'task_id': task_id,
                                               'timestamp': now})
 
                 # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
@@ -472,6 +477,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                         update_value(key=persistent_key,
                                      append=False,
                                      value_to_update={'kwargs': kwargs_dict,
+                                                      'task_id': task_id,
                                                       'timestamp': now})
                         log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
                                     level='error')
