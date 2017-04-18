@@ -69,6 +69,10 @@ but WITHOUT ANY WARRANTY of any kind.
                 </li>
             </ul>
         </li>
+        <li><b data-i18n="ovs:wizards.add_vpool.confirm.proxy_amount"></b>: <span data-bind="text: data.proxyAmount()"></span></li>
+        <li data-bind="visible: data.useAA() && data.cacheQuota() !== undefined && data.cacheQuota() !== ''">
+            <b data-i18n="ovs:wizards.add_vpool.confirm.cache_quota"></b>: <span data-bind="text: formatFloat(data.cacheQuota())"></span> <span data-i18n="ovs:generic.units.gib"></span>
+        </li>
     </ul>
     <p data-i18n="ovs:wizards.add_vpool.confirm.storagerouter_info"></p>
     <ul>
@@ -78,7 +82,6 @@ but WITHOUT ANY WARRANTY of any kind.
     <div>
         <p data-i18n="ovs:wizards.add_vpool.confirm.configuration"></p>
         <ul>
-            <li><b data-i18n="ovs:wizards.add_vpool.confirm.proxy_amount"></b>: <span data-bind="text: data.proxyAmount()"></span></li>
             <li>
                 <b data-bind="translate: 'ovs:vpools.' + (data.dtlEnabled() === true ? 'dtl_mode' : 'dtl')"></b>:
                 <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.general.dtl_modes.' + data.dtlMode().name : 'ovs:vpools.dtl_disabled')"></span>

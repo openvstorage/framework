@@ -271,9 +271,16 @@ define([
         };
         self.saveConfiguration = function() {
             if (self.vDisk() !== undefined) {
-                var vd = self.vDisk();
+                var vd = self.vDisk(), new_config = $.extend({}, vd.configuration());
+                if (!isNaN(new_config.cache_quota)) {
+                    new_config.cache_quota *= Math.pow(1024, 3);
+                } else {
+                    // Update current configuration to default value stored in vPool, otherwise 'Save' button will be enabled after saving
+                    var quota = vd.vpool().metadata().backend.caching_info[self.vDisk().storageRouterGuid()].quota;
+                    vd.configuration().cache_quota = quota / Math.pow(1024.0, 3);
+                }
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
-                    data: { new_config_params: vd.configuration() }
+                    data: { new_config_params: new_config }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {
@@ -434,6 +441,29 @@ define([
                 return $.t('ovs:vdisks.detail.is_clone');
             }
             return $.t('ovs:vdisks.detail.set_as_template');
+        });
+        self.equalsDefaultCacheQuota = ko.computed(function() {
+            if (self.vDisk() === undefined || self.vDisk().configuration() === undefined) {
+                return false;
+            }
+            var vPool = self.vDisk().vpool();
+            if (vPool === undefined || vPool.metadata() === undefined) {
+                return false;
+            }
+            if (vPool.metadata().backend.caching_info.hasOwnProperty(self.vDisk().storageRouterGuid())) {
+                var cachingInfo = vPool.metadata().backend.caching_info[self.vDisk().storageRouterGuid()];
+                if (cachingInfo.hasOwnProperty('quota')) {
+                    var parsedQuota = parseFloat(self.vDisk().cacheQuota());
+                    if (isNaN(parsedQuota) || cachingInfo.quota / Math.pow(1024.0, 3) === parsedQuota) {
+                        return true;
+                    }
+                } else {
+                    if (self.vDisk().cacheQuota() === undefined) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         });
 
         // Durandal

@@ -310,7 +310,7 @@ define([
                 self.data.writeBufferVolume(self.data.writeBufferVolume());
             });
             self.storageRouterSubscription = self.data.storageRouter.subscribe(function (storageRouter) {
-                if (storageRouter == undefined) {
+                if (storageRouter === undefined) {
                     return;
                 }
                 self.loadingMetadata(true);
@@ -425,7 +425,6 @@ define([
                 var metadata = self.data.vPool().metadata();
                 if (metadata.hasOwnProperty('backend')) {
                     if (metadata.backend.hasOwnProperty('connection_info')) {
-                        // Created in or after 2.7.0
                         self.data.localHost(metadata.backend.connection_info.local);
                         if (metadata.backend.connection_info.local) {
                             self.data.clientID('');
@@ -437,6 +436,18 @@ define([
                             self.data.clientSecret(metadata.backend.connection_info.client_secret);
                             self.data.host(metadata.backend.connection_info.host);
                             self.data.port(metadata.backend.connection_info.port);
+                        }
+                    }
+                    if (metadata.backend.hasOwnProperty('caching_info')) {
+                        var maxCacheQuota = 0;
+                        $.each(metadata.backend.caching_info, function(srGuid, cachingInfo) {
+                            if (cachingInfo.hasOwnProperty('quota') && cachingInfo['quota'] > maxCacheQuota) {
+                                maxCacheQuota = cachingInfo['quota'];
+                            }
+                        });
+                        if (maxCacheQuota !== 0) {
+                            self.data.cacheQuota(maxCacheQuota / Math.pow(1024.0, 3));
+                            self.data.cacheQuotaConfigured(true);
                         }
                     }
                 }

@@ -268,7 +268,7 @@ class VDiskController(object):
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.clone')
-    def clone(vdisk_guid, name, snapshot_id=None, storagerouter_guid=None, pagecache_ratio=None):
+    def clone(vdisk_guid, name, snapshot_id=None, storagerouter_guid=None, pagecache_ratio=None, cache_quota=None):
         """
         Clone a vDisk
         :param vdisk_guid: Guid of the vDisk to clone
@@ -281,6 +281,8 @@ class VDiskController(object):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
         :type pagecache_ratio: float
+        :param cache_quota: Max disk space the new clone can consume for caching purposes (in Bytes)
+        :type cache_quota: int
         :return: Information about the cloned volume
         :rtype: dict
         """
@@ -302,6 +304,10 @@ class VDiskController(object):
         if pagecache_ratio is not None:
             if not 0 < pagecache_ratio <= 1:
                 raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
+        if cache_quota is not None:
+            cache_quota = int(cache_quota)
+            if not 0.1 * 1024.0 ** 3 <= cache_quota <= 1 * 1024.0 ** 4:
+                raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
         if mds_service is None:
@@ -347,15 +353,16 @@ class VDiskController(object):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
                 new_vdisk = VDisk()
-                new_vdisk.volume_id = volume_id
                 new_vdisk.size = vdisk.size
-                new_vdisk.description = name
-                new_vdisk.devicename = devicename
                 new_vdisk.vpool = vdisk.vpool
-            new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
+                new_vdisk.volume_id = volume_id
+                new_vdisk.devicename = devicename
+                new_vdisk.description = name
+                new_vdisk.cache_quota = vdisk.cache_quota if cache_quota is None else cache_quota
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.parentsnapshot = snapshot_id
+            new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.save()
             VDiskController.vdisk_checkup(new_vdisk)
 
@@ -581,7 +588,7 @@ class VDiskController(object):
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.create_from_template')
-    def create_from_template(vdisk_guid, name, storagerouter_guid=None, pagecache_ratio=None):
+    def create_from_template(vdisk_guid, name, storagerouter_guid=None, pagecache_ratio=None, cache_quota=None):
         """
         Create a vDisk from a template
         :param vdisk_guid: Guid of the vDisk
@@ -592,6 +599,8 @@ class VDiskController(object):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
         :type pagecache_ratio: float
+        :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
+        :type cache_quota: int
         :return: Information about the new volume (vdisk_guid, name, backingdevice)
         :rtype: dict
         """
@@ -615,6 +624,10 @@ class VDiskController(object):
         if pagecache_ratio is not None:
             if not 0 < pagecache_ratio <= 1:
                 raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
+        if cache_quota is not None:
+            cache_quota = int(cache_quota)
+            if not 0.1 * 1024.0 ** 3 <= cache_quota <= 1 * 1024.0 ** 4:
+                raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
         if mds_service is None:
@@ -637,14 +650,15 @@ class VDiskController(object):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
                 new_vdisk = VDisk()
-                new_vdisk.volume_id = volume_id
                 new_vdisk.size = vdisk.size
-                new_vdisk.description = name
-                new_vdisk.devicename = devicename
                 new_vdisk.vpool = vdisk.vpool
-            new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
+                new_vdisk.volume_id = volume_id
+                new_vdisk.devicename = devicename
+                new_vdisk.description = name
+                new_vdisk.cache_quota = vdisk.cache_quota if cache_quota is None else cache_quota
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
+            new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.save()
             VDiskController.vdisk_checkup(new_vdisk)
 
@@ -654,7 +668,7 @@ class VDiskController(object):
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.create_new')
-    def create_new(volume_name, volume_size, storagedriver_guid, pagecache_ratio=1.0):
+    def create_new(volume_name, volume_size, storagedriver_guid, pagecache_ratio=1.0, cache_quota=None):
         """
         Create a new vDisk/volume using hypervisor calls
         :param volume_name: Name of the vDisk (can be a filename or a user friendly name)
@@ -665,6 +679,8 @@ class VDiskController(object):
         :type storagedriver_guid: str
         :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
         :type pagecache_ratio: float
+        :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
+        :type cache_quota: int
         :return: Guid of the new vDisk
         :rtype: str
         """
@@ -679,6 +695,10 @@ class VDiskController(object):
 
         if not 0 < pagecache_ratio <= 1:
             raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
+        if cache_quota is not None:
+            cache_quota = int(cache_quota)
+            if not 0.1 * 1024.0 ** 3 <= cache_quota <= 1 * 1024.0 ** 4:
+                raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
         if mds_service is None:
@@ -704,11 +724,12 @@ class VDiskController(object):
                 new_vdisk = VDisk()
                 new_vdisk.size = volume_size
                 new_vdisk.vpool = vpool
-                new_vdisk.devicename = devicename
-                new_vdisk.description = volume_name
                 new_vdisk.volume_id = volume_id
-            new_vdisk.pagecache_ratio = pagecache_ratio
+                new_vdisk.devicename = devicename
+                new_vdisk.cache_quota = cache_quota
+                new_vdisk.description = volume_name
             new_vdisk.name = volume_name
+            new_vdisk.pagecache_ratio = pagecache_ratio
             new_vdisk.save()
             VDiskController.vdisk_checkup(new_vdisk)
 
@@ -755,10 +776,16 @@ class VDiskController(object):
         if non_disposable_sco_factor is None:
             non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
 
+        cache_quota = vdisk.cache_quota
+        if cache_quota is None:
+            vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
+            cache_quota = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {}).get('quota')
+
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
-                'write_buffer': int(tlog_multiplier * sco_size * non_disposable_sco_factor),
                 'dtl_target': dtl_target,
+                'cache_quota': cache_quota,
+                'write_buffer': int(tlog_multiplier * sco_size * non_disposable_sco_factor),
                 'pagecache_ratio': vdisk.pagecache_ratio}
 
     @staticmethod
@@ -783,8 +810,9 @@ class VDiskController(object):
                            'dtl_target': (list, Toolbox.regex_guid),
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024})}
 
+        if new_config_params.get('cache_quota') is not None:
+            required_params.update({'cache_quota': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4})})
         if new_config_params.get('pagecache_ratio') is not None:
-            # noinspection PyTypeChecker
             required_params.update({'pagecache_ratio': (float, {'min': 0, 'max': 1})})
 
         Toolbox.verify_required_params(required_params, new_config_params)
@@ -926,11 +954,17 @@ class VDiskController(object):
                         vdisk.pagecache_ratio = new_value
                         vdisk.save()
                         VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
+                    elif key == 'cache_quota':
+                        if new_value is None:
+                            vdisk.cache_quota = None
+                        else:
+                            vdisk.cache_quota = int(new_value)
+                        vdisk.save()
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
                     VDiskController._logger.info('Updated property {0}'.format(key))
             except Exception as ex:
-                VDiskController._logger.error('Error updating "{0}": {1}'.format(key, ex))
+                VDiskController._logger.exception('Error updating "{0}": {1}'.format(key, ex))
                 errors = True
 
         if errors is True:
@@ -1354,12 +1388,12 @@ class VDiskController(object):
                                 devicename = '/{0}.raw'.format(volume_id)
                                 name = volume_id
                             new_vdisk.name = name
-                            new_vdisk.description = name
-                            new_vdisk.devicename = devicename
                             new_vdisk.size = new_vdisk.info['volume_size']
+                            new_vdisk.devicename = devicename
+                            new_vdisk.description = name
+                            new_vdisk.pagecache_ratio = 1.0
                             new_vdisk.metadata = {'lba_size': new_vdisk.info['lba_size'],
                                                   'cluster_multiplier': new_vdisk.info['cluster_multiplier']}
-                            new_vdisk.pagecache_ratio = 1.0
                             new_vdisk.save()
                             VDiskController.vdisk_checkup(new_vdisk)
                 else:

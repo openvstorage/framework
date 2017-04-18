@@ -73,10 +73,11 @@ but WITHOUT ANY WARRANTY of any kind.
             </span>
         </div>
     </div>
-    <div class="alert alert-info" data-bind="visible: loading() === true" style="margin-bottom: -10px;">
-        <span data-i18n="ovs:wizards.add_vdisk.gather.loading_information"></span>
+    <div class="alert alert-info" data-bind="visible: loading() || loadingBackend()" style="margin-bottom: -10px;">
+        <p data-i18n="ovs:wizards.add_vdisk.gather.loading_information" data-bind="visible: loading()"></p>
+        <p data-i18n="ovs:wizards.add_vdisk.gather.loading_backend_info" data-bind="visible: loadingBackend()"></p>
     </div>
-    <div class="alert alert-danger" data-bind="visible: (!canContinue().value || canContinue().showErrors) && loading() === false" style="margin-bottom: -10px;">
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value && canContinue().showErrors && !loading() && !loadingBackend()" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
         <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
         <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
