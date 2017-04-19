@@ -85,7 +85,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             <!-- /ko -->
                             <!-- ko if: backendPreset() !== undefined -->
                                 <td data-i18n="ovs:vpools.preset"></td>
-                                <td><span data-bind="text: backendPreset"></span></td>
+                                <td data-bind="text: backendPreset"></td>
                             <!-- /ko -->
                             <td data-i18n="ovs:vpools.cluster_size"></td>
                             <td>
@@ -99,9 +99,9 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>  <!-- row 3 -->
                             <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-bind="text: iops"></td>
                             <td data-i18n="ovs:vpools.backend_login"></td>
-                            <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
+                            <td data-bind="text: backendLogin() ? backendLogin() : '-'"></td>
                             <td data-i18n="ovs:vpools.volume_write_buffer"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -114,9 +114,9 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>  <!-- row 4 -->
                             <td data-i18n="ovs:generic.read_speed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-bind="text: readSpeed"></td>
                             <td data-i18n="ovs:vpools.backend_connection"></td>
-                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
+                            <td data-bind="text: backendConnection() ? backendConnection() : '-'"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
@@ -137,9 +137,9 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>  <!-- row 5 -->
                             <td data-i18n="ovs:generic.write_speed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td data-bind="text: writeSpeed"></td>
                             <td data-i18n="ovs:generic.read_speed"></td>
-                            <td><span data-bind="text: backendReadSpeed"></span></td>
+                            <td data-bind="text: backendReadSpeed"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
@@ -157,9 +157,9 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>  <!-- row 6 -->
                             <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
+                            <td data-bind="text: vDisks().length"></td>
                             <td data-i18n="ovs:generic.write_speed"></td>
-                            <td><span data-bind="text: backendWriteSpeed"></span></td>
+                            <td data-bind="text: backendWriteSpeed"></td>
                             <td colspan="2" >&nbsp;</td>
                         </tr>
                     </tbody>
@@ -233,12 +233,13 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <table class="table table-noborder table-hover table-condensed">
                                     <thead>
                                         <tr>
-                                            <th><span data-i18n="ovs:generic.storagerouter"></span></th>
-                                            <th><span data-i18n="ovs:vpools.proxies_amount"></span></th>
-                                            <th><span data-i18n="ovs:vpools.global_write_buffer"></span></th>
-                                            <th><span data-i18n="ovs:vpools.caching"></span></th>
-                                            <th><span data-i18n="ovs:vpools.accelerated_backend"></span></th>
-                                            <th style="width: 70px;"><span data-i18n="ovs:generic.actions"></span></th>
+                                            <th data-i18n="ovs:generic.storagerouter"></th>
+                                            <th data-i18n="ovs:vpools.proxies_amount"></th>
+                                            <th data-i18n="ovs:vpools.global_write_buffer"></th>
+                                            <th data-i18n="ovs:vpools.caching"></th>
+                                            <th data-i18n="ovs:vpools.cache_quota"></th>
+                                            <th data-i18n="ovs:vpools.accelerated_backend"></th>
+                                            <th style="width: 70px;" data-i18n="ovs:generic.actions"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -249,10 +250,11 @@ but WITHOUT ANY WARRANTY of any kind.
                                                         <span data-bind="text: name" class="hand"></span></a>
                                                 </td>
                                                 <!-- ko if: $root.srSDMap()[guid()] === undefined -->
-                                                    <td><span data-i18n="ovs:generic.null"></span></td>
-                                                    <td><span data-i18n="ovs:generic.null"></span></td>
-                                                    <td><span data-i18n="ovs:generic.null"></span></td>
-                                                    <td><span data-i18n="ovs:generic.null"></span></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
                                                     <td style="height:37px;">
                                                         <button type="button"
                                                             class="btn btn-mini btn-default hand"
@@ -266,11 +268,17 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     </td>
                                                 <!-- /ko -->
                                                 <!-- ko if: $root.srSDMap()[guid()] !== undefined -->
-                                                    <td><span data-bind="text: $root.srSDMap()[guid()].albaProxyGuids().length"></span></td>
-                                                    <td><span data-bind="text: $root.srSDMap()[guid()].vpoolBackendInfo() === undefined ? '' : $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().global_write_buffer)"></span></td>
-                                                    <td><span data-bind="translate: 'ovs:vpools.caching_types.' + $root.srSDMap()[guid()].caching()"></span></td>
+                                                    <td data-bind="text: $root.srSDMap()[guid()].albaProxyGuids().length"></td>
+                                                    <td data-bind="text: $root.srSDMap()[guid()].vpoolBackendInfo() === undefined ? '' : $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().global_write_buffer)"></td>
+                                                    <td data-bind="translate: 'ovs:vpools.caching_types.' + $root.srSDMap()[guid()].caching()"></td>
+                                                    <!-- ko if: $root.srSDMap()[guid()].vpoolBackendInfo() === undefined || $root.srSDMap()[guid()].vpoolBackendInfo().cache_quota === null -->
+                                                        <td data-i18n="ovs:generic.null"></td>
+                                                    <!-- /ko -->
+                                                    <!-- ko if: $root.srSDMap()[guid()].vpoolBackendInfo() !== undefined && $root.srSDMap()[guid()].vpoolBackendInfo().cache_quota > 0 -->
+                                                        <td data-bind="text: $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().cache_quota)"></td>
+                                                    <!-- /ko -->
                                                     <!-- ko if: $root.srSDMap()[guid()].backendInfo() === undefined || $root.srSDMap()[guid()].backendInfo() === null -->
-                                                        <td><span data-i18n="ovs:generic.null"></span></td>
+                                                        <td data-i18n="ovs:generic.null"></td>
                                                     <!-- /ko -->
                                                     <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid === null-->
                                                         <td>

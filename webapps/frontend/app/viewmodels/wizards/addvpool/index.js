@@ -44,6 +44,8 @@ define([
         data.backend(undefined);
         data.backendAA(undefined);
         data.backends([]);
+        data.cacheQuota(undefined);
+        data.cacheQuotaConfigured(false);
         data.clientID('');
         data.clientIDAA('');
         data.clientSecret('');

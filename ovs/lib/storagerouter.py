@@ -332,19 +332,33 @@ class StorageRouterController(object):
             alba_backend_guid_aa = backend_info_aa.get('alba_backend_guid')
             connection_info_aa = parameters.get('connection_info_aa', {})
             use_accelerated_alba = alba_backend_guid_aa is not None
+
             if alba_backend_guid == alba_backend_guid_aa:
                 error_messages.append('Backend and accelerated backend cannot be the same')
-            if alba_backend_guid_aa is not None:
+            if new_vpool is False and alba_backend_guid != vpool.metadata['backend']['backend_info']['alba_backend_guid']:
+                error_messages.append('Incorrect ALBA Backend guid specified')
+            if use_accelerated_alba is True:
                 if 'connection_info_aa' not in parameters:
                     error_messages.append('Missing the connection information for the accelerated Backend')
                 else:
                     try:
-                        Toolbox.verify_required_params(required_params={'host': (str, Toolbox.regex_ip),
-                                                                        'port': (int, None),
-                                                                        'client_id': (str, None),
-                                                                        'client_secret': (str, None),
-                                                                        'local': (bool, None, False)},
-                                                       actual_params=connection_info_aa)
+                        Toolbox.verify_required_params(actual_params=parameters,
+                                                       required_params={'cache_quota': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False),
+                                                                        'connection_info_aa': (dict, {'host': (str, Toolbox.regex_ip),
+                                                                                                      'port': (int, {'min': 1, 'max': 65535}),
+                                                                                                      'client_id': (str, None),
+                                                                                                      'client_secret': (str, None),
+                                                                                                      'local': (bool, None, False)})})
+                        # Check cache quota is large enough for at least 10 vDisks
+                        ovs_client = OVSClient(ip=connection_info_aa['host'],
+                                               port=connection_info_aa['port'],
+                                               credentials=(connection_info_aa['client_id'], connection_info_aa['client_secret']),
+                                               version=2)
+                        cache_quota = parameters.get('cache_quota')
+                        if cache_quota is not None:
+                            backend_dict_aa = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_aa), params={'contents': 'name,usages'})
+                            if backend_dict_aa['usages']['free'] < cache_quota * 10:
+                                raise RuntimeError('Requested cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_aa['name']))
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
 
@@ -467,6 +481,8 @@ class StorageRouterController(object):
                 vpool.metadata['backend']['caching_info'] = {}
             vpool.metadata['backend']['caching_info'][storagerouter.guid] = {'fragment_cache_on_read': fragment_cache_on_read,
                                                                              'fragment_cache_on_write': fragment_cache_on_write}
+            if 'cache_quota' in parameters:
+                vpool.metadata['backend']['caching_info'][storagerouter.guid]['quota'] = parameters['cache_quota']
             vpool.save()
 
             ### StorageDriver

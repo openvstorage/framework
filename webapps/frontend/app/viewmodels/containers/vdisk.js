@@ -43,6 +43,7 @@ define([
         self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheQuota        = ko.observable();
         self.childrenGuids     = ko.observableArray([]);
         self.deviceName        = ko.observable();
         self.dtlEnabled        = ko.observable(true);
@@ -114,15 +115,17 @@ define([
                 return {
                     sco_size: self.scoSize(),
                     dtl_mode: self.dtlEnabled() === true ? self.dtlMode() : 'no_sync',
-                    write_buffer: self.writeBuffer(),
-                    dtl_target: self.dtlTarget().slice()
+                    dtl_target: self.dtlTarget().slice(),
+                    cache_quota: parseFloat(self.cacheQuota()),
+                    write_buffer: self.writeBuffer()
                 }
             },
             write: function(configData) {
-                self.writeBuffer(Math.round(configData.write_buffer));
                 self.scoSize(configData.sco_size);
                 self.dtlMode(configData.dtl_mode);
                 self.dtlTarget(self.dtlManual() ? configData.dtl_target.slice() : []);
+                self.cacheQuota(configData.cache_quota === null ? undefined : configData.cache_quota);
+                self.writeBuffer(Math.round(configData.write_buffer));
             }
         });
         self.scoSize.subscribe(function(size) {
@@ -150,7 +153,16 @@ define([
                         changed = true;
                         return false;
                     }
-                    if ((self.configuration()[key] instanceof Array && !self.configuration()[key].equals(self.oldConfiguration()[key])) ||
+                    if (key === 'cache_quota') {
+                        var current = parseFloat(self.configuration()[key]),
+                            previous = self.oldConfiguration()[key];
+
+                        if (current !== previous && !(isNaN(current) && isNaN(previous))) {
+                            changed = true;
+                            return false;
+                        }
+
+                    } else if ((self.configuration()[key] instanceof Array && !self.configuration()[key].equals(self.oldConfiguration()[key])) ||
                         (!(self.configuration()[key] instanceof Array) && self.configuration()[key] !== self.oldConfiguration()[key])) {
                         changed = true;
                         return false;
@@ -272,6 +284,9 @@ define([
                         .done(function (data) {
                             if (data.hasOwnProperty('pagecache_ratio')) {
                                 delete data['pagecache_ratio'];
+                            }
+                            if (data.hasOwnProperty('cache_quota') && data.cache_quota !== null) {
+                                data.cache_quota /= Math.pow(1024.0, 3);
                             }
                             self.dtlEnabled(data.dtl_mode !== 'no_sync');
                             self.configuration(data);

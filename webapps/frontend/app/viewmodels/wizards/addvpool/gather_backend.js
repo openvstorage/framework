@@ -94,6 +94,19 @@ define([
                             fields.push('host');
                         }
                     }
+                    var quota = self.data.cacheQuota();
+                    if (quota !== undefined && quota !== '') {
+                        if (isNaN(parseFloat(quota))) {
+                            fields.push('quota');
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_quota_nan'));
+                        } else if (quota < 0.1 || quota > 1024) {
+                            fields.push('quota');
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_quota_boundaries_exceeded'));
+                        } else if (self.data.backendAA() !== undefined && quota * Math.pow(1024, 3) * 10 > self.data.backendAA().usages.free) {
+                            fields.push('quota');
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_quota_too_much_requested'));
+                        }
+                    }
                 }
             }
             return { value: reasons.length === 0, showErrors: showErrors, reasons: reasons, fields: fields };
@@ -154,7 +167,7 @@ define([
                         var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
-                                getData.contents = 'name,ns_statistics,presets';
+                                getData.contents = 'name,ns_statistics,presets,usages';
                                 if (item.scaling === 'LOCAL') {
                                     getData.contents += ',asd_statistics';
                                 }

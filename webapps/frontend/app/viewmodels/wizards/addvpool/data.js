@@ -83,6 +83,8 @@ define(['jquery', 'knockout'], function($, ko){
             backend:                 ko.observable(),
             backendAA:               ko.observable(),
             backends:                ko.observableArray([]),
+            cacheQuota:              ko.observable(),
+            cacheQuotaConfigured:    ko.observable(false),
             clientID:                ko.observable('').extend({removeWhiteSpaces: null}),
             clientIDAA:              ko.observable('').extend({removeWhiteSpaces: null}),
             clientSecret:            ko.observable('').extend({removeWhiteSpaces: null}),

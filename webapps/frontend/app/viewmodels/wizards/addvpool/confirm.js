@@ -33,11 +33,20 @@ define([
         });
 
         // Functions
+        self.formatFloat = function(value) {
+            return parseFloat(value);
+        };
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var postData = {
                     call_parameters: {
                         vpool_name: self.data.name(),
+                        storage_ip: self.data.storageIP(),
+                        cache_quota: self.data.useAA() === true && self.data.cacheQuota() !== undefined && self.data.cacheQuota() !== '' ? self.formatFloat(self.data.cacheQuota() * Math.pow(1024.0, 3)) : undefined,
+                        writecache_size: self.data.writeBufferGlobal(),
+                        storagerouter_ip: self.data.storageRouter().ipAddress(),
+                        fragment_cache_on_read: self.data.fragmentCacheOnRead(),
+                        fragment_cache_on_write: self.data.fragmentCacheOnWrite(),
                         connection_info: {
                             host: self.data.host(),
                             port: self.data.port(),
@@ -49,11 +58,6 @@ define([
                             preset: (self.data.preset() !== undefined ? self.data.preset().name : undefined),
                             alba_backend_guid: (self.data.backend() !== undefined ? self.data.backend().guid : undefined)
                         },
-                        storage_ip: self.data.storageIP(),
-                        storagerouter_ip: self.data.storageRouter().ipAddress(),
-                        writecache_size: self.data.writeBufferGlobal(),
-                        fragment_cache_on_read: self.data.fragmentCacheOnRead(),
-                        fragment_cache_on_write: self.data.fragmentCacheOnWrite(),
                         config_params: {
                             dtl_mode: (self.data.dtlEnabled() === true ? self.data.dtlMode().name : 'no_sync'),
                             sco_size: self.data.scoSize(),

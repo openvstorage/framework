@@ -26,7 +26,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         <span class="fa fa-minus"></span>
                     </button>
                 </span>
-                <input type="text" id="proxyAmount" class="form-control" data-bind="value: data.proxyAmount">
+                <input type="text" id="proxyAmount" class="form-control" data-bind="value: data.proxyAmount" style="text-align: center;">
                 <span class="input-group-btn">
                     <button class="btn btn-default" type="button" data-bind="click: function() { data.proxyAmount(parseInt('0' + data.proxyAmount(), 10) + 1); }">
                         <span class="fa fa-plus"></span>
@@ -49,18 +49,32 @@ but WITHOUT ANY WARRANTY of any kind.
         </div>
     </div>
     <div data-bind="visible: data.fragmentCacheOnRead() || data.fragmentCacheOnWrite()">
-        <div>
-            <div class="form-group">
-                <div class="col-lg-4"></div>
-                <div class="col-lg-7">
-                    <input type="radio" name="aaBackend" id="useAcceleratedAlbaNo" class="autofocus" data-bind="checked: data.useAA, checkedValue: false" />
-                    <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_backend.use_local" style="font-weight: normal;"></label><br />
-                    <input type="radio" name="aaBackend" id="useAcceleratedAlbaYes" class="autofocus" data-bind="checked: data.useAA, checkedValue: true" />
-                    <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_backend.use_backend_aa" style="font-weight: normal;"></label>
-                </div>
+        <div class="form-group">
+            <div class="col-lg-4"></div>
+            <div class="col-lg-7">
+                <input type="radio" name="aaBackend" id="useAcceleratedAlbaNo" class="autofocus" data-bind="checked: data.useAA, checkedValue: false" />
+                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_backend.use_local" style="font-weight: normal;"></label><br />
+                <input type="radio" name="aaBackend" id="useAcceleratedAlbaYes" class="autofocus" data-bind="checked: data.useAA, checkedValue: true" />
+                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_backend.use_backend_aa" style="font-weight: normal;"></label>
             </div>
         </div>
         <p data-bind="visible: data.useAA()" data-i18n="ovs:wizards.add_vpool.gather_backend.accelerated_info"></p>
+        <div class="form-group" data-bind="visible: data.useAA(), css: { 'has-error': canContinue().fields.contains('quota') }">
+            <label class="col-lg-4 control-label" style="padding-top: 8px;">
+                <a data-bind="popover: {
+                                  title: 'ovs:wizards.add_vpool.gather_backend.cache_quota_title',
+                                  content: 'ovs:wizards.add_vpool.gather_backend.cache_quota_info'
+                             }"
+                   class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
+                </a>
+                <span data-i18n="ovs:wizards.add_vpool.gather_backend.cache_quota_label"></span>
+            </label>
+            <div class="col-lg-2">
+                <input class="form-control" type="text" style="text-align: center;"
+                       data-bind="value: data.cacheQuota, valueUpdate: 'input', disable: data.cacheQuotaConfigured()">
+            </div>
+            <label class="col-lg-1" data-i18n="ovs:generic.units.gib" style="padding-top: 7px; padding-left: 0"></label>
+        </div>
         <div data-bind="visible: data.useAA() && localBackendsAvailable()">
             <div class="form-group">
                 <div class="col-lg-4"></div>
@@ -170,12 +184,13 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
         </div>
     </div>
-    <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
+    <div class="alert alert-warning" data-bind="visible: !isPresetAvailable() && canContinue().value" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_backend.alba_preset_unavailable"></span>
     </div>
-    <div class="alert alert-info" data-bind="visible: data.vPool() !== undefined || (data.useAA() && loadingBackends())" style="margin-top: 20px;">
-        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_backend.loading_backend_information', visible: (data.useAA() && loadingBackends())"></span>
+    <div class="alert alert-info" data-bind="visible: data.vPool() !== undefined || (data.useAA() && loadingBackends()) && canContinue().value" style="margin-top: 20px;">
+        <p data-bind="translate: 'ovs:wizards.add_vpool.gather_backend.loading_backend_information', visible: (data.useAA() && loadingBackends())"></p>
         <span data-bind="translate: 'ovs:wizards.add_vpool.gather_backend.information_extend', visible: data.vPool() !== undefined"></span>
+        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_backend.information_extend_quota', visible: data.vPool() !== undefined && data.cacheQuotaConfigured() && data.useAA()"></span>
     </div>
     <div class="alert alert-danger" data-bind="visible: (!data.useAA() || (data.useAA() && !loadingBackends())) && (!canContinue().value || canContinue().showErrors)" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
