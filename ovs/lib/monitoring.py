@@ -89,9 +89,9 @@ class MonitoringController(object):
                                        version=2)
                 try:
                     alba_guid_size_map[alba_backend_guid] = {'name': alba_backend_name,
-                                                             'used_size': 0,
                                                              'backend_ip': alba_backend_host,
-                                                             'total_size': ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'usages'})['usages']['free']}
+                                                             'total_size': ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'usages'})['usages']['size'],
+                                                             'requested_size': 0}
                 except Exception:
                     MonitoringController._logger.exception('Failed to retrieve ALBA Backend info for {0} on host {1}'.format(alba_backend_name, alba_backend_host))
                     continue
@@ -99,15 +99,13 @@ class MonitoringController(object):
             for vdisk_guid in storagedriver.vdisks_guids:
                 vdisk = VDisk(vdisk_guid)
                 if vdisk.cache_quota is None:
-                    alba_guid_size_map[alba_backend_guid]['used_size'] += cache_quota if cache_quota is not None else 0
+                    alba_guid_size_map[alba_backend_guid]['requested_size'] += cache_quota if cache_quota is not None else 0
                 else:
-                    alba_guid_size_map[alba_backend_guid]['used_size'] += vdisk.cache_quota
+                    alba_guid_size_map[alba_backend_guid]['requested_size'] += vdisk.cache_quota
 
         local_ips = [sr.ip for sr in StorageRouterList.get_storagerouters()]
         for alba_backend_info in alba_guid_size_map.itervalues():
             name = alba_backend_info['name']
-            used = alba_backend_info['used_size']
-            total = alba_backend_info['total_size']
             backend_ip = alba_backend_info['backend_ip']
 
             location = 'local'
@@ -115,9 +113,10 @@ class MonitoringController(object):
             if backend_ip not in local_ips:
                 location = 'remote'
                 remote_msg = ' (on remote IP {0})'.format(backend_ip)
-            percentage = used / total * 100
+
+            percentage = alba_backend_info['requested_size'] / alba_backend_info['total_size'] * 100
             if percentage > 100:
-                MonitoringController._logger.error('OVS_ERROR: Over-allocation for vDisk caching quota on {0} ALBA Backend {1}{2}. Unexpected behavior might occur'.format(location, name, remote_msg))
+                MonitoringController._logger.error('OVS_WARNING: Over-allocation for vDisk caching quota on {0} ALBA Backend {1}{2}. Unexpected behavior might occur'.format(location, name, remote_msg))
             elif percentage > 70:
                 MonitoringController._logger.warning('OVS_WARNING: vDisk caching quota on {0} ALBA Backend {1} is at {2:.1f}%{3}'.format(location, name, percentage, remote_msg))
         MonitoringController._logger.info('Finished vDisk cache quota verification')

@@ -31,49 +31,44 @@ define([
         self.shared    = shared;
 
         // Handles
-        self.loadAlbaBackendHandle    = undefined;
         self.loadStorageRoutersHandle = undefined;
         self.loadVPoolsHandle         = undefined;
 
         // Observables
-        self.loading                  = ko.observable(false);
-        self.loadingBackend           = ko.observable(false);
-        self.preValidateBackendPreset = ko.observable();
-        self.preValidateResult        = ko.observable({reasons: [], fields: []});
+        self.loading           = ko.observable(false);
+        self.loadingBackend    = ko.observable(false);
+        self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
         self.canContinue = ko.computed(function() {
-            var showErrors = true, reasons = [], fields = [], maxSize = self.data.sizeEntry.max * Math.pow(1024, 3),
-                preValidation = self.preValidateResult(),
-                backendPresetValidation = self.preValidateBackendPreset();
+            var valid = true, showErrors = false, reasons = [], fields = [], maxSize = self.data.sizeEntry.max * Math.pow(1024, 3),
+                preValidation = self.preValidateResult();
             if (preValidation.reasons.length > 0) {
+                showErrors = true;
                 reasons = reasons.concat(preValidation.reasons);
                 fields = fields.concat(preValidation.fields);
             }
-            if (backendPresetValidation !== undefined) {
-                reasons.push(backendPresetValidation);
-            }
             if (self.data.name() === '') {
+                valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_name'));
             }
             if (self.data.vPool() === undefined) {
+                valid = false;
                 fields.push('vpool');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_vpool'));
             }
             if (self.data.storageRouter() === undefined) {
+                valid = false;
                 fields.push('storageouter');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_storagerouter'));
             }
             if (self.data.size() > maxSize) {
+                valid = false;
                 fields.push('size');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_size', {amount: parseInt(self.data.sizeEntry.max / 1024), unit: $.t('ovs:generic.units.tib')}));
             }
-            if (self.loadingBackend()) {
-                showErrors = false;  // Not able to continue because Backend preset information being loaded
-                reasons.push('Loading Backend');
-            }
-            return { value: reasons.length === 0, showErrors: showErrors, reasons: reasons, fields: fields };
+            return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
         self.cleanedName = ko.computed(function() {
             return generic.cleanDeviceName(self.data.name());
@@ -104,19 +99,57 @@ define([
         self.preValidate = function() {
             var validationResult = {reasons: [], fields: []};
             return $.Deferred(function(deferred) {
-                if (self.data.vPool() === undefined || self.data.name() === undefined) {
+                var calls = [], vPool = self.data.vPool();
+                if (vPool === undefined || vPool.metadata() === undefined || !vPool.metadata().hasOwnProperty('backend') || self.data.name() === undefined) {
                     deferred.reject();
                     return;
                 }
-                api.get('vpools/' + self.data.vPool().guid() + '/devicename_exists', { queryparams: { name: self.data.name() }})
+                calls.push(api.get('vpools/' + self.data.vPool().guid() + '/devicename_exists', { queryparams: { name: self.data.name() }})
                     .done(function(exists) {
                         if (exists) {
                             validationResult.reasons.push($.t('ovs:wizards.add_vdisk.gather.name_exists'));
                             validationResult.fields.push('name');
-                            self.preValidateResult(validationResult);
+                        }
+                    }));
+
+                if (self.data.vPoolUsableBackendMap().hasOwnProperty(vPool.guid())) {
+                    if (self.data.vPoolUsableBackendMap()[vPool.guid()] === false) {
+                        validationResult.reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_preset'));
+                    }
+                } else {
+                    self.loadingBackend(true);
+                    generic.xhrAbort(self.loadAlbaBackendHandle);
+                    var connectionInfo = vPool.metadata().backend.connection_info,
+                        getData = {ip: connectionInfo.host,
+                                   port: connectionInfo.port,
+                                   client_id: connectionInfo.client_id,
+                                   client_secret: connectionInfo.client_secret,
+                                   contents: 'presets'};
+                    calls.push(api.get('relay/alba/backends/' + vPool.metadata().backend.backend_info.alba_backend_guid, {queryparams: getData})
+                        .done(function (data) {
+                            var usable_preset = false, map = self.data.vPoolUsableBackendMap();
+                            $.each(data.presets, function(_, preset) {
+                                if (preset.is_available === true) {
+                                    usable_preset = true;
+                                    return false;
+                                }
+                            });
+                            map[vPool.guid()] = usable_preset;
+                            self.data.vPoolUsableBackendMap(map);
+                        })
+                        .always(function() {
+                            self.loadingBackend(false);
+                            if (!self.data.vPoolUsableBackendMap().hasOwnProperty(vPool.guid()) || !self.data.vPoolUsableBackendMap()[vPool.guid()]) {
+                                validationResult.reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_preset'));
+                            }
+                        }));
+                }
+                $.when.apply($, calls)
+                    .always(function() {
+                        self.preValidateResult(validationResult);
+                        if (self.preValidateResult().reasons.length > 0) {
                             deferred.reject();
                         } else {
-                            self.preValidateResult(validationResult);
                             deferred.resolve();
                         }
                     })
@@ -219,56 +252,6 @@ define([
             }).promise();
         };
 
-        // Subscriptions
-        self.nameSubscription = self.data.name.subscribe(function() {
-            if (!self.canContinue().value) {
-                self.preValidateResult({reasons: [], fields: []});  // Reset the pre-validate result in case a vDisk name was specified which already existed
-            }
-        });
-        self.vPoolSubscription = self.data.vPool.subscribe(function (vPool) {
-            if (vPool === undefined || vPool.metadata() === undefined || !vPool.metadata().hasOwnProperty('backend')) {
-                self.preValidateBackendPreset(undefined);
-                return;
-            }
-            if (self.data.vPoolUsableBackendMap().hasOwnProperty(vPool.guid())) {
-                if (self.data.vPoolUsableBackendMap()[vPool.guid()]) {
-                    self.preValidateBackendPreset(undefined);
-                } else {
-                    self.preValidateBackendPreset($.t('ovs:wizards.add_vdisk.gather.invalid_preset'));
-                }
-                return;
-            }
-
-            self.loadingBackend(true);
-            generic.xhrAbort(self.loadAlbaBackendHandle);
-            var connectionInfo = vPool.metadata().backend.connection_info,
-                getData = {ip: connectionInfo.host,
-                           port: connectionInfo.port,
-                           client_id: connectionInfo.client_id,
-                           client_secret: connectionInfo.client_secret,
-                           contents: 'presets'};
-            self.loadAlbaBackendHandle = api.get('relay/alba/backends/' + vPool.metadata().backend.backend_info.alba_backend_guid, {queryparams: getData})
-                .done(function (data) {
-                    var usable_preset = false, map = self.data.vPoolUsableBackendMap();
-                    $.each(data.presets, function(_, preset) {
-                        if (preset.is_available === true) {
-                            usable_preset = true;
-                            return false;
-                        }
-                    });
-                    map[vPool.guid()] = usable_preset;
-                    self.data.vPoolUsableBackendMap(map);
-                })
-                .always(function() {
-                    self.loadingBackend(false);
-                    if (!self.data.vPoolUsableBackendMap().hasOwnProperty(vPool.guid()) || self.data.vPoolUsableBackendMap()[vPool.guid()] === true) {
-                        self.preValidateBackendPreset(undefined);
-                    } else {
-                        self.preValidateBackendPreset($.t('ovs:wizards.add_vdisk.gather.invalid_preset'));
-                    }
-                });
-        });
-
         // Durandal
         self.activate = function() {
             self.loading(true);
@@ -284,8 +267,5 @@ define([
             self.refresher.run();
             self.refresher.start();
         };
-        // self.deactivate = function() {
-        //     self.vPoolSubscription.dispose();
-        // }
     };
 });
