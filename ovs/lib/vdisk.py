@@ -144,7 +144,22 @@ class VDiskController(object):
         vdisk = VDisk(vdisk_guid)
         if len(vdisk.child_vdisks) > 0:
             raise RuntimeError('vDisk {0} has clones, cannot delete'.format(vdisk.name))
-        vdisk.storagedriver_client.unlink(str(vdisk.devicename))
+
+        vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
+        storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        if 'directory_unlink' in storagerouter.features['volumedriver']['features']:
+            first = True
+            devicename_parts = vdisk.devicename.strip('/').split('/')
+            for index in reversed(range(len(devicename_parts))):
+                try:
+                    path = '/{0}'.format('/'.join(devicename_parts[:index + 1]))
+                    vdisk.storagedriver_client.unlink(path)
+                    first = False
+                except RuntimeError:
+                    if first is True:  # Longest path should always succeed, so raise if not
+                        raise
+        else:
+            vdisk.storagedriver_client.unlink(str(vdisk.devicename))
         VDiskController.delete_from_voldrv(vdisk.volume_id)
 
     @staticmethod
