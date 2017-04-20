@@ -631,5 +631,5 @@ class GenericController(object):
         :type backend_guid: str
         :return: None
         """
-        for function in Toolbox.fetch_hooks('backend', 'domains-update'):
-            function(backend_guid=backend_guid)
+        for fct in Toolbox.fetch_hooks('backend', 'domains-update'):
+            fct(backend_guid=backend_guid)
