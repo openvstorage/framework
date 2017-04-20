@@ -331,6 +331,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                         queued_jobs = [v for v in values[0]['values'] if v['kwargs'] == kwargs_dict]
                         if len(queued_jobs) != 1:
                             if unittest_mode is True:
+                                Decorators.unittest_thread_info_by_name[thread_name] = ('WAITING', None)
                                 if thread_name not in Decorators.unittest_thread_info_by_state['WAITING']:
                                     Decorators.unittest_thread_info_by_state['WAITING'].append(thread_name)
                         else:
