@@ -233,8 +233,8 @@ class SSHClient(object):
                 raise
         except socket.error as ex:
             message = str(ex)
+            SSHClient._logger.error(message)
             if 'No route to host' in message or 'Unable to connect' in message:
-                SSHClient._logger.error(message)
                 raise UnableToConnectException(message)
             raise
         except AuthenticationException:

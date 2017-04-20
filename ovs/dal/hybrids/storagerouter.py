@@ -165,7 +165,7 @@ class StorageRouter(DataObject):
             volumedriver_edition = 'enterprise' if volumedriver_version['edition'] == 'ee-' else 'community'
             volumedriver_version_lv = LooseVersion(volumedriver_version['version'])
             volumedriver_features = [feature for feature, version
-                                     in {}.iteritems()
+                                     in {'directory_unlink': ('6.15.0', None)}.iteritems()
                                      if volumedriver_version_lv >= LooseVersion(version[0])
                                      and (version[1] is None or version[1] == volumedriver_edition)]
             version = client.run("alba version --terse", allow_insecure=True, allow_nonzero=True)
