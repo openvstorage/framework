@@ -1391,12 +1391,12 @@ class VDiskController(object):
         an entry addresses one cluster of a volume
 
         Example:
-        A volume has a cluster_size of 4k (default) and a metadata_page_capacity of 64. A single page addresses 4k * 64 = 256k of a volume
+        A volume has a cluster_size of 4k (default) and a metadata_page_capacity of 32. A single page addresses 4k * 32 = 128k of a volume
         So if a volume's size is 256M, the cache should have a capacity (cache_capacity) of 1024 to be completely in memory
 
         Example 2:
-        A volume has a size of 256M, and a cluster_size of 4k, and a metadata_page_capacity of 64
-        If we want 10% of that volume to be cached, we need 256 / (4k * 64 = 256k) = 1024 => a cache_capacity of 102
+        A volume has a size of 256M, and a cluster_size of 4k, and a metadata_page_capacity of 32
+        If we want 10% of that volume to be cached, we need 256M / (4k * 32 = 128k) = 2048 => a cache_capacity of 205
 
         :param vdisk: Object vDisk
         :type vdisk: VDisk
