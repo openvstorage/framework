@@ -260,7 +260,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                        tooltip: 'ovs:vpools.detail.extend',
                                                                        enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
                                                                        attr: { id: 'button_add_' + guid()},
-                                                                       visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
+                                                                       visible: !$root.updatingStorageRouters()">
                                                             <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
                                                         </button>
                                                     </td>

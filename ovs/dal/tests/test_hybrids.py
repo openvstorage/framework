@@ -75,7 +75,7 @@ class Hybrid(unittest.TestCase):
             self.assertIsInstance(cls._relations, list, '_relations required: {0}'.format(cls.__name__))
             self.assertIsInstance(cls._dynamics, list, '_dynamics required: {0}'.format(cls.__name__))
             # Check types
-            allowed_types = [int, float, long, str, bool, list, dict, set]
+            allowed_types = [int, float, long, str, bool, list, dict, set, tuple]
             unique_types = [int, float, long, str]
             indexed_types = [int, float, long, str, bool]
             for prop in cls._properties:
