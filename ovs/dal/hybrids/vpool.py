@@ -37,11 +37,13 @@ class VPool(DataObject):
                     Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domain name, Zone, ...) for the Storage BackendType.'),
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backends, as used by the Storage Drivers.'),
                     Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
-                    Property('status', STATUSES.keys(), doc='Status of the vPool')]
+                    Property('status', STATUSES.keys(), doc='Status of the vPool'),
+                    Property('metadata_store_bits', int, mandatory=False, doc='StorageDrivers deployed for this vPool will make use of this amount of metadata store bits')]
     __relations = []
     __dynamics = [Dynamic('configuration', dict, 3600),
                   Dynamic('statistics', dict, 4),
-                  Dynamic('identifier', str, 120)]
+                  Dynamic('identifier', str, 120),
+                  Dynamic('extensible', tuple, 60)]
     _fixed_properties = ['storagedriver_client', 'objectregistry_client', 'clusterregistry_client']
 
     def __init__(self, *args, **kwargs):
@@ -84,6 +86,19 @@ class VPool(DataObject):
         if self._clusterregistry_client is None:
             self.reload_client('clusterregistry')
         return self._clusterregistry_client
+
+    def reload_client(self, client):
+        """
+        Reloads the StorageDriverClient, ObjectRegistryClient or ClusterRegistry client
+        """
+        self._frozen = False
+        if client == 'storagedriver':
+            self._storagedriver_client = StorageDriverClient.load(self)
+        elif client == 'objectregistry':
+            self._objectregistry_client = ObjectRegistryClient.load(self)
+        elif client == 'clusterregistry':
+            self._clusterregistry_client = ClusterRegistryClient.load(self)
+        self._frozen = True
 
     def _configuration(self):
         """
@@ -154,15 +169,13 @@ class VPool(DataObject):
         """
         return '{0}_{1}'.format(self.guid, '_'.join(self.storagedrivers_guids))
 
-    def reload_client(self, client):
+    def _extensible(self):
         """
-        Reloads the StorageDriverClient, ObjectRegistryClient or ClusterRegistry client
+        Verifies whether this vPool can be extended or not
         """
-        self._frozen = False
-        if client == 'storagedriver':
-            self._storagedriver_client = StorageDriverClient.load(self)
-        elif client == 'objectregistry':
-            self._objectregistry_client = ObjectRegistryClient.load(self)
-        elif client == 'clusterregistry':
-            self._clusterregistry_client = ClusterRegistryClient.load(self)
-        self._frozen = True
+        reasons = []
+        if self.status != VPool.STATUSES.RUNNING:
+            reasons.append('non_running')
+        if self.metadata_store_bits is None:
+            reasons.append('voldrv_missing_info')
+        return len(reasons) == 0, reasons

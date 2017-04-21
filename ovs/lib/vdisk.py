@@ -40,7 +40,7 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
-                                                       SRCObjectNotFoundException, StorageDriverClient, StorageDriverConfiguration
+                                                       StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
@@ -1441,26 +1441,42 @@ class VDiskController(object):
         an entry addresses one cluster of a volume
 
         Example:
-        A volume has a cluster_size of 4k (default) and a metadata_page_capacity of 64. A single page addresses 4k * 64 = 256k of a volume
+        A volume has a cluster_size of 4k (default) and a metadata_page_capacity of 32. A single page addresses 4k * 32 = 128k of a volume
         So if a volume's size is 256M, the cache should have a capacity (cache_capacity) of 1024 to be completely in memory
 
         Example 2:
-        A volume has a size of 256M, and a cluster_size of 4k, and a metadata_page_capacity of 64
-        If we want 10% of that volume to be cached, we need 256 / (4k * 64 = 256k) = 1024 => a cache_capacity of 102
+        A volume has a size of 256M, and a cluster_size of 4k, and a metadata_page_capacity of 32
+        If we want 10% of that volume to be cached, we need 256M / (4k * 32 = 128k) = 2048 => a cache_capacity of 205
 
         :param vdisk: Object vDisk
-        :type vdisk: VDisk
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
         :return: None
+        :rtype: NoneType
         """
+        if vdisk.vpool.metadata_store_bits is None:
+            bits = None
+            for storagedriver in vdisk.vpool.storagedrivers:
+                entries = ServiceManager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vdisk.vpool.name),
+                                                                   client=SSHClient(endpoint=storagedriver.storagerouter, username='root'),
+                                                                   entries=['METADATASTORE_BITS='])
+                if len(entries) == 1:
+                    bits = entries[0].split('=')[-1]
+                    bits = int(bits) if bits.isdigit() else 5
+                    break
+            vdisk.vpool.metadata_store_bits = bits
+            vdisk.vpool.save()
+
         storagedriver_id = vdisk.storagedriver_id
-        if storagedriver_id is None:
-            raise SRCObjectNotFoundException()
+        if vdisk.vpool.metadata_store_bits is None or storagedriver_id is None:
+            VDiskController._logger.warning('OVS_WARNING: Failed to set the page cache size for vDisk {0}'.format(vdisk.name))
+            return
+
         ratio = vdisk.pagecache_ratio
         storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, storagedriver_id)
         storagedriver_config.load()
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
-        metadata_page_size = float(StorageDriverClient.METADATA_PAGE_CAPACITY * cluster_size)
+        metadata_page_size = float(2 ** vdisk.vpool.metadata_store_bits * cluster_size)
         cache_capacity = int(math.ceil(vdisk.size / metadata_page_size * ratio))
 
         max_cache_capacity = int(2 * 1024 ** 4 / metadata_page_size)

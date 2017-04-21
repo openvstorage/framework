@@ -145,6 +145,22 @@ class Systemd(object):
         Configuration.delete(key=Systemd.SERVICE_CONFIG_KEY.format(node_name, ExtensionsToolbox.remove_prefix(service_name, 'ovs-')))
 
     @staticmethod
+    def extract_from_service_file(name, client, entries=None):
+        """
+        Extract an entry, multiple entries or the entire service file content for a service
+        :param name: Name of the service
+        :type name: str
+        :param client: Client on which to extract something from the service file
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param entries: Entries to extract
+        :type entries: list
+        :return: The requested entry information or entire service file content if entry=None
+        :rtype: list
+        """
+        _ = name, client, entries
+        return []
+
+    @staticmethod
     def _service_exists(name, client, path):
         """
         Verify whether a mocked service exists
