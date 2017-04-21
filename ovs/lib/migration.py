@@ -45,12 +45,14 @@ class MigrationController(object):
 
         from ovs.dal.lists.storagedriverlist import StorageDriverList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
+        from ovs.dal.lists.vpoollist import VPoolList
         from ovs.extensions.generic.configuration import Configuration
         from ovs.extensions.generic.sshclient import SSHClient
         from ovs.extensions.generic.toolbox import ExtensionsToolbox
         from ovs.extensions.services.service import ServiceManager
         from ovs.extensions.services.systemd import Systemd
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+        from ovs.lib.generic import GenericController
 
         MigrationController._logger.info('Start out of band migrations...')
 
@@ -59,7 +61,7 @@ class MigrationController(object):
             sr_client_map[storagerouter.guid] = SSHClient(endpoint=storagerouter,
                                                           username='root')
 
-        ###############################################################
+        #########################################################
         # Addition of 'ExecReload' for AlbaProxy SystemD services
         getattr(ServiceManager, 'has_service')  # Invoke ServiceManager to fill out the ImplementationClass (default None)
         if ServiceManager.ImplementationClass == Systemd:  # Upstart does not have functionality to reload a process' configuration
@@ -82,7 +84,7 @@ class MigrationController(object):
             for root_client in changed_clients:
                 root_client.run(['systemctl', 'daemon-reload'])
 
-        ###############################################################
+        ##################################################################
         # Adjustment of open file descriptors for Arakoon services to 8192
         getattr(ServiceManager, 'has_service')  # Invoke ServiceManager to fill out the ImplementationClass (default None)
         changed_clients = set()
@@ -113,7 +115,7 @@ class MigrationController(object):
         for root_client in changed_clients:
             root_client.run(['systemctl', 'daemon-reload'])
 
-        ###############################################################
+        #############################
         # Migrate to multiple proxies
         for storagedriver in StorageDriverList.get_storagedrivers():
             vpool = storagedriver.vpool
@@ -218,7 +220,32 @@ class MigrationController(object):
                 if ServiceManager.ImplementationClass == Systemd:
                     root_client.run(['systemctl', 'daemon-reload'])
 
-        MigrationController._logger.info('Finished out of band migrations')
+        ########################################
+        # Update metadata_store_bits information
+        getattr(ServiceManager, 'has_service')  # Invoke ServiceManager to fill out the ImplementationClass (default None)
+        for vpool in VPoolList.get_vpools():
+            bits = None
+            for storagedriver in vpool.storagedrivers:
+                key = '/ovs/framework/hosts/{0}/services/volumedriver_{1}'.format(storagedriver.storagerouter.machine_id, vpool.name)
+                if Configuration.exists(key=key) and 'METADATASTORE_BITS' not in Configuration.get(key=key):
+                    if bits is None:
+                        entries = ServiceManager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vpool.name),
+                                                                           client=sr_client_map[storagedriver.storagerouter_guid],
+                                                                           entries=['METADATASTORE_BITS='])
+                        if len(entries) == 1:
+                            bits = entries[0].split('=')[-1]
+                            bits = int(bits) if bits.isdigit() else 5
+                    if bits is not None:
+                        try:
+                            content = Configuration.get(key=key)
+                            content['METADATASTORE_BITS'] = bits
+                            Configuration.set(key=key, value=content)
+                        except:
+                            MigrationController._logger.exception('Error updating volumedriver info for vPool {0} on StorageRouter {1}'.format(vpool.name, storagedriver.storagerouter.name))
 
-        from ovs.lib.generic import GenericController
+            if bits is not None:
+                vpool.metadata_store_bits = bits
+                vpool.save()
+
+        MigrationController._logger.info('Finished out of band migrations')
         GenericController.refresh_package_information()

@@ -131,14 +131,14 @@ class VDiskTest(unittest.TestCase):
 
         # Set pagecache_ratio
         capacity = vdisk_1.storagedriver_client.get_metadata_cache_capacity(str(vdisk_1.volume_id))
-        self.assertEqual(capacity, 4096)  # 1GiB volume has by default 4096 pages cached
+        self.assertEqual(capacity, 8192)  # 1GiB volume has by default 8192 pages cached
         set_config = copy.deepcopy(new_config_params)
         set_config['pagecache_ratio'] = 0.5
         VDiskController.set_config_params(vdisk_guid=vdisk_1.guid, new_config_params=set_config)
         get_config = VDiskController.get_config_params(vdisk_guid=vdisk_1.guid)
         self.assertEqual(get_config['pagecache_ratio'], 0.5)
         capacity = vdisk_1.storagedriver_client.get_metadata_cache_capacity(str(vdisk_1.volume_id))
-        self.assertEqual(capacity, 2048)
+        self.assertEqual(capacity, 4096)
 
         # Small volumes and pagecache_ratio
         vdisk_small = VDisk(VDiskController.create_new(volume_name='vdisk_small', volume_size=1024 * 8, storagedriver_guid=storagedrivers[1].guid))

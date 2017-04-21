@@ -967,6 +967,14 @@
                 "started_title": "Started Extending",
                 "success_message": "Extending vPool __what__ was successful",
                 "success_title": "Success"
+            },
+            "prohibited": {
+                "message": "Prohibited to extend vPool __name__ for following reason__multi__:<ul>",
+                "reasons": {
+                    "non_running": "vPool not in RUNNING state",
+                    "voldrv_missing_info": "Missing volumedriver information"
+                },
+                "title": "Extend vPool __name__"
             }
         },
         "rollback": {
