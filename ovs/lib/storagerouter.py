@@ -275,6 +275,7 @@ class StorageRouterController(object):
             vpool.description = vpool_name
             vpool.rdma_enabled = sd_config_params['dtl_transport'] == StorageDriverClient.FRAMEWORK_DTL_TRANSPORT_RSOCKET
             vpool.status = VPool.STATUSES.INSTALLING
+            vpool.metadata_store_bits = 5
             vpool.save()
         else:
             vpool.status = VPool.STATUSES.EXTENDING
@@ -820,7 +821,8 @@ class StorageRouterController(object):
                      'CONFIG_PATH': storagedriver_config.remote_path,
                      'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
                      'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
-                     'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
+                     'LOG_SINK': LogHandler.get_sink_path('storagedriver'),
+                     'METADATASTORE_BITS': 5}
         dtl_params = {'DTL_PATH': sdp_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,
                       'DTL_PORT': str(storagedriver.ports['dtl']),
