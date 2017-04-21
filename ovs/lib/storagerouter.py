@@ -822,7 +822,7 @@ class StorageRouterController(object):
                      'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
                      'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
                      'LOG_SINK': LogHandler.get_sink_path('storagedriver'),
-                     'METADATA_STORE_BITS': 5}
+                     'METADATASTORE_BITS': 5}
         dtl_params = {'DTL_PATH': sdp_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,
                       'DTL_PORT': str(storagedriver.ports['dtl']),

@@ -226,26 +226,26 @@ class MigrationController(object):
         for vpool in VPoolList.get_vpools():
             bits = None
             for storagedriver in vpool.storagedrivers:
-                if bits is None:
-                    entries = ServiceManager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vpool.name),
-                                                                       client=sr_client_map[storagedriver.storagerouter_guid],
-                                                                       entries=['METADATASTORE_BITS='])
-                    if len(entries) == 1:
-                        bits = entries[0].split('=')[-1]
-                        bits = int(bits) if bits.isdigit() else 5
-
-                if bits is not None:
-                    try:
-                        key = '/ovs/framework/hosts/{0}/services/volumedriver_{1}'.format(storagedriver.storagerouter.machine_id, vpool.name)
-                        content = Configuration.get(key=key)
-                        if 'METADATA_STORE_BITS' not in content:
-                            content['METADATA_STORE_BITS'] = bits
+                key = '/ovs/framework/hosts/{0}/services/volumedriver_{1}'.format(storagedriver.storagerouter.machine_id, vpool.name)
+                if Configuration.exists(key=key) and 'METADATASTORE_BITS' not in Configuration.get(key=key):
+                    if bits is None:
+                        entries = ServiceManager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vpool.name),
+                                                                           client=sr_client_map[storagedriver.storagerouter_guid],
+                                                                           entries=['METADATASTORE_BITS='])
+                        if len(entries) == 1:
+                            bits = entries[0].split('=')[-1]
+                            bits = int(bits) if bits.isdigit() else 5
+                    if bits is not None:
+                        try:
+                            content = Configuration.get(key=key)
+                            content['METADATASTORE_BITS'] = bits
                             Configuration.set(key=key, value=content)
-                    except:
-                        MigrationController._logger.exception('Error updating volumedriver info for vPool {0} on StorageRouter {1}'.format(vpool.name, storagedriver.storagerouter.name))
+                        except:
+                            MigrationController._logger.exception('Error updating volumedriver info for vPool {0} on StorageRouter {1}'.format(vpool.name, storagedriver.storagerouter.name))
 
-            vpool.metadata_store_bits = bits
-            vpool.save()
+            if bits is not None:
+                vpool.metadata_store_bits = bits
+                vpool.save()
 
         MigrationController._logger.info('Finished out of band migrations')
         GenericController.refresh_package_information()
