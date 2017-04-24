@@ -33,7 +33,7 @@ define([
         // Observables
         self.albaPresetMap          = ko.observable({});
         self.backendsBC             = ko.observableArray([]);
-        self.blockCacheSettings  = ko.observableArray(['write', 'read', 'rw', 'none']);
+        self.blockCacheSettings     = ko.observableArray(['write', 'read', 'rw', 'none']);
         self.invalidAlbaInfo        = ko.observable(false);
         self.loadingBackends        = ko.observable(false);
         self.localBackendsAvailable = ko.observable(true);
@@ -57,7 +57,7 @@ define([
                 return temp;
             }
             $.each(self.data.storageRoutersUsed(), function(index, sr) {
-                if (self.data.vPool().metadata().hasOwnProperty('backend_BC_' + sr.guid())) {
+                if (self.data.vPool().metadata().hasOwnProperty('backend_bc_' + sr.guid())) {
                     temp.push(sr);
                 }
             });
@@ -235,8 +235,8 @@ define([
                     self.data.clientIDBC('');
                     self.data.clientSecretBC('');
                 }
-                if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_BC_' + sr.guid())) {
-                    var md = self.data.vPool().metadata()['backend_BC_' + sr.guid()];
+                if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_bc_' + sr.guid())) {
+                    var md = self.data.vPool().metadata()['backend_bc_' + sr.guid()];
                     if (md.hasOwnProperty('connection_info')) {
                         self.data.hostBC(md.connection_info.host);
                         self.data.portBC(md.connection_info.port);

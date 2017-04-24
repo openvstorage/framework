@@ -57,7 +57,7 @@ define([
                 return temp;
             }
             $.each(self.data.storageRoutersUsed(), function(index, sr) {
-                if (self.data.vPool().metadata().hasOwnProperty('backend_FC_' + sr.guid())) {
+                if (self.data.vPool().metadata().hasOwnProperty('backend_fc_' + sr.guid())) {
                     temp.push(sr);
                 }
             });
@@ -235,8 +235,8 @@ define([
                     self.data.clientIDFC('');
                     self.data.clientSecretFC('');
                 }
-                if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_FC_' + sr.guid())) {
-                    var md = self.data.vPool().metadata()['backend_FC_' + sr.guid()];
+                if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_fc_' + sr.guid())) {
+                    var md = self.data.vPool().metadata()['backend_fc_' + sr.guid()];
                     if (md.hasOwnProperty('connection_info')) {
                         self.data.hostFC(md.connection_info.host);
                         self.data.portFC(md.connection_info.port);

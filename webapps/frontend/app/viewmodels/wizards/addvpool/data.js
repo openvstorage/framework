@@ -79,7 +79,6 @@ define(['jquery', 'knockout'], function($, ko){
 
     singleton = function() {
         var wizardData = {
-            // 'FC' stands for Accelerated Alba
             backend:                 ko.observable(),
             backends:                ko.observableArray([]),
             clientID:                ko.observable('').extend({removeWhiteSpaces: null}),

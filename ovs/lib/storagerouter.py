@@ -755,6 +755,7 @@ class StorageRouterController(object):
                                               'cache_on_read': block_cache_on_read,
                                               'cache_on_write': block_cache_on_write}]
 
+            # TODO: Replace by feature detection once merged back to development
             enterprise = 'ee' in root_client.run(['alba', 'version', '--terse'])
 
             main_proxy_config = {'log_level': 'info',
@@ -768,7 +769,7 @@ class StorageRouterController(object):
             if enterprise is True:
                 main_proxy_config['block_cache'] = block_cache_info
             else:
-                StorageRouterController._logger.warning('No enterprise support and quick-n-dirty code; things might get interesting')
+                StorageRouterController._logger.warning('No enterprise support and enterprise-only code; things might get interesting')
             Configuration.set(config_tree.format('main'),
                               json.dumps(main_proxy_config, indent=4),
                               raw=True)
@@ -777,14 +778,13 @@ class StorageRouterController(object):
                                   'ips': ['127.0.0.1'],
                                   'manifest_cache_size': manifest_cache_size,
                                   'fragment_cache': fragment_cache_scrub_info,
-                                  'block_cache': block_cache_scrub_info,
                                   'transport': 'tcp',
                                   'read_preference': read_preferences,
                                   'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
             if enterprise is True:
-                scrub_proxy_config['block_cache'] = block_cache_info
+                scrub_proxy_config['block_cache'] = block_cache_scrub_info
             else:
-                StorageRouterController._logger.warning('No enterprise support and quick-n-dirty code; things might get interesting')
+                StorageRouterController._logger.warning('No enterprise support and enterprise-only code; things might get interesting')
             Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid),
                               json.dumps(scrub_proxy_config, indent=4),
                               raw=True)
