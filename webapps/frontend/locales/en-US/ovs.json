@@ -158,6 +158,7 @@
         "iops": "IOPS",
         "ip": "IP",
         "latency": "Latency",
+        "local": "local",
         "loadingdata": "Loading data...",
         "logout": "Log out",
         "machine": "Machine",
@@ -185,6 +186,7 @@
         "null": "-",
         "of": "of",
         "ok": "OK",
+        "on": "on",
         "partitionroles": {
             "backend": "Backend",
             "db": "DB",
@@ -196,6 +198,7 @@
         "password": "Password",
         "performance": "Performance",
         "port": "Port",
+        "preset": "preset",
         "previous": "&laquo; Previous",
         "rawdisk": "Raw disk",
         "rawpartition": "Raw partition",
@@ -668,13 +671,12 @@
         "title": "vDisks"
     },
     "vpools": {
-        "accelerated_backend": "Accelerated Backend (Preset)",
         "add": "Add new vPool",
         "backend": "Backend",
         "backend_connection": "Connection",
         "backend_login": "Login",
         "backend_preset": "Backend (Preset)",
-        "caching": "Caching",
+        "block_caching": "Block caching",
         "caching_types": {
             "none": "No Caching",
             "read": "Read",
@@ -703,6 +705,7 @@
         "dtl_disabled": "Disabled",
         "dtl_mode": "DTL Mode",
         "dtl_transport": "DTL Transport",
+        "fragment_caching": "Fragment caching",
         "global_write_buffer": "Global Write Buffer",
         "preset": "Preset",
         "proxies_amount": "# Proxies",
