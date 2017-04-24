@@ -79,42 +79,54 @@ define(['jquery', 'knockout'], function($, ko){
 
     singleton = function() {
         var wizardData = {
-            // 'aa' stands for Accelerated Alba
+            // 'FC' stands for Accelerated Alba
             backend:                 ko.observable(),
-            backendAA:               ko.observable(),
             backends:                ko.observableArray([]),
             clientID:                ko.observable('').extend({removeWhiteSpaces: null}),
-            clientIDAA:              ko.observable('').extend({removeWhiteSpaces: null}),
             clientSecret:            ko.observable('').extend({removeWhiteSpaces: null}),
-            clientSecretAA:          ko.observable('').extend({removeWhiteSpaces: null}),
             clusterSize:             ko.observable(4),
             dtlEnabled:              ko.observable(true),
             dtlMode:                 ko.observable(),
             dtlTransportMode:        ko.observable({name: 'tcp'}),
-            fragmentCacheOnRead:     ko.observable(true),
-            fragmentCacheOnWrite:    ko.observable(true),
             host:                    ko.observable('').extend({regex: hostRegex}),
-            hostAA:                  ko.observable('').extend({regex: hostRegex}),
             localHost:               ko.observable(true),
-            localHostAA:             ko.observable(true),
             name:                    ko.observable('').extend({regex: nameRegex}),
             partitions:              ko.observable(),
             port:                    ko.observable(80).extend({ numeric: {min: 1, max: 65536}}),
-            portAA:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
             preset:                  ko.observable(),
-            presetAA:                ko.observable(),
             proxyAmount:             ko.observable(2).extend({numeric: {min: 1, max: 16}}),
             scoSize:                 ko.observable(4),
             storageIP:               ko.observable().extend({regex: ipRegex, identifier: 'storageip'}),
             storageRouter:           ko.observable(),
             storageRoutersAvailable: ko.observableArray([]),
             storageRoutersUsed:      ko.observableArray([]),
-            useAA:                   ko.observable(false),
             vPool:                   ko.observable(),
             vPools:                  ko.observableArray([]),
             writeBufferGlobal:       ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}}),
             writeBufferGlobalMax:    ko.observable(),
-            writeBufferVolume:       ko.observable(128).extend({numeric: {min: 128, max: 10240}})
+            writeBufferVolume:       ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
+            // Fragment cache
+            backendFC:               ko.observable(),
+            clientIDFC:              ko.observable('').extend({removeWhiteSpaces: null}),
+            clientSecretFC:          ko.observable('').extend({removeWhiteSpaces: null}),
+            fragmentCacheOnRead:     ko.observable(true),
+            fragmentCacheOnWrite:    ko.observable(true),
+            hostFC:                  ko.observable('').extend({regex: hostRegex}),
+            localHostFC:             ko.observable(true),
+            portFC:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
+            presetFC:                ko.observable(),
+            useFC:                   ko.observable(false),
+            // Block cache
+            backendBC:               ko.observable(),
+            blockCacheOnRead:        ko.observable(true),
+            blockCacheOnWrite:       ko.observable(true),
+            clientIDBC:              ko.observable('').extend({removeWhiteSpaces: null}),
+            clientSecretBC:          ko.observable('').extend({removeWhiteSpaces: null}),
+            hostBC:                  ko.observable('').extend({regex: hostRegex}),
+            localHostBC:             ko.observable(true),
+            portBC:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
+            presetBC:                ko.observable(),
+            useBC:                   ko.observable(false)
         };
 
         // Computed
@@ -138,20 +150,37 @@ define(['jquery', 'knockout'], function($, ko){
             }
             return presets;
         });
-        wizardData.enhancedPresetsAA = ko.computed(function(){
-            if (wizardData.backendAA() === undefined){
-                wizardData.presetAA(undefined);
+        wizardData.enhancedPresetsFC = ko.computed(function(){
+            if (wizardData.backendFC() === undefined){
+                wizardData.presetFC(undefined);
                 return []
             }
-            var presets = parsePresets(wizardData.backendAA()),
+            var presets = parsePresets(wizardData.backendFC()),
                 presetNames = [];
-            $.each(wizardData.backendAA().presets, function(_, preset) {
+            $.each(wizardData.backendFC().presets, function(_, preset) {
                 presetNames.push(preset.name);
             });
-            if (wizardData.presetAA() === undefined) {
-                wizardData.presetAA(presets[0]);
-            } else if (!presetNames.contains(wizardData.presetAA().name)) {
-                wizardData.presetAA(presets[0]);
+            if (wizardData.presetFC() === undefined) {
+                wizardData.presetFC(presets[0]);
+            } else if (!presetNames.contains(wizardData.presetFC().name)) {
+                wizardData.presetFC(presets[0]);
+            }
+            return presets;
+        });
+        wizardData.enhancedPresetsBC = ko.computed(function(){
+            if (wizardData.backendBC() === undefined){
+                wizardData.presetBC(undefined);
+                return []
+            }
+            var presets = parsePresets(wizardData.backendBC()),
+                presetNames = [];
+            $.each(wizardData.backendBC().presets, function(_, preset) {
+                presetNames.push(preset.name);
+            });
+            if (wizardData.presetBC() === undefined) {
+                wizardData.presetBC(presets[0]);
+            } else if (!presetNames.contains(wizardData.presetBC().name)) {
+                wizardData.presetBC(presets[0]);
             }
             return presets;
         });

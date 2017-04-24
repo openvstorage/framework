@@ -23,14 +23,6 @@ but WITHOUT ANY WARRANTY of any kind.
             <b data-i18n="ovs:wizards.add_vpool.confirm.alba_backend"></b>
             <span data-bind="text: data.backend() !== undefined ? data.backend().name : ''"></span>
             <ul>
-                <li>
-                    <b data-i18n="ovs:wizards.add_vpool.confirm.fragment_cache_read"></b>
-                    <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.fragment_cache_info.' + data.fragmentCacheOnRead()"></span>
-                </li>
-                <li>
-                    <b data-i18n="ovs:wizards.add_vpool.confirm.fragment_cache_write"></b>
-                    <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.fragment_cache_info.' + data.fragmentCacheOnWrite()"></span>
-                </li>
                 <li data-bind="visible: !data.localHost()">
                     <b data-i18n="ovs:wizards.add_vpool.confirm.host"></b>
                     <span data-bind="text: data.host"></span>
@@ -48,26 +40,77 @@ but WITHOUT ANY WARRANTY of any kind.
                 </li>
             </ul>
         </li>
-        <li data-bind="visible: data.useAA()">
-            <b data-i18n="ovs:wizards.add_vpool.confirm.accelerated_backend"></b>
-            <span data-bind="text: data.backendAA() !== undefined ? data.backendAA().name : ''"></span>
+        <li>
+            <b data-i18n="ovs:wizards.add_vpool.confirm.fragment_cache"></b>
             <ul>
-                <li data-bind="visible: !data.localHostAA()">
-                    <b data-i18n="ovs:wizards.add_vpool.confirm.host"></b>
-                    <span data-bind="text: data.hostAA"></span>
-                </li>
-                <li data-bind="visible: !data.localHostAA()">
-                    <b data-i18n="ovs:wizards.add_vpool.confirm.port"></b>
-                    <span data-bind="text: data.portAA"></span>
-                </li>
-                <li data-bind="visible: !data.localHostAA()">
-                    <b data-i18n="ovs:wizards.add_vpool.confirm.client_id"></b> <span data-bind="text: data.clientIDAA"></span>
+                <li>
+                    <b data-i18n="ovs:wizards.add_vpool.confirm.fragment_cache_read"></b>
+                    <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.fragment_cache_info.' + data.fragmentCacheOnRead()"></span>
                 </li>
                 <li>
-                    <b data-i18n="ovs:wizards.add_vpool.confirm.alba_preset"></b>
-                    <span data-bind="text: data.presetAA() !== undefined ? data.presetAA().name : ''"></span>
+                    <b data-i18n="ovs:wizards.add_vpool.confirm.fragment_cache_write"></b>
+                    <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.fragment_cache_info.' + data.fragmentCacheOnWrite()"></span>
                 </li>
             </ul>
+            <div data-bind="visible: data.useFC()">
+                <ul>
+                    <li>
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.backend"></b>
+                        <span data-bind="text: data.backendFC() !== undefined ? data.backendFC().name : ''"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostFC()">
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.host"></b>
+                        <span data-bind="text: data.hostFC"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostFC()">
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.port"></b>
+                        <span data-bind="text: data.portFC"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostFC()">
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.client_id"></b> <span data-bind="text: data.clientIDFC"></span>
+                    </li>
+                    <li>
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.alba_preset"></b>
+                        <span data-bind="text: data.presetFC() !== undefined ? data.presetFC().name : ''"></span>
+                    </li>
+                </ul>
+            </div>
+        </li>
+        <li>
+            <b data-i18n="ovs:wizards.add_vpool.confirm.block_cache"></b>
+            <ul>
+                <li>
+                    <b data-i18n="ovs:wizards.add_vpool.confirm.block_cache_read"></b>
+                    <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.block_cache_info.' + data.blockCacheOnRead()"></span>
+                </li>
+                <li>
+                    <b data-i18n="ovs:wizards.add_vpool.confirm.block_cache_write"></b>
+                    <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.block_cache_info.' + data.blockCacheOnWrite()"></span>
+                </li>
+            </ul>
+            <div data-bind="visible: data.useBC()">
+                <ul>
+                    <li>
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.backend"></b>
+                        <span data-bind="text: data.backendBC() !== undefined ? data.backendBC().name : ''"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostBC()">
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.host"></b>
+                        <span data-bind="text: data.hostBC"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostBC()">
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.port"></b>
+                        <span data-bind="text: data.portBC"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostBC()">
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.client_id"></b> <span data-bind="text: data.clientIDBC"></span>
+                    </li>
+                    <li>
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.alba_preset"></b>
+                        <span data-bind="text: data.presetBC() !== undefined ? data.presetBC().name : ''"></span>
+                    </li>
+                </ul>
+            </div>
         </li>
     </ul>
     <p data-i18n="ovs:wizards.add_vpool.confirm.storagerouter_info"></p>

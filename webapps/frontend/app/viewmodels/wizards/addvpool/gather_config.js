@@ -65,10 +65,13 @@ define([
                         largest_sata = value['available']
                     }
                 });
-                if (self.data.useAA() === false && (self.data.fragmentCacheOnRead() === true || self.data.fragmentCacheOnWrite() === true)) {
-                    var proportion = (largest_ssd || largest_sata) * 100.0 / total_available,
+                var useLocalFC = self.data.useFC() === false && (self.data.fragmentCacheOnRead() === true || self.data.fragmentCacheOnWrite() === true);
+                var useLocalBC = self.data.useBC() === false && (self.data.blockCacheOnRead() === true || self.data.blockCacheOnWrite() === true);
+                if (useLocalFC || useLocalBC) {
+                    var proxies = useLocalFC && useLocalBC ? amount_of_proxies * 2 : amount_of_proxies,
+                        proportion = (largest_ssd || largest_sata) * 100.0 / total_available,
                         available = proportion * self.data.writeBufferGlobal() * Math.pow(1024, 3) / 100 * 0.10,  // Only 10% is used on the largest WRITE partition for fragment caching
-                        fragment_size = available / amount_of_proxies;
+                        fragment_size = available / proxies;
                     if (fragment_size < Math.pow(1024, 3)) {
                         while (maximum > 0) {
                             if (available / maximum > Math.pow(1024, 3)) {
@@ -76,11 +79,12 @@ define([
                             }
                             maximum -= 1;
                         }
+                        var thisMaximum = proxies > amount_of_proxies ? Math.floor(maximum / 2) : maximum;
                         fields.push('writeBufferGlobal');
-                        if (maximum == 0) {
+                        if (thisMaximum === 0) {
                             reasons.push($.t('ovs:wizards.add_vpool.gather_config.fragment_cache_no_proxies'));
                         } else {
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_config.fragment_cache_too_small', {amount: maximum, multiple: maximum === 1 ? 'y' : 'ies'}));
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_config.fragment_cache_too_small', {amount: thisMaximum, multiple: thisMaximum === 1 ? 'y' : 'ies'}));
                         }
                     }
                 }
