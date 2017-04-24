@@ -175,7 +175,7 @@ define([
                                     api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
                                         .then(function(data) {
                                             if (data.guid !== self.data.backend().guid) {
-                                                if (Object.keys(data.asd_statistics).length > 0 || data.scaling === 'GLOBAL') {
+                                                if ((data.asd_statistics !== undefined && Object.keys(data.asd_statistics).length > 0) || data.scaling === 'GLOBAL') {
                                                     available_backends.push(data);
                                                     self.albaPresetMap()[data.guid] = {};
                                                     $.each(data.presets, function (_, preset) {
