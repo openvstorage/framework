@@ -32,8 +32,8 @@ define([
 
         // Observables
         self.albaPresetMap          = ko.observable({});
-        self.backendsAA             = ko.observableArray([]);
-        self.fragmentCacheSettings  = ko.observableArray(['write', 'read', 'rw', 'none']);
+        self.backendsBC             = ko.observableArray([]);
+        self.blockCacheSettings     = ko.observableArray(['write', 'read', 'rw', 'none']);
         self.invalidAlbaInfo        = ko.observable(false);
         self.loadingBackends        = ko.observable(false);
         self.localBackendsAvailable = ko.observable(true);
@@ -42,9 +42,9 @@ define([
         // Computed
         self.isPresetAvailable = ko.computed(function() {
             var presetAvailable = true;
-            if (self.data.backendAA() !== undefined && self.data.presetAA() !== undefined && self.data.useAA() === true) {
-                var guid = self.data.backendAA().guid,
-                    name = self.data.presetAA().name;
+            if (self.data.backendBC() !== undefined && self.data.presetBC() !== undefined && self.data.useBC() === true) {
+                var guid = self.data.backendBC().guid,
+                    name = self.data.presetBC().name;
                 if (self.albaPresetMap().hasOwnProperty(guid) && self.albaPresetMap()[guid].hasOwnProperty(name)) {
                     presetAvailable = self.albaPresetMap()[guid][name];
                 }
@@ -57,7 +57,7 @@ define([
                 return temp;
             }
             $.each(self.data.storageRoutersUsed(), function(index, sr) {
-                if (self.data.vPool().metadata().hasOwnProperty('backend_aa_' + sr.guid())) {
+                if (self.data.vPool().metadata().hasOwnProperty('backend_bc_' + sr.guid())) {
                     temp.push(sr);
                 }
             });
@@ -66,29 +66,29 @@ define([
         });
         self.canContinue = ko.computed(function() {
             var showErrors = false, reasons = [], fields = [];
-            if (self.data.useAA()) {
+            if (self.data.useBC()) {
                 if (self.loadingBackends() === true) {
-                    reasons.push($.t('ovs:wizards.add_vpool.gather_backend.backends_loading'));
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.backends_loading'));
                 } else {
-                    if (self.data.backendAA() === undefined && self.invalidAlbaInfo() === false) {
-                        reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_backend'));
+                    if (self.data.backendBC() === undefined && self.invalidAlbaInfo() === false) {
+                        reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.choose_backend'));
                         fields.push('backend');
-                    } else if (self.data.presetAA() === undefined && self.invalidAlbaInfo() === false) {
-                        reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_preset'));
+                    } else if (self.data.presetBC() === undefined && self.invalidAlbaInfo() === false) {
+                        reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.choose_preset'));
                         fields.push('preset');
                     }
-                    if (!self.data.localHostAA()) {
-                        if (!self.data.hostAA.valid()) {
+                    if (!self.data.localHostBC()) {
+                        if (!self.data.hostBC.valid()) {
                             fields.push('host');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_host'));
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_host'));
                         }
-                        if (self.data.clientIDAA() === '' || self.data.clientSecretAA() === '') {
+                        if (self.data.clientIDBC() === '' || self.data.clientSecretBC() === '') {
                             fields.push('clientid');
                             fields.push('clientsecret');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.no_credentials'));
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.no_credentials'));
                         }
                         if (self.invalidAlbaInfo()) {
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_alba_info'));
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_alba_info'));
                             fields.push('clientid');
                             fields.push('clientsecret');
                             fields.push('host');
@@ -98,34 +98,34 @@ define([
             }
             return { value: reasons.length === 0, showErrors: showErrors, reasons: reasons, fields: fields };
         });
-        self.fragmentCacheSetting = ko.computed({
+        self.blockCacheSetting = ko.computed({
             read: function() {
-                if (self.data.fragmentCacheOnRead() && self.data.fragmentCacheOnWrite()) {
+                if (self.data.blockCacheOnRead() && self.data.blockCacheOnWrite()) {
                     return 'rw';
                 }
-                if (self.data.fragmentCacheOnRead() || self.data.fragmentCacheOnWrite()) {
-                    return self.data.fragmentCacheOnRead() ? 'read' : 'write';
+                if (self.data.blockCacheOnRead() || self.data.blockCacheOnWrite()) {
+                    return self.data.blockCacheOnRead() ? 'read' : 'write';
                 }
                 return 'none';
             },
             write: function(cache) {
-                self.data.fragmentCacheOnRead(['rw', 'read'].contains(cache));
-                self.data.fragmentCacheOnWrite(['rw', 'write'].contains(cache));
+                self.data.blockCacheOnRead(['rw', 'read'].contains(cache));
+                self.data.blockCacheOnWrite(['rw', 'write'].contains(cache));
                 if (cache === 'none') {
-                    self.data.useAA(false);
+                    self.data.useBC(false);
                 }
             }
         });
 
         // Functions
-        self.resetBackendsAA = function() {
-            self.backendsAA([]);
-            self.data.backendAA(undefined);
-            self.data.presetAA(undefined);
+        self.resetBackendsBC = function() {
+            self.backendsBC([]);
+            self.data.backendBC(undefined);
+            self.data.presetBC(undefined);
         };
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
-                if (self.data.vPool() !== undefined && !self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite()) {
+                if (self.data.vPool() !== undefined && !self.data.blockCacheOnRead() && !self.data.blockCacheOnWrite()) {
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);
@@ -139,12 +139,12 @@ define([
                     getData = {
                         contents: 'available'
                     };
-                if (!self.data.localHostAA()) {
+                if (!self.data.localHostBC()) {
                     relay = 'relay/';
-                    remoteInfo.ip = self.data.hostAA();
-                    remoteInfo.port = self.data.portAA();
-                    remoteInfo.client_id = self.data.clientIDAA().replace(/\s+/, "");
-                    remoteInfo.client_secret = self.data.clientSecretAA().replace(/\s+/, "");
+                    remoteInfo.ip = self.data.hostBC();
+                    remoteInfo.port = self.data.portBC();
+                    remoteInfo.client_id = self.data.clientIDBC().replace(/\s+/, "");
+                    remoteInfo.client_secret = self.data.clientSecretBC().replace(/\s+/, "");
                 }
                 $.extend(getData, remoteInfo);
                 self.loadingBackends(true);
@@ -187,32 +187,32 @@ define([
                                     available_backends.sort(function(backend1, backend2) {
                                         return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
                                     });
-                                    self.backendsAA(available_backends);
-                                    if (self.data.backendAA() === undefined) {
-                                        self.data.backendAA(available_backends[0]);
-                                        self.data.presetAA(self.data.enhancedPresetsAA()[0]);
+                                    self.backendsBC(available_backends);
+                                    if (self.data.backendBC() === undefined) {
+                                        self.data.backendBC(available_backends[0]);
+                                        self.data.presetBC(self.data.enhancedPresetsBC()[0]);
                                     }
                                 } else {
-                                    self.backendsAA([]);
-                                    self.data.backendAA(undefined);
-                                    self.data.presetAA(undefined);
+                                    self.backendsBC([]);
+                                    self.data.backendBC(undefined);
+                                    self.data.presetBC(undefined);
                                 }
                                 self.loadingBackends(false);
                             })
                             .done(albaDeferred.resolve)
                             .fail(function() {
-                                self.backendsAA([]);
-                                self.data.backendAA(undefined);
-                                self.data.presetAA(undefined);
+                                self.backendsBC([]);
+                                self.data.backendBC(undefined);
+                                self.data.presetBC(undefined);
                                 self.loadingBackends(false);
                                 self.invalidAlbaInfo(true);
                                 albaDeferred.reject();
                             });
                     })
                     .fail(function() {
-                        self.backendsAA([]);
-                        self.data.backendAA(undefined);
-                        self.data.presetAA(undefined);
+                        self.backendsBC([]);
+                        self.data.backendBC(undefined);
+                        self.data.presetBC(undefined);
                         self.loadingBackends(false);
                         self.invalidAlbaInfo(true);
                         albaDeferred.reject();
@@ -223,76 +223,76 @@ define([
         // Durandal
         self.activate = function() {
             // Subscriptions
-            self.useAASubscription = self.data.useAA.subscribe(function(accelerated) {
-                if (accelerated === true && self.backendsAA().length === 0) {
+            self.useBCSubscription = self.data.useBC.subscribe(function(accelerated) {
+                if (accelerated === true && self.backendsBC().length === 0) {
                     self.loadBackends();
                 }
             });
             self.reUsedStorageRouterSubscription = self.reUsedStorageRouter.subscribe(function(sr) {
-                if (sr === undefined && !self.data.localHostAA() && self.data.storageRoutersUsed().length > 0) {
-                    self.data.hostAA('');
-                    self.data.portAA(80);
-                    self.data.clientIDAA('');
-                    self.data.clientSecretAA('');
+                if (sr === undefined && !self.data.localHostBC() && self.data.storageRoutersUsed().length > 0) {
+                    self.data.hostBC('');
+                    self.data.portBC(80);
+                    self.data.clientIDBC('');
+                    self.data.clientSecretBC('');
                 }
-                if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_aa_' + sr.guid())) {
-                    var md = self.data.vPool().metadata()['backend_aa_' + sr.guid()];
+                if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_bc_' + sr.guid())) {
+                    var md = self.data.vPool().metadata()['backend_bc_' + sr.guid()];
                     if (md.hasOwnProperty('connection_info')) {
-                        self.data.hostAA(md.connection_info.host);
-                        self.data.portAA(md.connection_info.port);
-                        self.data.clientIDAA(md.connection_info.client_id);
-                        self.data.clientSecretAA(md.connection_info.client_secret);
+                        self.data.hostBC(md.connection_info.host);
+                        self.data.portBC(md.connection_info.port);
+                        self.data.clientIDBC(md.connection_info.client_id);
+                        self.data.clientSecretBC(md.connection_info.client_secret);
                     }
                 }
             });
-            self.hostAASubscription = self.data.hostAA.subscribe(self.resetBackendsAA);
-            self.portAASubscription = self.data.portAA.subscribe(self.resetBackendsAA);
-            self.clientIDAASubscription = self.data.clientIDAA.subscribe(self.resetBackendsAA);
-            self.clientSecretAASubscription = self.data.clientSecretAA.subscribe(self.resetBackendsAA);
-            self.localHostAASubscription = self.data.localHostAA.subscribe(function(local) {
-                self.data.hostAA('');
-                self.data.portAA(80);
-                self.data.clientIDAA('');
-                self.data.clientSecretAA('');
+            self.hostBCSubscription = self.data.hostBC.subscribe(self.resetBackendsBC);
+            self.portBCSubscription = self.data.portBC.subscribe(self.resetBackendsBC);
+            self.clientIDBCSubscription = self.data.clientIDBC.subscribe(self.resetBackendsBC);
+            self.clientSecretBCSubscription = self.data.clientSecretBC.subscribe(self.resetBackendsBC);
+            self.localHostBCSubscription = self.data.localHostBC.subscribe(function(local) {
+                self.data.hostBC('');
+                self.data.portBC(80);
+                self.data.clientIDBC('');
+                self.data.clientSecretBC('');
                 self.reUsedStorageRouter(undefined);
-                if (local === true && self.data.useAA() === true && self.backendsAA().length === 0) {
+                if (local === true && self.data.useBC() === true && self.backendsBC().length === 0) {
                     self.loadBackends();
                 }
             });
 
             var localBackendsRequiredAmount = self.data.localHost() === true ? 2 : 1;
             if (self.data.backends().length >= localBackendsRequiredAmount) {
-                self.data.localHostAA(true);
+                self.data.localHostBC(true);
                 self.localBackendsAvailable(true);
             } else {
-                self.data.localHostAA(false);
+                self.data.localHostBC(false);
                 self.localBackendsAvailable(false);
             }
 
-            if (self.data.backend() !== undefined && self.data.backendAA() !== undefined && self.data.backend().guid === self.data.backendAA().guid) {
-                self.backendsAA([]);
+            if (self.data.backend() !== undefined && self.data.backendBC() !== undefined && self.data.backend().guid === self.data.backendBC().guid) {
+                self.backendsBC([]);
                 $.each(self.data.backends(), function (_, backend) {
-                    if (backend !== self.data.backend() && !self.backendsAA().contains(backend)) {
-                        self.backendsAA().push(backend);
+                    if (backend !== self.data.backend() && !self.backendsBC().contains(backend)) {
+                        self.backendsBC().push(backend);
                     }
                 });
-                if (self.backendsAA().length === 0) {
-                    self.data.backendAA(undefined);
-                    self.data.presetAA(undefined);
+                if (self.backendsBC().length === 0) {
+                    self.data.backendBC(undefined);
+                    self.data.presetBC(undefined);
                 } else {
-                    self.data.backendAA(self.backendsAA()[0]);
-                    self.data.presetAA(self.data.enhancedPresetsAA()[0]);
+                    self.data.backendBC(self.backendsBC()[0]);
+                    self.data.presetBC(self.data.enhancedPresetsBC()[0]);
                 }
             }
             self.loadBackends();
         };
         self.deactivate = function() {
-            self.useAASubscription.dispose();
-            self.hostAASubscription.dispose();
-            self.portAASubscription.dispose();
-            self.clientIDAASubscription.dispose();
-            self.localHostAASubscription.dispose();
-            self.clientSecretAASubscription.dispose();
+            self.useBCSubscription.dispose();
+            self.hostBCSubscription.dispose();
+            self.portBCSubscription.dispose();
+            self.clientIDBCSubscription.dispose();
+            self.localHostBCSubscription.dispose();
+            self.clientSecretBCSubscription.dispose();
             self.reUsedStorageRouterSubscription.dispose();
         }
     };
