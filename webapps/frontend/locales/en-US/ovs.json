@@ -766,7 +766,7 @@
                 "alba_preset": "Preset:",
                 "backend": "Backend:",
                 "basic_info": "Validate the basic vPool information.",
-                "block_cache": "Block cache:",
+                "block_cache": "Block Cache:",
                 "block_cache_info": {
                     "true": "Active",
                     "false": "Inactive"
@@ -778,7 +778,7 @@
                 "creating": "creating the vPool",
                 "dtl_transport": "DTL Transport Mode:",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take several minutes.",
-                "fragment_cache": "Fragment cache:",
+                "fragment_cache": "Fragment Cache:",
                 "fragment_cache_info": {
                     "true": "Active",
                     "false": "Inactive"
@@ -802,12 +802,12 @@
                 "alba_preset": "Preset:",
                 "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
                 "backends_loading": "Backends are being loaded",
-                "basic_info": "Configure additional caching (Block cache)",
+                "basic_info": "Configure additional caching (Block Cache)",
                 "choose_backend": "Choose one of the available backends",
                 "choose_preset": "Choose one of the available presets",
                 "client_id": "Client ID:",
                 "client_secret": "Client Secret:",
-                "block_cache": "Block cache:",
+                "block_cache": "Block Cache:",
                 "host": "Host (FQDN/IP):",
                 "information_extend": "Extending a vPool does not allow to reconfigure the caching policy",
                 "invalid_alba_info": "The entered connection info and credentials are invalid",
@@ -818,7 +818,7 @@
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
                 "re_use_connection_info": "Re-use connection info:",
-                "use_backend_bc": "Use another Backend as cache",
+                "use_backend_bc": "Use another Backend as Cache",
                 "use_local": "Use local disk"
             },
             "gather_fragment_cache": {
@@ -827,12 +827,12 @@
                 "alba_preset": "Preset:",
                 "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
                 "backends_loading": "Backends are being loaded",
-                "basic_info": "Configure additional caching (Fragment cache)",
+                "basic_info": "Configure additional caching (Fragment Cache)",
                 "choose_backend": "Choose one of the available backends",
                 "choose_preset": "Choose one of the available presets",
                 "client_id": "Client ID:",
                 "client_secret": "Client Secret:",
-                "fragment_cache": "Fragment cache:",
+                "fragment_cache": "Fragment Cache:",
                 "host": "Host (FQDN/IP):",
                 "information_extend": "Extending a vPool does not allow to reconfigure the caching policy",
                 "invalid_alba_info": "The entered connection info and credentials are invalid",
@@ -843,7 +843,7 @@
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
                 "re_use_connection_info": "Re-use connection info:",
-                "use_backend_fc": "Use another Backend as cache",
+                "use_backend_fc": "Use another Backend as Cache",
                 "use_local": "Use local disk"
             },
             "gather_config": {
@@ -851,8 +851,8 @@
                 "dtl": "Distributed Transaction Log Information",
                 "dtl_mode": "Mode:",
                 "dtl_transport": "Transport Mode:",
-                "fragment_cache_no_proxies": "No proxies can be deployed making use of local fragment cache with current Global Write Buffer size",
-                "fragment_cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local fragment cache with current Global Write Buffer size",
+                "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
+                "cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local Cache with current Global Write Buffer size",
                 "global_write_buffer": "Global Write Buffer:",
                 "global_write_buffer_available": "Dedicated global Write Buffer space:",
                 "information": "Information about the available space:",

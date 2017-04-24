@@ -82,9 +82,9 @@ define([
                         var thisMaximum = proxies > amount_of_proxies ? Math.floor(maximum / 2) : maximum;
                         fields.push('writeBufferGlobal');
                         if (thisMaximum === 0) {
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_config.fragment_cache_no_proxies'));
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_config.cache_no_proxies'));
                         } else {
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_config.fragment_cache_too_small', {amount: thisMaximum, multiple: thisMaximum === 1 ? 'y' : 'ies'}));
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_config.cache_too_small', {amount: thisMaximum, multiple: thisMaximum === 1 ? 'y' : 'ies'}));
                         }
                     }
                 }
