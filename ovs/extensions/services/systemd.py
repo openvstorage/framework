@@ -91,7 +91,7 @@ class Systemd(object):
                        'STARTUP_DEPENDENCY': '' if startup_dependency is None else '{0}.service'.format(startup_dependency)})
         template_content = client.file_read(template_file)
         for key, value in params.iteritems():
-            template_content = template_content.replace('<{0}>'.format(key), value)
+            template_content = template_content.replace('<{0}>'.format(key), str(value))
         client.file_write('/lib/systemd/system/{0}.service'.format(service_name), template_content)
 
         try:
@@ -430,3 +430,36 @@ class Systemd(object):
                                                                                           rabbitmq_pid_ctl,
                                                                                           rabbitmq_pid_sm))
         return rabbitmq_running, same_process
+
+    @staticmethod
+    def extract_from_service_file(name, client, entries=None):
+        """
+        Extract an entry, multiple entries or the entire service file content for a service
+        :param name: Name of the service
+        :type name: str
+        :param client: Client on which to extract something from the service file
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param entries: Entries to extract
+        :type entries: list
+        :return: The requested entry information or entire service file content if entry=None
+        :rtype: list
+        """
+        if Systemd.has_service(name=name, client=client) is False:
+            return []
+
+        try:
+            name = Systemd._get_name(name=name, client=client)
+            contents = client.file_read('/lib/systemd/system/{0}.service'.format(name)).splitlines()
+        except Exception:
+            Systemd._logger.exception('Failure to retrieve contents for service {0} on node with IP {1}'.format(name, client.ip))
+            return []
+
+        if entries is None:
+            return contents
+
+        return_value = []
+        for line in contents:
+            for entry in entries:
+                if entry in line:
+                    return_value.append(line)
+        return return_value

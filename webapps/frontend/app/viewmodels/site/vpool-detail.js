@@ -180,21 +180,37 @@ define([
         };
         self.addStorageRouter = function(sr) {
             self.updatingStorageRouters(true);
-
-            var deferred = $.Deferred(),
-                wizard = new ExtendVPool({
-                    modal: true,
-                    completed: deferred,
-                    vPool: self.vPool(),
-                    storageRouter: sr
+            if (self.vPool().extensible()) {
+                var deferred = $.Deferred(),
+                    wizard = new ExtendVPool({
+                        modal: true,
+                        completed: deferred,
+                        vPool: self.vPool(),
+                        storageRouter: sr
+                    });
+                wizard.closing.always(function() {
+                    deferred.resolve();
                 });
-            wizard.closing.always(function() {
-                deferred.resolve();
-            });
-            dialog.show(wizard);
-            deferred.always(function() {
-                self.updatingStorageRouters(false);
-            });
+                dialog.show(wizard);
+                deferred.always(function() {
+                    self.updatingStorageRouters(false);
+                });
+            } else {
+                var reasons = self.vPool().notExtensibleReasons(),
+                    message = $.t('ovs:wizards.extend_vpool.prohibited.message', {name: self.vPool().name(), multi: reasons.length === 1 ? '' : 's'});
+                $.each(reasons, function(index, reason) {
+                    message += '<li>' + $.t('ovs:wizards.extend_vpool.prohibited.reasons.' + reason) + '</li>';
+                }) ;
+                message += '</ul>';
+                app.showMessage(
+                    message,
+                    $.t('ovs:wizards.extend_vpool.prohibited.title', {name: self.vPool().name()}),
+                    [$.t('ovs:generic.ok')]
+                )
+                    .always(function() {
+                        self.updatingStorageRouters(false);
+                    });
+            }
         };
         self.removeStorageRouter = function(sr) {
             var single = generic.keys(self.srSDMap()).length === 1;
