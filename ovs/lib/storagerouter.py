@@ -763,7 +763,10 @@ class StorageRouterController(object):
                                                       'alba_connection_rora_manifest_cache_capacity': manifest_cache_size,
                                                       'backend_type': 'ALBA'}
         volume_router = {'vrouter_id': vrouter_id,
-                         'vrouter_redirect_timeout_ms': '5000',
+                         'vrouter_redirect_timeout_ms': '120000',
+                         'vrouter_keepalive_time_secs': '15',
+                         'vrouter_keepalive_interval_secs': '5',
+                         'vrouter_keepalive_retries': '2',
                          'vrouter_routing_retries': 10,
                          'vrouter_volume_read_threshold': 0,
                          'vrouter_volume_write_threshold': 0,
