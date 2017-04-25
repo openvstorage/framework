@@ -43,8 +43,6 @@ define([
         // Cleaning data (main)
         data.backend(undefined);
         data.backends([]);
-        data.cacheQuota(undefined);
-        data.cacheQuotaConfigured(false);
         data.clientID('');
         data.clientSecret('');
         data.clusterSize(4);
@@ -67,6 +65,8 @@ define([
         
         // Fragment cache
         data.backendFC(undefined);
+        data.cacheQuotaFC(undefined);
+        data.cacheQuotaFCConfigured(false);
         data.clientIDFC('');
         data.clientSecretFC('');
         data.fragmentCacheOnRead(true);
@@ -79,6 +79,8 @@ define([
         
         // Block cache
         data.backendBC(undefined);
+        data.cacheQuotaBC(undefined);
+        data.cacheQuotaBCConfigured(false);
         data.blockCacheOnRead(true);
         data.blockCacheOnWrite(true);
         data.clientIDBC('');

@@ -133,7 +133,8 @@ class StorageDriver(DataObject):
 
         cache_read = None
         cache_write = None
-        cache_quota = None
+        cache_quota_fc = None
+        cache_quota_bc = None
         backend_info = None
         connection_info = None
         block_cache_read = None
@@ -155,13 +156,15 @@ class StorageDriver(DataObject):
             caching_info = self.vpool.metadata['backend']['caching_info'][self.storagerouter_guid]
             cache_read = caching_info['fragment_cache_on_read']
             cache_write = caching_info['fragment_cache_on_write']
-            cache_quota = caching_info.get('quota')
+            cache_quota_fc = caching_info.get('quota_fc')
+            cache_quota_bc = caching_info.get('quota_bc')
             block_cache_read = caching_info['block_cache_on_read']
             block_cache_write = caching_info['block_cache_on_write']
 
         return {'cache_read': cache_read,
                 'cache_write': cache_write,
-                'cache_quota': cache_quota,
+                'cache_quota_fc': cache_quota_fc,
+                'cache_quota_bc': cache_quota_bc,
                 'backend_info': backend_info,
                 'connection_info': connection_info,
                 'block_cache_read': block_cache_read,

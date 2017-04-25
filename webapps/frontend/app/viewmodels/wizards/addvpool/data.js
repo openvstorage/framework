@@ -81,8 +81,6 @@ define(['jquery', 'knockout'], function($, ko){
         var wizardData = {
             backend:                 ko.observable(),
             backends:                ko.observableArray([]),
-            cacheQuota:              ko.observable(),
-            cacheQuotaConfigured:    ko.observable(false),
             clientID:                ko.observable('').extend({removeWhiteSpaces: null}),
             clientSecret:            ko.observable('').extend({removeWhiteSpaces: null}),
             clusterSize:             ko.observable(4),
@@ -108,6 +106,8 @@ define(['jquery', 'knockout'], function($, ko){
             writeBufferVolume:       ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
             // Fragment cache
             backendFC:               ko.observable(),
+            cacheQuotaFC:            ko.observable(),
+            cacheQuotaFCConfigured:  ko.observable(false),
             clientIDFC:              ko.observable('').extend({removeWhiteSpaces: null}),
             clientSecretFC:          ko.observable('').extend({removeWhiteSpaces: null}),
             fragmentCacheOnRead:     ko.observable(true),
@@ -119,6 +119,8 @@ define(['jquery', 'knockout'], function($, ko){
             useFC:                   ko.observable(false),
             // Block cache
             backendBC:               ko.observable(),
+            cacheQuotaBC:            ko.observable(),
+            cacheQuotaBCConfigured:  ko.observable(false),
             blockCacheOnRead:        ko.observable(true),
             blockCacheOnWrite:       ko.observable(true),
             clientIDBC:              ko.observable('').extend({removeWhiteSpaces: null}),

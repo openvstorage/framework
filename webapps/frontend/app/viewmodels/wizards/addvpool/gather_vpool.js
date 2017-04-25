@@ -448,8 +448,10 @@ define([
                             }
                         });
                         if (maxCacheQuota !== 0) {
-                            self.data.cacheQuota(maxCacheQuota / Math.pow(1024.0, 3));
-                            self.data.cacheQuotaConfigured(true);
+                            self.data.cacheQuotaFC(maxCacheQuota / Math.pow(1024.0, 3) / 2);
+                            self.data.cacheQuotaFCConfigured(true);
+                            self.data.cacheQuotaBC(maxCacheQuota / Math.pow(1024.0, 3) / 2);
+                            self.data.cacheQuotaBCConfigured(true);
                         }
                     }
                 }

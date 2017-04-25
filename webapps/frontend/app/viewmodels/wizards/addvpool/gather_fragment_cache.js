@@ -94,17 +94,17 @@ define([
                             fields.push('host');
                         }
                     }
-                    var quota = self.data.cacheQuota();
+                    var quota = self.data.cacheQuotaFC();
                     if (quota !== undefined && quota !== '') {
                         if (isNaN(parseFloat(quota))) {
                             fields.push('quota');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_quota_nan'));
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_fragment_cache.invalid_quota_nan'));
                         } else if (quota < 0.1 || quota > 1024) {
                             fields.push('quota');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_quota_boundaries_exceeded'));
-                        } else if (self.data.backendAA() !== undefined && quota * Math.pow(1024, 3) * 10 > self.data.backendAA().usages.free) {
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_fragment_cache.invalid_quota_boundaries_exceeded'));
+                        } else if (self.data.backendFC() !== undefined && quota * Math.pow(1024, 3) * 10 > self.data.backendFC().usages.free) {
                             fields.push('quota');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_quota_too_much_requested'));
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_fragment_cache.invalid_quota_too_much_requested'));
                         }
                     }
                 }
