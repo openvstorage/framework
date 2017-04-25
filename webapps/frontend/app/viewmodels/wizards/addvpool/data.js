@@ -119,16 +119,17 @@ define(['jquery', 'knockout'], function($, ko){
             useFC:                   ko.observable(false),
             // Block cache
             backendBC:               ko.observable(),
-            cacheQuotaBC:            ko.observable(),
-            cacheQuotaBCConfigured:  ko.observable(false),
             blockCacheOnRead:        ko.observable(true),
             blockCacheOnWrite:       ko.observable(true),
+            cacheQuotaBC:            ko.observable(),
+            cacheQuotaBCConfigured:  ko.observable(false),
             clientIDBC:              ko.observable('').extend({removeWhiteSpaces: null}),
             clientSecretBC:          ko.observable('').extend({removeWhiteSpaces: null}),
             hostBC:                  ko.observable('').extend({regex: hostRegex}),
             localHostBC:             ko.observable(true),
             portBC:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
             presetBC:                ko.observable(),
+            supportsBC:              ko.observable(true),
             useBC:                   ko.observable(false)
         };
 

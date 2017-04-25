@@ -267,6 +267,15 @@ class StorageRouterController(object):
                     raise RuntimeError('Node on which the vpool is being {0} is not reachable'.format('created' if new_vpool is True else 'extended'))
                 offline_nodes_detected = True  # We currently want to allow offline nodes while setting up or extend a vpool
 
+        block_cache_on_read = parameters['block_cache_on_read']
+        block_cache_on_write = parameters['block_cache_on_write']
+
+        # Validate features
+        features = storagerouter.features
+        supports_block_cache = 'block-cache' in features['alba']['features']
+        if supports_block_cache is False and (block_cache_on_read is True or block_cache_on_write is True):
+            raise RuntimeError('Block cache is not a supported feature')
+
         ################
         # CREATE VPOOL #
         ################
@@ -435,8 +444,6 @@ class StorageRouterController(object):
             local_amount_of_proxies = 0
             fragment_cache_on_read = parameters['fragment_cache_on_read']
             fragment_cache_on_write = parameters['fragment_cache_on_write']
-            block_cache_on_read = parameters['block_cache_on_read']
-            block_cache_on_write = parameters['block_cache_on_write']
             largest_write_mountpoint = None
             mountpoint_fragment_cache = None
             if largest_ssd_write_partition is None and largest_sata_write_partition is None:
@@ -784,9 +791,6 @@ class StorageRouterController(object):
                                               'cache_on_read': block_cache_on_read,
                                               'cache_on_write': block_cache_on_write}]
 
-            # TODO: Replace by feature detection once merged back to development
-            enterprise = 'ee' in root_client.run(['alba', 'version', '--terse'])
-
             main_proxy_config = {'log_level': 'info',
                                  'port': alba_proxy.service.ports[0],
                                  'ips': [storagedriver.storage_ip],
@@ -795,10 +799,8 @@ class StorageRouterController(object):
                                  'transport': 'tcp',
                                  'read_preference': read_preferences,
                                  'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
-            if enterprise is True:
+            if supports_block_cache is True:
                 main_proxy_config['block_cache'] = block_cache_info
-            else:
-                StorageRouterController._logger.warning('No enterprise support and enterprise-only code; things might get interesting')
             Configuration.set(config_tree.format('main'), json.dumps(main_proxy_config, indent=4), raw=True)
             scrub_proxy_config = {'log_level': 'info',
                                   'port': 0,  # Will be overruled by the scrubber scheduled task
@@ -808,10 +810,8 @@ class StorageRouterController(object):
                                   'transport': 'tcp',
                                   'read_preference': read_preferences,
                                   'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
-            if enterprise is True:
+            if supports_block_cache is True:
                 scrub_proxy_config['block_cache'] = block_cache_scrub_info
-            else:
-                StorageRouterController._logger.warning('No enterprise support and enterprise-only code; things might get interesting')
             Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4), raw=True)
 
         ###########################

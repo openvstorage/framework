@@ -138,7 +138,14 @@ define([
         };
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
-                if (self.data.vPool() !== undefined && !self.data.blockCacheOnRead() && !self.data.blockCacheOnWrite()) {
+                if (self.data.storageRouter() !== undefined && self.data.storageRouter().features() !== undefined &&
+                    !self.data.storageRouter().features().alba.features.contains('block-cache')) {
+                    //data.blockCacheOnRead(false);
+                    //data.blockCacheOnWrite(false);
+                    //data.supportsBC(false);
+                    //deferred.resolve(true);
+                    deferred.resolve(false);
+                } else if (self.data.vPool() !== undefined && !self.data.blockCacheOnRead() && !self.data.blockCacheOnWrite()) {
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);

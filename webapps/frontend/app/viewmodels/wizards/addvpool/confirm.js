@@ -87,7 +87,7 @@ define([
                         alba_backend_guid: (self.data.backendFC() !== undefined ? self.data.backendFC().guid : undefined)
                     };
                 }
-                if (self.data.useBC() === true) {
+                if (self.data.useBC() === true && self.data.supportsBC() === true) {
                     postData.call_parameters.connection_info_bc = {
                         host: self.data.hostBC(),
                         port: self.data.portBC(),

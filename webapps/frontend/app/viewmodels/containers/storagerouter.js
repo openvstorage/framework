@@ -53,6 +53,7 @@ define([
         self.downloadLogState    = ko.observable($.t('ovs:support.download_logs'));
         self.edit                = ko.observable(false);
         self.expanded            = ko.observable(true);
+        self.features            = ko.observable(undefined);
         self.guid                = ko.observable(guid);
         self.iops                = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
         self.ipAddress           = ko.observable();
@@ -191,6 +192,7 @@ define([
             generic.trySet(self.nodeType, data, 'node_type');
             generic.trySet(self.rdmaCapable, data, 'rdma_capable');
             generic.trySet(self.status, data, 'status', generic.lower);
+            generic.trySet(self.features, data, 'features');
             if (data.hasOwnProperty('recovery_domains')) {
                 self.recoveryDomainGuids(data.recovery_domains);
             }

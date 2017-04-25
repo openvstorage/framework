@@ -89,6 +89,7 @@ define([
         data.localHostBC(true);
         data.portBC(80);
         data.presetBC(undefined);
+        data.supportsBC(true);
         data.useBC(false);
     };
 });

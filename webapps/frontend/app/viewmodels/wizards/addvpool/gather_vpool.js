@@ -340,7 +340,7 @@ define([
             }
             promise.then(function () {
                 generic.xhrAbort(self.loadStorageRoutersHandle);
-                return self.loadStorageRoutersHandle = api.get('storagerouters', {queryparams: {contents: 'storagedrivers', sort: 'name'}})
+                return self.loadStorageRoutersHandle = api.get('storagerouters', {queryparams: {contents: 'storagedrivers,features', sort: 'name'}})
                     .done(function (data) {
                         var guids = [], srdata = {};
                         $.each(data.data, function (index, item) {

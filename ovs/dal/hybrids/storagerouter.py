@@ -158,24 +158,30 @@ class StorageRouter(DataObject):
         :return: Dictionary containing edition and available features per component
         """
         try:
+            enterprise = 'enterprise'
+            community = 'community'
             client = SSHClient(self, username='root')
             enterprise_regex = re.compile('^(?P<edition>ee-)?(?P<version>.*)$')
+
             version = client.run("volumedriver_fs --version | grep version: | awk '{print $2}'", allow_insecure=True, allow_nonzero=True)
             volumedriver_version = enterprise_regex.match(version).groupdict()
-            volumedriver_edition = 'enterprise' if volumedriver_version['edition'] == 'ee-' else 'community'
+            volumedriver_edition = enterprise if volumedriver_version['edition'] == 'ee-' else community
             volumedriver_version_lv = LooseVersion(volumedriver_version['version'])
             volumedriver_features = [feature for feature, version
                                      in {'directory_unlink': ('6.15.0', None)}.iteritems()
                                      if volumedriver_version_lv >= LooseVersion(version[0])
                                      and (version[1] is None or version[1] == volumedriver_edition)]
+
             version = client.run("alba version --terse", allow_insecure=True, allow_nonzero=True)
             alba_version = enterprise_regex.match(version).groupdict()
-            alba_edition = 'enterprise' if alba_version['edition'] == 'ee-' else 'community'
+            alba_edition = enterprise if alba_version['edition'] == 'ee-' else community
             alba_version_lv = LooseVersion(alba_version['version'])
             alba_features = [feature for feature, version
-                             in {'cache-quota': ('1.3.13', 'enterprise')}.iteritems()
+                             in {'cache-quota': ('1.3.13', enterprise),  # TODO: Correct version
+                                 'block-cache': ('1.3.14', enterprise)}.iteritems()  # TODO: Correct version
                              if alba_version_lv >= LooseVersion(version[0])
                              and (version[1] is None or version[1] == alba_edition)]
+
             return {'volumedriver': {'edition': volumedriver_edition,
                                      'features': volumedriver_features},
                     'alba': {'edition': alba_edition,
