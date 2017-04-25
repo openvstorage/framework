@@ -58,6 +58,8 @@ define([
                             preset: (self.data.preset() !== undefined ? self.data.preset().name : undefined),
                             alba_backend_guid: (self.data.backend() !== undefined ? self.data.backend().guid : undefined)
                         },
+                        block_cache_on_read: self.data.blockCacheOnRead(),
+                        block_cache_on_write: self.data.blockCacheOnWrite(),
                         config_params: {
                             dtl_mode: (self.data.dtlEnabled() === true ? self.data.dtlMode().name : 'no_sync'),
                             sco_size: self.data.scoSize(),
@@ -71,17 +73,30 @@ define([
                     }
                 };
 
-                if (self.data.useAA() === true) {
-                    postData.call_parameters.connection_info_aa = {
-                        host: self.data.hostAA(),
-                        port: self.data.portAA(),
-                        local: self.data.localHostAA(),
-                        client_id: self.data.clientIDAA(),
-                        client_secret: self.data.clientSecretAA()
+                if (self.data.useFC() === true) {
+                    postData.call_parameters.connection_info_fc = {
+                        host: self.data.hostFC(),
+                        port: self.data.portFC(),
+                        local: self.data.localHostFC(),
+                        client_id: self.data.clientIDFC(),
+                        client_secret: self.data.clientSecretFC()
                     };
-                    postData.call_parameters.backend_info_aa = {
-                        preset: (self.data.presetAA() !== undefined ? self.data.presetAA().name : undefined),
-                        alba_backend_guid: (self.data.backendAA() !== undefined ? self.data.backendAA().guid : undefined)
+                    postData.call_parameters.backend_info_fc = {
+                        preset: (self.data.presetFC() !== undefined ? self.data.presetFC().name : undefined),
+                        alba_backend_guid: (self.data.backendFC() !== undefined ? self.data.backendFC().guid : undefined)
+                    };
+                }
+                if (self.data.useBC() === true) {
+                    postData.call_parameters.connection_info_bc = {
+                        host: self.data.hostBC(),
+                        port: self.data.portBC(),
+                        local: self.data.localHostBC(),
+                        client_id: self.data.clientIDBC(),
+                        client_secret: self.data.clientSecretBC()
+                    };
+                    postData.call_parameters.backend_info_bc = {
+                        preset: (self.data.presetBC() !== undefined ? self.data.presetBC().name : undefined),
+                        alba_backend_guid: (self.data.backendBC() !== undefined ? self.data.backendBC().guid : undefined)
                     };
                 }
                 (function(name, vpool, completed, dfd) {

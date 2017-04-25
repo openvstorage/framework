@@ -383,6 +383,8 @@ define([
                             if (metadata.backend.hasOwnProperty('caching_info') && metadata.backend.caching_info.hasOwnProperty(self.data.storageRoutersUsed()[0].guid())) {
                                 self.data.fragmentCacheOnRead(metadata.backend.caching_info[self.data.storageRoutersUsed()[0].guid()].fragment_cache_on_read);
                                 self.data.fragmentCacheOnWrite(metadata.backend.caching_info[self.data.storageRoutersUsed()[0].guid()].fragment_cache_on_write);
+                                self.data.blockCacheOnRead(metadata.backend.caching_info[self.data.storageRoutersUsed()[0].guid()].block_cache_on_read);
+                                self.data.blockCacheOnWrite(metadata.backend.caching_info[self.data.storageRoutersUsed()[0].guid()].block_cache_on_write);
                             }
                         }
                     })
