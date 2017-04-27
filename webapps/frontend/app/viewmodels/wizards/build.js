@@ -102,12 +102,7 @@ define([
                             if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
                                 step.shouldSkip()
                                     .done(function(skip) {
-                                        if (skip === true && parent.step() < parent.stepsLength() - 1) {
-                                            parent.step(parent.step() + 1);
-                                            next = true;
-                                        } else {
-                                            next = false;
-                                        }
+                                        next = skip === true && parent.step() < parent.stepsLength() - 1;
                                     })
                                     .fail(function() {
                                         next = false;
@@ -135,12 +130,7 @@ define([
                     if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
                         step.shouldSkip()
                             .done(function (skip) {
-                                if (skip === true && parent.step() > 0) {
-                                    parent.step(parent.step() - 1);
-                                    next = true;
-                                } else {
-                                    next = false;
-                                }
+                                next = skip === true && parent.step() > 0;
                             })
                             .fail(function() {
                                 next = false;

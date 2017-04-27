@@ -178,7 +178,7 @@ class StorageRouter(DataObject):
             alba_version_lv = LooseVersion(alba_version['version'])
             alba_features = [feature for feature, version
                              in {'cache-quota': ('1.3.13', enterprise),  # TODO: Correct version
-                                 'block-cache': ('1.3.14', enterprise)}.iteritems()  # TODO: Correct version
+                                 'block-cache': ('1.4.0', enterprise)}.iteritems()
                              if alba_version_lv >= LooseVersion(version[0])
                              and (version[1] is None or version[1] == alba_edition)]
 
