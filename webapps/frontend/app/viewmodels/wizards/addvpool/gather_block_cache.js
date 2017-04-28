@@ -64,6 +64,14 @@ define([
             temp.unshift(undefined);  // Insert undefined as element 0
             return temp;
         });
+        self.hasBlockCache = ko.computed(function() {
+            return self.data.storageRouter() !== undefined &&
+                self.data.storageRouter().features() !== undefined &&
+                self.data.storageRouter().features().alba.features.contains('block-cache');
+        });
+        self.canConfigureBCRW = ko.computed(function() {
+            return self.data.vPoolAdd() && self.hasBlockCache();
+        });
         self.canContinue = ko.computed(function() {
             var showErrors = false, reasons = [], fields = [];
             if (self.data.useBC()) {
@@ -138,13 +146,7 @@ define([
         };
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
-                if (self.data.storageRouter() !== undefined && self.data.storageRouter().features() !== undefined &&
-                    !self.data.storageRouter().features().alba.features.contains('block-cache')) {
-                    data.blockCacheOnRead(false);
-                    data.blockCacheOnWrite(false);
-                    data.supportsBC(false);
-                    deferred.resolve(true);
-                } else if (self.data.vPool() !== undefined && !self.data.blockCacheOnRead() && !self.data.blockCacheOnWrite()) {
+                if (self.data.vPool() !== undefined && !self.data.blockCacheOnRead() && !self.data.blockCacheOnWrite()) {
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);
@@ -297,6 +299,15 @@ define([
                 }
             }
             self.loadBackends();
+            if (!self.hasBlockCache()) {
+                self.data.blockCacheOnRead(false);
+                self.data.blockCacheOnWrite(false);
+                self.data.supportsBC(false);
+            } else {
+                self.data.blockCacheOnRead(true);
+                self.data.blockCacheOnWrite(true);
+                self.data.supportsBC(true);
+            }
         };
         self.deactivate = function() {
             self.useBCSubscription.dispose();

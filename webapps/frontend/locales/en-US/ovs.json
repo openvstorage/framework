@@ -130,6 +130,9 @@
         "dtl_status": "DTL",
         "edge": "Edge",
         "edge_clients": "Edge Clients",
+        "ee_teaser": {
+            "no_block_cache": "Block Cache can only be configured in the Enterprise Edition."
+        },
         "elementsloading": "Items loading...",
         "error": "Error",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
