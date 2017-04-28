@@ -441,16 +441,21 @@ define([
                         }
                     }
                     if (metadata.backend.hasOwnProperty('caching_info')) {
-                        var maxCacheQuota = 0;
+                        var maxFCacheQuota = 0, maxBCacheQuota = 0;
                         $.each(metadata.backend.caching_info, function(srGuid, cachingInfo) {
-                            if (cachingInfo.hasOwnProperty('quota') && cachingInfo['quota'] > maxCacheQuota) {
-                                maxCacheQuota = cachingInfo['quota'];
+                            if (cachingInfo.hasOwnProperty('quota_fc') && cachingInfo['quota_fc'] > maxFCacheQuota) {
+                                maxFCacheQuota = cachingInfo['quota_fc'];
+                            }
+                            if (cachingInfo.hasOwnProperty('quota_bc') && cachingInfo['quota_bc'] > maxBCacheQuota) {
+                                maxBCacheQuota = cachingInfo['quota_bc'];
                             }
                         });
-                        if (maxCacheQuota !== 0) {
-                            self.data.cacheQuotaFC(maxCacheQuota / Math.pow(1024.0, 3) / 2);
+                        if (maxFCacheQuota !== 0) {
+                            self.data.cacheQuotaFC(maxFCacheQuota / Math.pow(1024.0, 3));
                             self.data.cacheQuotaFCConfigured(true);
-                            self.data.cacheQuotaBC(maxCacheQuota / Math.pow(1024.0, 3) / 2);
+                        }
+                        if (maxBCacheQuota !== 0) {
+                            self.data.cacheQuotaBC(maxBCacheQuota / Math.pow(1024.0, 3));
                             self.data.cacheQuotaBCConfigured(true);
                         }
                     }

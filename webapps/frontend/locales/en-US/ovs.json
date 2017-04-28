@@ -130,7 +130,7 @@
         "dtl_status": "DTL",
         "edge": "Edge",
         "edge_clients": "Edge Clients",
-        "ee_teaser": {
+        "ee_teasers": {
             "no_block_cache": "Block Cache can only be configured in the Enterprise Edition."
         },
         "elementsloading": "Items loading...",
@@ -814,10 +814,10 @@
                 "success_title": "Success"
             },
             "gather_block_cache": {
-                "backend_info": "Backend information",
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",
                 "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
+                "backend_info": "Backend information",
                 "backends_loading": "Backends are being loaded",
                 "basic_info": "Configure additional caching (Block Cache)",
                 "cache_quota_info": "Maximum space each vDisk can use for caching purposes",
@@ -846,10 +846,10 @@
                 "use_local": "Use local disk"
             },
             "gather_fragment_cache": {
-                "backend_info": "Backend information",
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",
                 "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
+                "backend_info": "Backend information",
                 "backends_loading": "Backends are being loaded",
                 "basic_info": "Configure additional caching (Fragment Cache)",
                 "cache_quota_info": "Maximum space each vDisk can use for caching purposes",
@@ -878,12 +878,12 @@
                 "use_local": "Use local disk"
             },
             "gather_config": {
+                "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
+                "cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local Cache with current Global Write Buffer size",
                 "cluster_size": "Cluster Size:",
                 "dtl": "Distributed Transaction Log Information",
                 "dtl_mode": "Mode:",
                 "dtl_transport": "Transport Mode:",
-                "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
-                "cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local Cache with current Global Write Buffer size",
                 "global_write_buffer": "Global Write Buffer:",
                 "global_write_buffer_available": "Dedicated global Write Buffer space:",
                 "information": "Information about the available space:",

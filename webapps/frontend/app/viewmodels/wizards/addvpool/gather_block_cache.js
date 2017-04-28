@@ -304,8 +304,6 @@ define([
                 self.data.blockCacheOnWrite(false);
                 self.data.supportsBC(false);
             } else {
-                self.data.blockCacheOnRead(true);
-                self.data.blockCacheOnWrite(true);
                 self.data.supportsBC(true);
             }
         };
