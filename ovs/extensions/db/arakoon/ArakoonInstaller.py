@@ -122,19 +122,22 @@ class ArakoonClusterConfig(object):
                 raise RuntimeError('An IP should be passed for filesystem configuration')
             return SSHClient(ip, username=ArakoonInstaller.SSHCLIENT_USER)
 
-    def read_config(self, ip=None):
+    def read_config(self, ip=None, contents=None):
         """
         Constructs a configuration object from config contents
         :param ip: IP on which the configuration file resides (Only for filesystem Arakoon clusters)
         :type ip: str
+        :param contents: Contents to parse
+        :type contents: str
         :return: None
         :rtype: NoneType
         """
-        if ip is None:
-            contents = Configuration.get(self.internal_config_path, raw=True)
-        else:
-            client = self.load_client(ip)
-            contents = client.file_read(self.internal_config_path)
+        if contents is None:
+            if ip is None:
+                contents = Configuration.get(self.internal_config_path, raw=True)
+            else:
+                client = self.load_client(ip)
+                contents = client.file_read(self.internal_config_path)
 
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))
@@ -192,7 +195,7 @@ class ArakoonClusterConfig(object):
             client = self.load_client(ip)
             client.file_delete(self.internal_config_path)
 
-    def export_json(self):
+    def export_dict(self):
         """
         Exports the current configuration to a python dict
         :return: Data available in the Arakoon configuration
@@ -227,7 +230,7 @@ class ArakoonClusterConfig(object):
         :rtype: str
         """
         contents = RawConfigParser()
-        data = self.export_json()
+        data = self.export_dict()
         sections = data.keys()
         sections.remove('global')
         for section in ['global'] + sorted(sections):
@@ -244,7 +247,7 @@ class ArakoonClusterConfig(object):
         :return: None
         :rtype: NoneType
         """
-        config = ArakoonClusterConfig.convert_config_to(config=config, return_type='JSON')
+        config = ArakoonClusterConfig.convert_config_to(config=config, return_type='DICT')
         new_sections = sorted(config.keys())
         old_sections = sorted([node.name for node in self.nodes] + ['global'])
         if old_sections != new_sections:
@@ -305,22 +308,22 @@ class ArakoonClusterConfig(object):
     @staticmethod
     def convert_config_to(config, return_type):
         """
-        Convert an Arakoon Cluster Config to another format (JSON or INI)
+        Convert an Arakoon Cluster Config to another format (DICT or INI)
         :param config: Arakoon Cluster Config representation
         :type config: dict|str
-        :param return_type: Type in which the config needs to be returned (JSON or INI)
+        :param return_type: Type in which the config needs to be returned (DICT or INI)
         :type return_type: str
-        :return: If config is JSON, INI format is returned
+        :return: If config is DICT, INI format is returned and vice versa
         """
-        if return_type not in ['JSON', 'INI']:
+        if return_type not in ['DICT', 'INI']:
             raise ValueError('Unsupported return_type specified')
         if not isinstance(config, dict) and not isinstance(config, basestring):
             raise ValueError('Config should be a dict or basestring representation of an Arakoon cluster config')
 
-        if (isinstance(config, dict) and return_type == 'JSON') or (isinstance(config, basestring) and return_type == 'INI'):
+        if (isinstance(config, dict) and return_type == 'DICT') or (isinstance(config, basestring) and return_type == 'INI'):
             return config
 
-        # JSON --> INI
+        # DICT --> INI
         if isinstance(config, dict):
             rcp = RawConfigParser()
             for section in config:
@@ -331,7 +334,7 @@ class ArakoonClusterConfig(object):
             rcp.write(config_io)
             return str(config_io.getvalue())
 
-        # INI --> JSON
+        # INI --> DICT
         if isinstance(config, basestring):
             converted = {}
             rcp = RawConfigParser()
@@ -583,7 +586,7 @@ class ArakoonInstaller(object):
         removal_node = None
         for node in config.nodes[:]:
             if node.ip == removal_ip:
-                if node.name in config.export_json()['global'].get('preferred_masters', '').split(','):
+                if node.name in config.export_dict()['global'].get('preferred_masters', '').split(','):
                     ArakoonInstaller._logger.warning('OVS_WARNING: Preferred master node {0} has been removed from cluster {1}'.format(node.name, cluster_name))
 
                 config.nodes.remove(node)
