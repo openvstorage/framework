@@ -780,7 +780,7 @@ class StorageRouterController(object):
                 block_cache_info = ['none']
             elif use_block_cache_backend is True:
                 block_cache_info = ['alba', {'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_bc')),
-                                             'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
+                                             'bucket_strategy': ['1-to-1', {'prefix': '{0}_bc'.format(vpool.guid),
                                                                             'preset': vpool.metadata['backend_bc_{0}'.format(storagerouter.guid)]['backend_info']['preset']}],
                                              'manifest_cache_size': manifest_cache_size,
                                              'cache_on_read': block_cache_on_read,
