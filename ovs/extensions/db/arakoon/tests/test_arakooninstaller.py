@@ -1392,11 +1392,11 @@ tlog_dir = {base_dir}/arakoon/{cluster_name}/tlogs
 
             config = ArakoonClusterConfig(cluster_id=pref_cluster_name)
             if len(expected_masters) == 0:
-                self.assertFalse(expr='preferred_masters' in config.export_json()['global'])
+                self.assertFalse(expr='preferred_masters' in config.export_dict()['global'])
             else:
-                self.assertTrue(expr='preferred_masters' in config.export_json()['global'])
+                self.assertTrue(expr='preferred_masters' in config.export_dict()['global'])
                 self.assertEqual(first=sorted(expected_masters),
-                                 second=sorted(config.export_json()['global']['preferred_masters'].split(',')))
+                                 second=sorted(config.export_dict()['global']['preferred_masters'].split(',')))
 
             LogHandler._logs = {}
             ArakoonInstaller.shrink_cluster(cluster_name=pref_cluster_name,

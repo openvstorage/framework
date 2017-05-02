@@ -70,13 +70,15 @@ class Watcher(object):
                 from ovs.extensions.db.arakoon.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
                 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
                 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
-
-                config = ArakoonClusterConfig(cluster_id='cacc', source_ip='127.0.0.1')
+                with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
+                    contents = config_file.read()
+                config = ArakoonClusterConfig(cluster_id='cacc', load_config=False)
+                config.read_config(contents)
                 client = ArakoonInstaller.build_client(config)
                 contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
                 if Watcher.LOG_CONTENTS != contents:
                     try:
-                        config.read_config(ip='127.0.0.1')  # Validate whether the contents are not corrupt
+                        config.read_config(contents)  # Validate whether the contents are not corrupt
                     except Exception as ex:
                         self.log_message(target, '  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
                         return False

@@ -225,7 +225,7 @@ class StorageDriverController(object):
         current_service = None
         remaining_ips = []
         for service in servicetype.services:
-            if service.name == 'arakoon-voldrv' and service.is_internal is True:  # Externally managed arakoon cluster services do not have StorageRouter
+            if service.name == 'arakoon-voldrv' and service.is_internal is True:  # Externally managed arakoon cluster services do not have StorageRouters
                 if service.storagerouter.ip == cluster_ip:
                     current_service = service
                 elif service.storagerouter.ip not in offline_node_ips:
