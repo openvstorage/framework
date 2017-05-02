@@ -24,7 +24,7 @@ import json
 import time
 import signal
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import remote

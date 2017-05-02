@@ -20,7 +20,7 @@ Wrapper class for the storagedriver client of the voldrv team
 import os
 import copy
 import json
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
