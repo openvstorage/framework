@@ -340,7 +340,7 @@ define([
             }
             promise.then(function () {
                 generic.xhrAbort(self.loadStorageRoutersHandle);
-                return self.loadStorageRoutersHandle = api.get('storagerouters', {queryparams: {contents: 'storagedrivers', sort: 'name'}})
+                return self.loadStorageRoutersHandle = api.get('storagerouters', {queryparams: {contents: 'storagedrivers,features', sort: 'name'}})
                     .done(function (data) {
                         var guids = [], srdata = {};
                         $.each(data.data, function (index, item) {
@@ -383,6 +383,8 @@ define([
                             if (metadata.backend.hasOwnProperty('caching_info') && metadata.backend.caching_info.hasOwnProperty(self.data.storageRoutersUsed()[0].guid())) {
                                 self.data.fragmentCacheOnRead(metadata.backend.caching_info[self.data.storageRoutersUsed()[0].guid()].fragment_cache_on_read);
                                 self.data.fragmentCacheOnWrite(metadata.backend.caching_info[self.data.storageRoutersUsed()[0].guid()].fragment_cache_on_write);
+                                self.data.blockCacheOnRead(metadata.backend.caching_info[self.data.storageRoutersUsed()[0].guid()].block_cache_on_read);
+                                self.data.blockCacheOnWrite(metadata.backend.caching_info[self.data.storageRoutersUsed()[0].guid()].block_cache_on_write);
                             }
                         }
                     })
@@ -439,15 +441,22 @@ define([
                         }
                     }
                     if (metadata.backend.hasOwnProperty('caching_info')) {
-                        var maxCacheQuota = 0;
+                        var maxFCacheQuota = 0, maxBCacheQuota = 0;
                         $.each(metadata.backend.caching_info, function(srGuid, cachingInfo) {
-                            if (cachingInfo.hasOwnProperty('quota') && cachingInfo['quota'] > maxCacheQuota) {
-                                maxCacheQuota = cachingInfo['quota'];
+                            if (cachingInfo.hasOwnProperty('quota_fc') && cachingInfo['quota_fc'] > maxFCacheQuota) {
+                                maxFCacheQuota = cachingInfo['quota_fc'];
+                            }
+                            if (cachingInfo.hasOwnProperty('quota_bc') && cachingInfo['quota_bc'] > maxBCacheQuota) {
+                                maxBCacheQuota = cachingInfo['quota_bc'];
                             }
                         });
-                        if (maxCacheQuota !== 0) {
-                            self.data.cacheQuota(maxCacheQuota / Math.pow(1024.0, 3));
-                            self.data.cacheQuotaConfigured(true);
+                        if (maxFCacheQuota !== 0) {
+                            self.data.cacheQuotaFC(maxFCacheQuota / Math.pow(1024.0, 3));
+                            self.data.cacheQuotaFCConfigured(true);
+                        }
+                        if (maxBCacheQuota !== 0) {
+                            self.data.cacheQuotaBC(maxBCacheQuota / Math.pow(1024.0, 3));
+                            self.data.cacheQuotaBCConfigured(true);
                         }
                     }
                 }

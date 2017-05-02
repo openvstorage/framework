@@ -84,7 +84,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: 'storagedrivers'
+                        contents: 'storagedrivers,features'
                     };
                     self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {

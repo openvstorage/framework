@@ -190,9 +190,13 @@ class StorageRouterController(object):
                                                     'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys())}),
                            'fragment_cache_on_read': (bool, None),
                            'fragment_cache_on_write': (bool, None),
+                           'block_cache_on_read': (bool, None),
+                           'block_cache_on_write': (bool, None),
                            'backend_info': (dict, {'preset': (str, Toolbox.regex_preset),
                                                    'alba_backend_guid': (str, Toolbox.regex_guid)}),
-                           'backend_info_aa': (dict, {'preset': (str, Toolbox.regex_preset),
+                           'backend_info_fc': (dict, {'preset': (str, Toolbox.regex_preset),
+                                                      'alba_backend_guid': (str, Toolbox.regex_guid)}, False),
+                           'backend_info_bc': (dict, {'preset': (str, Toolbox.regex_preset),
                                                       'alba_backend_guid': (str, Toolbox.regex_guid)}, False),
                            'connection_info': (dict, {'host': (str, Toolbox.regex_ip),
                                                       'port': (int, {'min': 1, 'max': 65535}),
@@ -263,6 +267,15 @@ class StorageRouterController(object):
                     raise RuntimeError('Node on which the vpool is being {0} is not reachable'.format('created' if new_vpool is True else 'extended'))
                 offline_nodes_detected = True  # We currently want to allow offline nodes while setting up or extend a vpool
 
+        block_cache_on_read = parameters['block_cache_on_read']
+        block_cache_on_write = parameters['block_cache_on_write']
+
+        # Validate features
+        features = storagerouter.features
+        supports_block_cache = 'block-cache' in features['alba']['features']
+        if supports_block_cache is False and (block_cache_on_read is True or block_cache_on_write is True):
+            raise RuntimeError('Block cache is not a supported feature')
+
         ################
         # CREATE VPOOL #
         ################
@@ -328,38 +341,75 @@ class StorageRouterController(object):
 
             # Check backend information and connection information
             backend_info = parameters['backend_info']
-            backend_info_aa = parameters.get('backend_info_aa', {})
+            backend_info_fc = parameters.get('backend_info_fc', {})
+            backend_info_bc = parameters.get('backend_info_bc', {})
             alba_backend_guid = backend_info['alba_backend_guid']
-            alba_backend_guid_aa = backend_info_aa.get('alba_backend_guid')
-            connection_info_aa = parameters.get('connection_info_aa', {})
-            use_accelerated_alba = alba_backend_guid_aa is not None
+            alba_backend_guid_fc = backend_info_fc.get('alba_backend_guid')
+            alba_backend_guid_bc = backend_info_bc.get('alba_backend_guid')
+            connection_info_fc = parameters.get('connection_info_fc', {})
+            connection_info_bc = parameters.get('connection_info_bc', {})
+            use_fragment_cache_backend = alba_backend_guid_fc is not None
+            use_block_cache_backend = alba_backend_guid_bc is not None
 
-            if alba_backend_guid == alba_backend_guid_aa:
-                error_messages.append('Backend and accelerated backend cannot be the same')
+            if alba_backend_guid == alba_backend_guid_fc:
+                error_messages.append('Backend and Fragment cache backend cannot be the same')
+            if alba_backend_guid == alba_backend_guid_bc:
+                error_messages.append('Backend and Block cache backend cannot be the same')
             if new_vpool is False and alba_backend_guid != vpool.metadata['backend']['backend_info']['alba_backend_guid']:
                 error_messages.append('Incorrect ALBA Backend guid specified')
-            if use_accelerated_alba is True:
-                if 'connection_info_aa' not in parameters:
-                    error_messages.append('Missing the connection information for the accelerated Backend')
+
+            backend_dict_fc = None
+            if use_fragment_cache_backend is True:
+                if 'connection_info_fc' not in parameters:
+                    error_messages.append('Missing the connection information for the Fragment Cache Backend')
                 else:
                     try:
                         Toolbox.verify_required_params(actual_params=parameters,
-                                                       required_params={'cache_quota': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False),
-                                                                        'connection_info_aa': (dict, {'host': (str, Toolbox.regex_ip),
+                                                       required_params={'cache_quota_fc': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False),
+                                                                        'connection_info_fc': (dict, {'host': (str, Toolbox.regex_ip),
                                                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                                                       'client_id': (str, None),
                                                                                                       'client_secret': (str, None),
                                                                                                       'local': (bool, None, False)})})
                         # Check cache quota is large enough for at least 10 vDisks
-                        ovs_client = OVSClient(ip=connection_info_aa['host'],
-                                               port=connection_info_aa['port'],
-                                               credentials=(connection_info_aa['client_id'], connection_info_aa['client_secret']),
-                                               version=2)
-                        cache_quota = parameters.get('cache_quota')
+                        cache_quota = parameters.get('cache_quota_fc')
                         if cache_quota is not None:
-                            backend_dict_aa = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_aa), params={'contents': 'name,usages'})
-                            if backend_dict_aa['usages']['free'] < cache_quota * 10:
-                                raise RuntimeError('Requested cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_aa['name']))
+                            ovs_client = OVSClient(ip=connection_info_fc['host'],
+                                                   port=connection_info_fc['port'],
+                                                   credentials=(connection_info_fc['client_id'],
+                                                                connection_info_fc['client_secret']),
+                                                   version=2)
+                            backend_dict_fc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_fc), params={'contents': 'name,usages'})
+                            if backend_dict_fc['usages']['free'] < cache_quota * 10:
+                                raise RuntimeError('Requested Fragment Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_fc['name']))
+                    except RuntimeError as rte:
+                        error_messages.append(rte.message)
+            if use_block_cache_backend is True:
+                if 'connection_info_bc' not in parameters:
+                    error_messages.append('Missing the connection information for the Block Cache Backend')
+                else:
+                    try:
+                        Toolbox.verify_required_params(actual_params=parameters,
+                                                       required_params={'cache_quota_bc': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False),
+                                                                        'connection_info_bc': (dict, {'host': (str, Toolbox.regex_ip),
+                                                                                                      'port': (int, {'min': 1, 'max': 65535}),
+                                                                                                      'client_id': (str, None),
+                                                                                                      'client_secret': (str, None),
+                                                                                                      'local': (bool, None, False)})})
+                        # Check cache quota is large enough for at least 10 vDisks
+                        cache_quota = parameters.get('cache_quota_bc')
+                        if cache_quota is not None:
+                            if backend_dict_fc is not None and alba_backend_guid_bc == alba_backend_guid_fc:
+                                backend_dict_bc = copy.deepcopy(backend_dict_fc)
+                            else:
+                                ovs_client = OVSClient(ip=connection_info_bc['host'],
+                                                       port=connection_info_bc['port'],
+                                                       credentials=(connection_info_bc['client_id'],
+                                                                    connection_info_bc['client_secret']),
+                                                       version=2)
+                                backend_dict_bc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_bc), params={'contents': 'name,usages'})
+                            if backend_dict_bc['usages']['free'] < cache_quota * 10:
+                                raise RuntimeError('Requested Block Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_bc['name']))
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
 
@@ -395,30 +445,41 @@ class StorageRouterController(object):
                     largest_sata_write_partition = info['guid']
 
             amount_of_proxies = parameters.get('parallelism', {}).get('proxies', 2)
+            local_amount_of_proxies = 0
             fragment_cache_on_read = parameters['fragment_cache_on_read']
             fragment_cache_on_write = parameters['fragment_cache_on_write']
             largest_write_mountpoint = None
             mountpoint_fragment_cache = None
             if largest_ssd_write_partition is None and largest_sata_write_partition is None:
-                error_messages.append('No WRITE partition found to put the local fragment cache on')
+                error_messages.append('No WRITE partition found to put the local caches on')
             else:
                 largest_write_mountpoint = DiskPartition(largest_ssd_write_partition or largest_sata_write_partition)
-                if use_accelerated_alba is False:
-                    mountpoint_fragment_cache = largest_write_mountpoint
+                if use_fragment_cache_backend is False:
                     if fragment_cache_on_read is True or fragment_cache_on_write is True:  # Local fragment caching
-                        one_gib = 1024 ** 3  # 1GiB
-                        proportion = float(largest_ssd or largest_sata) * 100.0 / writecache_size_available
-                        available = proportion * writecache_size_requested / 100 * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
-                        fragment_size = available / amount_of_proxies
-                        if fragment_size < one_gib:
-                            maximum = amount_of_proxies
-                            while True:
-                                if maximum == 0 or available / maximum > one_gib:
-                                    break
-                                maximum -= 1
-                            error_messages.append('Fragment cache is too small to deploy {0} prox{1}. 1GiB is required per proxy and with an available size of {2:.2f}GiB, {3} prox{4} can be deployed'.format(
-                                amount_of_proxies, 'y' if amount_of_proxies == 1 else 'ies', available / 1024.0 ** 3, maximum, 'y' if maximum == 1 else 'ies')
-                            )
+                        local_amount_of_proxies += amount_of_proxies
+                if use_block_cache_backend is False:
+                    if block_cache_on_read is True or block_cache_on_write is True:  # Local block caching
+                        local_amount_of_proxies += amount_of_proxies
+                if local_amount_of_proxies > 0:
+                    mountpoint_fragment_cache = largest_write_mountpoint
+                    one_gib = 1024 ** 3  # 1GiB
+                    proportion = float(largest_ssd or largest_sata) * 100.0 / writecache_size_available
+                    available = proportion * writecache_size_requested / 100 * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
+                    fragment_size = available / local_amount_of_proxies
+                    if fragment_size < one_gib:
+                        maximum = local_amount_of_proxies
+                        while True:
+                            if maximum == 0 or available / maximum > one_gib:
+                                break
+                            maximum -= 2 if local_amount_of_proxies > amount_of_proxies else 1
+                        error_messages.append('Cache location is too small to deploy {0} prox{1}. {2}1GiB is required per proxy and with an available size of {3:.2f}GiB, {4} prox{5} can be deployed'.format(
+                            amount_of_proxies,
+                            'y' if amount_of_proxies == 1 else 'ies',
+                            '2x ' if local_amount_of_proxies > amount_of_proxies else '',
+                            available / 1024.0 ** 3,
+                            maximum,
+                            'y' if maximum == 1 else 'ies'
+                        ))
 
             if error_messages:
                 raise ValueError('Errors validating the specified parameters:\n - {0}'.format('\n - '.join(set(error_messages))))
@@ -427,7 +488,7 @@ class StorageRouterController(object):
             # MODELING #
             ############
 
-            ### Renew vPool metadata
+            # Renew vPool metadata
             StorageRouterController._logger.info('Add vPool {0} started'.format(vpool_name))
             if new_vpool is True:
                 metadata_map = {'backend': {'backend_info': backend_info,
@@ -435,9 +496,12 @@ class StorageRouterController(object):
             else:
                 metadata_map = copy.deepcopy(vpool.metadata)
 
-            if use_accelerated_alba is True:
-                metadata_map['backend_aa_{0}'.format(storagerouter.guid)] = {'backend_info': backend_info_aa,
-                                                                             'connection_info': connection_info_aa}
+            if use_fragment_cache_backend is True:
+                metadata_map['backend_aa_{0}'.format(storagerouter.guid)] = {'backend_info': backend_info_fc,
+                                                                             'connection_info': connection_info_fc}
+            if use_block_cache_backend is True:
+                metadata_map['backend_bc_{0}'.format(storagerouter.guid)] = {'backend_info': backend_info_bc,
+                                                                             'connection_info': connection_info_bc}
 
             read_preferences = []
             for key, metadata in metadata_map.iteritems():
@@ -481,12 +545,16 @@ class StorageRouterController(object):
             if 'caching_info' not in vpool.metadata['backend']:
                 vpool.metadata['backend']['caching_info'] = {}
             vpool.metadata['backend']['caching_info'][storagerouter.guid] = {'fragment_cache_on_read': fragment_cache_on_read,
-                                                                             'fragment_cache_on_write': fragment_cache_on_write}
-            if 'cache_quota' in parameters:
-                vpool.metadata['backend']['caching_info'][storagerouter.guid]['quota'] = parameters['cache_quota']
+                                                                             'fragment_cache_on_write': fragment_cache_on_write,
+                                                                             'block_cache_on_read': block_cache_on_read,
+                                                                             'block_cache_on_write': block_cache_on_write}
+            if 'cache_quota_fc' in parameters:
+                vpool.metadata['backend']['caching_info'][storagerouter.guid]['quota_fc'] = parameters['cache_quota_fc']
+            if 'cache_quota_bc' in parameters:
+                vpool.metadata['backend']['caching_info'][storagerouter.guid]['quota_bc'] = parameters['cache_quota_bc']
             vpool.save()
 
-            ### StorageDriver
+            # StorageDriver
             machine_id = System.get_my_machine_id(client)
             port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
             with volatile_mutex('add_vpool_get_free_ports_{0}'.format(machine_id), wait=30):
@@ -514,7 +582,7 @@ class StorageRouterController(object):
                 storagedriver.storagedriver_id = vrouter_id
                 storagedriver.save()
 
-                ### ALBA Proxies
+                # ALBA Proxies
                 proxy_service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ALBA_PROXY)
                 for proxy_id in xrange(amount_of_proxies):
                     service = DalService()
@@ -528,11 +596,11 @@ class StorageRouterController(object):
                     alba_proxy.storagedriver = storagedriver
                     alba_proxy.save()
 
-            ### StorageDriver Partitions
-            #     * Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
-            #     * Once the free space on a mountpoint is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
-            #     * make sure that <backoff_gap> free space is available ==> backoff_gap must be <= size of the partition
-            #     * Both backoff_gap and trigger_gap apply to each mountpoint individually, but cannot be configured on a per mountpoint base
+            # StorageDriver Partitions
+            # * Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
+            # * Once the free space on a mountpoint is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
+            # * make sure that <backoff_gap> free space is available => backoff_gap must be <= size of the partition
+            # * Both backoff_gap and trigger_gap apply to each mountpoint individually, but cannot be configured on a per mountpoint base
 
             # Assign WRITE / Fragment cache
             frag_size = None
@@ -555,6 +623,8 @@ class StorageRouterController(object):
                                                                                                       'sub_role': StorageDriverPartition.SUBROLE.FCACHE,
                                                                                                       'partition': partition})
                         dirs2create.append(sdp_frag.path)
+                        for subfolder in ['fc', 'bc']:
+                            dirs2create.append('{0}/{1}'.format(sdp_frag.path, subfolder))
                         sdp_frags.append(sdp_frag)
 
                 w_size = int(size_to_be_used * write_cache_percentage / 1024 / 4096) * 4096
@@ -597,8 +667,9 @@ class StorageRouterController(object):
 
             gap_configuration = StorageDriverController.generate_backoff_gap_settings(smallest_write_partition)
 
-            if frag_size is None and use_accelerated_alba is False and (fragment_cache_on_read is True or fragment_cache_on_write is True):
-                raise ValueError('Something went wrong trying to calculate the fragment cache size')
+            if frag_size is None and ((use_fragment_cache_backend is False and (fragment_cache_on_read is True or fragment_cache_on_write is True))
+                                      or (use_block_cache_backend is False and (block_cache_on_read is True or block_cache_on_write is True))):
+                raise ValueError('Something went wrong trying to calculate the cache sizes')
 
             root_client.dir_create(dirs2create)
         except Exception:
@@ -668,8 +739,11 @@ class StorageRouterController(object):
         manifest_cache_size = 16 * 1024 * 1024 * 1024
         for proxy_id, alba_proxy in enumerate(storagedriver.alba_proxies):
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
-            metadata_keys = {'backend': 'abm'} if use_accelerated_alba is False else {'backend': 'abm',
-                                                                                      'backend_aa_{0}'.format(storagerouter.guid): 'abm_aa'}
+            metadata_keys = {'backend': 'abm'}
+            if use_fragment_cache_backend is True:
+                metadata_keys['backend_aa_{0}'.format(storagerouter.guid)] = 'abm_aa'
+            if use_block_cache_backend is True:
+                metadata_keys['backend_bc_{0}'.format(storagerouter.guid)] = 'abm_bc'
             for metadata_key in metadata_keys:
                 arakoon_config = vpool.metadata[metadata_key]['arakoon_config']
                 rcp = RawConfigParser()
@@ -684,7 +758,7 @@ class StorageRouterController(object):
             fragment_cache_scrub_info = ['none']
             if fragment_cache_on_read is False and fragment_cache_on_write is False:
                 fragment_cache_info = ['none']
-            elif use_accelerated_alba is True:
+            elif use_fragment_cache_backend is True:
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                                'preset': vpool.metadata['backend_aa_{0}'.format(storagerouter.guid)]['backend_info']['preset']}],
@@ -696,31 +770,53 @@ class StorageRouterController(object):
                     fragment_cache_scrub_info = copy.deepcopy(fragment_cache_info)
                     fragment_cache_scrub_info[1]['cache_on_read'] = False
             else:
-                fragment_cache_info = ['local', {'path': sdp_frags[proxy_id].path,
-                                                 'max_size': frag_size / amount_of_proxies,
+                fragment_cache_info = ['local', {'path': '{0}/fc'.format(sdp_frags[proxy_id].path),
+                                                 'max_size': frag_size / local_amount_of_proxies,
                                                  'cache_on_read': fragment_cache_on_read,
                                                  'cache_on_write': fragment_cache_on_write}]
+                
+            block_cache_scrub_info = ['none']
+            if block_cache_on_read is False and block_cache_on_write is False:
+                block_cache_info = ['none']
+            elif use_block_cache_backend is True:
+                block_cache_info = ['alba', {'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_bc')),
+                                             'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
+                                                                            'preset': vpool.metadata['backend_bc_{0}'.format(storagerouter.guid)]['backend_info']['preset']}],
+                                             'manifest_cache_size': manifest_cache_size,
+                                             'cache_on_read': block_cache_on_read,
+                                             'cache_on_write': block_cache_on_write}]
+                if block_cache_on_write is True:
+                    # The scrubbers want only cache-on-write.
+                    block_cache_scrub_info = copy.deepcopy(block_cache_info)
+                    block_cache_scrub_info[1]['cache_on_read'] = False
+            else:
+                block_cache_info = ['local', {'path': '{0}/bc'.format(sdp_frags[proxy_id].path),
+                                              'max_size': frag_size / local_amount_of_proxies,
+                                              'cache_on_read': block_cache_on_read,
+                                              'cache_on_write': block_cache_on_write}]
 
-            Configuration.set(config_tree.format('main'), json.dumps({
-                'log_level': 'info',
-                'port': alba_proxy.service.ports[0],
-                'ips': [storagedriver.storage_ip],
-                'manifest_cache_size': manifest_cache_size,
-                'fragment_cache': fragment_cache_info,
-                'transport': 'tcp',
-                'read_preference': read_preferences,
-                'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
-            }, indent=4), raw=True)
-            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({
-                'log_level': 'info',
-                'port': 0,  # Will be overruled by the scrubber scheduled task
-                'ips': ['127.0.0.1'],
-                'manifest_cache_size': manifest_cache_size,
-                'fragment_cache': fragment_cache_scrub_info,
-                'transport': 'tcp',
-                'read_preference': read_preferences,
-                'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
-            }, indent=4), raw=True)
+            main_proxy_config = {'log_level': 'info',
+                                 'port': alba_proxy.service.ports[0],
+                                 'ips': [storagedriver.storage_ip],
+                                 'manifest_cache_size': manifest_cache_size,
+                                 'fragment_cache': fragment_cache_info,
+                                 'transport': 'tcp',
+                                 'read_preference': read_preferences,
+                                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
+            if supports_block_cache is True:
+                main_proxy_config['block_cache'] = block_cache_info
+            Configuration.set(config_tree.format('main'), json.dumps(main_proxy_config, indent=4), raw=True)
+            scrub_proxy_config = {'log_level': 'info',
+                                  'port': 0,  # Will be overruled by the scrubber scheduled task
+                                  'ips': ['127.0.0.1'],
+                                  'manifest_cache_size': manifest_cache_size,
+                                  'fragment_cache': fragment_cache_scrub_info,
+                                  'transport': 'tcp',
+                                  'read_preference': read_preferences,
+                                  'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
+            if supports_block_cache is True:
+                scrub_proxy_config['block_cache'] = block_cache_scrub_info
+            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4), raw=True)
 
         ###########################
         # CONFIGURE STORAGEDRIVER #
@@ -777,7 +873,10 @@ class StorageRouterController(object):
                                                       'alba_connection_rora_manifest_cache_capacity': manifest_cache_size,
                                                       'backend_type': 'ALBA'}
         volume_router = {'vrouter_id': vrouter_id,
-                         'vrouter_redirect_timeout_ms': '5000',
+                         'vrouter_redirect_timeout_ms': '120000',
+                         'vrouter_keepalive_time_secs': '15',
+                         'vrouter_keepalive_interval_secs': '5',
+                         'vrouter_keepalive_retries': '2',
                          'vrouter_routing_retries': 10,
                          'vrouter_volume_read_threshold': 0,
                          'vrouter_volume_write_threshold': 0,
@@ -1194,6 +1293,10 @@ class StorageRouterController(object):
                     break
         else:
             metadata_key = 'backend_aa_{0}'.format(storage_router.guid)
+            if metadata_key in vpool.metadata:
+                vpool.metadata.pop(metadata_key)
+                vpool.save()
+            metadata_key = 'backend_bc_{0}'.format(storage_router.guid)
             if metadata_key in vpool.metadata:
                 vpool.metadata.pop(metadata_key)
                 vpool.save()
