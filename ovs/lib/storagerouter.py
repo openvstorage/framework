@@ -21,9 +21,7 @@ import os
 import copy
 import json
 import time
-from ConfigParser import RawConfigParser
 from subprocess import CalledProcessError
-from StringIO import StringIO
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
@@ -40,7 +38,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import remote
@@ -746,14 +744,8 @@ class StorageRouterController(object):
                 metadata_keys['backend_bc_{0}'.format(storagerouter.guid)] = 'abm_bc'
             for metadata_key in metadata_keys:
                 arakoon_config = vpool.metadata[metadata_key]['arakoon_config']
-                rcp = RawConfigParser()
-                for section in arakoon_config:
-                    rcp.add_section(section)
-                    for key, value in arakoon_config[section].iteritems():
-                        rcp.set(section, key, value)
-                config_io = StringIO()
-                rcp.write(config_io)
-                Configuration.set(config_tree.format(metadata_keys[metadata_key]), config_io.getvalue(), raw=True)
+                arakoon_config = ArakoonClusterConfig.convert_config_to(config=arakoon_config, return_type='INI')
+                Configuration.set(config_tree.format(metadata_keys[metadata_key]), arakoon_config, raw=True)
 
             fragment_cache_scrub_info = ['none']
             if fragment_cache_on_read is False and fragment_cache_on_write is False:
@@ -774,7 +766,7 @@ class StorageRouterController(object):
                                                  'max_size': frag_size / local_amount_of_proxies,
                                                  'cache_on_read': fragment_cache_on_read,
                                                  'cache_on_write': fragment_cache_on_write}]
-                
+
             block_cache_scrub_info = ['none']
             if block_cache_on_read is False and block_cache_on_write is False:
                 block_cache_info = ['none']

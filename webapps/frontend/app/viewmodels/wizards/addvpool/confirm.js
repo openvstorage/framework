@@ -59,8 +59,8 @@ define([
                             preset: (self.data.preset() !== undefined ? self.data.preset().name : undefined),
                             alba_backend_guid: (self.data.backend() !== undefined ? self.data.backend().guid : undefined)
                         },
-                        block_cache_on_read: self.data.blockCacheOnRead(),
-                        block_cache_on_write: self.data.blockCacheOnWrite(),
+                        block_cache_on_read: self.data.blockCacheOnRead() === undefined ? false : self.data.blockCacheOnRead(),
+                        block_cache_on_write: self.data.blockCacheOnWrite() === undefined ? false : self.data.blockCacheOnWrite(),
                         config_params: {
                             dtl_mode: (self.data.dtlEnabled() === true ? self.data.dtlMode().name : 'no_sync'),
                             sco_size: self.data.scoSize(),

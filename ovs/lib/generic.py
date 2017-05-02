@@ -36,7 +36,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.remote import remote
