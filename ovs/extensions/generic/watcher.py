@@ -73,12 +73,12 @@ class Watcher(object):
                 with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
                     contents = config_file.read()
                 config = ArakoonClusterConfig(cluster_id='cacc', load_config=False)
-                config.read_config(contents)
+                config.read_config(contents=contents)
                 client = ArakoonInstaller.build_client(config)
                 contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
                 if Watcher.LOG_CONTENTS != contents:
                     try:
-                        config.read_config(contents)  # Validate whether the contents are not corrupt
+                        config.read_config(contents=contents)  # Validate whether the contents are not corrupt
                     except Exception as ex:
                         self.log_message(target, '  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
                         return False
