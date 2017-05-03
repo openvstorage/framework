@@ -147,6 +147,7 @@ define([
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
                 if (self.data.vPool() !== undefined && !self.data.blockCacheOnRead() && !self.data.blockCacheOnWrite()) {
+                    self.data.supportsBC(false);
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);

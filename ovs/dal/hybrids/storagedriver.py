@@ -158,8 +158,8 @@ class StorageDriver(DataObject):
             cache_write = caching_info['fragment_cache_on_write']
             cache_quota_fc = caching_info.get('quota_fc')
             cache_quota_bc = caching_info.get('quota_bc')
-            block_cache_read = caching_info['block_cache_on_read']
-            block_cache_write = caching_info['block_cache_on_write']
+            block_cache_read = caching_info.get('block_cache_on_read')
+            block_cache_write = caching_info.get('block_cache_on_write')
 
         return {'cache_read': cache_read,
                 'cache_write': cache_write,
