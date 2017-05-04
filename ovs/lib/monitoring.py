@@ -73,35 +73,38 @@ class MonitoringController(object):
         for storagedriver in StorageDriverList.get_storagedrivers():
             storagedriver.invalidate_dynamics(['vpool_backend_info', 'vdisks_guids'])
 
-            cache_quota = storagedriver.vpool_backend_info['cache_quota']
-            backend_info = storagedriver.vpool_backend_info['backend_info']
-            connection_info = storagedriver.vpool_backend_info['connection_info']
-            if backend_info is None or connection_info is None:
-                continue
-
-            alba_backend_name = backend_info['name']
-            alba_backend_host = connection_info['host']
-            alba_backend_guid = backend_info['alba_backend_guid']
-            if alba_backend_guid not in alba_guid_size_map:
-                ovs_client = OVSClient(ip=alba_backend_host,
-                                       port=connection_info['port'],
-                                       credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                       version=2)
-                try:
-                    alba_guid_size_map[alba_backend_guid] = {'name': alba_backend_name,
-                                                             'backend_ip': alba_backend_host,
-                                                             'total_size': ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'usages'})['usages']['size'],
-                                                             'requested_size': 0}
-                except Exception:
-                    MonitoringController._logger.exception('Failed to retrieve ALBA Backend info for {0} on host {1}'.format(alba_backend_name, alba_backend_host))
+            for cache_type in [['cache_quota_fc', 'backend_info', 'connection_info', 'fragment'],
+                               ['cache_quota_bc', 'block_cache_backend_info', 'block_cache_connection_info', 'block']]:
+                cache_quota = storagedriver.vpool_backend_info[cache_type[0]]
+                backend_info = storagedriver.vpool_backend_info[cache_type[1]]
+                connection_info = storagedriver.vpool_backend_info[cache_type[2]]
+                if backend_info is None or connection_info is None:
                     continue
 
-            for vdisk_guid in storagedriver.vdisks_guids:
-                vdisk = VDisk(vdisk_guid)
-                if vdisk.cache_quota is None:
-                    alba_guid_size_map[alba_backend_guid]['requested_size'] += cache_quota if cache_quota is not None else 0
-                else:
-                    alba_guid_size_map[alba_backend_guid]['requested_size'] += vdisk.cache_quota
+                alba_backend_name = backend_info['name']
+                alba_backend_host = connection_info['host']
+                alba_backend_guid = backend_info['alba_backend_guid']
+                if alba_backend_guid not in alba_guid_size_map:
+                    ovs_client = OVSClient(ip=alba_backend_host,
+                                           port=connection_info['port'],
+                                           credentials=(connection_info['client_id'], connection_info['client_secret']),
+                                           version=2)
+                    try:
+                        alba_guid_size_map[alba_backend_guid] = {'name': alba_backend_name,
+                                                                 'backend_ip': alba_backend_host,
+                                                                 'total_size': ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'usages'})['usages']['size'],
+                                                                 'requested_size': 0}
+                    except Exception:
+                        MonitoringController._logger.exception('Failed to retrieve ALBA Backend info for {0} on host {1}'.format(alba_backend_name, alba_backend_host))
+                        continue
+
+                for vdisk_guid in storagedriver.vdisks_guids:
+                    vdisk = VDisk(vdisk_guid)
+                    vdisk_cq = vdisk.cache_quota.get(cache_type[3]) if vdisk.cache_quota is not None else None
+                    if vdisk_cq is None:
+                        alba_guid_size_map[alba_backend_guid]['requested_size'] += cache_quota if cache_quota is not None else 0
+                    else:
+                        alba_guid_size_map[alba_backend_guid]['requested_size'] += vdisk_cq
 
         local_ips = [sr.ip for sr in StorageRouterList.get_storagerouters()]
         for alba_backend_info in alba_guid_size_map.itervalues():

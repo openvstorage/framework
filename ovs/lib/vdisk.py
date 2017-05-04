@@ -113,6 +113,7 @@ class VDiskController(object):
             if vdisk.objectregistry_client.find(str(vdisk.volume_id)) is None:
                 VDiskController._logger.warning('Volume {0} does not exist anymore.'.format(vdisk.volume_id))
                 VDiskController.clean_vdisk_from_model(vdisk)
+        # TODO: Configure cache quota
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.delete_from_voldrv')
@@ -296,8 +297,8 @@ class VDiskController(object):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
         :type pagecache_ratio: float
-        :param cache_quota: Max disk space the new clone can consume for caching purposes (in Bytes)
-        :type cache_quota: int
+        :param cache_quota: Max disk space the new clone can consume for caching (both fragment as block) purposes (in Bytes)
+        :type cache_quota: dict
         :return: Information about the cloned volume
         :rtype: dict
         """
@@ -317,12 +318,14 @@ class VDiskController(object):
                 raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
 
         if pagecache_ratio is not None:
-            if not 0 < pagecache_ratio <= 1:
+            if not 0.0 < pagecache_ratio <= 1:
                 raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            cache_quota = int(cache_quota)
-            if not 0.1 * 1024.0 ** 3 <= cache_quota <= 1 * 1024.0 ** 4:
-                raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
+            for quota_type in ['fragment', 'block']:
+                quota = cache_quota.get(quota_type)
+                if quota is not None:
+                    if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
+                        raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
         if mds_service is None:
@@ -615,7 +618,7 @@ class VDiskController(object):
         :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
         :type pagecache_ratio: float
         :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
-        :type cache_quota: int
+        :type cache_quota: dict
         :return: Information about the new volume (vdisk_guid, name, backingdevice)
         :rtype: dict
         """
@@ -637,12 +640,14 @@ class VDiskController(object):
                 raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
 
         if pagecache_ratio is not None:
-            if not 0 < pagecache_ratio <= 1:
+            if not 0.0 < pagecache_ratio <= 1:
                 raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            cache_quota = int(cache_quota)
-            if not 0.1 * 1024.0 ** 3 <= cache_quota <= 1 * 1024.0 ** 4:
-                raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
+            for quota_type in ['fragment', 'block']:
+                quota = cache_quota.get(quota_type)
+                if quota is not None:
+                    if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
+                        raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
         if mds_service is None:
@@ -695,7 +700,7 @@ class VDiskController(object):
         :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
         :type pagecache_ratio: float
         :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
-        :type cache_quota: int
+        :type cache_quota: dict
         :return: Guid of the new vDisk
         :rtype: str
         """
@@ -708,12 +713,14 @@ class VDiskController(object):
         if volume_size > 64 * 1024 ** 4:
             raise ValueError('Maximum volume size of 64TiB exceeded')
 
-        if not 0 < pagecache_ratio <= 1:
+        if not 0.0 < pagecache_ratio <= 1:
             raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            cache_quota = int(cache_quota)
-            if not 0.1 * 1024.0 ** 3 <= cache_quota <= 1 * 1024.0 ** 4:
-                raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
+            for quota_type in ['fragment', 'block']:
+                quota = cache_quota.get(quota_type)
+                if quota is not None:
+                    if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
+                        raise ValueError('Parameter cache_quota must be between 0.1 GiB and 1024 GiB')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
         if mds_service is None:
@@ -794,7 +801,9 @@ class VDiskController(object):
         cache_quota = vdisk.cache_quota
         if cache_quota is None:
             vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
-            cache_quota = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {}).get('quota')
+            metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
+            cache_quota = {'fragment': metadata.get('quota_fc'),
+                           'block': metadata.get('quota_bc')}
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
@@ -826,9 +835,10 @@ class VDiskController(object):
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024})}
 
         if new_config_params.get('cache_quota') is not None:
-            required_params.update({'cache_quota': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4})})
+            required_params['cache_quota'] = (dict, {'fragment': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False),
+                                                     'block': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False)})
         if new_config_params.get('pagecache_ratio') is not None:
-            required_params.update({'pagecache_ratio': (float, {'min': 0, 'max': 1})})
+            required_params['pagecache_ratio'] = (float, {'min': 0, 'max': 1})
 
         Toolbox.verify_required_params(required_params, new_config_params)
         if 'pagecache_ratio' in new_config_params and new_config_params['pagecache_ratio'] == 0:
@@ -970,10 +980,8 @@ class VDiskController(object):
                         vdisk.save()
                         VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
                     elif key == 'cache_quota':
-                        if new_value is None:
-                            vdisk.cache_quota = None
-                        else:
-                            vdisk.cache_quota = int(new_value)
+                        vdisk.cache_quota = new_value
+                        VDiskController.vdisk_checkup(vdisk)
                         vdisk.save()
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
