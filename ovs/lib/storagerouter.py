@@ -365,7 +365,7 @@ class StorageRouterController(object):
                 else:
                     try:
                         Toolbox.verify_required_params(actual_params=parameters,
-                                                       required_params={'cache_quota_fc': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False),
+                                                       required_params={'cache_quota_fc': (int, {'min': 1024 ** 3 / 10, 'max': 1024.0 ** 4}, False),
                                                                         'connection_info_fc': (dict, {'host': (str, Toolbox.regex_ip),
                                                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                                                       'client_id': (str, None),
@@ -390,7 +390,7 @@ class StorageRouterController(object):
                 else:
                     try:
                         Toolbox.verify_required_params(actual_params=parameters,
-                                                       required_params={'cache_quota_bc': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False),
+                                                       required_params={'cache_quota_bc': (int, {'min': 1024 ** 3 / 10, 'max': 1024.0 ** 4}, False),
                                                                         'connection_info_bc': (dict, {'host': (str, Toolbox.regex_ip),
                                                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                                                       'client_id': (str, None),

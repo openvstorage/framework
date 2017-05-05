@@ -41,9 +41,9 @@ define([
         self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.blockCQ           = ko.observable();
         self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheQuota        = ko.observable();
         self.childrenGuids     = ko.observableArray([]);
         self.deviceName        = ko.observable();
         self.dtlEnabled        = ko.observable(true);
@@ -52,6 +52,7 @@ define([
         self.dtlStatus         = ko.observable();
         self.dtlTarget         = ko.observableArray([]);
         self.edgeClients       = ko.observableArray([]);
+        self.fragmentCQ        = ko.observable();
         self.guid              = ko.observable(guid);
         self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.isVTemplate       = ko.observable();
@@ -116,7 +117,10 @@ define([
                     sco_size: self.scoSize(),
                     dtl_mode: self.dtlEnabled() === true ? self.dtlMode() : 'no_sync',
                     dtl_target: self.dtlTarget().slice(),
-                    cache_quota: parseFloat(self.cacheQuota()),
+                    cache_quota: {
+                        'fragment': self.fragmentCQ(),
+                        'block': self.blockCQ()
+                    },
                     write_buffer: self.writeBuffer()
                 }
             },
@@ -126,6 +130,7 @@ define([
                 self.dtlTarget(self.dtlManual() ? configData.dtl_target.slice() : []);
                 self.cacheQuota(configData.cache_quota === null ? undefined : configData.cache_quota);
                 self.writeBuffer(Math.round(configData.write_buffer));
+                if (configData
             }
         });
         self.scoSize.subscribe(function(size) {

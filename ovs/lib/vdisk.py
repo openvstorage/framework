@@ -835,8 +835,8 @@ class VDiskController(object):
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024})}
 
         if new_config_params.get('cache_quota') is not None:
-            required_params['cache_quota'] = (dict, {'fragment': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False),
-                                                     'block': (float, {'min': 0.1 * 1024.0 ** 3, 'max': 1 * 1024.0 ** 4}, False)})
+            required_params['cache_quota'] = (dict, {'fragment': (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False),
+                                                     'block': (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False)})
         if new_config_params.get('pagecache_ratio') is not None:
             required_params['pagecache_ratio'] = (float, {'min': 0, 'max': 1})
 

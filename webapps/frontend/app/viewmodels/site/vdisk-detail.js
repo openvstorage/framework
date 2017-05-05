@@ -451,17 +451,17 @@ define([
                 return false;
             }
             if (vPool.metadata().backend.caching_info.hasOwnProperty(self.vDisk().storageRouterGuid())) {
-                var cachingInfo = vPool.metadata().backend.caching_info[self.vDisk().storageRouterGuid()];
-                if (cachingInfo.hasOwnProperty('quota')) {
-                    var parsedQuota = parseFloat(self.vDisk().cacheQuota());
-                    if (isNaN(parsedQuota) || cachingInfo.quota / Math.pow(1024.0, 3) === parsedQuota) {
-                        return true;
-                    }
-                } else {
-                    if (self.vDisk().cacheQuota() === undefined) {
-                        return true;
-                    }
-                }
+                var cachingInfo = vPool.metadata().backend.caching_info[self.vDisk().storageRouterGuid()],
+                    cacheQuota = self.vDisk().cacheQuota();
+                var poolCQ = {
+                    'fragment': cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_fc', null) : null,
+                    'block': cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_bc', null) : null
+                };
+                var vdiskCQ = {
+                    'fragment': cacheQuota !== null && cacheQuota !== undefined ? generic.tryGet(cacheQuota, 'fragment', null) : null,
+                    'block': cacheQuota !== null && cacheQuota !== undefined ? generic.tryGet(cacheQuota, 'block', null) : null
+                };
+                return generic.objectEquals(poolCQ, vdiskCQ);
             }
             return false;
         });
