@@ -42,8 +42,8 @@ define([
                     call_parameters: {
                         vpool_name: self.data.name(),
                         storage_ip: self.data.storageIP(),
-                        cache_quota_fc: self.data.useFC() === true && self.data.cacheQuotaFC() !== undefined && self.data.cacheQuotaFC() !== '' ? Math.round(self.data.cacheQuotaFC() * Math.pow(1024.0, 3)) : undefined,
-                        cache_quota_bc: self.data.useBC() === true && self.data.cacheQuotaBC() !== undefined && self.data.cacheQuotaBC() !== '' ? Math.round(self.data.cacheQuotaBC() * Math.pow(1024.0, 3)) : undefined,
+                        cache_quota_fc: self.data.useFC() === true && self.data.cacheQuotaFC() !== undefined && self.data.cacheQuotaFC() !== '' ? Math.round(self.data.cacheQuotaFC() * Math.pow(1024, 3)) : undefined,
+                        cache_quota_bc: self.data.useBC() === true && self.data.cacheQuotaBC() !== undefined && self.data.cacheQuotaBC() !== '' ? Math.round(self.data.cacheQuotaBC() * Math.pow(1024, 3)) : undefined,
                         writecache_size: self.data.writeBufferGlobal(),
                         storagerouter_ip: self.data.storageRouter().ipAddress(),
                         fragment_cache_on_read: self.data.fragmentCacheOnRead(),

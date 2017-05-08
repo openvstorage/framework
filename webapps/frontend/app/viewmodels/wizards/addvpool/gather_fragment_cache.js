@@ -129,6 +129,16 @@ define([
                 }
             }
         });
+        self.hasCacheQuota = ko.computed(function() {
+            return self.data.storageRouter() !== undefined &&
+                self.data.storageRouter().features() !== undefined &&
+                self.data.storageRouter().features().alba.features.contains('cache-quota');
+        });
+        self.hasEE = ko.computed(function() {
+            return self.data.storageRouter() !== undefined &&
+                self.data.storageRouter().features() !== undefined &&
+                self.data.storageRouter().features().alba.edition === 'enterprise';
+        });
 
         // Functions
         self.resetBackendsFC = function() {

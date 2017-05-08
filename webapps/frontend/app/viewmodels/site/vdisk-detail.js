@@ -81,7 +81,7 @@ define([
                             vPoolGuid = vdisk.vpoolGuid();
                         if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
                             sr = new StorageRouter(storageRouterGuid);
-                            sr.load();
+                            sr.load('features');
                             vdisk.storageRouter(sr);
                         }
                         if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
@@ -443,25 +443,35 @@ define([
             return $.t('ovs:vdisks.detail.set_as_template');
         });
         self.equalsDefaultCacheQuota = ko.computed(function() {
+            var allFalse = {fragment: false, block: false};
             if (self.vDisk() === undefined || self.vDisk().configuration() === undefined) {
-                return false;
+                return allFalse;
             }
             var vPool = self.vDisk().vpool();
             if (vPool === undefined || vPool.metadata() === undefined) {
-                return false;
+                return allFalse;
             }
             if (vPool.metadata().backend.caching_info.hasOwnProperty(self.vDisk().storageRouterGuid())) {
                 var cachingInfo = vPool.metadata().backend.caching_info[self.vDisk().storageRouterGuid()],
-                    cacheQuota = self.vDisk().cacheQuota();
-                var poolCQ = {
-                    'fragment': cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_fc', null) : null,
-                    'block': cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_bc', null) : null
-                };
-                var vdiskCQ = {
-                    'fragment': cacheQuota !== null && cacheQuota !== undefined ? generic.tryGet(cacheQuota, 'fragment', null) : null,
-                    'block': cacheQuota !== null && cacheQuota !== undefined ? generic.tryGet(cacheQuota, 'block', null) : null
-                };
-                return generic.objectEquals(poolCQ, vdiskCQ);
+                    vPoolFragment = cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_fc', null) : null,
+                    vPoollock = cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_bc', null) : null,
+                    vDiskFragment = self.vDisk().fragmentCQ() !== undefined && self.vDisk().fragmentCQ() !== '' ? Math.round(self.vDisk().fragmentCQ() * Math.pow(1024.0, 3)) : null,
+                    vDiskBlock = self.vDisk().blockCQ() !== undefined && self.vDisk().blockCQ() !== '' ? Math.round(self.vDisk().blockCQ() * Math.pow(1024.0, 3)) : null;
+                return {fragment: vPoolFragment === vDiskFragment, block: vPoollock === vDiskBlock};
+            }
+            return allFalse;
+        });
+        self.hasCacheQuota = ko.computed(function() {
+            if (self.vDisk() !== undefined && self.vDisk().storageRouter() !== undefined && self.vDisk().storageRouter().features() !== undefined) {
+                var features = self.vDisk().storageRouter().features();
+                return features.alba.features !== undefined && features.alba.features.contains('cache-quota');
+            }
+            return false;
+        });
+        self.hasBlockCache = ko.computed(function() {
+            if (self.vDisk() !== undefined && self.vDisk().storageRouter() !== undefined && self.vDisk().storageRouter().features() !== undefined) {
+                var features = self.vDisk().storageRouter().features();
+                return features.alba.features !== undefined && features.alba.features.contains('block-cache');
             }
             return false;
         });

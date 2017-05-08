@@ -69,6 +69,16 @@ define([
                 self.data.storageRouter().features() !== undefined &&
                 self.data.storageRouter().features().alba.features.contains('block-cache');
         });
+        self.hasCacheQuota = ko.computed(function() {
+            return self.data.storageRouter() !== undefined &&
+                self.data.storageRouter().features() !== undefined &&
+                self.data.storageRouter().features().alba.features.contains('cache-quota');
+        });
+        self.hasEE = ko.computed(function() {
+            return self.data.storageRouter() !== undefined &&
+                self.data.storageRouter().features() !== undefined &&
+                self.data.storageRouter().features().alba.edition === 'enterprise';
+        });
         self.canConfigureBCRW = ko.computed(function() {
             return self.data.vPoolAdd() && self.hasBlockCache();
         });

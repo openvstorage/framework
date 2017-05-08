@@ -170,8 +170,15 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_preset_unavailable"></span>
     </div>
-    <div class="alert alert-info" data-bind="visible: !hasBlockCache()" style="margin-top: 20px;">
-        <span data-i18n="ovs:generic.ee_teasers.no_block_cache"></span>
+    <div class="alert alert-info" data-bind="visible: !hasBlockCache() || !hasCacheQuota()" style="margin-top: 20px;">
+        <span data-bind="visible: !hasBlockCache()">
+            <span data-i18n="ovs:generic.ee_teasers.no_block_cache" data-bind="visible: !hasEE()"></span>
+            <span data-i18n="ovs:generic.version_teasers.no_block_cache" data-bind="visible: hasEE()"></span>
+        </span>
+        <span data-bind="visible: !hasCacheQuota() && hasBlockCache()">
+            <span data-i18n="ovs:generic.ee_teasers.no_cache_quota" data-bind="visible: !hasEE()"></span>
+            <span data-i18n="ovs:generic.version_teasers.no_cache_quota" data-bind="visible: hasEE()"></span>
+        </span>
     </div>
     <div class="alert alert-info" data-bind="visible: data.vPool() !== undefined || (data.useBC() && loadingBackends())" style="margin-top: 20px;">
         <span data-bind="translate: 'ovs:wizards.add_vpool.gather_block_cache.loading_backend_information', visible: (data.useBC() && loadingBackends())"></span>

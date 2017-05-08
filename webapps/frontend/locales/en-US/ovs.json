@@ -131,7 +131,8 @@
         "edge": "Edge",
         "edge_clients": "Edge Clients",
         "ee_teasers": {
-            "no_block_cache": "Block Cache can only be configured in the Enterprise Edition."
+            "no_block_cache": "Block Cache can only be configured in the Enterprise Edition.",
+            "no_cache_quota": "Cache Quota is only available in the Enterprise Edition"
         },
         "elementsloading": "Items loading...",
         "error": "Error",
@@ -318,6 +319,10 @@
         "validuntil": "Valid until",
         "vdisk": "vDisk",
         "vdisks": "vDisks",
+        "version_teasers": {
+            "no_block_cache": "A newer version of Alba is required for Block Cache",
+            "no_cache_quota": "A newer version of ALBA is required for Cache Quota"
+        },
         "vpool": "vPool",
         "vpools": "vPools",
         "vtemplate": "vTemplate",
@@ -457,6 +462,7 @@
     },
     "storagedrivers": {
         "general": {
+            "blockquota": "Block quota",
             "cluster_size": "Cluster size",
             "dedupe": "Deduplication",
             "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
@@ -482,6 +488,7 @@
                 "rdma": "RDMA",
                 "tcp": "TCP"
             },
+            "fragmentquota": "Fragment quota",
             "sco_size": "SCO size",
             "quota": "Quota",
             "volume": "Volumes",
