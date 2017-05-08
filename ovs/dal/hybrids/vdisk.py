@@ -48,7 +48,7 @@ class VDisk(DataObject):
                     Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer'),
                     Property('pagecache_ratio', float, default=1.0, doc='Ratio of the volume\'s metadata pages that needs to be cached'),
                     Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)'),
-                    Property('cache_quota', int, mandatory=False, doc='Maximum fragment caching space this volume can consume (in Bytes). If not None, the caching for this volume has been set manually')]
+                    Property('cache_quota', dict, mandatory=False, doc='Maximum caching space(s) this volume can consume (in Bytes) per cache type. If not None, the caching(s) for this volume has been set manually')]
     __relations = [Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),

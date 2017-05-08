@@ -41,9 +41,9 @@ define([
         self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.blockCQ           = ko.observable();
         self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheQuota        = ko.observable();
         self.childrenGuids     = ko.observableArray([]);
         self.deviceName        = ko.observable();
         self.dtlEnabled        = ko.observable(true);
@@ -52,6 +52,7 @@ define([
         self.dtlStatus         = ko.observable();
         self.dtlTarget         = ko.observableArray([]);
         self.edgeClients       = ko.observableArray([]);
+        self.fragmentCQ        = ko.observable();
         self.guid              = ko.observable(guid);
         self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.isVTemplate       = ko.observable();
@@ -112,11 +113,16 @@ define([
         });
         self.configuration = ko.computed({
             read: function() {
+                var fcq = parseFloat(self.fragmentCQ()),
+                    bcq = parseFloat(self.blockCQ());
                 return {
                     sco_size: self.scoSize(),
                     dtl_mode: self.dtlEnabled() === true ? self.dtlMode() : 'no_sync',
                     dtl_target: self.dtlTarget().slice(),
-                    cache_quota: parseFloat(self.cacheQuota()),
+                    cache_quota: {
+                        fragment: !isNaN(fcq) ? Math.round(fcq * Math.pow(1024, 3)) : null,
+                        block: !isNaN(bcq) ? Math.round(bcq * Math.pow(1024, 3)) : null
+                    },
                     write_buffer: self.writeBuffer()
                 }
             },
@@ -124,8 +130,11 @@ define([
                 self.scoSize(configData.sco_size);
                 self.dtlMode(configData.dtl_mode);
                 self.dtlTarget(self.dtlManual() ? configData.dtl_target.slice() : []);
-                self.cacheQuota(configData.cache_quota === null ? undefined : configData.cache_quota);
                 self.writeBuffer(Math.round(configData.write_buffer));
+                if (configData.cache_quota !== null) {
+                    self.fragmentCQ([null, undefined].contains(configData.cache_quota.fragment) ? undefined : generic.round(configData.cache_quota.fragment / Math.pow(1024, 3), 2));
+                    self.blockCQ([null, undefined].contains(configData.cache_quota.block) ? undefined : generic.round(configData.cache_quota.block / Math.pow(1024, 3), 2));
+                }
             }
         });
         self.scoSize.subscribe(function(size) {
@@ -154,10 +163,7 @@ define([
                         return false;
                     }
                     if (key === 'cache_quota') {
-                        var current = parseFloat(self.configuration()[key]),
-                            previous = self.oldConfiguration()[key];
-
-                        if (current !== previous && !(isNaN(current) && isNaN(previous))) {
+                        if (!generic.objectEquals(self.configuration()[key], self.oldConfiguration()[key])) {
                             changed = true;
                             return false;
                         }
@@ -284,9 +290,6 @@ define([
                         .done(function (data) {
                             if (data.hasOwnProperty('pagecache_ratio')) {
                                 delete data['pagecache_ratio'];
-                            }
-                            if (data.hasOwnProperty('cache_quota') && data.cache_quota !== null) {
-                                data.cache_quota /= Math.pow(1024.0, 3);
                             }
                             self.dtlEnabled(data.dtl_mode !== 'no_sync');
                             self.configuration(data);

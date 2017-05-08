@@ -53,7 +53,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </label>
             <div class="col-lg-2">
                 <input class="form-control" type="text" style="text-align: center;"
-                       data-bind="value: data.cacheQuotaFC, valueUpdate: 'input', disable: data.cacheQuotaFCConfigured()">
+                       data-bind="value: data.cacheQuotaFC, valueUpdate: 'input', disable: data.cacheQuotaFCConfigured() || !hasCacheQuota()">
             </div>
             <label class="col-lg-1" data-i18n="ovs:generic.units.gib" style="padding-top: 7px; padding-left: 0"></label>
         </div>
@@ -169,6 +169,10 @@ but WITHOUT ANY WARRANTY of any kind.
     </div>
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable() && canContinue().value" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.alba_preset_unavailable"></span>
+    </div>
+    <div class="alert alert-info" data-bind="visible: !hasCacheQuota() && data.useFC()" style="margin-top: 20px;">
+        <span data-i18n="ovs:generic.ee_teasers.no_cache_quota" data-bind="visible: !hasEE()"></span>
+        <span data-i18n="ovs:generic.version_teasers.no_cache_quota" data-bind="visible: hasEE()"></span>
     </div>
     <div class="alert alert-info" data-bind="visible: data.vPool() !== undefined || (data.useFC() && loadingBackends()) && canContinue().value" style="margin-top: 20px;">
         <p data-bind="translate: 'ovs:wizards.add_vpool.gather_fragment_cache.loading_backend_information', visible: (data.useFC() && loadingBackends())"></p>

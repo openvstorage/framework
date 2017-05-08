@@ -382,7 +382,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                             </table>
                                         </div>
                                     </li>
-                                    <li>
+                                    <li data-bind="visible: $root.hasCacheQuota()">
                                         <div data-i18n="ovs:storagedrivers.vdisk.cache" style="margin-top: 7px;"></div>
                                         <div>
                                             <table class="table table-condensed" style="margin-left: 20px; margin-bottom: 0; width: 100%;">
@@ -390,18 +390,32 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagedrivers.general.quota"></span>:
+                                                                <span data-i18n="ovs:storagedrivers.general.fragmentquota"></span>:
                                                             </div>
                                                         </td>
                                                         <td style="width: 16%; padding: 0;">
-                                                            <input title="cacheQuota"
-                                                                   data-bind="value: cacheQuota"
-                                                                   size="5"
-                                                                   style="height: 25px; text-align: center;"/>
+                                                            <input data-bind="value: fragmentCQ"
+                                                                   size="5" style="height: 25px; text-align: center;"/>
                                                             <span data-i18n="ovs:generic.units.gib"></span>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <span data-i18n="ovs:generic.default" data-bind="visible: $root.equalsDefaultCacheQuota"></span>
+                                                            <span data-i18n="ovs:generic.default" data-bind="visible: $root.equalsDefaultCacheQuota().fragment"></span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr data-bind="visible: $root.hasBlockCache()">
+                                                        <td style="width: 20%; padding: 0;">
+                                                            <div style="margin-top: 5px;">
+                                                                <span data-i18n="ovs:storagedrivers.general.blockquota"></span>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="width: 16%; padding: 0;">
+                                                            <input data-bind="value: blockCQ"
+                                                                   size="5" style="height: 25px; text-align: center; margin-top: 5px;"/>
+                                                            <span data-i18n="ovs:generic.units.gib"></span>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <span data-i18n="ovs:generic.default" data-bind="visible: $root.equalsDefaultCacheQuota().block"
+                                                                  style="padding-top: 5px;"></span>
                                                         </td>
                                                     </tr>
                                                 </tbody>
