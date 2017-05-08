@@ -88,13 +88,13 @@ class VDiskTest(unittest.TestCase):
         new_config_params = {'dtl_mode': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC,
                              'sco_size': 4,
                              'dtl_target': [],
-                             'cache_quota': {'fragment': 5 * 1024.0 ** 3,
-                                             'block': 1024.0 ** 3},
+                             'cache_quota': {'fragment': 5 * 1024 ** 3,
+                                             'block': 1024 ** 3},
                              'write_buffer': 128}
         for key, values in {'dtl_mode': ['unknown', StorageDriverClient.VOLDRV_DTL_ASYNC],
                             'sco_size': list(set(range(257)).difference({4, 8, 16, 32, 64, 128})) + [-1],
                             'dtl_target': ['', {}, (), 0],
-                            'cache_quota': [{'fragment': -1}, {'fragment': 0.1 * 1024.0 ** 3 - 1}, {'fragment': 1024.0 ** 4 + 1},
+                            'cache_quota': [{'fragment': -1}, {'fragment': 1 * 1024.0 ** 3 - 1}, {'fragment': 1024 ** 4 + 1},
                                             {'block': -1}, {'block': 0.1 * 1024.0 ** 3 - 1}, {'block': 1024.0 ** 4 + 1}],
                             'write_buffer': [-1] + range(128) + range(10241, 10300),
                             'pagecache_ratio': [-0.1, 0, 1.1]}.iteritems():
