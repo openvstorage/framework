@@ -276,8 +276,6 @@ class Configuration(object):
                          'arakoon_clusters': {},
                          'stores': {'persistent': 'pyrakoon',
                                     'volatile': 'memcache'},
-                         'messagequeue': {'protocol': 'amqp',
-                                          'queues': {'storagedriver': 'volumerouter'}},
                          'logging': {'type': 'console'}})
         if logging_target is not None:
             base_cfg['logging'] = logging_target
