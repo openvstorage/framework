@@ -1201,8 +1201,8 @@ class StorageRouterController(object):
                     errors_found = True
 
         # Reconfigure cluster node configs
-        try:
-            if storage_drivers_left is True:
+        if storage_drivers_left is True:
+            try:
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring cluster node configs'.format(storage_driver.guid))
                 node_configs = []
                 for sd in vpool.storagedrivers:
@@ -1218,9 +1218,9 @@ class StorageRouterController(object):
                     if sd != storage_driver:
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Driver {1} {2} - Updating cluster node configs'.format(storage_driver.guid, sd.guid, sd.name))
                         vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
-        except Exception:
-            StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Reconfiguring cluster node configs failed'.format(storage_driver.guid))
-            errors_found = True
+            except Exception:
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Reconfiguring cluster node configs failed'.format(storage_driver.guid))
+                errors_found = True
 
         # Removing MDS services
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing MDS services'.format(storage_driver.guid))

@@ -103,6 +103,7 @@ define([
                 var vdisk = self.vDisk();
                 if (vdisk !== undefined && generic.xhrCompleted(self.loadDomainHandle)) {
                     self.loadDomainHandle = api.get('domains', { queryparams: {
+                        sort: 'name',
                         contents: 'storage_router_layout',
                         vdisk_guid: vdisk.guid()
                     }})

@@ -250,7 +250,7 @@
             },
             "dtl": {
                 "catch_up": "Rebuilding",
-                "checkup_required": "DTL should be configured",
+                "checkup_required": "DTL location optimization possible",
                 "degraded": "Degraded",
                 "disabled": "Disabled",
                 "ok_standalone": "Healthy (standalone)",

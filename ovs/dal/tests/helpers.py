@@ -230,7 +230,7 @@ class DalHelper(object):
                                        'edge': 4}
                 storagedriver.save()
                 storagedrivers[sd_id] = storagedriver
-                DalHelper._set_vpool_storage_driver_configuration(vpool=vpools[vpool_id], storagedriver=storagedriver)
+                DalHelper.set_vpool_storage_driver_configuration(vpool=vpools[vpool_id], storagedriver=storagedriver)
         for mds_id, sd_id in structure.get('mds_services', ()):
             if mds_id not in mds_services:
                 sd = storagedrivers[sd_id]
@@ -389,13 +389,15 @@ class DalHelper(object):
         return lambda s: _configs
 
     @staticmethod
-    def _set_vpool_storage_driver_configuration(vpool, storagedriver):
+    def set_vpool_storage_driver_configuration(vpool, storagedriver=None, config=None):
         """
         Mock the vpool configuration
         :param vpool: vPool to mock the configuration for
         :type vpool: vPool
-        :param storagedriver: StorageDriver on which the vPool is running
-        :type storagedriver: StorageDriver
+        :param storagedriver: StorageDriver on which the vPool is running or None for all StorageDrivers
+        :type storagedriver: ovs.dal.hybrids.storagedriver.StorageDriver|None
+        :param config: Configuration settings to adjust
+        :type config: dict
         :return: None
         """
         default_config = {'backend_connection_manager': {'local_connection_path': ''},
@@ -425,10 +427,16 @@ class DalHelper(object):
                                              'non_disposable_scos_factor': 2.0},
                           'volume_registry': {'vregistry_arakoon_cluster_id': 'voldrv',
                                               'vregistry_arakoon_cluster_nodes': []},
-                          'volume_router': {'vrouter_id': storagedriver.storagedriver_id,
-                                            'vrouter_sco_multiplier': 1024},
+                          'volume_router': {'vrouter_sco_multiplier': 1024},
                           'volume_router_cluster': {'vrouter_cluster_id': vpool.guid}}
+        if config is not None:
+            default_config.update(config)
 
-        key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storagedriver.storagedriver_id)
-        Configuration.set(key, json.dumps(default_config), raw=True)
-        LocalStorageRouterClient.configurations[key] = default_config
+        sds = vpool.storagedrivers
+        if storagedriver is not None:
+            sds = [storagedriver]
+        for sd in sds:
+            key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
+            Configuration.set(key, json.dumps(default_config), raw=True)
+            default_config['volume_router']['vrouter_id'] = sd.storagedriver_id
+            LocalStorageRouterClient.configurations[key] = default_config

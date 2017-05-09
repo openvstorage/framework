@@ -127,9 +127,16 @@ define([
                 }
             },
             write: function(configData) {
+                var validTargets = [];
+                var currentTargets = self.dtlManual() ? configData.dtl_target.slice() : [];
+                $.each(currentTargets, function(index, target) {
+                    if (self.dtlTargets().contains(target)) {
+                        validTargets.push(target);
+                    }
+                });
                 self.scoSize(configData.sco_size);
                 self.dtlMode(configData.dtl_mode);
-                self.dtlTarget(self.dtlManual() ? configData.dtl_target.slice() : []);
+                self.dtlTarget(validTargets);
                 self.writeBuffer(Math.round(configData.write_buffer));
                 if (configData.cache_quota !== null) {
                     self.fragmentCQ([null, undefined].contains(configData.cache_quota.fragment) ? undefined : generic.round(configData.cache_quota.fragment / Math.pow(1024, 3), 2));

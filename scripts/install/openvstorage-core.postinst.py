@@ -40,7 +40,6 @@ if __name__ == '__main__':
         with open(fn, 'w') as the_file:
             the_file.write(cts)
 
-    # TODO: set owner:group only where it is really needed
     check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
     # Cleanup *.pyc files to make sure that on update old obsolete pyc files are removed
     check_output('find /opt/OpenvStorage -name *.pyc -exec rm -f {} \;', shell=True)

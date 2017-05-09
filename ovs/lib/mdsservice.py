@@ -333,7 +333,7 @@ class MDSServiceController(object):
             vdisk.reload_client('storagedriver')
             vdisk.reload_client('objectregistry')
 
-            vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
+            vdisk.invalidate_dynamics('storagerouter_guid')
             if vdisk.storagerouter_guid is None:
                 raise SRCObjectNotFoundException('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
 
