@@ -18,6 +18,7 @@
 DalHelper module
 """
 import os
+import copy
 import glob
 import json
 import shutil
@@ -429,14 +430,15 @@ class DalHelper(object):
                                               'vregistry_arakoon_cluster_nodes': []},
                           'volume_router': {'vrouter_sco_multiplier': 1024},
                           'volume_router_cluster': {'vrouter_cluster_id': vpool.guid}}
+        new_config = copy.deepcopy(default_config)
         if config is not None:
-            default_config.update(config)
+            new_config.update(config)
 
         sds = vpool.storagedrivers
         if storagedriver is not None:
             sds = [storagedriver]
         for sd in sds:
             key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
-            Configuration.set(key, json.dumps(default_config), raw=True)
-            default_config['volume_router']['vrouter_id'] = sd.storagedriver_id
-            LocalStorageRouterClient.configurations[key] = default_config
+            new_config['volume_router']['vrouter_id'] = sd.storagedriver_id
+            LocalStorageRouterClient.configurations[key] = new_config
+            Configuration.set(key, json.dumps(new_config), raw=True)
