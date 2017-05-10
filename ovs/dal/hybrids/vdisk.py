@@ -119,12 +119,12 @@ class VDisk(DataObject):
         if (self.has_manual_dtl is False and vpool_dtl is False) or (self.has_manual_dtl is True and vpool_dtl is True and len(self.domains_dtl_guids) == 0):
             return 'disabled'
 
-        self.invalidate_dynamics('storagerouter_guid')
-        if self.storagerouter_guid is None:
+        storagerouter_guid = self._storagerouter_guid()
+        if storagerouter_guid is None:
             return 'checkup_required'
 
-        this_sr = StorageRouter(self.storagerouter_guid)
-        other_storagerouters = set([sd.storagerouter for sd in self.vpool.storagedrivers if sd.storagerouter_guid != self.storagerouter_guid])
+        this_sr = StorageRouter(storagerouter_guid)
+        other_storagerouters = set([sd.storagerouter for sd in self.vpool.storagedrivers if sd.storagerouter_guid != storagerouter_guid])
 
         # Retrieve all StorageRouters linked to the Recovery Domains (primary) and Regular Domains (secondary) for the StorageRouter hosting this vDisk
         primary = set()
