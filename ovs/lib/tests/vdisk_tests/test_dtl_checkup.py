@@ -17,11 +17,10 @@
 """
 DTL checkup test module
 DTL allocation rules:
-    - Priority to StorageRouters which have the recovery Domain of the vDisk StorageRouter, as regular Domain
-    - Second priority to StorageRouters which have the regular Domain of the vDisk StorageRouter, as regular Domain
-    - If Domains configured, but no StorageRouters are found matching any of the Domains on the vDisk StorageRouter, a random SR in the same vPool is chosen
+    - First priority to StorageRouters located in the vDisk's StorageRouter's Recovery Domain
+    - Second priority to StorageRouters located in the vDisk's StorageRouter's Regular Domain
+    - If Domains configured, but no StorageRouters are found matching any of the Domains on the vDisk's StorageRouter, a random SR in the same vPool is chosen
     - If no Domains configured on the vDisk StorageRouter, any other StorageRouter on which the vPool has been extended is chosen
-
 """
 import unittest
 from ovs.dal.hybrids.domain import Domain
