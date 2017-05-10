@@ -100,12 +100,19 @@ but WITHOUT ANY WARRANTY of any kind.
                         <tr>
                             <td data-i18n="ovs:generic.domains"></td>
                             <td>
-                                <span data-bind="dropdown: {
-                                                     items: $root.domainGuids, target: domainGuids,
+                                <span class="fa fa-spin" data-bind="visible: !$root.domainsLoaded() || !$root.storageRouterLoaded()" data-i18n="[html]ovs:icons.loading"></span>
+                                <span data-bind="visible: $root.domainsLoaded() && $root.storageRouterLoaded(),
+                                                 dropdown: {
+                                                     small: true,
+                                                     items: $root.domainGuids,
+                                                     target: domainGuids,
+                                                     enabled: edit,
+                                                     emptyisloading: false,
                                                      text: function(guid) {
                                                          return $root.domainCache()[guid].name();
-                                                     }, enabled: edit, small: true, emptyisloading: false
-                                                 }"></span>
+                                                     }
+                                                 }">
+                                </span>
                             </td>
                             <td data-i18n="ovs:generic.iops"></td>
                             <td><span data-bind="text: iops"></span></td>
@@ -113,12 +120,19 @@ but WITHOUT ANY WARRANTY of any kind.
                         <tr>
                             <td data-i18n="ovs:generic.recovery_domains"></td>
                             <td style="position: relative;">
-                                <span data-bind="dropdown: {
-                                                     items: $root.recoveryDomainGuids, target: recoveryDomainGuids,
+                                <span class="fa fa-spin" data-bind="visible: !$root.domainsLoaded() || !$root.storageRouterLoaded()" data-i18n="[html]ovs:icons.loading"></span>
+                                <span data-bind="visible: $root.domainsLoaded() && $root.storageRouterLoaded(),
+                                                 dropdown: {
+                                                     small: true,
+                                                     items: $root.recoveryDomainGuids,
+                                                     target: recoveryDomainGuids,
+                                                     enabled: edit,
+                                                     emptyisloading: false,
                                                      text: function(guid) {
                                                          return $root.domainCache()[guid].name();
-                                                     }, enabled: edit, small: true, emptyisloading: false
-                                                 }"></span>
+                                                     }
+                                                 }">
+                                </span>
                                 <span class="help-block" data-bind="if: $root.badRecoveryDomains().length > 0"
                                       style="position: absolute; font-size: 0.75em; top: 23px; padding-left: 5px;">
                                     <span class="fa" data-i18n="[html]icons.warning"></span>

@@ -54,15 +54,16 @@ define([
         });
 
         // Observables
-        self.checkedVPoolGuids = ko.observableArray([]);
-        self.domainCache       = ko.observable({});
-        self.domains           = ko.observableArray([]);
-        self.domainsLoaded     = ko.observable(false);
-        self.markingOffline    = ko.observable(false);
-        self.refreshing        = ko.observable(false);
-        self.storageRouter     = ko.observable();
-        self.vPools            = ko.observableArray([]);
-        self.vPoolsLoaded      = ko.observable(false);
+        self.checkedVPoolGuids   = ko.observableArray([]);
+        self.domainCache         = ko.observable({});
+        self.domains             = ko.observableArray([]);
+        self.domainsLoaded       = ko.observable(false);
+        self.markingOffline      = ko.observable(false);
+        self.refreshing          = ko.observable(false);
+        self.storageRouter       = ko.observable();
+        self.storageRouterLoaded = ko.observable(false);
+        self.vPools              = ko.observableArray([]);
+        self.vPoolsLoaded        = ko.observable(false);
 
         // Computed
         self.domainGuids = ko.computed(function() {
@@ -121,7 +122,10 @@ define([
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids());
                     })
-                    .always(deferred.resolve);
+                    .always(function() {
+                        self.storageRouterLoaded(true);
+                        deferred.resolve();
+                    });
             }).promise();
         };
         self.loadVPools = function() {
@@ -154,9 +158,7 @@ define([
         self.loadDomains = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadDomainsHandle)) {
-                    self.loadDomainsHandle = api.get('domains', {
-                        queryparams: { sort: 'name', contents: 'storage_router_layout' }
-                    })
+                    self.loadDomainsHandle = api.get('domains', {queryparams: {sort: 'name', contents: 'storage_router_layout'}})
                         .done(function(data) {
                             var guids = [], ddata = {};
                             $.each(data.data, function(index, item) {

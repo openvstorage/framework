@@ -105,27 +105,26 @@ class Toolbox(object):
         return functions_found
 
     @staticmethod
-    def verify_required_params(required_params, actual_params, exact_match=False):
+    def verify_required_params(required_params, actual_params, verify_keys=False):
         """
         Verify whether the actual parameters match the required parameters
         :param required_params: Required parameters which actual parameters have to meet
         :type required_params: dict
-
         :param actual_params: Actual parameters to check for validity
         :type actual_params: dict
-
-        :param exact_match: Keys of both dictionaries must be identical
-        :type exact_match: bool
-
+        :param verify_keys: Verify whether the passed in keys are actually part of the required keys
+        :type verify_keys: bool
         :return: None
+        :rtype: NoneType
         """
-        error_messages = []
         if not isinstance(required_params, dict) or not isinstance(actual_params, dict):
             raise RuntimeError('Required and actual parameters must be of type dictionary')
 
-        if exact_match is True:
-            for key in set(actual_params.keys()).difference(required_params.keys()):
-                error_messages.append('Missing key "{0}" in required_params'.format(key))
+        error_messages = []
+        if verify_keys is True:
+            for key in actual_params:
+                if key not in required_params:
+                    error_messages.append('Specified parameter "{0}" is not valid'.format(key))
 
         for required_key, key_info in required_params.iteritems():
             expected_type = key_info[0]
@@ -163,6 +162,8 @@ class Toolbox(object):
                     maximum = expected_value.get('max', sys.maxint)
                     if not minimum <= actual_value <= maximum:
                         error_messages.append('{0} param "{1}" with value "{2}" should be in range: {3} - {4}'.format(mandatory_or_optional, required_key, actual_value, minimum, maximum))
+                    if actual_value in expected_value.get('exclude', []):
+                        error_messages.append('{0} param "{1}" cannot have value {2}'.format(mandatory_or_optional, required_key, actual_value))
             else:
                 if DalToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
                     error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
