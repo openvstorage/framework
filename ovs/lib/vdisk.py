@@ -19,6 +19,7 @@ Module for VDiskController
 """
 import os
 import re
+import json
 import math
 import time
 import uuid
@@ -36,6 +37,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
@@ -113,7 +115,48 @@ class VDiskController(object):
             if vdisk.objectregistry_client.find(str(vdisk.volume_id)) is None:
                 VDiskController._logger.warning('Volume {0} does not exist anymore.'.format(vdisk.volume_id))
                 VDiskController.clean_vdisk_from_model(vdisk)
-        # TODO: Configure cache quota
+        command = '<unknown>'
+        try:
+            vpool = vdisk.vpool
+            storagedriver = vpool.storagedrivers[0]
+            storagerouter = storagedriver.storagerouter
+            if 'cache-quota' in storagerouter.features['alba']['features']:
+                proxy = storagedriver.alba_proxies[0]
+                configuration = Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/abm'.format(vpool.guid, proxy.guid))
+                client = SSHClient(storagerouter)
+                if vdisk.cache_quota is not None:
+                    fcq = vdisk.cache_quota.get('fragment')
+                    bcq = vdisk.cache_quota.get('block')
+                else:
+                    vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
+                    metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
+                    fcq = metadata.get('quota_fc')
+                    bcq = metadata.get('quota_bc')
+                if fcq is not None and fcq > 0:
+                    fcq_action = 'Setting FCQ to {0}'.format(fcq)
+                    fcq_command = ['--fragment-cache-quota', str(fcq)]
+                else:
+                    fcq_action = 'Clearing FCQ'
+                    fcq_command = ['--clear-fragment-cache-quota']
+                if 'block-cache' in storagerouter.features['alba']['features'] and bcq is not None and bcq > 0:
+                    bcq_action = 'Setting BCQ to {0}'.format(bcq)
+                    bcq_command = ['--block-cache-quota', str(bcq)]
+                else:
+                    bcq_action = 'Clearing BCQ'
+                    bcq_command = ['--clear-block-cache-quota']
+                command = ['alba', 'set-namespace-cache-quota', '--to-json', '--config', configuration] + fcq_command + bcq_command + [vdisk.volume_id]
+                VDiskController._logger.debug('Cache Quota actions on vDisk {0}: {1}, {2}'.format(vdisk.name, fcq_action, bcq_action))
+                raw_result = client.run(command)
+                try:
+                    results = json.loads(raw_result)
+                except ValueError:
+                    VDiskController._logger.debug('Could not parse result: {0}'.format(raw_result))
+                    raise
+                if results['success'] is False:
+                    raise RuntimeError('Could not set Fragment/Block Cache Quota: {0}'.format(results))
+        except Exception:
+            VDiskController._logger.debug('Executed command: {0}'.format(command))
+            VDiskController._logger.exception('Error when setting cache quotas')
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.delete_from_voldrv')
