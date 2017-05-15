@@ -115,7 +115,7 @@ class VDiskController(object):
             if vdisk.objectregistry_client.find(str(vdisk.volume_id)) is None:
                 VDiskController._logger.warning('Volume {0} does not exist anymore.'.format(vdisk.volume_id))
                 VDiskController.clean_vdisk_from_model(vdisk)
-        command = '<unknown>'
+        command = None
         try:
             vpool = vdisk.vpool
             storagedriver = vpool.storagedrivers[0]
@@ -155,7 +155,8 @@ class VDiskController(object):
                 if results['success'] is False:
                     raise RuntimeError('Could not set Fragment/Block Cache Quota: {0}'.format(results))
         except Exception:
-            VDiskController._logger.debug('Executed command: {0}'.format(command))
+            if command is not None:
+                VDiskController._logger.debug('Executed command: {0}'.format(command))
             VDiskController._logger.exception('Error when setting cache quotas')
 
     @staticmethod
