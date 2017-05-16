@@ -129,7 +129,7 @@ class MigrationController(object):
                 service.name = new_service_name
                 service.save()
 
-                if not ServiceManager.has_service(name=old_service_name, client=root_client):
+                if not service_manager.has_service(name=old_service_name, client=root_client):
                     continue
                 old_configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(storagedriver.storagerouter.machine_id, old_service_name)
                 if not Configuration.exists(key=old_configuration_key):
@@ -142,10 +142,10 @@ class MigrationController(object):
                                                     new_service_name=new_service_name)
 
                 # Register new service and remove old service
-                ServiceManager.add_service(name='ovs-albaproxy',
-                                           client=root_client,
-                                           params=Configuration.get(old_configuration_key),
-                                           target_name='ovs-{0}'.format(new_service_name))
+                service_manager.add_service(name='ovs-albaproxy',
+                                            client=root_client,
+                                            params=Configuration.get(old_configuration_key),
+                                            target_name='ovs-{0}'.format(new_service_name))
 
                 # Update scrub proxy config
                 proxy_config_key = '/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)
@@ -216,21 +216,20 @@ class MigrationController(object):
                 ExtensionsToolbox.edit_version_file(client=root_client,
                                                     package_name='volumedriver',
                                                     old_service_name='volumedriver_{0}'.format(vpool.name))
-                if ServiceManager.ImplementationClass == Systemd:
+                if service_manager.ImplementationClass == Systemd:
                     root_client.run(['systemctl', 'daemon-reload'])
 
         ########################################
         # Update metadata_store_bits information
-        getattr(ServiceManager, 'has_service')  # Invoke ServiceManager to fill out the ImplementationClass (default None)
         for vpool in VPoolList.get_vpools():
             bits = None
             for storagedriver in vpool.storagedrivers:
                 key = '/ovs/framework/hosts/{0}/services/volumedriver_{1}'.format(storagedriver.storagerouter.machine_id, vpool.name)
                 if Configuration.exists(key=key) and 'METADATASTORE_BITS' not in Configuration.get(key=key):
                     if bits is None:
-                        entries = ServiceManager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vpool.name),
-                                                                           client=sr_client_map[storagedriver.storagerouter_guid],
-                                                                           entries=['METADATASTORE_BITS='])
+                        entries = service_manager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vpool.name),
+                                                                            client=sr_client_map[storagedriver.storagerouter_guid],
+                                                                            entries=['METADATASTORE_BITS='])
                         if len(entries) == 1:
                             bits = entries[0].split('=')[-1]
                             bits = int(bits) if bits.isdigit() else 5

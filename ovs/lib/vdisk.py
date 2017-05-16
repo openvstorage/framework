@@ -1059,6 +1059,8 @@ class VDiskController(object):
         :return: None
         :rtype: NoneType
         """
+        service_manager = ServiceFactory.get_manager()
+
         if vpool_guid is not None and vdisk_guid is not None:
             raise ValueError('vPool and vDisk are mutually exclusive')
         if storagerouters_to_exclude is None:
@@ -1187,7 +1189,7 @@ class VDiskController(object):
                                 try:
                                     root_client = SSHClient(endpoint=storagerouter, username='root')
                                     service_name = 'dtl_{0}'.format(vpool.name)
-                                    if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client) == 'active':
+                                    if service_manager.has_service(service_name, client=root_client) is True and service_manager.get_service_status(service_name, client=root_client) == 'active':
                                         root_client_map[storagerouter] = root_client
                                     else:
                                         VDiskController._logger.warning('    DTL service on Storage Router with IP {0} is not reachable'.format(storagerouter.ip))
@@ -1455,12 +1457,13 @@ class VDiskController(object):
         :return: None
         :rtype: NoneType
         """
+        service_manager = ServiceFactory.get_manager()
         if vdisk.vpool.metadata_store_bits is None:
             bits = None
             for storagedriver in vdisk.vpool.storagedrivers:
-                entries = ServiceManager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vdisk.vpool.name),
-                                                                   client=SSHClient(endpoint=storagedriver.storagerouter, username='root'),
-                                                                   entries=['METADATASTORE_BITS='])
+                entries = service_manager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vdisk.vpool.name),
+                                                                    client=SSHClient(endpoint=storagedriver.storagerouter, username='root'),
+                                                                    entries=['METADATASTORE_BITS='])
                 if len(entries) == 1:
                     bits = entries[0].split('=')[-1]
                     bits = int(bits) if bits.isdigit() else 5
@@ -1478,6 +1481,7 @@ class VDiskController(object):
         storagedriver_config.load()
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
+        # noinspection PyTypeChecker
         metadata_page_size = float(2 ** vdisk.vpool.metadata_store_bits * cluster_size)
         cache_capacity = int(math.ceil(vdisk.size / metadata_page_size * ratio))
 

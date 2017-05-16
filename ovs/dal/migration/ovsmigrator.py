@@ -17,8 +17,6 @@
 """
 OVS migration module
 """
-import copy
-import json
 import random
 import string
 import hashlib

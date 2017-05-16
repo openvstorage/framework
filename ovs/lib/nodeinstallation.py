@@ -747,7 +747,9 @@ class NodeInstallationController(object):
                                                    cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                                    ip=cluster_ip,
                                                    base_dir='/opt/OpenvStorage/db',
-                                                   locked=False)
+                                                   locked=False,
+                                                   log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                   crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
             ArakoonInstaller.start_cluster(ip=cluster_ip,
                                            metadata=info['metadata'])
             contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
@@ -786,7 +788,9 @@ class NodeInstallationController(object):
                                                      cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
                                                      ip=cluster_ip,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                                     locked=False)
+                                                     locked=False,
+                                                     log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                     crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
             metadata = result['metadata']
             arakoon_ports = result['ports']
             ArakoonInstaller.start_cluster(metadata=metadata)
@@ -811,7 +815,7 @@ class NodeInstallationController(object):
         Toolbox.log(logger=NodeInstallationController._logger, messages='Starting model services')
         model_services = ['memcached', 'arakoon-ovsdb'] if internal is True else ['memcached']
         for service in model_services:
-            if ServiceManager.has_service(service, client=target_client):
+            if service_manager.has_service(service, client=target_client):
                 Toolbox.change_service_state(target_client, service, 'restart', NodeInstallationController._logger)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Start model migration')
@@ -838,7 +842,7 @@ class NodeInstallationController(object):
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Starting services on 1st node')
         for service in model_services + ['rabbitmq-server']:
-            if ServiceManager.has_service(service, client=target_client):
+            if service_manager.has_service(service, client=target_client):
                 Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
         # Enable HA for the rabbitMQ queues
         NodeTypeController.check_rabbitmq_and_enable_ha_mode(client=target_client, logger=NodeInstallationController._logger)
@@ -859,8 +863,8 @@ class NodeInstallationController(object):
             Configuration.set('/ovs/framework/support|enabled', False)
         else:
             service = 'support-agent'
-            if not ServiceManager.has_service(service, target_client):
-                ServiceManager.add_service(service, client=target_client)
+            if not service_manager.has_service(service, target_client):
+                service_manager.add_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         if NodeTypeController.avahi_installed(client=target_client, logger=NodeInstallationController._logger) is True:

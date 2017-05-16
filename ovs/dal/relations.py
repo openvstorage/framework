@@ -47,6 +47,7 @@ class RelationMapper(object):
         hybrid_structure = HybridRunner.get_hybrids()
         for class_descriptor in hybrid_structure.values():  # Extended objects
             cls = Descriptor().load(class_descriptor).get_object()
+            # noinspection PyProtectedMember
             for relation in cls._relations:
                 if relation.foreign_type is None:
                     remote_class = cls

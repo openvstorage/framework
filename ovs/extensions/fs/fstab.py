@@ -76,7 +76,7 @@ class Fstab(object):
         f.write('%s %s %s %s %s %s\n' % (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno))
         f.close()
 
-    def modify_config_by_device(self, device, fs_file = '', fs_vfstype = '', fs_mntops='', fs_freq='', fs_passno = ''):
+    def modify_config_by_device(self, device, fs_file='', fs_vfstype='', fs_mntops='', fs_freq='', fs_passno=''):
         """
         Modify an entry to /etc/fstab
 

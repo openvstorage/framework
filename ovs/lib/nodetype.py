@@ -209,6 +209,7 @@ class NodeTypeController(object):
         from ovs.dal.hybrids.service import Service
 
         Toolbox.log(logger=NodeTypeController._logger, messages='Promoting node', title=True)
+        service_manager = ServiceFactory.get_manager()
         if configure_memcached is True:
             if NodeTypeController._validate_local_memcache_servers(ip_client_map) is False:
                 raise RuntimeError('Not all memcache nodes can be reached which is required for promoting a node.')
@@ -228,12 +229,14 @@ class NodeTypeController(object):
             metadata = ArakoonInstaller.extend_cluster(cluster_name='config',
                                                        ip=master_ip,
                                                        new_ip=cluster_ip,
-                                                       base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
+                                                       base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
+                                                       log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                       crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
             ArakoonInstaller.restart_cluster_after_extending(cluster_name='config',
                                                              new_ip=cluster_ip,
                                                              ip=master_ip)
-            ServiceManager.register_service(node_name=machine_id,
-                                            service_metadata=metadata['service_metadata'])
+            service_manager.register_service(node_name=machine_id,
+                                             service_metadata=metadata['service_metadata'])
 
         # Find other (arakoon) master nodes
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
@@ -250,7 +253,9 @@ class NodeTypeController(object):
             Toolbox.log(logger=NodeTypeController._logger, messages='Joining Arakoon OVS DB cluster')
             result = ArakoonInstaller.extend_cluster(cluster_name=arakoon_cluster_name,
                                                      new_ip=cluster_ip,
-                                                     base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
+                                                     base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
+                                                     log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                     crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
             ArakoonInstaller.restart_cluster_after_extending(cluster_name=arakoon_cluster_name,
                                                              new_ip=cluster_ip)
             arakoon_ports = result['ports']
@@ -319,7 +324,7 @@ class NodeTypeController(object):
         if arakoon_metadata['internal'] is True:
             services.remove('arakoon-ovsdb')
         for service in services:
-            if ServiceManager.has_service(service, client=target_client):
+            if service_manager.has_service(service, client=target_client):
                 Toolbox.change_service_state(target_client, service, 'start', NodeTypeController._logger)
 
         Toolbox.log(logger=NodeTypeController._logger, messages='Restarting services')
@@ -352,6 +357,7 @@ class NodeTypeController(object):
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
         Toolbox.log(logger=NodeTypeController._logger, messages='Demoting node', title=True)
+        service_manager = ServiceFactory.get_manager()
         if offline_nodes is None:
             offline_nodes = []
 
@@ -439,7 +445,7 @@ class NodeTypeController(object):
             if unconfigure_rabbitmq is True:
                 Toolbox.log(logger=NodeTypeController._logger, messages='Removing/unconfiguring RabbitMQ')
                 try:
-                    if ServiceManager.has_service('rabbitmq-server', client=target_client):
+                    if service_manager.has_service('rabbitmq-server', client=target_client):
                         Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeTypeController._logger)
                         target_client.run(['rabbitmq-server', '-detached'])
                         time.sleep(5)
@@ -461,7 +467,7 @@ class NodeTypeController(object):
             if unconfigure_memcached is False:
                 services.remove('memcached')
             for service in services:
-                if ServiceManager.has_service(service, client=target_client):
+                if service_manager.has_service(service, client=target_client):
                     Toolbox.log(logger=NodeTypeController._logger, messages='Stopping service {0}'.format(service))
                     try:
                         Toolbox.change_service_state(target_client, service, 'stop', NodeTypeController._logger)
@@ -471,18 +477,18 @@ class NodeTypeController(object):
             Toolbox.log(logger=NodeTypeController._logger, messages='Removing services')
             services = ['scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
             for service in services:
-                if ServiceManager.has_service(service, client=target_client):
+                if service_manager.has_service(service, client=target_client):
                     Toolbox.log(logger=NodeTypeController._logger, messages='Removing service {0}'.format(service))
                     try:
                         Toolbox.change_service_state(target_client, service, 'stop', NodeTypeController._logger)
-                        ServiceManager.remove_service(service, client=target_client)
+                        service_manager.remove_service(service, client=target_client)
                     except Exception as ex:
                         Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to remove service'.format(service), ex], loglevel='exception')
 
-            if ServiceManager.has_service('workers', client=target_client):
-                ServiceManager.add_service(name='workers',
-                                           client=target_client,
-                                           params={'WORKER_QUEUE': '{0}'.format(unique_id)})
+            if service_manager.has_service('workers', client=target_client):
+                service_manager.add_service(name='workers',
+                                            client=target_client,
+                                            params={'WORKER_QUEUE': '{0}'.format(unique_id)})
         try:
             NodeTypeController._configure_amqp_to_volumedriver()
         except Exception as ex:
@@ -526,6 +532,7 @@ class NodeTypeController(object):
         """
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
+        service_manager = ServiceFactory.get_manager()
         master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
         slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
         if offline_node_ips is None:
@@ -535,16 +542,16 @@ class NodeTypeController(object):
         support_agent = 'support-agent'
         for ip in master_ips + slave_ips:
             if ip not in offline_node_ips:
-                if ServiceManager.has_service(watcher, clients[ip]):
+                if service_manager.has_service(watcher, clients[ip]):
                     Toolbox.change_service_state(clients[ip], watcher, 'stop', logger)
         for ip in master_ips:
             if ip not in offline_node_ips:
                 Toolbox.change_service_state(clients[ip], memcached, 'restart', logger)
         for ip in master_ips + slave_ips:
             if ip not in offline_node_ips:
-                if ServiceManager.has_service(watcher, clients[ip]):
+                if service_manager.has_service(watcher, clients[ip]):
                     Toolbox.change_service_state(clients[ip], watcher, 'start', logger)
-                if ServiceManager.has_service(support_agent, clients[ip]):
+                if service_manager.has_service(support_agent, clients[ip]):
                     Toolbox.change_service_state(clients[ip], support_agent, 'restart', logger)
         VolatileFactory.store = None
 
@@ -575,6 +582,7 @@ class NodeTypeController(object):
         :return: None
         """
         Toolbox.log(logger=logger, messages='Setting up RabbitMQ')
+        service_manager = ServiceFactory.get_manager()
         rabbitmq_port = Configuration.get('/ovs/framework/messagequeue|endpoints')[0].split(':')[1]
         rabbitmq_login = Configuration.get('/ovs/framework/messagequeue|user')
         rabbitmq_password = Configuration.get('/ovs/framework/messagequeue|password')
@@ -586,7 +594,7 @@ class NodeTypeController(object):
               {{vm_memory_high_watermark, 0.2}}]}}
 ].""".format(rabbitmq_port, rabbitmq_login, rabbitmq_password))
 
-        rabbitmq_running, same_process = ServiceManager.is_rabbitmq_running(client=client)
+        rabbitmq_running, same_process = service_manager.is_rabbitmq_running(client=client)
         if rabbitmq_running is True:
             # Example output of 'list_users' command
             # Listing users ...
@@ -637,9 +645,10 @@ class NodeTypeController(object):
         :type logger: ovs.log.log_handler.LogHandler
         :return: None
         """
-        if not ServiceManager.has_service('rabbitmq-server', client):
+        service_manager = ServiceFactory.get_manager()
+        if not service_manager.has_service('rabbitmq-server', client):
             raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
-        rabbitmq_running, same_process = ServiceManager.is_rabbitmq_running(client=client)
+        rabbitmq_running, same_process = service_manager.is_rabbitmq_running(client=client)
         if rabbitmq_running is False or same_process is False:
             Toolbox.change_service_state(client, 'rabbitmq-server', 'restart', logger)
 
@@ -732,6 +741,7 @@ class NodeTypeController(object):
         :return: None
         """
         Toolbox.log(logger=logger, messages='Adding services')
+        service_manager = ServiceFactory.get_manager()
         services = {}
         worker_queue = System.get_my_machine_id(client=client)
         if node_type == 'master':
@@ -745,9 +755,9 @@ class NodeTypeController(object):
                          'watcher-framework': {}})
 
         for service_name, params in services.iteritems():
-            if not ServiceManager.has_service(service_name, client):
+            if not service_manager.has_service(service_name, client):
                 Toolbox.log(logger=logger, messages='Adding service {0}'.format(service_name))
-                ServiceManager.add_service(name=service_name, params=params, client=client)
+                service_manager.add_service(name=service_name, params=params, client=client)
 
     @staticmethod
     def retrieve_storagerouter_info_via_host(ip, password):

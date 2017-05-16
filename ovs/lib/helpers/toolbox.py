@@ -66,8 +66,8 @@ class Toolbox(object):
         for filename in os.listdir(path):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(module):
+                mod = imp.load_source(name, '/'.join([path, filename]))
+                for member in inspect.getmembers(mod):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
                             and 'object' in [base.__name__ for base in member[1].__bases__]:
@@ -98,10 +98,10 @@ class Toolbox(object):
         functions_found = len(functions) > 0
         if logger is not None and functions_found is True:
             Toolbox.log(logger=logger, messages='Running "{0} - {1}" hooks'.format(component, sub_component), title=True)
-        for function in functions:
+        for fct in functions:
             if logger is not None:
-                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(function.__module__, function.__name__))
-            function(**kwargs)
+                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(fct.__module__, fct.__name__))
+            fct(**kwargs)
         return functions_found
 
     @staticmethod

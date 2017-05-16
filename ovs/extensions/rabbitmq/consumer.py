@@ -73,8 +73,8 @@ if __name__ == '__main__':
             for filename in os.listdir(path):
                 if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                     name = filename.replace('.py', '')
-                    module = imp.load_source(name, '/'.join([path, filename]))
-                    for member in inspect.getmembers(module):
+                    mod = imp.load_source(name, '/'.join([path, filename]))
+                    for member in inspect.getmembers(mod):
                         if inspect.isclass(member[1]) \
                                 and member[1].__module__ == name \
                                 and 'object' in [base.__name__ for base in member[1].__bases__]:

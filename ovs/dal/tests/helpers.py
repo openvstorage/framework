@@ -43,7 +43,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
-from ovs_extensions.services.tests.systemd import Systemd
+from ovs_extensions.services.mockups.systemd import SystemdMock
 from ovs_extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -66,7 +66,6 @@ class DalHelper(object):
         """
         Execute several actions before starting a new UnitTest
         :param kwargs: Additional key word arguments
-        :type kwargs: dict
         """
         if kwargs.get('fake_sleep', False) is True:
             fakesleep.monkey_patch()
@@ -79,7 +78,6 @@ class DalHelper(object):
         """
         Execute several actions when ending a UnitTest
         :param kwargs: Additional key word arguments
-        :type kwargs: dict
         """
         if kwargs.get('fake_sleep', False) is True:
             fakesleep.monkey_restore()
@@ -97,7 +95,7 @@ class DalHelper(object):
         # noinspection PyProtectedMember
         SSHClient._clean()
         # noinspection PyProtectedMember
-        Systemd._clean()
+        SystemdMock._clean()
         # noinspection PyProtectedMember
         MDSClient._clean()
         # noinspection PyProtectedMember

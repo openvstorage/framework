@@ -25,6 +25,7 @@ from ovs_extensions.db.arakoon.arakooninstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.log.log_handler import LogHandler
 
 
 class NodeConfigTest(unittest.TestCase):
@@ -278,7 +279,9 @@ class NodeConfigTest(unittest.TestCase):
         ArakoonInstaller.create_cluster(cluster_name='voldrv',
                                         cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
                                         ip=storagerouters[1].ip,
-                                        base_dir='/tmp')
+                                        base_dir='/tmp',
+                                        log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                        crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
 
         # Initial run, it will now be configured
         StorageRouterClient.node_config_recordings = []

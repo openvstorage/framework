@@ -725,13 +725,17 @@ class Generic(unittest.TestCase):
                                                        cluster_type=cluster_type,
                                                        ip=storagerouter_1.ip,
                                                        base_dir=base_dir,
-                                                       internal=internal)
+                                                       internal=internal,
+                                                       log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                       crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
                 ArakoonInstaller.start_cluster(metadata=info['metadata'],
                                                ip=storagerouter_1.ip if filesystem is True else None)
                 ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
                                                 ip=storagerouter_1.ip if filesystem is True else None,
                                                 new_ip=storagerouter_2.ip,
-                                                base_dir=base_dir)
+                                                base_dir=base_dir,
+                                                log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
 
                 service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
                 if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.ABM:

@@ -254,14 +254,15 @@ class StorageDriverController(object):
         :return: None
         """
         from ovs_extensions.generic.sshclient import NotAuthenticatedException
-
         _ = complete_removal
+
+        service_manager = ServiceFactory.get_manager()
         service_name = 'watcher-volumedriver'
         try:
             client = SSHClient(endpoint=cluster_ip, username='root')
-            if ServiceManager.has_service(name=service_name, client=client):
-                ServiceManager.stop_service(name=service_name, client=client)
-                ServiceManager.remove_service(name=service_name, client=client)
+            if service_manager.has_service(name=service_name, client=client):
+                service_manager.stop_service(name=service_name, client=client)
+                service_manager.remove_service(name=service_name, client=client)
         except (UnableToConnectException, NotAuthenticatedException):
             pass
 
@@ -345,7 +346,9 @@ class StorageDriverController(object):
                 result = ArakoonInstaller.create_cluster(cluster_name=arakoon_voldrv_cluster,
                                                          cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
                                                          ip=storagerouter.ip,
-                                                         base_dir=partition.folder)
+                                                         base_dir=partition.folder,
+                                                         log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                         crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
                 ports = result['ports']
                 metadata = result['metadata']
                 ArakoonInstaller.start_cluster(metadata=metadata)
@@ -372,7 +375,9 @@ class StorageDriverController(object):
                     continue
                 result = ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
                                                          new_ip=storagerouter.ip,
-                                                         base_dir=partition.folder)
+                                                         base_dir=partition.folder,
+                                                         log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                         crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
                 _add_service(service_storagerouter=storagerouter,
                              arakoon_ports=result['ports'],
                              service_name=ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))

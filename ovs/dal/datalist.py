@@ -30,6 +30,7 @@ from ovs_extensions.storage.persistentfactory import PersistentFactory
 from ovs.dal.relations import RelationMapper
 
 
+# noinspection PyProtectedMember
 class DataList(object):
     """
     The DataList is a class that provide query functionality for the hybrid DAL
@@ -400,6 +401,7 @@ class DataList(object):
             self.from_cache = True
             self._guids = cached_data
 
+            # noinspection PyTypeChecker
             keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
             entries = list(self._persistent.get_multi(keys, must_exist=False))
 
@@ -534,6 +536,7 @@ class DataList(object):
         * Sorting (guids) of this list
         * Cached objects from both lists
         :param other: The list that must be used to update this lists query results
+        :type other: ovs.dal.datalist.DataList
         """
         # Validating and esure that the guids are available
         if not isinstance(other, DataList):
@@ -554,6 +557,7 @@ class DataList(object):
         for guid in old_guids:
             if guid in new_guids:
                 self._guids.append(guid)
+        # noinspection PyTypeChecker
         for guid in new_guids:
             if guid not in self._guids:
                 self._guids.append(guid)
@@ -648,6 +652,7 @@ class DataList(object):
         """
         __add__ operator for DataList
         :param other: A DataList instance that must be added to this instance
+        :type other: ovs.dal.datalist.DataList
         """
         if not isinstance(other, DataList):
             raise TypeError('Both operands should be of type DataList')
@@ -659,6 +664,7 @@ class DataList(object):
             other._execute_query()
         new_datalist = DataList(self._object_type, {})
         guids = self._guids[:]
+        # noinspection PyTypeChecker
         for guid in other._guids:
             if guid not in guids:
                 guids.append(guid)
@@ -721,6 +727,7 @@ class DataList(object):
         """
         if self._executed is False and self._guids is None:
             self._execute_query()
+        # noinspection PyTypeChecker
         return len(self._guids)
 
     def __getitem__(self, item):
