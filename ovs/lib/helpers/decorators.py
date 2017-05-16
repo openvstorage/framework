@@ -26,8 +26,8 @@ import string
 import inspect
 import threading
 from ovs.dal.lists.storagedriverlist import StorageDriverList
-from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.generic.volatilemutex import volatile_mutex
+from ovs_extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.log.log_handler import LogHandler
 

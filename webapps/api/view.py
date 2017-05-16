@@ -31,7 +31,7 @@ from api.oauth2.decorators import auto_response, limit, authenticated
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.api.client import OVSClient
+from ovs_extensions.api.client import OVSClient
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.log.log_handler import LogHandler

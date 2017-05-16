@@ -28,8 +28,8 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.services.service import ServiceManager
+from ovs_extensions.generic.sshclient import SSHClient
+from ovs_extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.vdisk import VDiskController
 

@@ -52,7 +52,7 @@ class OVSMigrator(object):
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         if working_version < OVSMigrator.THIS_VERSION:
             from ovs.extensions.generic.configuration import Configuration
-            from ovs.extensions.generic.sshclient import SSHClient
+            from ovs_extensions.generic.sshclient import SSHClient
             from ovs.extensions.generic.system import System
             local_machine_id = System.get_my_machine_id()
             local_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(local_machine_id))

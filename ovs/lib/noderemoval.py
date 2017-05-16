@@ -21,13 +21,12 @@ Module for NodeRemovalController
 import os
 import re
 import sys
-from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.interactive import Interactive
-from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.interactive import Interactive
+from ovs_extensions.generic.remote import remote
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.services.service import ServiceManager
+from ovs_extensions.services.servicefactory import ServiceFactory
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.nodetype import NodeTypeController
 from ovs.log.log_handler import LogHandler
@@ -53,7 +52,7 @@ class NodeRemovalController(object):
         from ovs.lib.storagedriver import StorageDriverController
         from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.lists.storagerouterlist import StorageRouterList
-        from ovs.extensions.generic.sshclient import NotAuthenticatedException
+        from ovs_extensions.generic.sshclient import NotAuthenticatedException
 
         Toolbox.log(logger=NodeRemovalController._logger, messages='Remove node', boxed=True)
         Toolbox.log(logger=NodeRemovalController._logger, messages='WARNING: Some of these steps may take a very long time, please check the logs for more information\n\n')
@@ -252,7 +251,7 @@ class NodeRemovalController(object):
         """
         Remove all services managed by OVS
         :param client: Client on which to remove the services
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param node_type: Type of node, can be 'master' or 'extra'
         :type node_type: str
         :param logger: Logger object used for logging

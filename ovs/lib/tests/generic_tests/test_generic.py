@@ -26,11 +26,11 @@ from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.tests.helpers import DalHelper
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
-from ovs.extensions.generic.threadhelpers import Waiter
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
+from ovs_extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox

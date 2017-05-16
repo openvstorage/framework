@@ -31,13 +31,12 @@ from celery.signals import task_postrun, worker_process_init, after_setup_logger
 from celery.task.control import inspect
 from kombu import Queue
 from threading import Thread
-from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.storage.exceptions import KeyNotFoundException
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.generic.volatilemutex import volatile_mutex
+from ovs_extensions.storage.exceptions import KeyNotFoundException
+from ovs_extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.messaging import MessageController
 from ovs.log.log_handler import LogHandler
@@ -177,7 +176,6 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
     _ = args, kwargs, kwds
     VolatileFactory.store = None
     PersistentFactory.store = None
-    ArakoonConfiguration.client = None
 
 
 @after_setup_task_logger.connect

@@ -17,9 +17,9 @@
 """
 Messaging module
 """
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.generic.filemutex import file_mutex
+from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.generic.volatilemutex import volatile_mutex
+from ovs_extensions.generic.filemutex import file_mutex
 from ovs.log.log_handler import LogHandler
 
 

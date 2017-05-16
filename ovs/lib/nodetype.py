@@ -24,14 +24,14 @@ import sys
 import json
 import time
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.remote import remote
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.services.servicefactory import ServiceFactory
+from ovs_extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
@@ -553,7 +553,7 @@ class NodeTypeController(object):
         """
         Configure Memcached
         :param client: Client on which to configure Memcached
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
         :type logger: ovs.log.log_handler.LogHandler
         :return: None
@@ -569,7 +569,7 @@ class NodeTypeController(object):
         """
         Configure RabbitMQ
         :param client: Client on which to configure RabbitMQ
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
         :type logger: ovs.log.log_handler.LogHandler
         :return: None
@@ -632,7 +632,7 @@ class NodeTypeController(object):
         """
         Verify RabbitMQ is running properly and enable HA mode
         :param client: Client on which to check RabbitMQ
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
         :type logger: ovs.log.log_handler.LogHandler
         :return: None
@@ -651,7 +651,7 @@ class NodeTypeController(object):
         """
         Verify whether Avahi is installed
         :param client: Client on which to check for Avahi
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
         :type logger: ovs.log.log_handler.LogHandler
         :return: True if Avahi is installed, False otherwise
@@ -691,7 +691,7 @@ class NodeTypeController(object):
         """
         Configure Avahi
         :param client: Client on which to configure avahi
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param node_name: Name of the node to set in Avahi
         :type node_name: str
         :param node_type: Type of the node ('master' or 'extra')
@@ -724,7 +724,7 @@ class NodeTypeController(object):
         """
         Add the services required by the OVS cluster
         :param client: Client on which to add the services
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param node_type: Type of node ('master' or 'extra')
         :type node_type: str
         :param logger: Logger object used for logging

@@ -47,14 +47,15 @@ class MigrationController(object):
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.dal.lists.vpoollist import VPoolList
         from ovs.extensions.generic.configuration import Configuration
-        from ovs.extensions.generic.sshclient import SSHClient
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
-        from ovs.extensions.services.service import ServiceManager
-        from ovs.extensions.services.systemd import Systemd
+        from ovs_extensions.generic.sshclient import SSHClient
+        from ovs_extensions.generic.toolbox import ExtensionsToolbox
+        from ovs_extensions.services.servicefactory import ServiceFactory
+        from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
         from ovs.lib.generic import GenericController
 
         MigrationController._logger.info('Start out of band migrations...')
+        service_manager = ServiceFactory.get_manager()
 
         sr_client_map = {}
         for storagerouter in StorageRouterList.get_storagerouters():
@@ -63,21 +64,20 @@ class MigrationController(object):
 
         #########################################################
         # Addition of 'ExecReload' for AlbaProxy SystemD services
-        getattr(ServiceManager, 'has_service')  # Invoke ServiceManager to fill out the ImplementationClass (default None)
-        if ServiceManager.ImplementationClass == Systemd:  # Upstart does not have functionality to reload a process' configuration
+        if ServiceFactory.get_service_type() == 'systemd':
             changed_clients = set()
             for storagedriver in StorageDriverList.get_storagedrivers():
                 root_client = sr_client_map[storagedriver.storagerouter_guid]
                 for alba_proxy in storagedriver.alba_proxies:
                     service = alba_proxy.service
                     service_name = 'ovs-{0}'.format(service.name)
-                    if not ServiceManager.has_service(name=service_name, client=root_client):
+                    if not service_manager.has_service(name=service_name, client=root_client):
                         continue
                     if 'ExecReload=' in root_client.file_read(filename='/lib/systemd/system/{0}.service'.format(service_name)):
                         continue
 
                     try:
-                        ServiceManager.regenerate_service(name='ovs-albaproxy', client=root_client, target_name=service_name)
+                        service_manager.regenerate_service(name='ovs-albaproxy', client=root_client, target_name=service_name)
                         changed_clients.add(root_client)
                     except:
                         MigrationController._logger.exception('Error rebuilding service {0}'.format(service_name))
@@ -86,15 +86,14 @@ class MigrationController(object):
 
         ##################################################################
         # Adjustment of open file descriptors for Arakoon services to 8192
-        getattr(ServiceManager, 'has_service')  # Invoke ServiceManager to fill out the ImplementationClass (default None)
         changed_clients = set()
         for storagerouter in StorageRouterList.get_storagerouters():
             root_client = sr_client_map[storagerouter.guid]
-            for service_name in ServiceManager.list_services(client=root_client):
+            for service_name in service_manager.list_services(client=root_client):
                 if not service_name.startswith('ovs-arakoon-'):
                     continue
 
-                if ServiceManager.ImplementationClass == Systemd:
+                if ServiceFactory.get_service_type() == 'systemd':
                     path = '/lib/systemd/system/{0}.service'.format(service_name)
                     check = 'LimitNOFILE=8192'
                 else:
@@ -107,7 +106,7 @@ class MigrationController(object):
                     continue
 
                 try:
-                    ServiceManager.regenerate_service(name='ovs-arakoon', client=root_client, target_name=service_name)
+                    service_manager.regenerate_service(name='ovs-arakoon', client=root_client, target_name=service_name)
                     changed_clients.add(root_client)
                     ExtensionsToolbox.edit_version_file(client=root_client, package_name='arakoon', old_service_name=service_name)
                 except:

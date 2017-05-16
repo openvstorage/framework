@@ -37,9 +37,9 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
-from ovs.extensions.services.service import ServiceManager
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
+from ovs_extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import log, ovs_task
@@ -306,7 +306,7 @@ class VDiskController(object):
         :return: None
         :rtype: NoneType
         """
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+        from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
         old_path = '/{0}/'.format(old_path.strip('/'))
         new_path = '/{0}/'.format(new_path.strip('/'))

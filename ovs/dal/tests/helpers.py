@@ -37,15 +37,15 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
-from ovs.extensions.generic import fakesleep
+from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs_extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs_extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
-from ovs.extensions.services.tests.systemd import Systemd
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
+from ovs_extensions.services.tests.systemd import Systemd
+from ovs_extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import LocalStorageRouterClient, MDSClient, StorageRouterClient
 from ovs.lib.helpers.decorators import Decorators

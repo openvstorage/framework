@@ -28,11 +28,11 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.service import ServiceManager
+from ovs_extensions.generic.remote import remote
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule
@@ -253,7 +253,7 @@ class StorageDriverController(object):
         :type complete_removal: bool
         :return: None
         """
-        from ovs.extensions.generic.sshclient import NotAuthenticatedException
+        from ovs_extensions.generic.sshclient import NotAuthenticatedException
 
         _ = complete_removal
         service_name = 'watcher-volumedriver'

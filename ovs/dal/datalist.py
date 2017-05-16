@@ -25,8 +25,8 @@ import hashlib
 from random import randint
 from ovs.dal.helpers import Descriptor, HybridRunner
 from ovs.dal.exceptions import ObjectNotFoundException
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.storage.persistentfactory import PersistentFactory
 from ovs.dal.relations import RelationMapper
 
 

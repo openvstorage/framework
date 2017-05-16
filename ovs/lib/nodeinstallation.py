@@ -24,14 +24,14 @@ import json
 import time
 import signal
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
-from ovs.extensions.generic.interactive import Interactive
-from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs_extensions.generic.interactive import Interactive
+from ovs_extensions.generic.remote import remote
+from ovs_extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.services.servicefactory import ServiceFactory
+from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.nodetype import NodeTypeController
 from ovs.lib.noderemoval import NodeRemovalController
@@ -561,11 +561,12 @@ class NodeInstallationController(object):
         """
         Rollback a failed setup
         :param target_client: Client on which to perform the rollback
-        :type target_client: ovs.extensions.generic.sshclient.SSHClient
+        :type target_client: ovs_extensions.generic.sshclient.SSHClient
         """
         from ovs.dal.lists.servicetypelist import ServiceTypeList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         Toolbox.log(logger=NodeInstallationController._logger, messages='Rolling back setup of current node', title=True)
+        service_manager = ServiceFactory.get_manager()
 
         single_node = len(StorageRouterList.get_storagerouters()) == 1
         if target_client is None:
@@ -599,14 +600,14 @@ class NodeInstallationController(object):
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Stopping services')
         for service in ['watcher-framework', 'watcher-config', 'workers', 'support-agent']:
-            if ServiceManager.has_service(service, client=target_client):
+            if service_manager.has_service(service, client=target_client):
                 Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
 
         endpoints = required_info['/ovs/framework/messagequeue|endpoints']
         if len(endpoints) > 0 and unconfigure_rabbitmq is True:
             Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring RabbitMQ')
             try:
-                if ServiceManager.is_rabbitmq_running(client=target_client)[0] is True:
+                if service_manager.is_rabbitmq_running(client=target_client)[0] is True:
                     Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeInstallationController._logger)
                 target_client.file_delete('/etc/rabbitmq/rabbitmq.config')
             except Exception as ex:
@@ -624,7 +625,7 @@ class NodeInstallationController(object):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring Memcached')
             endpoints = required_info['/ovs/framework/memcache|endpoints']
             if len(endpoints) > 0 and unconfigure_memcached is True:
-                ServiceManager.stop_service('memcached', target_client)
+                service_manager.stop_service('memcached', target_client)
                 for endpoint in endpoints:
                     if endpoint.startswith(target_client.ip):
                         endpoints.remove(endpoint)
@@ -636,10 +637,10 @@ class NodeInstallationController(object):
 
         NodeRemovalController.remove_services(target_client, 'master', logger=NodeInstallationController._logger)
         service = 'watcher-config'
-        if ServiceManager.has_service(service, client=target_client):
+        if service_manager.has_service(service, client=target_client):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Removing service {0}'.format(service))
-            ServiceManager.stop_service(service, client=target_client)
-            ServiceManager.remove_service(service, client=target_client)
+            service_manager.stop_service(service, client=target_client)
+            service_manager.remove_service(service, client=target_client)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model')
         #  Model is completely cleaned up when the arakoon cluster is destroyed
@@ -692,7 +693,7 @@ class NodeInstallationController(object):
         if metadata is not None and metadata['internal'] is True:
             services.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
         for service in services:
-            if ServiceManager.has_service(service, client=target_client):
+            if service_manager.has_service(service, client=target_client):
                 Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
 
         if single_node is True:
@@ -719,16 +720,15 @@ class NodeInstallationController(object):
         """
         Sets up the first node services. This node is always a master
         """
-        from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
-
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up first node', title=True)
+        service_manager = ServiceFactory.get_manager()
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration management')
         if external_config is None and not cluster_name.startswith('preconfig-'):
             if Interactive.ask_yesno(message='Use an external cluster?', default_value=False) is True:
-                file_location = ArakoonConfiguration.CACC_LOCATION
+                file_location = Configuration.CACC_LOCATION
                 while not target_client.file_exists(file_location):
                     Toolbox.log(logger=NodeInstallationController._logger, messages='Please place a copy of the Arakoon\'s client configuration file at: {0}'.format(file_location))
                     Interactive.ask_continue()
@@ -751,9 +751,9 @@ class NodeInstallationController(object):
             ArakoonInstaller.start_cluster(ip=cluster_ip,
                                            metadata=info['metadata'])
             contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
-            target_client.file_write(ArakoonConfiguration.CACC_LOCATION, contents)
-            ServiceManager.register_service(node_name=machine_id,
-                                            service_metadata=info['service_metadata'])
+            target_client.file_write(Configuration.CACC_LOCATION, contents)
+            service_manager.register_service(node_name=machine_id,
+                                             service_metadata=info['service_metadata'])
         else:
             arakoon_cacc_cluster = 'cacc'
             ArakoonInstaller.claim_cluster(cluster_name=arakoon_cacc_cluster,
@@ -771,9 +771,9 @@ class NodeInstallationController(object):
         Configuration.set('/ovs/framework/cluster_name', cluster_name)
 
         service = 'watcher-config'
-        if not ServiceManager.has_service(service, target_client):
+        if not service_manager.has_service(service, target_client):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Adding service {0}'.format(service))
-            ServiceManager.add_service(service, params={}, client=target_client)
+            service_manager.add_service(service, params={}, client=target_client)
             Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
@@ -877,31 +877,30 @@ class NodeInstallationController(object):
         """
         Sets up an additional node
         """
-        from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
-
         Toolbox.log(logger=NodeInstallationController._logger, messages='Adding extra node', title=True)
+        service_manager = ServiceFactory.get_manager()
         target_client = ip_client_map[cluster_ip]
         master_client = ip_client_map[master_ip]
         machine_id = System.get_my_machine_id(target_client)
 
         target_client.file_write(Configuration.BOOTSTRAP_CONFIG_LOCATION,
                                  master_client.file_read(Configuration.BOOTSTRAP_CONFIG_LOCATION))
-        target_client.file_write(ArakoonConfiguration.CACC_LOCATION,
-                                 master_client.file_read(ArakoonConfiguration.CACC_LOCATION))
+        target_client.file_write(Configuration.CACC_LOCATION,
+                                 master_client.file_read(Configuration.CACC_LOCATION))
         Configuration.initialize_host(machine_id)
 
         service = 'watcher-config'
-        if not ServiceManager.has_service(service, target_client):
+        if not service_manager.has_service(service, target_client):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Adding service {0}'.format(service))
-            ServiceManager.add_service(service, params={}, client=target_client)
+            service_manager.add_service(service, params={}, client=target_client)
             Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
         NodeTypeController.add_services(client=target_client, node_type='extra', logger=NodeInstallationController._logger)
 
         enabled = Configuration.get('/ovs/framework/support|enabled')
         if enabled is True:
             service = 'support-agent'
-            if not ServiceManager.has_service(service, target_client):
-                ServiceManager.add_service(service, client=target_client)
+            if not service_manager.has_service(service, target_client):
+                service_manager.add_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         node_name, _ = target_client.get_hostname()
@@ -911,7 +910,7 @@ class NodeInstallationController(object):
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Starting services')
         for service in ['watcher-framework', 'watcher-config']:
-            if ServiceManager.get_service_status(service, target_client) != 'active':
+            if service_manager.get_service_status(service, target_client) != 'active':
                 Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')

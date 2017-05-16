@@ -36,8 +36,8 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.generic.volatilemutex import volatile_mutex
+from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
 
 if os.environ.get('RUNNING_UNITTESTS') == 'True':

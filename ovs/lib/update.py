@@ -23,18 +23,18 @@ import inspect
 from subprocess import CalledProcessError
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import file_mutex, NoLockAvailableException
-from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.remote import remote
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.migration.migrator import Migrator
-from ovs.extensions.packages.package import PackageManager
-from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.packages.packagefactory import PackageFactory
+from ovs_extensions.services.servicefactory import ServiceFactory
+from ovs_extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.decorators import add_hooks, ovs_task
 from ovs.lib.helpers.toolbox import Toolbox
@@ -433,7 +433,7 @@ class UpdateController(object):
         if 'framework' not in components and 'storagedriver' not in components:
             return
 
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+        from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
         # Remove services which have been renamed in the migration code
         for version_file in client.file_list(directory='/opt/OpenvStorage/run'):

@@ -23,7 +23,7 @@ import time
 from distutils.version import LooseVersion
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.log.log_handler import LogHandler
 
 

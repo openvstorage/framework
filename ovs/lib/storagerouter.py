@@ -37,16 +37,16 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs_extensions.api.client import OVSClient
+from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.disk import DiskTools
-from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.disk import DiskTools
+from ovs_extensions.generic.remote import remote
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.packages.package import PackageManager
-from ovs.extensions.services.service import ServiceManager
+from ovs_extensions.generic.volatilemutex import volatile_mutex
+from ovs_extensions.packages.packagefactory import PackageFactory
+from ovs_extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController

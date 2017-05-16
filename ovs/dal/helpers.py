@@ -25,8 +25,8 @@ import copy
 import time
 import inspect
 import hashlib
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.log_handler import LogHandler
 
 

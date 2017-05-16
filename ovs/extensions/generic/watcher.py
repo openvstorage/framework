@@ -24,7 +24,7 @@ import sys
 import time
 import uuid
 import logging
-from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.log_handler import LogHandler
 
 
@@ -67,10 +67,10 @@ class Watcher(object):
                     self.log_message(target, '  Error during configuration store test: {0}'.format(ex), 2)
                     return False
 
-                from ovs.extensions.db.arakoon.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
-                from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
-                from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
-                with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
+                from ovs_extensions.db.arakoon.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
+                from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
+                from ovs.extensions.generic.configuration import Configuration
+                with open(Configuration.CACC_LOCATION) as config_file:
                     contents = config_file.read()
                 config = ArakoonClusterConfig(cluster_id='cacc', load_config=False)
                 config.read_config(contents=contents)
@@ -82,12 +82,12 @@ class Watcher(object):
                     except Exception as ex:
                         self.log_message(target, '  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
                         return False
-                    temp_filename = '{0}~'.format(ArakoonConfiguration.CACC_LOCATION)
+                    temp_filename = '{0}~'.format(Configuration.CACC_LOCATION)
                     with open(temp_filename, 'w') as config_file:
                         config_file.write(contents)
                         config_file.flush()
                         os.fsync(config_file)
-                    os.rename(temp_filename, ArakoonConfiguration.CACC_LOCATION)
+                    os.rename(temp_filename, Configuration.CACC_LOCATION)
                     Watcher.LOG_CONTENTS = contents
                 self.log_message(target, '  Configuration store OK', 0)
 
@@ -100,7 +100,7 @@ class Watcher(object):
                     try:
                         try:
                             logging.disable(logging.WARNING)
-                            from ovs.extensions.storage.volatilefactory import VolatileFactory
+                            from ovs_extensions.storage.volatilefactory import VolatileFactory
                             VolatileFactory.store = None
                             volatile = VolatileFactory.get_client()
                             volatile.set(key, value)
@@ -150,7 +150,7 @@ class Watcher(object):
                 while tries < max_tries:
                     try:
                         from ovs.extensions.generic.configuration import Configuration
-                        from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
+                        from ovs_extensions.storage.persistent.pyrakoonstore import PyrakoonStore
                         cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
                         client = PyrakoonStore(cluster=cluster_name)
                         client.nop()

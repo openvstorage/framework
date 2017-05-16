@@ -22,7 +22,7 @@ import time
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.log.log_handler import LogHandler
 
