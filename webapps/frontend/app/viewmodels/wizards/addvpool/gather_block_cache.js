@@ -64,6 +64,24 @@ define([
             temp.unshift(undefined);  // Insert undefined as element 0
             return temp;
         });
+        self.hasBlockCache = ko.computed(function() {
+            return self.data.storageRouter() !== undefined &&
+                self.data.storageRouter().features() !== undefined &&
+                self.data.storageRouter().features().alba.features.contains('block-cache');
+        });
+        self.hasCacheQuota = ko.computed(function() {
+            return self.data.storageRouter() !== undefined &&
+                self.data.storageRouter().features() !== undefined &&
+                self.data.storageRouter().features().alba.features.contains('cache-quota');
+        });
+        self.hasEE = ko.computed(function() {
+            return self.data.storageRouter() !== undefined &&
+                self.data.storageRouter().features() !== undefined &&
+                self.data.storageRouter().features().alba.edition === 'enterprise';
+        });
+        self.canConfigureBCRW = ko.computed(function() {
+            return self.data.vPoolAdd() && self.hasBlockCache();
+        });
         self.canContinue = ko.computed(function() {
             var showErrors = false, reasons = [], fields = [];
             if (self.data.useBC()) {
@@ -92,6 +110,19 @@ define([
                             fields.push('clientid');
                             fields.push('clientsecret');
                             fields.push('host');
+                        }
+                    }
+                    var quota = self.data.cacheQuotaBC();
+                    if (quota !== undefined && quota !== '') {
+                        if (isNaN(parseFloat(quota))) {
+                            fields.push('quota');
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_nan'));
+                        } else if (quota < 0.1 || quota > 1024) {
+                            fields.push('quota');
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_boundaries_exceeded'));
+                        } else if (self.data.backendBC() !== undefined && quota * Math.pow(1024, 3) * 10 > self.data.backendBC().usages.free) {
+                            fields.push('quota');
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_too_much_requested'));
                         }
                     }
                 }
@@ -126,6 +157,7 @@ define([
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
                 if (self.data.vPool() !== undefined && !self.data.blockCacheOnRead() && !self.data.blockCacheOnWrite()) {
+                    self.data.supportsBC(false);
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);
@@ -154,7 +186,7 @@ define([
                         var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
-                                getData.contents = 'name,ns_statistics,presets';
+                                getData.contents = 'name,ns_statistics,presets,usages';
                                 if (item.scaling === 'LOCAL') {
                                     getData.contents += ',asd_statistics';
                                 }
@@ -162,14 +194,7 @@ define([
                                     api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
                                         .then(function(data) {
                                             if (data.guid !== self.data.backend().guid) {
-                                                var asdsFound = false;
-                                                if (data.scaling === 'LOCAL') {
-                                                    $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
-                                                        asdsFound = true;
-                                                        return false;
-                                                    });
-                                                }
-                                                if (asdsFound === true || data.scaling === 'GLOBAL') {
+                                                if ((data.asd_statistics !== undefined && Object.keys(data.asd_statistics).length > 0) || data.scaling === 'GLOBAL') {
                                                     available_backends.push(data);
                                                     self.albaPresetMap()[data.guid] = {};
                                                     $.each(data.presets, function (_, preset) {
@@ -285,6 +310,13 @@ define([
                 }
             }
             self.loadBackends();
+            if (!self.hasBlockCache()) {
+                self.data.blockCacheOnRead(false);
+                self.data.blockCacheOnWrite(false);
+                self.data.supportsBC(false);
+            } else {
+                self.data.supportsBC(true);
+            }
         };
         self.deactivate = function() {
             self.useBCSubscription.dispose();

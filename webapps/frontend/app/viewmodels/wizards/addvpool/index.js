@@ -65,6 +65,8 @@ define([
         
         // Fragment cache
         data.backendFC(undefined);
+        data.cacheQuotaFC(undefined);
+        data.cacheQuotaFCConfigured(false);
         data.clientIDFC('');
         data.clientSecretFC('');
         data.fragmentCacheOnRead(true);
@@ -77,6 +79,8 @@ define([
         
         // Block cache
         data.backendBC(undefined);
+        data.cacheQuotaBC(undefined);
+        data.cacheQuotaBCConfigured(false);
         data.blockCacheOnRead(true);
         data.blockCacheOnWrite(true);
         data.clientIDBC('');
@@ -85,6 +89,7 @@ define([
         data.localHostBC(true);
         data.portBC(80);
         data.presetBC(undefined);
+        data.supportsBC(true);
         data.useBC(false);
     };
 });

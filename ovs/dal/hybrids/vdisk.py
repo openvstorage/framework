@@ -23,13 +23,13 @@ import pickle
 from datetime import datetime
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient,\
                                                        SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
-
 from ovs.log.log_handler import LogHandler
 
 
@@ -48,7 +48,8 @@ class VDisk(DataObject):
                     Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
                     Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer'),
                     Property('pagecache_ratio', float, default=1.0, doc='Ratio of the volume\'s metadata pages that needs to be cached'),
-                    Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)')]
+                    Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)'),
+                    Property('cache_quota', dict, mandatory=False, doc='Maximum caching space(s) this volume can consume (in Bytes) per cache type. If not None, the caching(s) for this volume has been set manually')]
     __relations = [Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),
@@ -107,33 +108,67 @@ class VDisk(DataObject):
         """
         Retrieve the DTL status for a vDisk
         """
-        sd_status = self.info.get('failover_mode', 'UNKNOWN').lower()
+        sd_status = self._info().get('failover_mode', 'UNKNOWN').lower()
         if sd_status == '':
             sd_status = 'unknown'
-        if sd_status != 'ok_standalone':
+        if sd_status not in ['ok_sync', 'ok_standalone']:  # ok_sync or ok_standalone according to voldrv, can still mean incorrect deployment
             return sd_status
 
-        # Verify whether 'ok_standalone' is the correct status for this vDisk
+        # Verify whether 'ok_standalone' or 'ok_sync' is the correct status for this vDisk
         vpool_dtl = self.vpool.configuration['dtl_enabled']
-        if self.has_manual_dtl is True or vpool_dtl is False:
+        if (self.has_manual_dtl is False and vpool_dtl is False) or (self.has_manual_dtl is True and vpool_dtl is True and len(self.domains_dtl_guids) == 0):
             return 'disabled'
 
-        domains = []
-        possible_dtl_targets = set()
-        for sr in StorageRouterList.get_storagerouters():
-            if sr.guid == self.storagerouter_guid:
-                domains = [junction.domain for junction in sr.domains]
-            elif len(sr.storagedrivers) > 0:
-                possible_dtl_targets.add(sr)
+        storagerouter_guid = self._storagerouter_guid()
+        if storagerouter_guid is None:
+            return 'checkup_required'
 
-        if len(domains) > 0:
-            possible_dtl_targets = set()
-            for domain in domains:
-                possible_dtl_targets.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
+        this_sr = StorageRouter(storagerouter_guid)
+        other_storagerouters = set([sd.storagerouter for sd in self.vpool.storagedrivers if sd.storagerouter_guid != storagerouter_guid])
 
-        if len(possible_dtl_targets) == 0:
-            return sd_status
-        return 'checkup_required'
+        # Retrieve all StorageRouters linked to the Recovery Domains (primary) and Regular Domains (secondary) for the StorageRouter hosting this vDisk
+        primary = set()
+        secondary = set()
+        for junction in this_sr.domains:
+            if junction.backup is True:
+                primary.update(set(StorageRouterList.get_primary_storagerouters_for_domain(junction.domain)))
+            else:
+                secondary.update(set(StorageRouterList.get_primary_storagerouters_for_domain(junction.domain)))
+        primary = primary.intersection(other_storagerouters)
+        secondary = secondary.difference(primary)
+        secondary = secondary.intersection(other_storagerouters)
+
+        try:
+            config = self.storagedriver_client.get_dtl_config(str(self.volume_id))
+        except:
+            return 'checkup_required'
+
+        if self.has_manual_dtl is False:  # No DTL targets --> Check for Storage Routers linked to current vPool (priority for StorageRouters in recovery domain of current StorageRouter)
+            possible_storagerouters = list(primary) if len(primary) > 0 else list(secondary) if len(secondary) > 0 else list(other_storagerouters)
+            if len(possible_storagerouters) > 0 and config is not None:
+                if config.host not in [sd.storage_ip for sr in possible_storagerouters for sd in sr.storagedrivers if sd.vpool_guid == self.vpool_guid]:
+                    return 'checkup_required'
+        else:
+            if len(self.domains_dtl) > 0:
+                chosen_storagerouters = set()
+                for junction in self.domains_dtl:
+                    chosen_storagerouters.update(set(StorageRouterList.get_primary_storagerouters_for_domain(junction.domain)))
+                possible_storagerouters = chosen_storagerouters.intersection(other_storagerouters)
+            else:
+                possible_storagerouters = other_storagerouters
+
+            if config is None:
+                if len(possible_storagerouters) == 0:
+                    if sd_status == 'ok_standalone':
+                        return sd_status
+                return 'checkup_required'
+            else:
+                if len(possible_storagerouters) > 0:
+                    if config.host in [sd.storage_ip for sr in possible_storagerouters for sd in sr.storagedrivers if sd.vpool_guid == self.vpool_guid]:
+                        return sd_status
+                    return 'checkup_required'
+                return 'checkup_required'
+        return sd_status
 
     def _snapshot_ids(self):
         """
@@ -244,11 +279,12 @@ class VDisk(DataObject):
         """
         Loads the vDisks StorageRouter guid
         """
-        if not self.storagedriver_id:
+        storagedriver_id = self._storagedriver_id()
+        if not storagedriver_id:
             return None
         from ovs.dal.hybrids.storagedriver import StorageDriver
         sds = DataList(StorageDriver, {'type': DataList.where_operator.AND,
-                                       'items': [('storagedriver_id', DataList.operator.EQUALS, self.storagedriver_id)]})
+                                       'items': [('storagedriver_id', DataList.operator.EQUALS, storagedriver_id)]})
         if len(sds) == 1:
             return sds[0].storagerouter_guid
         return None

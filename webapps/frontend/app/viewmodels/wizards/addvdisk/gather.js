@@ -36,13 +36,14 @@ define([
 
         // Observables
         self.loading           = ko.observable(false);
+        self.loadingBackend    = ko.observable(false);
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
         self.canContinue = ko.computed(function() {
             var valid = true, showErrors = false, reasons = [], fields = [], maxSize = self.data.sizeEntry.max * Math.pow(1024, 3),
                 preValidation = self.preValidateResult();
-            if (preValidation.valid === false) {
+            if (preValidation.reasons.length > 0) {
                 showErrors = true;
                 reasons = reasons.concat(preValidation.reasons);
                 fields = fields.concat(preValidation.fields);
@@ -96,22 +97,59 @@ define([
 
         // Functions
         self.preValidate = function() {
-            var validationResult = { valid: true, reasons: [], fields: [] };
+            var validationResult = {reasons: [], fields: []};
             return $.Deferred(function(deferred) {
-                if (self.data.vPool() === undefined || self.data.name() === undefined) {
+                var calls = [], vPool = self.data.vPool();
+                if (vPool === undefined || vPool.metadata() === undefined || !vPool.metadata().hasOwnProperty('backend') || self.data.name() === undefined) {
                     deferred.reject();
                     return;
                 }
-                api.get('vpools/' + self.data.vPool().guid() + '/devicename_exists', { queryparams: { name: self.data.name() }})
+                calls.push(api.get('vpools/' + self.data.vPool().guid() + '/devicename_exists', { queryparams: { name: self.data.name() }})
                     .done(function(exists) {
                         if (exists) {
-                            validationResult.valid = false;
                             validationResult.reasons.push($.t('ovs:wizards.add_vdisk.gather.name_exists'));
                             validationResult.fields.push('name');
-                            self.preValidateResult(validationResult);
+                        }
+                    }));
+
+                if (self.data.vPoolUsableBackendMap().hasOwnProperty(vPool.guid())) {
+                    if (self.data.vPoolUsableBackendMap()[vPool.guid()] === false) {
+                        validationResult.reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_preset'));
+                    }
+                } else {
+                    self.loadingBackend(true);
+                    generic.xhrAbort(self.loadAlbaBackendHandle);
+                    var connectionInfo = vPool.metadata().backend.connection_info,
+                        getData = {ip: connectionInfo.host,
+                                   port: connectionInfo.port,
+                                   client_id: connectionInfo.client_id,
+                                   client_secret: connectionInfo.client_secret,
+                                   contents: 'presets'};
+                    calls.push(api.get('relay/alba/backends/' + vPool.metadata().backend.backend_info.alba_backend_guid, {queryparams: getData})
+                        .done(function (data) {
+                            var usable_preset = false, map = self.data.vPoolUsableBackendMap();
+                            $.each(data.presets, function(_, preset) {
+                                if (preset.is_available === true) {
+                                    usable_preset = true;
+                                    return false;
+                                }
+                            });
+                            map[vPool.guid()] = usable_preset;
+                            self.data.vPoolUsableBackendMap(map);
+                        })
+                        .always(function() {
+                            self.loadingBackend(false);
+                            if (!self.data.vPoolUsableBackendMap().hasOwnProperty(vPool.guid()) || !self.data.vPoolUsableBackendMap()[vPool.guid()]) {
+                                validationResult.reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_preset'));
+                            }
+                        }));
+                }
+                $.when.apply($, calls)
+                    .always(function() {
+                        self.preValidateResult(validationResult);
+                        if (self.preValidateResult().reasons.length > 0) {
                             deferred.reject();
                         } else {
-                            self.preValidateResult(validationResult);
                             deferred.resolve();
                         }
                     })
@@ -182,22 +220,6 @@ define([
                     .fail(deferred.reject);
             });
         };
-
-        // Durandal
-        self.activate = function() {
-            self.loading(true);
-            self.refresher.init(function() {
-                return self.loadVPools()
-                    .then(self.loadStorageRouters)
-                    .then(function() {
-                        if (self.loading() === true) {
-                            self.loading(false);
-                        }
-                    });
-            }, 5000);
-            self.refresher.run();
-            self.refresher.start();
-        };
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 generic.alertInfo(
@@ -228,6 +250,22 @@ define([
                         );
                     });
             }).promise();
+        };
+
+        // Durandal
+        self.activate = function() {
+            self.loading(true);
+            self.refresher.init(function() {
+                return self.loadVPools()
+                    .then(self.loadStorageRouters)
+                    .then(function() {
+                        if (self.loading() === true) {
+                            self.loading(false);
+                        }
+                    });
+            }, 5000);
+            self.refresher.run();
+            self.refresher.start();
         };
     };
 });

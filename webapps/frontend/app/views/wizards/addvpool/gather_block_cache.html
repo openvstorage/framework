@@ -21,7 +21,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.block_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
             <span data-bind="dropdown: {
-                                 enabled: data.vPoolAdd,
+                                 enabled: canConfigureBCRW,
                                  items: blockCacheSettings, target: blockCacheSetting,
                                  text: function(item) {
                                      return $.t('ovs:generic.blockcaches.' + item);
@@ -31,18 +31,33 @@ but WITHOUT ANY WARRANTY of any kind.
         </div>
     </div>
     <div data-bind="visible: data.blockCacheOnRead() || data.blockCacheOnWrite()">
-        <div>
-            <div class="form-group">
-                <div class="col-lg-3"></div>
-                <div class="col-lg-7">
-                    <input type="radio" name="bcBackend" id="useAcceleratedAlbaNo" class="autofocus" data-bind="checked: data.useBC, checkedValue: false" />
-                    <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_local" style="font-weight: normal;"></label><br />
-                    <input type="radio" name="bcBackend" id="useAcceleratedAlbaYes" class="autofocus" data-bind="checked: data.useBC, checkedValue: true" />
-                    <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_backend_bc" style="font-weight: normal;"></label>
-                </div>
+        <div class="form-group">
+            <div class="col-lg-3"></div>
+            <div class="col-lg-7">
+                <input type="radio" name="bcBackend" id="useAcceleratedAlbaNo" class="autofocus" data-bind="checked: data.useBC, checkedValue: false" />
+                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_local" style="font-weight: normal;"></label><br />
+                <input type="radio" name="bcBackend" id="useAcceleratedAlbaYes" class="autofocus" data-bind="checked: data.useBC, checkedValue: true" />
+                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_backend_bc" style="font-weight: normal;"></label>
             </div>
         </div>
-        <p data-bind="visible: data.useBC()" data-i18n="ovs:wizards.add_vpool.gather_block_cache.backend_info"></p>
+        <p data-bind="visible: data.useBC()" data-i18n="ovs:wizards.add_vpool.gather_block_cache.accelerated_info"></p>
+        <div class="form-group" data-bind="visible: data.useBC(), css: { 'has-error': canContinue().fields.contains('quota') }">
+            <label class="col-lg-3 control-label" style="padding-top: 8px;">
+                <a data-bind="popover: {
+                                  title: 'ovs:wizards.add_vpool.gather_block_cache.cache_quota_title',
+                                  content: 'ovs:wizards.add_vpool.gather_block_cache.cache_quota_info'
+                             }"
+                   class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
+                </a>
+                <span data-i18n="ovs:wizards.add_vpool.gather_block_cache.cache_quota_label"></span>
+            </label>
+            <div class="col-lg-2">
+                <input class="form-control" type="text" style="text-align: center;"
+                       data-bind="value: data.cacheQuotaBC, valueUpdate: 'input', disable: data.cacheQuotaBCConfigured() || !hasCacheQuota()">
+            </div>
+            <label class="col-lg-1" data-i18n="ovs:generic.units.gib" style="padding-top: 7px; padding-left: 0"></label>
+        </div>
+        <p data-bind="visible: data.useBC()" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.backend_info"></p>
         <div data-bind="visible: data.useBC() && localBackendsAvailable()">
             <div class="form-group">
                 <div class="col-lg-3"></div>
@@ -155,9 +170,20 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_preset_unavailable"></span>
     </div>
+    <div class="alert alert-info" data-bind="visible: !hasBlockCache() || !hasCacheQuota()" style="margin-top: 20px;">
+        <span data-bind="visible: !hasBlockCache()">
+            <span data-i18n="ovs:generic.ee_teasers.no_block_cache" data-bind="visible: !hasEE()"></span>
+            <span data-i18n="ovs:generic.version_teasers.no_block_cache" data-bind="visible: hasEE()"></span>
+        </span>
+        <span data-bind="visible: !hasCacheQuota() && hasBlockCache()">
+            <span data-i18n="ovs:generic.ee_teasers.no_cache_quota" data-bind="visible: !hasEE()"></span>
+            <span data-i18n="ovs:generic.version_teasers.no_cache_quota" data-bind="visible: hasEE()"></span>
+        </span>
+    </div>
     <div class="alert alert-info" data-bind="visible: data.vPool() !== undefined || (data.useBC() && loadingBackends())" style="margin-top: 20px;">
         <span data-bind="translate: 'ovs:wizards.add_vpool.gather_block_cache.loading_backend_information', visible: (data.useBC() && loadingBackends())"></span>
         <span data-bind="translate: 'ovs:wizards.add_vpool.gather_block_cache.information_extend', visible: data.vPool() !== undefined"></span>
+        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_block_cache.information_extend_quota', visible: data.vPool() !== undefined && data.cacheQuotaBCConfigured() && data.useBC()"></span>
     </div>
     <div class="alert alert-danger" data-bind="visible: (!data.useBC() || (data.useBC() && !loadingBackends())) && (!canContinue().value || canContinue().showErrors)" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>

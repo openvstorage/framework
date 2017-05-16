@@ -51,6 +51,9 @@ but WITHOUT ANY WARRANTY of any kind.
                     <b data-i18n="ovs:wizards.add_vpool.confirm.fragment_cache_write"></b>
                     <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.fragment_cache_info.' + data.fragmentCacheOnWrite()"></span>
                 </li>
+                <li data-bind="visible: data.useFC() && data.cacheQuotaFC() !== undefined && data.cacheQuotaFC() !== ''">
+                    <b data-i18n="ovs:wizards.add_vpool.confirm.cache_quota"></b>: <span data-bind="text: formatFloat(data.cacheQuotaFC())"></span> <span data-i18n="ovs:generic.units.gib"></span>
+                </li>
             </ul>
             <div data-bind="visible: data.useFC()">
                 <ul>
@@ -76,7 +79,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </ul>
             </div>
         </li>
-        <li>
+        <li data-bind="visible: data.supportsBC()">
             <b data-i18n="ovs:wizards.add_vpool.confirm.block_cache"></b>
             <ul>
                 <li>
@@ -86,6 +89,9 @@ but WITHOUT ANY WARRANTY of any kind.
                 <li>
                     <b data-i18n="ovs:wizards.add_vpool.confirm.block_cache_write"></b>
                     <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.block_cache_info.' + data.blockCacheOnWrite()"></span>
+                </li>
+                <li data-bind="visible: data.useBC() && data.cacheQuotaBC() !== undefined && data.cacheQuotaBC() !== ''">
+                    <b data-i18n="ovs:wizards.add_vpool.confirm.cache_quota"></b>: <span data-bind="text: formatFloat(data.cacheQuotaBC())"></span> <span data-i18n="ovs:generic.units.gib"></span>
                 </li>
             </ul>
             <div data-bind="visible: data.useBC()">
@@ -112,6 +118,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </ul>
             </div>
         </li>
+        <li><b data-i18n="ovs:wizards.add_vpool.confirm.proxy_amount"></b>: <span data-bind="text: data.proxyAmount()"></span></li>
     </ul>
     <p data-i18n="ovs:wizards.add_vpool.confirm.storagerouter_info"></p>
     <ul>
@@ -121,7 +128,6 @@ but WITHOUT ANY WARRANTY of any kind.
     <div>
         <p data-i18n="ovs:wizards.add_vpool.confirm.configuration"></p>
         <ul>
-            <li><b data-i18n="ovs:wizards.add_vpool.confirm.proxy_amount"></b>: <span data-bind="text: data.proxyAmount()"></span></li>
             <li>
                 <b data-bind="translate: 'ovs:vpools.' + (data.dtlEnabled() === true ? 'dtl_mode' : 'dtl')"></b>:
                 <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.general.dtl_modes.' + data.dtlMode().name : 'ovs:vpools.dtl_disabled')"></span>

@@ -178,7 +178,7 @@ define(['durandal/system', 'durandal/viewLocator', 'durandal/binder', 'durandal/
 
     function replaceParts(context){
         var parts = cloneNodes(context.parts);
-        // @TODO: The below part is a manual tweak that will most likely break nested widgets, but works around #346
+        // The below part is a manual tweak that will most likely break nested widgets, but works around #346
         // https://github.com/BlueSpire/Durandal/issues/346
         var replacementParts = composition.getParts(parts, null, false);
         var standardParts = composition.getParts(context.child);

@@ -11,7 +11,7 @@ define(['durandal/system', 'knockout'], function (system, ko) {
     var activator;
 
     function ensureSettings(settings) {
-        if (settings == undefined) {
+        if (settings === undefined) {
             settings = {};
         }
 

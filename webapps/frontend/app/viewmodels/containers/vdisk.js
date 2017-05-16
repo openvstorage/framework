@@ -41,6 +41,7 @@ define([
         self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.blockCQ           = ko.observable();
         self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.childrenGuids     = ko.observableArray([]);
@@ -51,6 +52,7 @@ define([
         self.dtlStatus         = ko.observable();
         self.dtlTarget         = ko.observableArray([]);
         self.edgeClients       = ko.observableArray([]);
+        self.fragmentCQ        = ko.observable();
         self.guid              = ko.observable(guid);
         self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.isVTemplate       = ko.observable();
@@ -111,18 +113,35 @@ define([
         });
         self.configuration = ko.computed({
             read: function() {
+                var fcq = parseFloat(self.fragmentCQ()),
+                    bcq = parseFloat(self.blockCQ());
                 return {
                     sco_size: self.scoSize(),
                     dtl_mode: self.dtlEnabled() === true ? self.dtlMode() : 'no_sync',
-                    write_buffer: self.writeBuffer(),
-                    dtl_target: self.dtlTarget().slice()
+                    dtl_target: self.dtlTarget().slice(),
+                    cache_quota: {
+                        fragment: !isNaN(fcq) ? Math.round(fcq * Math.pow(1024, 3)) : null,
+                        block: !isNaN(bcq) ? Math.round(bcq * Math.pow(1024, 3)) : null
+                    },
+                    write_buffer: self.writeBuffer()
                 }
             },
             write: function(configData) {
-                self.writeBuffer(Math.round(configData.write_buffer));
+                var validTargets = [];
+                var currentTargets = self.dtlManual() ? configData.dtl_target.slice() : [];
+                $.each(currentTargets, function(index, target) {
+                    if (self.dtlTargets().contains(target)) {
+                        validTargets.push(target);
+                    }
+                });
                 self.scoSize(configData.sco_size);
                 self.dtlMode(configData.dtl_mode);
-                self.dtlTarget(self.dtlManual() ? configData.dtl_target.slice() : []);
+                self.dtlTarget(validTargets);
+                self.writeBuffer(Math.round(configData.write_buffer));
+                if (configData.cache_quota !== null) {
+                    self.fragmentCQ([null, undefined].contains(configData.cache_quota.fragment) ? undefined : generic.round(configData.cache_quota.fragment / Math.pow(1024, 3), 2));
+                    self.blockCQ([null, undefined].contains(configData.cache_quota.block) ? undefined : generic.round(configData.cache_quota.block / Math.pow(1024, 3), 2));
+                }
             }
         });
         self.scoSize.subscribe(function(size) {
@@ -150,7 +169,13 @@ define([
                         changed = true;
                         return false;
                     }
-                    if ((self.configuration()[key] instanceof Array && !self.configuration()[key].equals(self.oldConfiguration()[key])) ||
+                    if (key === 'cache_quota') {
+                        if (!generic.objectEquals(self.configuration()[key], self.oldConfiguration()[key])) {
+                            changed = true;
+                            return false;
+                        }
+
+                    } else if ((self.configuration()[key] instanceof Array && !self.configuration()[key].equals(self.oldConfiguration()[key])) ||
                         (!(self.configuration()[key] instanceof Array) && self.configuration()[key] !== self.oldConfiguration()[key])) {
                         changed = true;
                         return false;
@@ -169,7 +194,7 @@ define([
                     clients.push($.t('ovs:generic.xmore', { amount: self.edgeClients().length - 5 }));
                     return false;
                 }
-                clients.push(client.ip() + ':' + client.port());
+                clients.push(client.clientIp() + ':' + client.clientPort());
             });
             return clients.join(', ')
         });

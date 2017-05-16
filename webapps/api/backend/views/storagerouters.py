@@ -359,6 +359,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 connection_info_bc['port'] = 443
                 connection_info_bc['local'] = True
 
+        if 'block_cache_on_read' not in call_parameters:
+            call_parameters['block_cache_on_read'] = False
+        if 'block_cache_on_write' not in call_parameters:
+            call_parameters['block_cache_on_write'] = False
+
         call_parameters.pop('type', None)
         call_parameters.pop('readcache_size', None)
         call_parameters['config_params'].pop('dedupe_mode', None)

@@ -184,7 +184,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def clone(self, vdisk, name, storagerouter_guid, snapshot_id=None, pagecache_ratio=None):
+    def clone(self, vdisk, name, storagerouter_guid, snapshot_id=None, pagecache_ratio=None, cache_quota=None):
         """
         Clones a vDisk
         :param vdisk: Guid of the virtual disk to clone
@@ -197,6 +197,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type snapshot_id: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
+        :param cache_quota: Max disk space the new clone can consume for caching purposes (in Bytes)
+        :type cache_quota: int
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
@@ -204,7 +206,8 @@ class VDiskViewSet(viewsets.ViewSet):
                                            snapshot_id=snapshot_id,
                                            name=name,
                                            storagerouter_guid=storagerouter_guid,
-                                           pagecache_ratio=pagecache_ratio)
+                                           pagecache_ratio=pagecache_ratio,
+                                           cache_quota=cache_quota)
 
     @action()
     @log()
@@ -268,7 +271,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load()
-    def create(self, name, size, vpool_guid, storagerouter_guid, pagecache_ratio=1.0):
+    def create(self, name, size, vpool_guid, storagerouter_guid, pagecache_ratio=1.0, cache_quota=None):
         """
         Create a new vdisk
         :param name: Name of the new vdisk
@@ -281,6 +284,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
+        :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
+        :type cache_quota: int
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
@@ -290,7 +295,8 @@ class VDiskViewSet(viewsets.ViewSet):
                 return VDiskController.create_new.delay(volume_name=name,
                                                         volume_size=size,
                                                         storagedriver_guid=storagedriver.guid,
-                                                        pagecache_ratio=pagecache_ratio)
+                                                        pagecache_ratio=pagecache_ratio,
+                                                        cache_quota=cache_quota)
         raise HttpNotAcceptableException(error_description='No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid),
                                          error='impossible_request')
 
@@ -334,7 +340,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def create_from_template(self, vdisk, name, storagerouter_guid, pagecache_ratio=None):
+    def create_from_template(self, vdisk, name, storagerouter_guid, pagecache_ratio=None, cache_quota=None):
         """
         Create a new vdisk from a template vDisk
         :param vdisk: Guid of the template virtual disk
@@ -345,13 +351,16 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
+        :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
+        :type cache_quota: int
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
         return VDiskController.create_from_template.delay(vdisk_guid=vdisk.guid,
                                                           name=name,
                                                           storagerouter_guid=storagerouter_guid,
-                                                          pagecache_ratio=pagecache_ratio)
+                                                          pagecache_ratio=pagecache_ratio,
+                                                          cache_quota=cache_quota)
 
     @link()
     @log()

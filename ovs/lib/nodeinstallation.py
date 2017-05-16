@@ -24,7 +24,7 @@ import json
 import time
 import signal
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import remote
@@ -848,7 +848,7 @@ class NodeInstallationController(object):
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
-        Toolbox.wait_for_service(target_client, 'workers', True, NodeInstallationController._logger)
+        Toolbox.wait_for_service(client=target_client, name='workers', status='active', logger=NodeInstallationController._logger)
 
         Toolbox.run_hooks(component='nodeinstallation',
                           sub_component='firstnode',
@@ -911,12 +911,12 @@ class NodeInstallationController(object):
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Starting services')
         for service in ['watcher-framework', 'watcher-config']:
-            if ServiceManager.get_service_status(service, target_client)[0] is False:
+            if ServiceManager.get_service_status(service, target_client) != 'active':
                 Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
-        Toolbox.wait_for_service(target_client, 'workers', True, NodeInstallationController._logger)
+        Toolbox.wait_for_service(client=target_client, name='workers', status='active', logger=NodeInstallationController._logger)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Restarting workers')
         for node_client in ip_client_map.itervalues():

@@ -88,6 +88,7 @@ class StorageRouterClient(object):
     exceptions = {}
     vrouter_id = {}
     object_type = {}
+    failover_mode = {}
     mds_recording = []
     node_config_recordings = []
     synced = True
@@ -101,6 +102,7 @@ class StorageRouterClient(object):
         for item in [StorageRouterClient.volumes,
                      StorageRouterClient.vrouter_id,
                      StorageRouterClient.object_type,
+                     StorageRouterClient.failover_mode,
                      StorageRouterClient._config_cache,
                      StorageRouterClient._dtl_config_cache,
                      StorageRouterClient._metadata_backend_config,
@@ -117,6 +119,7 @@ class StorageRouterClient(object):
         for item in [StorageRouterClient.volumes,
                      StorageRouterClient.vrouter_id,
                      StorageRouterClient.object_type,
+                     StorageRouterClient.failover_mode,
                      StorageRouterClient._config_cache,
                      StorageRouterClient._dtl_config_cache,
                      StorageRouterClient._metadata_backend_config,
@@ -205,13 +208,14 @@ class StorageRouterClient(object):
         Returns an empty info object
         """
         _ = self, req_timeout_secs
-        return type('Info', (), {'cluster_multiplier': 0,
+        return type('Info', (), {'halted': False,
                                  'lba_size': 0,
-                                 'halted': False,
-                                 'metadata_backend_config': property(lambda s: None),
-                                 'object_type': property(lambda s: 'BASE'),
                                  'vrouter_id': property(lambda s: None),
-                                 'volume_size': 0})()
+                                 'object_type': property(lambda s: 'BASE'),
+                                 'volume_size': 0,
+                                 'failover_mode': property(lambda s: 'OK_STANDALONE'),
+                                 'cluster_multiplier': 0,
+                                 'metadata_backend_config': property(lambda s: None)})()
 
     def get_dtl_config(self, volume_id, req_timeout_secs=None):
         """
@@ -272,13 +276,14 @@ class StorageRouterClient(object):
         """
         _ = req_timeout_secs
         volume_size = StorageRouterClient.volumes[self.vpool_guid].get(volume_id, {}).get('volume_size', 0)
-        return type('Info', (), {'cluster_multiplier': property(lambda s: 8),
+        return type('Info', (), {'halted': property(lambda s: False),
                                  'lba_size': property(lambda s: 512),
-                                 'halted': property(lambda s: False),
-                                 'metadata_backend_config': property(lambda s: StorageRouterClient._metadata_backend_config[self.vpool_guid].get(volume_id)),
-                                 'object_type': property(lambda s: StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')),
                                  'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id)),
-                                 'volume_size': property(lambda s: volume_size)})()
+                                 'volume_size': property(lambda s: volume_size),
+                                 'object_type': property(lambda s: StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')),
+                                 'failover_mode': property(lambda s: StorageRouterClient.failover_mode[self.vpool_guid].get(volume_id, 'OK_STANDALONE')),
+                                 'cluster_multiplier': property(lambda s: 8),
+                                 'metadata_backend_config': property(lambda s: StorageRouterClient._metadata_backend_config[self.vpool_guid].get(volume_id))})()
 
     def is_volume_synced_up_to_snapshot(self, volume_id, snapshot_id, req_timeout_secs=None):
         """
@@ -319,8 +324,10 @@ class StorageRouterClient(object):
         """
         _ = req_timeout_secs
         if config is None:
+            StorageRouterClient.failover_mode[self.vpool_guid][volume_id] = 'OK_STANDALONE'
             dtl_config = None
         else:
+            StorageRouterClient.failover_mode[self.vpool_guid][volume_id] = 'OK_SYNC'
             dtl_config = DTLConfig(host=config.host, mode=config.mode, port=config.port)
         StorageRouterClient._dtl_config_cache[self.vpool_guid][volume_id] = dtl_config
 

@@ -109,6 +109,9 @@ class VPool(DataObject):
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', self.guid, self.storagedrivers[0].storagedriver_id)
         storagedriver_config.load()
+        for expected_key in ['distributed_transaction_log', 'filesystem', 'volume_router', 'volume_manager']:
+            if expected_key not in storagedriver_config.configuration:
+                return {}
 
         dtl = storagedriver_config.configuration['distributed_transaction_log']
         file_system = storagedriver_config.configuration['filesystem']

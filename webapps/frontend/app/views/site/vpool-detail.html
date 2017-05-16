@@ -85,7 +85,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             <!-- /ko -->
                             <!-- ko if: backendPreset() !== undefined -->
                                 <td data-i18n="ovs:vpools.preset"></td>
-                                <td><span data-bind="text: backendPreset"></span></td>
+                                <td data-bind="text: backendPreset"></td>
                             <!-- /ko -->
                             <td data-i18n="ovs:vpools.cluster_size"></td>
                             <td>
@@ -99,9 +99,9 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>  <!-- row 3 -->
                             <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-bind="text: iops"></td>
                             <td data-i18n="ovs:vpools.backend_login"></td>
-                            <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
+                            <td data-bind="text: backendLogin() ? backendLogin() : '-'"></td>
                             <td data-i18n="ovs:vpools.volume_write_buffer"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -114,9 +114,9 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>  <!-- row 4 -->
                             <td data-i18n="ovs:generic.read_speed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-bind="text: readSpeed"></td>
                             <td data-i18n="ovs:vpools.backend_connection"></td>
-                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
+                            <td data-bind="text: backendConnection() ? backendConnection() : '-'"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
@@ -137,9 +137,9 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>  <!-- row 5 -->
                             <td data-i18n="ovs:generic.write_speed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td data-bind="text: writeSpeed"></td>
                             <td data-i18n="ovs:generic.read_speed"></td>
-                            <td><span data-bind="text: backendReadSpeed"></span></td>
+                            <td data-bind="text: backendReadSpeed"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
@@ -157,9 +157,9 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>  <!-- row 6 -->
                             <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
+                            <td data-bind="text: vDisks().length"></td>
                             <td data-i18n="ovs:generic.write_speed"></td>
-                            <td><span data-bind="text: backendWriteSpeed"></span></td>
+                            <td data-bind="text: backendWriteSpeed"></td>
                             <td colspan="2" >&nbsp;</td>
                         </tr>
                     </tbody>
@@ -233,12 +233,15 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <table class="table table-noborder table-hover table-condensed">
                                     <thead>
                                         <tr>
-                                            <th><span data-i18n="ovs:generic.storagerouter"></span></th>
-                                            <th><span data-i18n="ovs:vpools.proxies_amount"></span></th>
-                                            <th><span data-i18n="ovs:vpools.global_write_buffer"></span></th>
-                                            <th><span data-i18n="ovs:vpools.fragment_caching"></span></th>
-                                            <th><span data-i18n="ovs:vpools.block_caching"></span></th>
-                                            <th style="width: 70px;"><span data-i18n="ovs:generic.actions"></span></th>
+                                            <th style="width: 120px;" data-i18n="ovs:generic.storagerouter"></th>
+                                            <th style="width: 75px;" data-i18n="ovs:vpools.proxies_amount"></th>
+                                            <th style="width: 120px;">
+                                                <abbr data-i18n="ovs:vpools.global_write_buffer_short"
+                                                      data-bind="attr: { title: $.t('ovs:vpools.global_write_buffer') }"></abbr>
+                                            </th>
+                                            <th data-i18n="ovs:vpools.fragment_caching"></th>
+                                            <th data-i18n="ovs:vpools.block_caching"></th>
+                                            <th style="width: 70px;" data-i18n="ovs:generic.actions"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -249,10 +252,10 @@ but WITHOUT ANY WARRANTY of any kind.
                                                         <span data-bind="text: name" class="hand"></span></a>
                                                 </td>
                                                 <!-- ko if: $root.srSDMap()[guid()] === undefined -->
-                                                    <td><span data-i18n="ovs:generic.null"></span></td>
-                                                    <td><span data-i18n="ovs:generic.null"></span></td>
-                                                    <td><span data-i18n="ovs:generic.null"></span></td>
-                                                    <td><span data-i18n="ovs:generic.null"></span></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
                                                     <td style="height:37px;">
                                                         <button type="button"
                                                             class="btn btn-mini btn-default hand"
@@ -270,44 +273,55 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <td><span data-bind="text: $root.srSDMap()[guid()].vpoolBackendInfo() === undefined ? '' : $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().global_write_buffer)"></span></td>
                                                     <td>
                                                         <span data-bind="translate: 'ovs:vpools.caching_types.' + $root.srSDMap()[guid()].caching()"></span>
-                                                        <!-- ko if: $root.srSDMap()[guid()].backendInfo() === undefined || $root.srSDMap()[guid()].backendInfo() === null -->
-                                                            (<span data-i18n="ovs:generic.local"></span>)
-                                                        <!-- /ko -->
-                                                        <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid === null-->
+                                                        <!-- ko if: $root.srSDMap()[guid()].caching() !== 'none' -->
                                                             <span data-i18n="ovs:generic.on"></span>
-                                                            <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name"></span>
-                                                            (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset"></span>&quot;)
-                                                        <!-- /ko -->
-                                                        <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid !== null-->
-                                                            <span data-i18n="ovs:generic.on"></span>
-                                                            <a data-bind="attr: {
-                                                                              href: 'https://' + $root.srSDMap()[guid()].connectionInfo().host + ':' + $root.srSDMap()[guid()].connectionInfo().port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: $root.srSDMap()[guid()].backendInfo().backend_guid }),
-                                                                              target: ($root.srSDMap()[guid()].connectionInfo().local !== false ? '' : '_blank')
-                                                                          }">
-                                                                <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: $root.srSDMap()[guid()].connectionInfo().local === false"></i> <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name" class="hand"></span>
-                                                            </a>
-                                                            (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset"></span>&quot;)
+                                                            <!-- ko if: $root.srSDMap()[guid()].backendInfo() === undefined || $root.srSDMap()[guid()].backendInfo() === null -->
+                                                                <span data-i18n="ovs:generic.local"></span>
+                                                            <!-- /ko -->
+                                                            <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid === null-->
+                                                                <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name"></span>
+                                                                (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset"></span>&quot;)
+                                                            <!-- /ko -->
+                                                            <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid !== null-->
+                                                                <a data-bind="attr: {
+                                                                                  href: 'https://' + $root.srSDMap()[guid()].connectionInfo().host + ':' + $root.srSDMap()[guid()].connectionInfo().port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: $root.srSDMap()[guid()].backendInfo().backend_guid }),
+                                                                                  target: ($root.srSDMap()[guid()].connectionInfo().local !== false ? '' : '_blank')
+                                                                              }">
+                                                                    <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: $root.srSDMap()[guid()].connectionInfo().local === false"></i> <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name" class="hand"></span>
+                                                                </a>
+                                                                (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset"></span>&quot;)
+                                                            <!-- /ko -->
+                                                            <!-- ko if: $root.srSDMap()[guid()].vpoolBackendInfo() !== undefined && $root.srSDMap()[guid()].vpoolBackendInfo().cache_quota_fc > 0 -->
+                                                                <br /><span data-i18n="ovs:generic.cache_quota"></span>: <span data-bind="text: $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().cache_quota_fc)"></span>
+                                                            <!-- /ko -->
                                                         <!-- /ko -->
                                                     </td>
                                                     <td>
-                                                        <span data-bind="translate: 'ovs:vpools.caching_types.' + $root.srSDMap()[guid()].blockCaching()"></span>
-                                                        <!-- ko if: $root.srSDMap()[guid()].blockCacheBackendInfo() === undefined || $root.srSDMap()[guid()].blockCacheBackendInfo() === null -->
-                                                            (<span data-i18n="ovs:generic.local"></span>)
-                                                        <!-- /ko -->
-                                                        <!-- ko if: $root.srSDMap()[guid()].blockCacheBackendInfo() !== undefined && $root.srSDMap()[guid()].blockCacheBackendInfo() !== null && $root.srSDMap()[guid()].blockCacheBackendInfo().backend_guid === null-->
+                                                        <span data-bind="visible: features() !== undefined && !features()['alba']['features'].contains('block-cache')"
+                                                              data-i18n="ovs:generic.null"></span>
+                                                        <span data-bind="visible: features() === undefined || features()['alba']['features'].contains('block-cache'),
+                                                                         translate: 'ovs:vpools.caching_types.' + $root.srSDMap()[guid()].blockCaching()"></span>
+                                                        <!-- ko if: $root.srSDMap()[guid()].blockCaching() !== 'none' -->
                                                             <span data-i18n="ovs:generic.on"></span>
-                                                            <span data-bind="text: $root.srSDMap()[guid()].blockCacheBackendInfo().name"></span>
-                                                            (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: $root.srSDMap()[guid()].blockCacheBackendInfo().preset"></span>&quot;)
-                                                        <!-- /ko -->
-                                                        <!-- ko if: $root.srSDMap()[guid()].blockCacheBackendInfo() !== undefined && $root.srSDMap()[guid()].blockCacheBackendInfo() !== null && $root.srSDMap()[guid()].blockCacheBackendInfo().backend_guid !== null-->
-                                                            <span data-i18n="ovs:generic.on"></span>
-                                                            <a data-bind="attr: {
-                                                                              href: 'https://' + $root.srSDMap()[guid()].blockCacheConnectionInfo().host + ':' + $root.srSDMap()[guid()].blockCacheConnectionInfo().port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: $root.srSDMap()[guid()].blockCacheBackendInfo().backend_guid }),
-                                                                              target: ($root.srSDMap()[guid()].connectionInfo().local !== false ? '' : '_blank')
-                                                                          }">
-                                                                <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: $root.srSDMap()[guid()].blockCacheConnectionInfo().local === false"></i> <span data-bind="text: $root.srSDMap()[guid()].blockCacheBackendInfo().name" class="hand"></span>
-                                                            </a>
-                                                            (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: $root.srSDMap()[guid()].blockCacheBackendInfo().preset"></span>&quot;)
+                                                            <!-- ko if: $root.srSDMap()[guid()].blockCacheBackendInfo() === undefined || $root.srSDMap()[guid()].blockCacheBackendInfo() === null -->
+                                                                <span data-i18n="ovs:generic.local"></span>
+                                                            <!-- /ko -->
+                                                            <!-- ko if: $root.srSDMap()[guid()].blockCacheBackendInfo() !== undefined && $root.srSDMap()[guid()].blockCacheBackendInfo() !== null && $root.srSDMap()[guid()].blockCacheBackendInfo().backend_guid === null-->
+                                                                <span data-bind="text: $root.srSDMap()[guid()].blockCacheBackendInfo().name"></span>
+                                                                (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: $root.srSDMap()[guid()].blockCacheBackendInfo().preset"></span>&quot;)
+                                                            <!-- /ko -->
+                                                            <!-- ko if: $root.srSDMap()[guid()].blockCacheBackendInfo() !== undefined && $root.srSDMap()[guid()].blockCacheBackendInfo() !== null && $root.srSDMap()[guid()].blockCacheBackendInfo().backend_guid !== null-->
+                                                                <a data-bind="attr: {
+                                                                                  href: 'https://' + $root.srSDMap()[guid()].blockCacheConnectionInfo().host + ':' + $root.srSDMap()[guid()].blockCacheConnectionInfo().port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: $root.srSDMap()[guid()].blockCacheBackendInfo().backend_guid }),
+                                                                                  target: ($root.srSDMap()[guid()].blockCacheConnectionInfo().local !== false ? '' : '_blank')
+                                                                              }">
+                                                                    <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: $root.srSDMap()[guid()].blockCacheConnectionInfo().local === false"></i> <span data-bind="text: $root.srSDMap()[guid()].blockCacheBackendInfo().name" class="hand"></span>
+                                                                </a>
+                                                                (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: $root.srSDMap()[guid()].blockCacheBackendInfo().preset"></span>&quot;)
+                                                            <!-- /ko -->
+                                                            <!-- ko if: $root.srSDMap()[guid()].vpoolBackendInfo() !== undefined && $root.srSDMap()[guid()].vpoolBackendInfo().cache_quota_bc > 0 -->
+                                                                <br /><span data-i18n="ovs:generic.cache_quota"></span>: <span data-bind="text: $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().cache_quota_bc)"></span>
+                                                            <!-- /ko -->
                                                         <!-- /ko -->
                                                     </td>
                                                     <td style="height:37px;">

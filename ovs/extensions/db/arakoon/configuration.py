@@ -66,7 +66,12 @@ class ArakoonConfiguration(object):
         """
         key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
-        return any(client.prefix(key))
+        for entry in list(client.prefix(key)):
+            parts = entry.split('/')
+            for index in range(len(parts)):
+                if key == '/'.join(parts[:index + 1]):
+                    return client.exists(key) is False  # Exists returns False for directories (not complete keys)
+        return False
 
     @staticmethod
     def list(key):

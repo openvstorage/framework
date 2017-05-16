@@ -55,9 +55,9 @@ class Systemd(object):
         """
         name = Systemd._get_name(name, client)
         key = 'None' if client is None else client.ip
-        output = 'active' if name in Systemd.services[key] else 'inactive'
-        status = Systemd.services[key].get(name, 'HALTED') == 'RUNNING'
-        return status, output
+        if Systemd.services.get(key, {}).get(name) == 'RUNNING':
+            return 'active'
+        return 'inactive'
 
     @staticmethod
     def remove_service(name, client, delay_unregistration=False):
@@ -81,10 +81,8 @@ class Systemd(object):
         if name not in Systemd.services[key]:
             raise RuntimeError('Service {0} does not exist'.format(name))
         Systemd.services[key][name] = 'RUNNING'
-        status, output = Systemd.get_service_status(name, client)
-        if status is True:
-            return output
-        raise RuntimeError('Start {0} failed. {1}'.format(name, output))
+        if Systemd.get_service_status(name, client) != 'active':
+            raise RuntimeError('Start {0} failed'.format(name))
 
     @staticmethod
     def stop_service(name, client):
@@ -96,10 +94,8 @@ class Systemd(object):
         if name not in Systemd.services[key]:
             raise RuntimeError('Service {0} does not exist'.format(name))
         Systemd.services[key][name] = 'HALTED'
-        status, output = Systemd.get_service_status(name, client)
-        if status is False:
-            return output
-        raise RuntimeError('Stop {0} failed. {1}'.format(name, output))
+        if Systemd.get_service_status(name, client) != 'inactive':
+            raise RuntimeError('Stop {0} failed'.format(name))
 
     @staticmethod
     def restart_service(name, client):
@@ -108,7 +104,7 @@ class Systemd(object):
         """
         name = Systemd._get_name(name, client)
         Systemd.stop_service(name, client)
-        return Systemd.start_service(name, client)
+        Systemd.start_service(name, client)
 
     @staticmethod
     def has_service(name, client):

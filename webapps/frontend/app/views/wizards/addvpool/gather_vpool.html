@@ -165,10 +165,8 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable() && canContinue().value" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset_unavailable"></span>
     </div>
-    <div class="alert alert-info" data-bind="visible: canContinue().value && (loadingMetadata() || data.vPool() !== undefined)" style="margin-top: 20px;">
-        <span data-bind="visible: loadingMetadata()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
-        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.metadata_loading', visible: loadingMetadata()"></span>
-        <p data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.information_extend', visible: data.vPool() !== undefined"></p>
+    <div class="alert alert-info" data-bind="visible: canContinue().value && data.vPool() !== undefined" style="margin-top: 20px;">
+        <p data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.information_extend'"></p>
     </div>
     <div class="alert alert-danger" style="margin-bottom: -3px;"
          data-bind="visible: !canContinue().value || canContinue().showErrors">

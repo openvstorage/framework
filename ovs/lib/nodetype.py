@@ -24,7 +24,7 @@ import sys
 import json
 import time
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -229,9 +229,9 @@ class NodeTypeController(object):
                                                        ip=master_ip,
                                                        new_ip=cluster_ip,
                                                        base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
-            ArakoonInstaller.restart_cluster_add(cluster_name='config',
-                                                 current_ips=metadata['ips'],
-                                                 new_ip=cluster_ip)
+            ArakoonInstaller.restart_cluster_after_extending(cluster_name='config',
+                                                             new_ip=cluster_ip,
+                                                             ip=master_ip)
             ServiceManager.register_service(node_name=machine_id,
                                             service_metadata=metadata['service_metadata'])
 
@@ -251,9 +251,8 @@ class NodeTypeController(object):
             result = ArakoonInstaller.extend_cluster(cluster_name=arakoon_cluster_name,
                                                      new_ip=cluster_ip,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
-            ArakoonInstaller.restart_cluster_add(cluster_name=arakoon_cluster_name,
-                                                 current_ips=result['ips'],
-                                                 new_ip=cluster_ip)
+            ArakoonInstaller.restart_cluster_after_extending(cluster_name=arakoon_cluster_name,
+                                                             new_ip=cluster_ip)
             arakoon_ports = result['ports']
 
         if configure_memcached is True:
@@ -276,9 +275,8 @@ class NodeTypeController(object):
 
         if arakoon_metadata['internal'] is True:
             Toolbox.log(logger=NodeTypeController._logger, messages='Restarting master node services')
-            ArakoonInstaller.restart_cluster_add(cluster_name=arakoon_cluster_name,
-                                                 current_ips=master_node_ips,
-                                                 new_ip=cluster_ip)
+            ArakoonInstaller.restart_cluster_after_extending(cluster_name=arakoon_cluster_name,
+                                                             new_ip=cluster_ip)
             PersistentFactory.store = None
             VolatileFactory.store = None
 
@@ -366,7 +364,9 @@ class NodeTypeController(object):
         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
         config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
         master_node_ips = [node.ip for node in config.nodes]
+        shrink = False
         if cluster_ip in master_node_ips:
+            shrink = True
             master_node_ips.remove(cluster_ip)
         if len(master_node_ips) == 0:
             raise RuntimeError('There should be at least one other master node')
@@ -376,19 +376,22 @@ class NodeTypeController(object):
         storagerouter.save()
 
         offline_node_ips = [node.ip for node in offline_nodes]
-        if arakoon_metadata['internal'] is True:
+        if arakoon_metadata['internal'] is True and shrink is True:
             Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Arakoon {0} cluster'.format(arakoon_cluster_name))
             ArakoonInstaller.shrink_cluster(cluster_name=arakoon_cluster_name,
-                                            ip=cluster_ip,
+                                            removal_ip=cluster_ip,
                                             offline_nodes=offline_node_ips)
+            ArakoonInstaller.restart_cluster_after_shrinking(cluster_name=arakoon_cluster_name)
         try:
             external_config = Configuration.get('/ovs/framework/external_config')
-            if external_config is None:
+            if external_config is None and shrink is True:
                 Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Arakoon config cluster')
                 ArakoonInstaller.shrink_cluster(cluster_name='config',
-                                                ip=cluster_ip,
-                                                remaining_ip=master_node_ips[0],
+                                                removal_ip=cluster_ip,
+                                                ip=master_node_ips[0],
                                                 offline_nodes=offline_node_ips)
+                ArakoonInstaller.restart_cluster_after_shrinking(cluster_name='config',
+                                                                 ip=master_node_ips[0])
         except Exception as ex:
             Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to leave configuration cluster', ex], loglevel='exception')
 
