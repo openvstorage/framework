@@ -863,6 +863,8 @@ class StorageRouterController(object):
                                                       'alba_connection_use_rora': True,
                                                       'alba_connection_transport': 'TCP',
                                                       'alba_connection_rora_manifest_cache_capacity': manifest_cache_size,
+                                                      'alba_connection_asd_connection_pool_capacity': 20,
+                                                      'alba_connection_rora_timeout_msecs': 50,
                                                       'backend_type': 'ALBA'}
         volume_router = {'vrouter_id': vrouter_id,
                          'vrouter_redirect_timeout_ms': '120000',
