@@ -501,6 +501,7 @@
     },
     "support": {
         "alba": "Alba",
+        "alba-ee": "Alba Enterprise Edition",
         "arakoon": "Arakoon",
         "callhome": "Call Home settings",
         "clusterid": "Cluster ID:",
