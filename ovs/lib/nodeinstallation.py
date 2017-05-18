@@ -778,7 +778,8 @@ class NodeInstallationController(object):
             service_manager.add_service(service, params={}, client=target_client)
             Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
-        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
+        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
+                                                                          configuration=Configuration)
         arakoon_ports = []
         if metadata is None:  # No externally managed cluster found, we create 1 ourselves
             Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up Arakoon cluster ovsdb')

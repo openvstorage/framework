@@ -336,7 +336,8 @@ class StorageDriverController(object):
             all_sr_ips.append(storagerouter.ip)
 
         if create_cluster is True and len(current_services) == 0:  # Create new cluster
-            metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD)
+            metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
+                                                                              configuration=Configuration)
             if metadata is None:  # No externally managed cluster found, we create 1 ourselves
                 if not available_storagerouters:
                     raise RuntimeError('Could not find any Storage Router with a DB role')
