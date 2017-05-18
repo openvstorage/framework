@@ -544,7 +544,7 @@ class GenericController(object):
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
             ip = storagerouter.ip if cluster in ['cacc', 'unittest-cacc'] else None
             try:
-                config = ArakoonClusterConfig(cluster, source_ip=ip)
+                config = ArakoonClusterConfig(cluster, configuration=Configuration, source_ip=ip)
                 cluster_config_map[cluster] = config
             except:
                 GenericController._logger.exception('  Retrieving cluster information on {0} for {1} failed'.format(storagerouter.ip, cluster))

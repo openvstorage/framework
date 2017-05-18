@@ -276,12 +276,13 @@ class NodeConfigTest(unittest.TestCase):
         )
         storagerouters = structure['storagerouters']
         vpool = structure['vpools'][1]
-        ArakoonInstaller.create_cluster(cluster_name='voldrv',
-                                        cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
-                                        ip=storagerouters[1].ip,
-                                        base_dir='/tmp',
-                                        log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                        crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+        arakoon_installer = ArakoonInstaller(cluster_name='voldrv',
+                                             configuration=Configuration)
+        arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
+                                         ip=storagerouters[1].ip,
+                                         base_dir='/tmp',
+                                         log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                         crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
 
         # Initial run, it will now be configured
         StorageRouterClient.node_config_recordings = []

@@ -24,6 +24,7 @@ import sys
 import time
 import uuid
 import logging
+from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.log_handler import LogHandler
 
@@ -72,7 +73,7 @@ class Watcher(object):
                 from ovs.extensions.generic.configuration import Configuration
                 with open(Configuration.CACC_LOCATION) as config_file:
                     contents = config_file.read()
-                config = ArakoonClusterConfig(cluster_id='cacc', load_config=False)
+                config = ArakoonClusterConfig(cluster_id='cacc', configuration=Configuration, load_config=False)
                 config.read_config(contents=contents)
                 client = ArakoonInstaller.build_client(config)
                 contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())

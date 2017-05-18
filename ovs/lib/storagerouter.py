@@ -885,7 +885,8 @@ class StorageRouterController(object):
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
         arakoon_nodes = [{'host': node.ip,
                           'port': node.client_port,
-                          'node_id': node.name} for node in ArakoonClusterConfig(cluster_id=arakoon_cluster_name).nodes]
+                          'node_id': node.name} for node in ArakoonClusterConfig(cluster_id=arakoon_cluster_name,
+                                                                                 configuration=Configuration).nodes]
 
         # DTL path is not used, but a required parameter. The DTL transport should be the same as the one set in the DTL server.
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)

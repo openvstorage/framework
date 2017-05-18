@@ -272,7 +272,7 @@ class UpdateController(object):
                 raise RuntimeError('Arakoon cluster {0} does not have the required metadata key'.format(cluster))
 
             if arakoon_metadata['internal'] is True:
-                config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=ip)
+                config = ArakoonClusterConfig(cluster_id=cluster_name, configuration=Configuration, source_ip=ip)
                 if cluster == 'ovsdb':
                     arakoon_ovs_info['down'] = len(config.nodes) < 3
                     arakoon_ovs_info['name'] = arakoon_metadata['cluster_name']
@@ -487,7 +487,7 @@ class UpdateController(object):
                         continue
 
                     if arakoon_metadata['internal'] is True:
-                        config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=master_ip)
+                        config = ArakoonClusterConfig(cluster_id=cluster_name, configuration=Configuration, source_ip=master_ip)
                         if client.ip in [node.ip for node in config.nodes]:
                             UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
                             ArakoonInstaller.restart_node(metadata=arakoon_metadata,

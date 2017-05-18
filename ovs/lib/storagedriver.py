@@ -343,15 +343,16 @@ class StorageDriverController(object):
 
                 storagerouter, partition = available_storagerouters.items()[0]
                 arakoon_voldrv_cluster = 'voldrv'
-                result = ArakoonInstaller.create_cluster(cluster_name=arakoon_voldrv_cluster,
-                                                         cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
-                                                         ip=storagerouter.ip,
-                                                         base_dir=partition.folder,
-                                                         log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                                         crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
-                ports = result['ports']
-                metadata = result['metadata']
-                ArakoonInstaller.start_cluster(metadata=metadata)
+                arakoon_installer = ArakoonInstaller(cluster_name=arakoon_voldrv_cluster,
+                                                     configuration=Configuration)
+                arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
+                                                 ip=storagerouter.ip,
+                                                 base_dir=partition.folder,
+                                                 log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                arakoon_installer.start_cluster()
+                ports = arakoon_installer.ports[storagerouter.ip]
+                metadata = arakoon_installer.metadata
                 current_ips.append(storagerouter.ip)
             else:
                 ports = []
@@ -389,7 +390,7 @@ class StorageDriverController(object):
     @staticmethod
     def _configure_arakoon_to_volumedriver(cluster_name):
         StorageDriverController._logger.info('Update existing vPools')
-        config = ArakoonClusterConfig(cluster_id=cluster_name)
+        config = ArakoonClusterConfig(cluster_id=cluster_name, configuration=Configuration)
         arakoon_nodes = []
         for node in config.nodes:
             arakoon_nodes.append({'host': node.ip,

@@ -721,21 +721,19 @@ class Generic(unittest.TestCase):
                 cluster_name = cluster_info['name']
 
                 base_dir = DalHelper.CLUSTER_DIR.format(cluster_name)
-                info = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
-                                                       cluster_type=cluster_type,
-                                                       ip=storagerouter_1.ip,
-                                                       base_dir=base_dir,
-                                                       internal=internal,
-                                                       log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                                       crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
-                ArakoonInstaller.start_cluster(metadata=info['metadata'],
-                                               ip=storagerouter_1.ip if filesystem is True else None)
-                ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
-                                                ip=storagerouter_1.ip if filesystem is True else None,
-                                                new_ip=storagerouter_2.ip,
-                                                base_dir=base_dir,
-                                                log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                                crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                arakoon_installer = ArakoonInstaller(cluster_name=cluster_name,
+                                                     configuration=Configuration)
+                arakoon_installer.create_cluster(cluster_type=cluster_type,
+                                                 ip=storagerouter_1.ip,
+                                                 base_dir=base_dir,
+                                                 internal=internal,
+                                                 log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                arakoon_installer.start_cluster()
+                arakoon_installer.extend_cluster(new_ip=storagerouter_2.ip,
+                                                 base_dir=base_dir,
+                                                 log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
 
                 service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
                 if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.ABM:
@@ -749,11 +747,11 @@ class Generic(unittest.TestCase):
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type,
                                              storagerouter=storagerouter_1,
-                                             ports=info['ports'])
+                                             ports=arakoon_installer.ports[storagerouter_1.ip])
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type,
                                              storagerouter=storagerouter_2,
-                                             ports=info['ports'])
+                                             ports=arakoon_installer.ports[storagerouter_2.ip])
                 else:
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type)

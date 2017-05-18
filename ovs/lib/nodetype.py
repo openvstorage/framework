@@ -135,7 +135,7 @@ class NodeTypeController(object):
 
             if node_action == 'demote':
                 for cluster_name in Configuration.list('/ovs/arakoon'):
-                    config = ArakoonClusterConfig(cluster_id=cluster_name)
+                    config = ArakoonClusterConfig(cluster_id=cluster_name, configuration=Configuration)
                     arakoon_client = ArakoonInstaller.build_client(config)
                     metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
                     if len(config.nodes) == 1 and config.nodes[0].ip == ip and metadata.get('internal') is True:
@@ -241,7 +241,7 @@ class NodeTypeController(object):
         # Find other (arakoon) master nodes
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, configuration=Configuration)
         master_node_ips = [node.ip for node in config.nodes]
         if cluster_ip in master_node_ips:
             master_node_ips.remove(cluster_ip)
@@ -368,7 +368,7 @@ class NodeTypeController(object):
         # Find other (arakoon) master nodes
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, configuration=Configuration)
         master_node_ips = [node.ip for node in config.nodes]
         shrink = False
         if cluster_ip in master_node_ips:

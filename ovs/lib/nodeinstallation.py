@@ -495,7 +495,7 @@ class NodeInstallationController(object):
                     if promote_completed is False:
                         Toolbox.log(logger=NodeInstallationController._logger, messages='Analyzing cluster layout')
                         framework_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
-                        arakoon_config = ArakoonClusterConfig(cluster_id=framework_cluster_name)
+                        arakoon_config = ArakoonClusterConfig(cluster_id=framework_cluster_name, configuration=Configuration)
                         NodeInstallationController._logger.debug('{0} nodes for cluster {1} found'.format(len(arakoon_config.nodes), framework_cluster_name))
                         if (len(arakoon_config.nodes) < 3 or node_type == 'master') and node_type != 'extra':
                             configure_rabbitmq = Toolbox.is_service_internally_managed(service='rabbitmq')
@@ -743,26 +743,26 @@ class NodeInstallationController(object):
 
         if external_config is None:
             arakoon_config_cluster = 'config'
-            info = ArakoonInstaller.create_cluster(cluster_name=arakoon_config_cluster,
-                                                   cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
-                                                   ip=cluster_ip,
-                                                   base_dir='/opt/OpenvStorage/db',
-                                                   locked=False,
-                                                   log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                                   crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
-            ArakoonInstaller.start_cluster(ip=cluster_ip,
-                                           metadata=info['metadata'])
+            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_config_cluster,
+                                                 configuration=Configuration)
+            arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
+                                             ip=cluster_ip,
+                                             base_dir='/opt/OpenvStorage/db',
+                                             locked=False,
+                                             log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                             crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+            arakoon_installer.start_cluster()
             contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
             target_client.file_write(Configuration.CACC_LOCATION, contents)
             service_manager.register_service(node_name=machine_id,
-                                             service_metadata=info['service_metadata'])
+                                             service_metadata=arakoon_installer.service_metadata[cluster_ip])
         else:
             arakoon_cacc_cluster = 'cacc'
-            ArakoonInstaller.claim_cluster(cluster_name=arakoon_cacc_cluster,
-                                           ip=cluster_ip)
-            arakoon_config = ArakoonClusterConfig(cluster_id=arakoon_cacc_cluster, source_ip=cluster_ip)
-            arakoon_client = ArakoonInstaller.build_client(arakoon_config)
-            arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, arakoon_config.export_ini())
+            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cacc_cluster,
+                                                 configuration=Configuration)
+            arakoon_installer.load(ip=cluster_ip)
+            arakoon_installer.claim_cluster()
+            arakoon_installer.store_config()
 
         Configuration.initialize(external_config=external_config, logging_target=logging_target)
         Configuration.initialize_host(machine_id)
@@ -784,16 +784,17 @@ class NodeInstallationController(object):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up Arakoon cluster ovsdb')
             internal = True
             arakoon_ovsdb_cluster = 'ovsdb'
-            result = ArakoonInstaller.create_cluster(cluster_name=arakoon_ovsdb_cluster,
-                                                     cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
-                                                     ip=cluster_ip,
-                                                     base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                                     locked=False,
-                                                     log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                                     crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
-            metadata = result['metadata']
-            arakoon_ports = result['ports']
-            ArakoonInstaller.start_cluster(metadata=metadata)
+            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_ovsdb_cluster,
+                                                 configuration=Configuration)
+            arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
+                                             ip=cluster_ip,
+                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
+                                             locked=False,
+                                             log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                             crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+            arakoon_installer.start_cluster()
+            metadata = arakoon_installer.metadata
+            arakoon_ports = arakoon_installer.ports[cluster_ip]
         else:
             Toolbox.log(logger=NodeInstallationController._logger, messages='Externally managed Arakoon cluster of type {0} found with name {1}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, metadata['cluster_name']))
             internal = False
