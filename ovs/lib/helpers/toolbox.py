@@ -91,7 +91,6 @@ class Toolbox(object):
         :param logger: Logger object to use for logging
         :type logger: ovs.log.log_handler.LogHandler
         :param kwargs: Additional named arguments
-        :type kwargs: dict
         :return: Amount of functions executed
         """
         functions = Toolbox.fetch_hooks(component=component, sub_component=sub_component)

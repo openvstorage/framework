@@ -36,7 +36,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex
 from ovs_extensions.generic.remote import remote
@@ -544,7 +544,7 @@ class GenericController(object):
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
             ip = storagerouter.ip if cluster in ['cacc', 'unittest-cacc'] else None
             try:
-                config = ArakoonClusterConfig(cluster, configuration=Configuration, source_ip=ip)
+                config = ArakoonClusterConfig(cluster_id=cluster, source_ip=ip)
                 cluster_config_map[cluster] = config
             except:
                 GenericController._logger.exception('  Retrieving cluster information on {0} for {1} failed'.format(storagerouter.ip, cluster))

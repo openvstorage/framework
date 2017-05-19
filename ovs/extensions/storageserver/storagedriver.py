@@ -20,7 +20,7 @@ Wrapper class for the storagedriver client of the voldrv team
 import os
 import copy
 import json
-from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
@@ -182,7 +182,7 @@ class ObjectRegistryClient(object):
         if key not in oclient_vpool_cache:
             arakoon_node_configs = []
             arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, configuration=Configuration)
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
             for node in config.nodes:
                 arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
             client = ORClient(str(vpool.guid), str(arakoon_cluster_name), arakoon_node_configs)
@@ -251,7 +251,7 @@ class ClusterRegistryClient(object):
         key = vpool.identifier
         if key not in crclient_vpool_cache:
             arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, configuration=Configuration)
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
             arakoon_node_configs = []
             for node in config.nodes:
                 arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
@@ -285,7 +285,7 @@ class FSMetaDataClient(object):
         key = vpool.identifier
         if key not in fsmclient_vpool_cache:
             arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, configuration=Configuration)
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name)
             arakoon_node_configs = []
             for node in config.nodes:
                 arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))

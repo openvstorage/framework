@@ -37,7 +37,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
-from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs_extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.sshclient import SSHClient

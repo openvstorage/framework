@@ -38,7 +38,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient
-from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.disk import DiskTools
 from ovs_extensions.generic.remote import remote
@@ -885,8 +885,7 @@ class StorageRouterController(object):
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
         arakoon_nodes = [{'host': node.ip,
                           'port': node.client_port,
-                          'node_id': node.name} for node in ArakoonClusterConfig(cluster_id=arakoon_cluster_name,
-                                                                                 configuration=Configuration).nodes]
+                          'node_id': node.name} for node in ArakoonClusterConfig(cluster_id=arakoon_cluster_name).nodes]
 
         # DTL path is not used, but a required parameter. The DTL transport should be the same as the one set in the DTL server.
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)

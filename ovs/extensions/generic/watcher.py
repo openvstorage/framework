@@ -68,12 +68,12 @@ class Watcher(object):
                     self.log_message(target, '  Error during configuration store test: {0}'.format(ex), 2)
                     return False
 
-                from ovs_extensions.db.arakoon.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
+                from ovs.extensions.db.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
                 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
                 from ovs.extensions.generic.configuration import Configuration
                 with open(Configuration.CACC_LOCATION) as config_file:
                     contents = config_file.read()
-                config = ArakoonClusterConfig(cluster_id='cacc', configuration=Configuration, load_config=False)
+                config = ArakoonClusterConfig(cluster_id='cacc', load_config=False)
                 config.read_config(contents=contents)
                 client = ArakoonInstaller.build_client(config)
                 contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())

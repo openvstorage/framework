@@ -26,7 +26,7 @@ from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.tests.helpers import DalHelper
-from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
@@ -721,8 +721,7 @@ class Generic(unittest.TestCase):
                 cluster_name = cluster_info['name']
 
                 base_dir = DalHelper.CLUSTER_DIR.format(cluster_name)
-                arakoon_installer = ArakoonInstaller(cluster_name=cluster_name,
-                                                     configuration=Configuration)
+                arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
                 arakoon_installer.create_cluster(cluster_type=cluster_type,
                                                  ip=storagerouter_1.ip,
                                                  base_dir=base_dir,

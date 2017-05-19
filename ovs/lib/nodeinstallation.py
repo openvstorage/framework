@@ -24,7 +24,7 @@ import json
 import time
 import signal
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
 from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
@@ -495,7 +495,7 @@ class NodeInstallationController(object):
                     if promote_completed is False:
                         Toolbox.log(logger=NodeInstallationController._logger, messages='Analyzing cluster layout')
                         framework_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
-                        arakoon_config = ArakoonClusterConfig(cluster_id=framework_cluster_name, configuration=Configuration)
+                        arakoon_config = ArakoonClusterConfig(cluster_id=framework_cluster_name)
                         NodeInstallationController._logger.debug('{0} nodes for cluster {1} found'.format(len(arakoon_config.nodes), framework_cluster_name))
                         if (len(arakoon_config.nodes) < 3 or node_type == 'master') and node_type != 'extra':
                             configure_rabbitmq = Toolbox.is_service_internally_managed(service='rabbitmq')
@@ -700,7 +700,7 @@ class NodeInstallationController(object):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configure Arakoon')
             if metadata is not None and metadata['internal'] is True:
                 try:
-                    ArakoonInstaller.delete_cluster(cluster_name=cluster_name)
+                    ArakoonInstaller.delete_cluster()
                 except Exception as ex:
                     Toolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to delete cluster', ex], loglevel='exception')
                 base_dir = required_info['/ovs/framework/paths|ovsdb']
@@ -743,8 +743,7 @@ class NodeInstallationController(object):
 
         if external_config is None:
             arakoon_config_cluster = 'config'
-            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_config_cluster,
-                                                 configuration=Configuration)
+            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_config_cluster)
             arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                              ip=cluster_ip,
                                              base_dir='/opt/OpenvStorage/db',
@@ -758,8 +757,7 @@ class NodeInstallationController(object):
                                              service_metadata=arakoon_installer.service_metadata[cluster_ip])
         else:
             arakoon_cacc_cluster = 'cacc'
-            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cacc_cluster,
-                                                 configuration=Configuration)
+            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cacc_cluster)
             arakoon_installer.load(ip=cluster_ip)
             arakoon_installer.claim_cluster()
             arakoon_installer.store_config()
@@ -778,15 +776,13 @@ class NodeInstallationController(object):
             service_manager.add_service(service, params={}, client=target_client)
             Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
-        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
-                                                                          configuration=Configuration)
+        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
         arakoon_ports = []
         if metadata is None:  # No externally managed cluster found, we create 1 ourselves
             Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up Arakoon cluster ovsdb')
             internal = True
             arakoon_ovsdb_cluster = 'ovsdb'
-            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_ovsdb_cluster,
-                                                 configuration=Configuration)
+            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_ovsdb_cluster)
             arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
                                              ip=cluster_ip,
                                              base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
