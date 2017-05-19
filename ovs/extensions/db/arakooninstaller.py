@@ -19,6 +19,7 @@ Generic module for managing configuration somewhere
 """
 from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig as _ArakoonClusterConfig, ArakoonInstaller as _ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.services.servicefactory import ServiceFactory
 
 
 class ArakoonClusterConfig(_ArakoonClusterConfig):
@@ -26,15 +27,8 @@ class ArakoonClusterConfig(_ArakoonClusterConfig):
     Extends the 'default' ArakoonClusterConfig
     """
 
-    def __init__(self, cluster_id, load_config=True, source_ip=None, plugins=None):
-        """
-        Initializes an empty Cluster Config
-        """
-        super(ArakoonClusterConfig, self).__init__(cluster_id=cluster_id,
-                                                   configuration=Configuration,
-                                                   load_config=load_config,
-                                                   source_ip=source_ip,
-                                                   plugins=plugins)
+    def __init__(self, *args, **kwargs):
+        super(ArakoonClusterConfig, self).__init__(*args, **kwargs)
 
     @classmethod
     def _get_configuration(cls):
@@ -46,13 +40,13 @@ class ArakoonInstaller(_ArakoonInstaller):
     Class to dynamically install/(re)configure Arakoon cluster
     """
 
-    def __init__(self, cluster_name):
-        """
-        ArakoonInstaller constructor
-        """
-        super(ArakoonInstaller, self).__init__(cluster_name=cluster_name,
-                                               configuration=Configuration)
+    def __init__(self, *args, **kwargs):
+        super(ArakoonInstaller, self).__init__(*args, **kwargs)
 
     @classmethod
     def _get_configuration(cls):
         return Configuration
+
+    @classmethod
+    def _get_service_manager(cls):
+        return ServiceFactory.get_manager()
