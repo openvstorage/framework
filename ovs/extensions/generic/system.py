@@ -18,8 +18,9 @@
 Generic system module, executing statements on local node
 """
 
-from ovs_extensions.packages.packagefactory import PackageFactory
+import os
 from ovs_extensions.generic.system import System as _System
+from ovs_extensions.packages.packagefactory import PackageFactory
 
 
 class System(_System):
@@ -37,26 +38,49 @@ class System(_System):
         """
         raise RuntimeError('System is a static class')
 
-    @staticmethod
-    def get_release_name(client=None):
+    @classmethod
+    def get_my_machine_id(cls, client=None):
+        """
+        Returns unique machine id, generated during the setup of the iSCSI Manager
+        :param client: Local client on which to retrieve the machine ID
+        :type client: SSHClient
+        :return: Machine ID
+        :rtype: str
+        """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return cls._machine_id.get('none' if client is None else client.ip)
+        if client is not None:
+            return client.run(['cat', cls.OVS_ID_FILE]).strip()
+        with open(cls.OVS_ID_FILE, 'r') as the_file:
+            return the_file.read().strip()
+
+    @classmethod
+    def get_release_name(cls, client=None):
+        """
+        Retrieve the release name
+        :param client: Client on which to retrieve the release name
+        :type client: ovs_extensions.generic.sshclient.SSHClient
+        :return: The name of the release
+        :rtype: str
+        """
         try:
             if client is not None:
-                return client.run(['cat', System.RELEASE_NAME_FILE]).strip()
-            with open(System.RELEASE_NAME_FILE, 'r') as the_file:
+                return client.run(['cat', cls.RELEASE_NAME_FILE]).strip()
+            with open(cls.RELEASE_NAME_FILE, 'r') as the_file:
                 return the_file.read().strip()
         except:
             manager = PackageFactory.get_manager()
             return manager.get_release_name()
 
-    @staticmethod
-    def get_my_storagerouter():
+    @classmethod
+    def get_my_storagerouter(cls):
         """
         Returns unique machine storagerouter id
         :return: Storage Router this is executed on
         :rtype: StorageRouter
         """
         from ovs.dal.lists.storagerouterlist import StorageRouterList
-        storagerouter = StorageRouterList.get_by_machine_id(System.get_my_machine_id())
+        storagerouter = StorageRouterList.get_by_machine_id(cls.get_my_machine_id())
         if storagerouter is None:
             raise RuntimeError('Could not find the local StorageRouter')
         return storagerouter

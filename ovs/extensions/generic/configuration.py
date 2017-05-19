@@ -127,11 +127,11 @@ class Configuration(_Configuration):
     def get_store_info(cls):
         """
         Retrieve the configuration store method. This can currently only be 'arakoon'
-        :return: A tuple containing the store and params that can be bassed to the configuration implementation instance
+        :return: A tuple containing the store and params that can be passed to the configuration implementation instance
         :rtype: tuple(str, dict)
         """
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
             return 'unittest', None
-        with open(Configuration.BOOTSTRAP_CONFIG_LOCATION) as config_file:
+        with open(cls.BOOTSTRAP_CONFIG_LOCATION) as config_file:
             contents = json.load(config_file)
-            return contents['configuration_store'], {'cacc_location': Configuration.CACC_LOCATION}
+            return contents['configuration_store'], {'cacc_location': cls.CACC_LOCATION}

@@ -43,7 +43,7 @@ from ovs_extensions.generic.remote import remote
 from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.volatilemutex import volatile_mutex
-from ovs_extensions.services.servicefactory import ServiceFactory
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox, Schedule

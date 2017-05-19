@@ -31,7 +31,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.generic.sshclient import SSHClient
-from ovs_extensions.services.servicefactory import ServiceFactory
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, DTLMode
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler

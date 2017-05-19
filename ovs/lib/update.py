@@ -32,7 +32,7 @@ from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.migration.migrator import Migrator
 from ovs_extensions.packages.packagefactory import PackageFactory
-from ovs_extensions.services.servicefactory import ServiceFactory
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs_extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.generic import GenericController

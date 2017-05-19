@@ -49,8 +49,8 @@ class MigrationController(object):
         from ovs.extensions.generic.configuration import Configuration
         from ovs_extensions.generic.sshclient import SSHClient
         from ovs_extensions.generic.toolbox import ExtensionsToolbox
-        from ovs_extensions.services.servicefactory import ServiceFactory
         from ovs_extensions.services.interfaces.systemd import Systemd
+        from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
         from ovs.lib.generic import GenericController
 
