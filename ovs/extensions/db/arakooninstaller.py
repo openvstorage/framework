@@ -19,6 +19,7 @@ Generic module for managing configuration somewhere
 """
 from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig as _ArakoonClusterConfig, ArakoonInstaller as _ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
 
 
@@ -50,3 +51,7 @@ class ArakoonInstaller(_ArakoonInstaller):
     @classmethod
     def _get_service_manager(cls):
         return ServiceFactory.get_manager()
+
+    @classmethod
+    def _get_system(cls):
+        return System
