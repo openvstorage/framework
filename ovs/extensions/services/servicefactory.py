@@ -18,6 +18,8 @@
 Service Factory for the OVS Framework
 """
 import logging
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs_extensions.services.servicefactory import ServiceFactory as _ServiceFactory
 
 logger = logging.getLogger(__name__)
@@ -30,7 +32,16 @@ class ServiceFactory(_ServiceFactory):
     RUN_FILE_DIR = '/opt/OpenvStorage/run'
     SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
     CONFIG_TEMPLATE_DIR = '/opt/OpenvStorage/config/templates/{0}'
+    MONITOR_PREFIXES = 'ovs-'
 
     def __init__(self):
         """Init method"""
         raise Exception('This class cannot be instantiated')
+
+    @classmethod
+    def _get_system(cls):
+        return System
+
+    @classmethod
+    def _get_configuration(cls):
+        return Configuration
