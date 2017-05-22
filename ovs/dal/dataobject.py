@@ -30,10 +30,10 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 from ovs.dal.helpers import Descriptor, DalToolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
-from ovs_extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
+from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
 from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
-from ovs_extensions.storage.persistentfactory import PersistentFactory
-from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
 
 

@@ -40,13 +40,14 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.generic.disk import DiskTools
+from ovs.extensions.generic.disk import DiskTools
 from ovs_extensions.generic.remote import remote
 from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs_extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
@@ -376,7 +377,8 @@ class StorageRouterController(object):
                                                    port=connection_info_fc['port'],
                                                    credentials=(connection_info_fc['client_id'],
                                                                 connection_info_fc['client_secret']),
-                                                   version=2)
+                                                   version=2,
+                                                   cache_store=VolatileFactory.get_client())
                             backend_dict_fc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_fc), params={'contents': 'name,usages'})
                             if backend_dict_fc['usages']['free'] < cache_quota * 10:
                                 raise RuntimeError('Requested Fragment Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_fc['name']))
@@ -404,7 +406,8 @@ class StorageRouterController(object):
                                                        port=connection_info_bc['port'],
                                                        credentials=(connection_info_bc['client_id'],
                                                                     connection_info_bc['client_secret']),
-                                                       version=2)
+                                                       version=2,
+                                                       cache_store=VolatileFactory.get_client())
                                 backend_dict_bc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_bc), params={'contents': 'name,usages'})
                             if backend_dict_bc['usages']['free'] < cache_quota * 10:
                                 raise RuntimeError('Requested Block Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_bc['name']))
@@ -506,7 +509,8 @@ class StorageRouterController(object):
                 ovs_client = OVSClient(ip=metadata['connection_info']['host'],
                                        port=metadata['connection_info']['port'],
                                        credentials=(metadata['connection_info']['client_id'], metadata['connection_info']['client_secret']),
-                                       version=2)
+                                       version=2,
+                                       cache_store=VolatileFactory.get_client())
                 preset_name = metadata['backend_info']['preset']
                 alba_backend_guid = metadata['backend_info']['alba_backend_guid']
                 arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(backend_guid=alba_backend_guid, ovs_client=ovs_client)

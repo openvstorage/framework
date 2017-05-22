@@ -27,9 +27,9 @@ from celery import current_app
 from celery.beat import Scheduler
 from celery.schedules import crontab, timedelta
 from ovs.extensions.generic.system import System
-from ovs_extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
-from ovs_extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 

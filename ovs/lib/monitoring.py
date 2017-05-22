@@ -23,6 +23,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.client import OVSClient
 from ovs_extensions.generic.remote import remote
 from ovs_extensions.generic.sshclient import SSHClient
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
@@ -88,7 +89,8 @@ class MonitoringController(object):
                     ovs_client = OVSClient(ip=alba_backend_host,
                                            port=connection_info['port'],
                                            credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                           version=2)
+                                           version=2,
+                                           cache_store=VolatileFactory.get_client())
                     try:
                         alba_guid_size_map[alba_backend_guid] = {'name': alba_backend_name,
                                                                  'backend_ip': alba_backend_host,

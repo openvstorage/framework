@@ -33,10 +33,10 @@ from kombu import Queue
 from threading import Thread
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs_extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
-from ovs_extensions.storage.persistentfactory import PersistentFactory
-from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.messaging import MessageController
 from ovs.log.log_handler import LogHandler

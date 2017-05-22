@@ -33,8 +33,8 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.migration.migrator import Migrator
 from ovs_extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs_extensions.storage.persistentfactory import PersistentFactory
-from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.decorators import add_hooks, ovs_task
 from ovs.lib.helpers.toolbox import Toolbox

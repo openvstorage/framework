@@ -24,8 +24,7 @@ import sys
 import time
 import uuid
 import logging
-from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.log_handler import LogHandler
 
 
@@ -101,7 +100,7 @@ class Watcher(object):
                     try:
                         try:
                             logging.disable(logging.WARNING)
-                            from ovs_extensions.storage.volatilefactory import VolatileFactory
+                            from ovs.extensions.storage.volatilefactory import VolatileFactory
                             VolatileFactory.store = None
                             volatile = VolatileFactory.get_client()
                             volatile.set(key, value)

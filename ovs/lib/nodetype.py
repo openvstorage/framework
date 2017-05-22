@@ -30,8 +30,8 @@ from ovs_extensions.generic.remote import remote
 from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs_extensions.storage.persistentfactory import PersistentFactory
-from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler

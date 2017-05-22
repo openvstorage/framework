@@ -158,7 +158,7 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.extensions.generic.configuration import Configuration
-            from ovs_extensions.storage.persistentfactory import PersistentFactory
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
 
             # Migrate unique constraints & indexes
             client = PersistentFactory.get_client()

@@ -18,7 +18,7 @@
 RelationMapper module
 """
 from ovs.dal.helpers import HybridRunner, Descriptor
-from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
 class RelationMapper(object):

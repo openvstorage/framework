@@ -31,9 +31,9 @@ from ovs.dal.hybrids.t_teststoragedriver import TestStorageDriver
 from ovs.dal.hybrids.t_teststoragerouter import TestStorageRouter
 from ovs.dal.hybrids.t_testvpool import TestVPool
 from ovs.dal.tests.helpers import DalHelper
-from ovs_extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
-from ovs_extensions.storage.persistentfactory import PersistentFactory
-from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
 class Basic(unittest.TestCase):

@@ -34,6 +34,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.client import OVSClient
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
 
 
@@ -153,7 +154,11 @@ def relay(*args, **kwargs):
     def _relay(_, ip, port, client_id, client_secret, raw_version, request):
         path = '/{0}'.format(request.path.replace('/api/relay/', ''))
         method = request.META['REQUEST_METHOD'].lower()
-        client = OVSClient(ip, port, credentials=(client_id, client_secret), version=raw_version, raw_response=True)
+        client = OVSClient(ip, port,
+                           credentials=(client_id, client_secret),
+                           version=raw_version,
+                           raw_response=True,
+                           cache_store=VolatileFactory.get_client())
         if not hasattr(client, method):
             raise HttpBadRequestException(error='unavailable_call',
                                           error_description='Method not available in relay')

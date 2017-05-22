@@ -31,7 +31,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
-from ovs_extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 
 # noinspection PyProtectedMember

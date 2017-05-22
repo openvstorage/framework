@@ -31,7 +31,7 @@ from ovs_extensions.generic.remote import remote
 from ovs_extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs_extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.nodetype import NodeTypeController
 from ovs.lib.noderemoval import NodeRemovalController
