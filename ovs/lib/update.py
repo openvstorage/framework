@@ -24,7 +24,7 @@ from subprocess import CalledProcessError
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
-from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
+from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import file_mutex, NoLockAvailableException
 from ovs_extensions.generic.remote import remote
