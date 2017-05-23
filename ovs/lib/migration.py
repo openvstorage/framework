@@ -47,7 +47,7 @@ class MigrationController(object):
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.dal.lists.vpoollist import VPoolList
         from ovs.extensions.generic.configuration import Configuration
-        from ovs_extensions.generic.sshclient import SSHClient
+        from ovs.extensions.generic.sshclient import SSHClient
         from ovs_extensions.generic.toolbox import ExtensionsToolbox
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory

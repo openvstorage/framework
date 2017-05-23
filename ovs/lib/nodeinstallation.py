@@ -28,7 +28,7 @@ from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInst
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
 from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
-from ovs_extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory

@@ -21,7 +21,7 @@ import subprocess
 import unicodedata
 from datetime import date, datetime, timedelta
 from ovs_extensions.generic.remote import remote
-from ovs_extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.log.log_handler import LogHandler

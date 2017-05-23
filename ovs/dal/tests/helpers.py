@@ -40,7 +40,7 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs_extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs_extensions.services.mockups.systemd import SystemdMock

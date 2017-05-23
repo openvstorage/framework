@@ -31,7 +31,7 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.remote import remote
-from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
@@ -253,7 +253,7 @@ class StorageDriverController(object):
         :type complete_removal: bool
         :return: None
         """
-        from ovs_extensions.generic.sshclient import NotAuthenticatedException
+        from ovs.extensions.generic.sshclient import NotAuthenticatedException
         _ = complete_removal
 
         service_manager = ServiceFactory.get_manager()

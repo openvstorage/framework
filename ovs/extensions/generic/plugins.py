@@ -18,7 +18,7 @@
 Plugin module
 """
 
-from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
 

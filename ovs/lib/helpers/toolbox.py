@@ -30,7 +30,7 @@ from celery.schedules import crontab
 from ovs.dal.helpers import DalToolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.interactive import Interactive
-from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.log.log_handler import LogHandler
 

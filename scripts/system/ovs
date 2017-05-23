@@ -145,7 +145,7 @@ elif [ "$1" = "stop" ] || [ "$1" = "start" ] ; then
         if [ "$#" -eq 2 ] ; then
             python -c """
 from ovs.extensions.generic.system import System
-from ovs_extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.servicefactory import ServiceFactory
 print '{0}...'.format('Starting' if '$1' == 'start' else 'Stopping')
 ServiceManager.$1_service('watcher-framework', SSHClient(System.get_my_storagerouter(), username='root'))
@@ -154,7 +154,7 @@ print 'Done'"""
             if [ "$3" == "all" ] ; then
                 python -c """
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
 for storagerouter in sorted(StorageRouterList.get_storagerouters(), key=lambda k: k.name):
     print '{0} on {1}...'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)
@@ -168,7 +168,7 @@ print 'Done'"""
             else
                 python -c """
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs_extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
 storagerouter = StorageRouterList.get_by_ip('$3')
 if storagerouter is None:
