@@ -20,7 +20,9 @@ Middleware module
 
 import re
 import json
+import time
 from django.http import HttpResponse
+from api.helpers import OVSResponse
 from ovs.dal.exceptions import MissingMandatoryFieldsException
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.log.log_handler import LogHandler
@@ -59,6 +61,7 @@ class OVSMiddleware(object):
         Processes requests
         """
         _ = self
+        start = time.time()
         # Processes CORS preflight requests
         if request.method == 'OPTIONS' and 'HTTP_ACCESS_CONTROL_REQUEST_METHOD' in request.META:
             return HttpResponse()
@@ -67,12 +70,14 @@ class OVSMiddleware(object):
         regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
         if path != '/api/' and '/api/oauth2/' not in path and '/swagger.json' not in path:
             if 'HTTP_ACCEPT' not in request.META or regex.match(request.META['HTTP_ACCEPT']) is None:
-                return HttpResponse(
+                return OVSResponse(
                     json.dumps({'error': 'missing_header',
                                 'error_description': "The version required by the client should be added to the Accept header. E.g.: 'Accept: application/json; version=1'"}),
                     status=406,
-                    content_type='application/json'
+                    content_type='application/json',
+                    timings={'total': [time.time() - start, 'Total']}
                 )
+        request._entry_time = time.time()
         return None
 
     def process_response(self, request, response):
@@ -80,6 +85,11 @@ class OVSMiddleware(object):
         Processes responses
         """
         _ = self
+        # Timings
+        if isinstance(response, OVSResponse):
+            if hasattr(request, '_entry_time'):
+                response.timings['total'] = [time.time() - request._entry_time, 'Total']
+            response.build_timings()
         # Process CORS responses
         if 'HTTP_ORIGIN' in request.META:
             path = request.path

@@ -182,6 +182,7 @@ class DataObject(object):
         self._metadata = {}  # Some metadata, mainly used for unit testing
         self._data = {}      # Internal data storage
         self._objects = {}   # Internal objects storage
+        self._dynamic_timings = {}
 
         # Initialize public fields
         self.dirty = False
@@ -967,6 +968,12 @@ class DataObject(object):
             backend_version = cached_object['_version']
         return this_version != backend_version
 
+    def get_timings(self):
+        return self._dynamic_timings
+
+    def reset_timings(self):
+        self._dynamic_timings = {}
+
     ##############
     # Properties #
     ##############
@@ -997,10 +1004,12 @@ class DataObject(object):
                     cached_data = self._volatile.get(cache_key)
                 if cached_data is None:
                     function_info = inspect.getargspec(function)
+                    start = time.time()
                     if 'dynamic' in function_info.args:
                         dynamic_data = function(dynamic=dynamic)  # Load data from backend
                     else:
                         dynamic_data = function()
+                    self._dynamic_timings[caller_name] = time.time() - start
                     correct, allowed_types, given_type = DalToolbox.check_type(dynamic_data, dynamic.return_type)
                     if not correct:
                         raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
