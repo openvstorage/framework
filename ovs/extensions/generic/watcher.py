@@ -152,7 +152,8 @@ class Watcher(object):
                         from ovs.extensions.generic.configuration import Configuration
                         from ovs_extensions.storage.persistent.pyrakoonstore import PyrakoonStore
                         cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-                        client = PyrakoonStore(cluster=cluster_name)
+                        configuration = Configuration.get('/ovs/arakoon/{0}/config'.format(cluster_name), raw=True)
+                        client = PyrakoonStore(cluster=cluster_name, configuration=configuration)
                         client.nop()
                         break
                     except Exception as message:

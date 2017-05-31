@@ -261,24 +261,24 @@ class Decorators(unittest.TestCase):
         from api.backend.decorators import load
 
         @load(User, min_version=2, max_version=2)
-        def the_function_tl_1(input_value, _request, _user, version, mandatory, optional='default'):
+        def the_function_tl_1(input_value, request, user, version, mandatory, optional='default'):
             """
             Decorated function
             """
-            output['value'] = {'request': _request,
+            output['value'] = {'request': request,
                                'mandatory': mandatory,
                                'optional': optional,
                                'version': version,
-                               'user': _user}
+                               'user': user}
             return HttpResponse(json.dumps(input_value))
 
         @load(User)
-        def the_function_tl_2(input_value, _request, _user, pk, version):
+        def the_function_tl_2(input_value, request, user, pk, version):
             """
             Decorated function
             """
-            output['value'] = {'request': _request,
-                               'user': _user,
+            output['value'] = {'request': request,
+                               'user': user,
                                'pk': pk,
                                'version': version}
             return HttpResponse(json.dumps(input_value))

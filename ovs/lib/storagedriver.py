@@ -236,6 +236,7 @@ class StorageDriverController(object):
             StorageDriverController._logger.debug('* Shrink StorageDriver cluster')
             cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
             arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
+            arakoon_installer.load()
             arakoon_installer.shrink_cluster(removal_ip=cluster_ip,
                                              offline_nodes=offline_node_ips)
             arakoon_installer.restart_cluster_after_shrinking()
@@ -374,6 +375,7 @@ class StorageDriverController(object):
                 if storagerouter.ip in current_ips:
                     continue
                 arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
+                arakoon_installer.load()
                 arakoon_installer.extend_cluster(new_ip=storagerouter.ip,
                                                  base_dir=partition.folder,
                                                  log_sinks=LogHandler.get_sink_path('arakoon_server'),

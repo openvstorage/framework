@@ -227,6 +227,7 @@ class NodeTypeController(object):
         if external_config is None:
             Toolbox.log(logger=NodeTypeController._logger, messages='Joining Arakoon configuration cluster')
             arakoon_installer = ArakoonInstaller(cluster_name='config')
+            arakoon_installer.load(ip=master_ip)
             arakoon_installer.extend_cluster(new_ip=cluster_ip,
                                              base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
                                              log_sinks=LogHandler.get_sink_path('arakoon_server'),
@@ -249,6 +250,7 @@ class NodeTypeController(object):
         if arakoon_metadata['internal'] is True:
             Toolbox.log(logger=NodeTypeController._logger, messages='Joining Arakoon OVS DB cluster')
             arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cluster_name)
+            arakoon_installer.load()
             arakoon_installer.extend_cluster(new_ip=cluster_ip,
                                              base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
                                              log_sinks=LogHandler.get_sink_path('arakoon_server'),
@@ -378,20 +380,20 @@ class NodeTypeController(object):
         offline_node_ips = [node.ip for node in offline_nodes]
         if arakoon_metadata['internal'] is True and shrink is True:
             Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Arakoon {0} cluster'.format(arakoon_cluster_name))
-            ArakoonInstaller.shrink_cluster(cluster_name=arakoon_cluster_name,
-                                            removal_ip=cluster_ip,
-                                            offline_nodes=offline_node_ips)
-            ArakoonInstaller.restart_cluster_after_shrinking(cluster_name=arakoon_cluster_name)
+            arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cluster_name)
+            arakoon_installer.load()
+            arakoon_installer.shrink_cluster(removal_ip=cluster_ip,
+                                             offline_nodes=offline_node_ips)
+            arakoon_installer.restart_cluster_after_shrinking()
         try:
             external_config = Configuration.get('/ovs/framework/external_config')
             if external_config is None and shrink is True:
                 Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Arakoon config cluster')
-                ArakoonInstaller.shrink_cluster(cluster_name='config',
-                                                removal_ip=cluster_ip,
-                                                ip=master_node_ips[0],
-                                                offline_nodes=offline_node_ips)
-                ArakoonInstaller.restart_cluster_after_shrinking(cluster_name='config',
-                                                                 ip=master_node_ips[0])
+                arakoon_installer = ArakoonInstaller(cluster_name='config')
+                arakoon_installer.load(ip=master_node_ips[0])
+                arakoon_installer.shrink_cluster(removal_ip=cluster_ip,
+                                                 offline_nodes=offline_node_ips)
+                arakoon_installer.restart_cluster_after_shrinking()
         except Exception as ex:
             Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to leave configuration cluster', ex], loglevel='exception')
 
