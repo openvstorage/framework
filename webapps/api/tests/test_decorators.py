@@ -380,20 +380,21 @@ class Decorators(unittest.TestCase):
             Return a fake User object that would be serialized
             """
             _ = args, kwargs
-            return type('User', (), {'input_value': input_value,
-                                     'guid': 'foo'})
+            user = User()
+            user.username = input_value
+            return user
 
         time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         request.QUERY_PARAMS = {}
-        response = the_function_ro(1, request)
+        response = the_function_ro('a', request)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['instance'].input_value, 1)
+        self.assertEqual(response.data['instance'].username, 'a')
         self.assertIsNone(response.data['contents'])
         request.QUERY_PARAMS['contents'] = 'foo,bar'
-        response = the_function_ro(2, request)
+        response = the_function_ro('b', request)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['instance'].input_value, 2)
+        self.assertEqual(response.data['instance'].username, 'b')
         self.assertEqual(response.data['contents'], ['foo', 'bar'])
 
     def test_return_list(self):
