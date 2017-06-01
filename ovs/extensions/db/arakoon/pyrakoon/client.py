@@ -28,24 +28,6 @@ from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, 
 from ovs.log.log_handler import LogHandler
 
 
-def locked():
-    """
-    Locking decorator.
-    """
-    def wrap(f):
-        """
-        Returns a wrapped function
-        """
-        def new_function(self, *args, **kw):
-            """
-            Executes the decorated function in a locked context
-            """
-            with self._lock:
-                return f(self, *args, **kw)
-        return new_function
-    return wrap
-
-
 class PyrakoonClient(object):
     """
     Arakoon client wrapper:
@@ -68,33 +50,28 @@ class PyrakoonClient(object):
         self._batch_size = 500
         self._sequences = {}
 
-    @locked()
     def get(self, key, consistency=None):
         """
         Retrieves a certain value for a given key
         """
-        return PyrakoonClient._try(self._identifier, self._client.get, key, consistency)
+        return self._try(self._client.get, key, consistency)
 
-    @locked()
     def get_multi(self, keys, must_exist=True):
         """
         Get multiple keys at once
         """
-        for item in PyrakoonClient._try(self._identifier,
-                                        self._client.multiGet if must_exist is True else self._client.multiGetOption,
-                                        keys):
+        for item in self._try(self._client.multiGet if must_exist is True else self._client.multiGetOption,
+                              keys):
             yield item
 
-    @locked()
     def set(self, key, value, transaction=None):
         """
         Sets the value for a key to a given value
         """
         if transaction is not None:
             return self._sequences[transaction].addSet(key, value)
-        return PyrakoonClient._try(self._identifier, self._client.set, key, value,)
+        return self._try(self._client.set, key, value,)
 
-    @locked()
     def prefix(self, prefix):
         """
         Lists all keys starting with the given prefix
@@ -102,17 +79,15 @@ class PyrakoonClient(object):
         next_prefix = PyrakoonClient._next_key(prefix)
         batch = None
         while batch is None or len(batch) > 0:
-            batch = PyrakoonClient._try(self._identifier,
-                                        self._client.range,
-                                        beginKey=prefix if batch is None else batch[-1],
-                                        beginKeyIncluded=batch is None,
-                                        endKey=next_prefix,
-                                        endKeyIncluded=False,
-                                        maxElements=self._batch_size)
+            batch = self._try(self._client.range,
+                              beginKey=prefix if batch is None else batch[-1],
+                              beginKeyIncluded=batch is None,
+                              endKey=next_prefix,
+                              endKeyIncluded=False,
+                              maxElements=self._batch_size)
             for item in batch:
                 yield item
 
-    @locked()
     def prefix_entries(self, prefix):
         """
         Lists all keys starting with the given prefix
@@ -120,17 +95,15 @@ class PyrakoonClient(object):
         next_prefix = PyrakoonClient._next_key(prefix)
         batch = None
         while batch is None or len(batch) > 0:
-            batch = PyrakoonClient._try(self._identifier,
-                                        self._client.range_entries,
-                                        beginKey=prefix if batch is None else batch[-1][0],
-                                        beginKeyIncluded=batch is None,
-                                        endKey=next_prefix,
-                                        endKeyIncluded=False,
-                                        maxElements=self._batch_size)
+            batch = self._try(self._client.range_entries,
+                              beginKey=prefix if batch is None else batch[-1][0],
+                              beginKeyIncluded=batch is None,
+                              endKey=next_prefix,
+                              endKeyIncluded=False,
+                              maxElements=self._batch_size)
             for item in batch:
                 yield item
 
-    @locked()
     def delete(self, key, must_exist=True, transaction=None):
         """
         Deletes a given key from the store
@@ -141,48 +114,43 @@ class PyrakoonClient(object):
             else:
                 return self._sequences[transaction].addReplace(key, None)
         if must_exist is True:
-            return PyrakoonClient._try(self._identifier, self._client.delete, key)
+            return self._try(self._client.delete, key)
         else:
-            return PyrakoonClient._try(self._identifier, self._client.replace, key, None)
+            return self._try(self._client.replace, key, None)
 
-    @locked()
     def delete_prefix(self, prefix):
         """
         Removes a given prefix from the store
         """
-        return PyrakoonClient._try(self._identifier, self._client.deletePrefix, prefix)
+        return self._try(self._client.deletePrefix, prefix)
 
-    @locked()
     def nop(self):
         """
         Executes a nop command
         """
-        return PyrakoonClient._try(self._identifier, self._client.nop)
+        return self._try(self._client.nop)
 
-    @locked()
     def exists(self, key):
         """
         Check if key exists
         """
-        return PyrakoonClient._try(self._identifier, self._client.exists, key)
+        return self._try(self._client.exists, key)
 
-    @locked()
     def assert_value(self, key, value, transaction=None):
         """
         Asserts a key-value pair
         """
         if transaction is not None:
             return self._sequences[transaction].addAssert(key, value)
-        return PyrakoonClient._try(self._identifier, self._client.aSSert, key, value)
+        return self._try(self._client.aSSert, key, value)
 
-    @locked()
     def assert_exists(self, key, transaction=None):
         """
         Asserts that a given key exists
         """
         if transaction is not None:
             return self._sequences[transaction].addAssertExists(key)
-        return PyrakoonClient._try(self._identifier, self._client.aSSert_exists, key)
+        return self._try(self._client.aSSert_exists, key)
 
     def begin_transaction(self):
         """
@@ -196,10 +164,9 @@ class PyrakoonClient(object):
         """
         Applies a transaction
         """
-        return PyrakoonClient._try(self._identifier, self._client.sequence, self._sequences[transaction], max_duration=1)
+        return self._try(self._client.sequence, self._sequences[transaction], max_duration=1)
 
-    @staticmethod
-    def _try(identifier, method, *args, **kwargs):
+    def _try(self, method, *args, **kwargs):
         """
         Tries to call a given method, retry-ing if Arakoon is temporary unavailable
         """
@@ -208,15 +175,18 @@ class PyrakoonClient(object):
             if 'max_duration' in kwargs:
                 max_duration = kwargs['max_duration']
                 del kwargs['max_duration']
-            start = time.time()
-            try:
-                return_value = method(*args, **kwargs)
-            except (ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError):
-                PyrakoonClient._logger.debug('Error during arakoon call {0}, retry'.format(method.__name__))
-                time.sleep(1)
-                return_value = method(*args, **kwargs)
+            with self._lock:
+                start = time.time()
+                try:
+                    return_value = method(*args, **kwargs)
+                except (ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError):
+                    PyrakoonClient._logger.debug('Error during arakoon call {0}, retry'.format(method.__name__))
+                    time.sleep(1)
+                    return_value = method(*args, **kwargs)
             duration = time.time() - start
             if duration > max_duration:
+                import traceback
+                PyrakoonClient._logger.warning(traceback.format_stack())
                 PyrakoonClient._logger.warning('Arakoon call {0} took {1}s'.format(method.__name__, round(duration, 2)))
             return return_value
         except (ArakoonNotFound, ArakoonAssertionFailed):
@@ -224,7 +194,7 @@ class PyrakoonClient(object):
             raise
         except Exception:
             PyrakoonClient._logger.error('Error during {0}. Process {1}, thread {2}, clientid {3}'.format(
-                method.__name__, os.getpid(), current_thread().ident, identifier
+                method.__name__, os.getpid(), current_thread().ident, self.identifier
             ))
             raise
 
