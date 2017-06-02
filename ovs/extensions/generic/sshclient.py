@@ -29,9 +29,19 @@ class SSHClient(_SSHClient):
     Remote/local client
     """
 
-    def __init__(self, endpoint, username='ovs', password=None, cached=True):
+    def __init__(self, endpoint, username='ovs', password=None, cached=True, timeout=None):
         """
         Initializes an SSHClient
+        :param endpoint: Ip address to connect to / storagerouter
+        :type endpoint: basestring | ovs.dal.hybrids.storagerouter.StorageRouter
+        :param username: Name of the user to connect as
+        :type username: str
+        :param password: Password to authenticate the user as. Can be None when ssh keys are in place.
+        :type password: str
+        :param cached: Cache this SSHClient instance
+        :type cached: bool
+        :param timeout: An optional timeout (in seconds) for the TCP connect
+        :type timeout: float
         """
         from ovs.dal.hybrids.storagerouter import StorageRouter
         storagerouter = None
@@ -52,4 +62,5 @@ class SSHClient(_SSHClient):
         super(SSHClient, self).__init__(endpoint=endpoint,
                                         username=username,
                                         password=password,
-                                        cached=cached)
+                                        cached=cached,
+                                        timeout=timeout)
