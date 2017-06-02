@@ -199,6 +199,7 @@ class Watcher(object):
             return False
 
 if __name__ == '__main__':
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     given_target = sys.argv[1]
     mode = sys.argv[2]
     watcher = Watcher()

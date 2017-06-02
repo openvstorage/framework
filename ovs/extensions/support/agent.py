@@ -191,6 +191,7 @@ class SupportAgent(object):
 
 
 if __name__ == '__main__':
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     logger = LogHandler.get('support', name='agent')
     try:
         if Configuration.get('/ovs/framework/support|enabled') is False:

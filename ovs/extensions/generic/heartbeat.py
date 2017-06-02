@@ -64,4 +64,5 @@ class HeartBeat(object):
                     logger.exception('Error clearing ARP cache')
 
 if __name__ == '__main__':
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     HeartBeat.pulse()

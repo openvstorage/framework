@@ -42,6 +42,7 @@ class NodeInstallationController(object):
     """
     This class contains all logic for setting up an environment, installed with system-native packages
     """
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     _logger = LogHandler.get('lib', name='node-installation')
     _logger.logger.propagate = False
 

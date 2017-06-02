@@ -56,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--durable', dest='queue_durable', action='store_const', default=False, const=True,
                         help='Declare queue as durable')
 
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     logger = LogHandler.get('extensions', name='consumer')
 
     args = parser.parse_args()

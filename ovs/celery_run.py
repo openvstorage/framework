@@ -221,4 +221,5 @@ def _clean_cache():
 if __name__ == '__main__':
     import sys
     if len(sys.argv) == 2 and sys.argv[1] == 'clear_cache':
+        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
         _clean_cache()

@@ -45,6 +45,7 @@ class UpdateController(object):
     """
     This class contains all logic for updating an environment
     """
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     _logger = LogHandler.get('update', name='core')
     _logger.logger.propagate = False
     _update_file = '/etc/ready_for_upgrade'
