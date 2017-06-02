@@ -27,7 +27,7 @@ from subprocess import check_output
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs_extensions.packages.packagefactory import PackageFactory
+from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.log.log_handler import LogHandler
 
 

@@ -20,7 +20,7 @@ Generic system module, executing statements on local node
 
 import os
 from ovs_extensions.generic.system import System as _System
-from ovs_extensions.packages.packagefactory import PackageFactory
+from ovs.extensions.packages.packagefactory import PackageFactory
 
 
 class System(_System):
