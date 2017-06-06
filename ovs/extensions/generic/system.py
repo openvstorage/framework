@@ -41,8 +41,8 @@ class System(_System):
     @classmethod
     def get_my_machine_id(cls, client=None):
         """
-        Returns unique machine id, generated during the setup of the iSCSI Manager
-        :param client: Local client on which to retrieve the machine ID
+        Returns unique machine id, generated at install time.
+        :param client: Remote client on which to retrieve the machine ID
         :type client: SSHClient
         :return: Machine ID
         :rtype: str
