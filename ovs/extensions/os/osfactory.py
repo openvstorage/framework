@@ -1,4 +1,4 @@
-# Copyright (C) 2017 iNuron NV
+# Copyright (C) 2016 iNuron NV
 #
 # This file is part of Open vStorage Open Source Edition (OSE),
 # as available from
@@ -15,5 +15,22 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-This package contains generic test modules
+OS Factory module
 """
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
+from ovs_extensions.os.osfactory import OSFactory as _OSFactory
+
+
+class OSFactory(_OSFactory):
+    """
+    Factory class returning specialized classes
+    """
+
+    @classmethod
+    def _get_configuration(cls):
+        return Configuration
+
+    @classmethod
+    def _get_system(cls):
+        return System

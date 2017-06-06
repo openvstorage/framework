@@ -15,10 +15,10 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import time
-from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.log.log_handler import LogHandler
 from subprocess import check_output, CalledProcessError
@@ -64,4 +64,5 @@ class HeartBeat(object):
                     logger.exception('Error clearing ARP cache')
 
 if __name__ == '__main__':
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     HeartBeat.pulse()

@@ -29,9 +29,9 @@ import subprocess
 from celery.schedules import crontab
 from ovs.dal.helpers import DalToolbox
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.interactive import Interactive
+from ovs_extensions.generic.interactive import Interactive
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.log.log_handler import LogHandler
 
 
@@ -66,8 +66,8 @@ class Toolbox(object):
         for filename in os.listdir(path):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(module):
+                mod = imp.load_source(name, '/'.join([path, filename]))
+                for member in inspect.getmembers(mod):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
                             and 'object' in [base.__name__ for base in member[1].__bases__]:
@@ -91,17 +91,16 @@ class Toolbox(object):
         :param logger: Logger object to use for logging
         :type logger: ovs.log.log_handler.LogHandler
         :param kwargs: Additional named arguments
-        :type kwargs: dict
         :return: Amount of functions executed
         """
         functions = Toolbox.fetch_hooks(component=component, sub_component=sub_component)
         functions_found = len(functions) > 0
         if logger is not None and functions_found is True:
             Toolbox.log(logger=logger, messages='Running "{0} - {1}" hooks'.format(component, sub_component), title=True)
-        for function in functions:
+        for fct in functions:
             if logger is not None:
-                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(function.__module__, function.__name__))
-            function(**kwargs)
+                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(fct.__module__, fct.__name__))
+            fct(**kwargs)
         return functions_found
 
     @staticmethod
@@ -213,22 +212,23 @@ class Toolbox(object):
         :param state: State to put the service in
         :param logger: LogHandler Object
         """
+        service_manager = ServiceFactory.get_manager()
         action = None
-        status = ServiceManager.get_service_status(name, client=client)
+        status = service_manager.get_service_status(name, client=client)
         if status != 'active' and state in ['start', 'restart']:
             if logger is not None:
                 logger.debug('{0}: Starting service {1}'.format(client.ip, name))
-            ServiceManager.start_service(name, client=client)
+            service_manager.start_service(name, client=client)
             action = 'Started'
         elif status == 'active' and state == 'stop':
             if logger is not None:
                 logger.debug('{0}: Stopping service {1}'.format(client.ip, name))
-            ServiceManager.stop_service(name, client=client)
+            service_manager.stop_service(name, client=client)
             action = 'Stopped'
         elif status == 'active' and state == 'restart':
             if logger is not None:
                 logger.debug('{0}: Restarting service {1}'.format(client.ip, name))
-            ServiceManager.restart_service(name, client=client)
+            service_manager.restart_service(name, client=client)
             action = 'Restarted'
 
         if action is None:
@@ -243,7 +243,7 @@ class Toolbox(object):
         """
         Wait for service to enter status
         :param client: SSHClient to run commands
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param name: Name of service
         :type name: str
         :param status: 'active' if running, 'inactive' if halted
@@ -254,14 +254,15 @@ class Toolbox(object):
         :rtype: NoneType
         """
         tries = 10
-        service_status = ServiceManager.get_service_status(name, client)
+        service_manager = ServiceFactory.get_manager()
+        service_status = service_manager.get_service_status(name, client)
         while tries > 0:
             if service_status == status:
                 return
             logger.debug('... waiting for service {0}'.format(name))
             tries -= 1
             time.sleep(10 - tries)
-            service_status = ServiceManager.get_service_status(name, client)
+            service_status = service_manager.get_service_status(name, client)
         raise RuntimeError('Service {0} does not have expected status: Expected: {1} - Actual: {2}'.format(name, status, service_status))
 
     @staticmethod

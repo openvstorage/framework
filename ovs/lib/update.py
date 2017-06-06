@@ -23,16 +23,16 @@ import inspect
 from subprocess import CalledProcessError
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
-from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.filemutex import file_mutex, NoLockAvailableException
-from ovs.extensions.generic.remote import remote
+from ovs_extensions.generic.filemutex import file_mutex, NoLockAvailableException
+from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.migration.migrator import Migrator
-from ovs.extensions.packages.package import PackageManager
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.packages.packagefactory import PackageFactory
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.generic import GenericController
@@ -45,6 +45,7 @@ class UpdateController(object):
     """
     This class contains all logic for updating an environment
     """
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     _logger = LogHandler.get('update', name='core')
     _logger.logger.propagate = False
     _update_file = '/etc/ready_for_upgrade'
@@ -93,9 +94,12 @@ class UpdateController(object):
             if client.username != 'root':
                 raise RuntimeError('Only the "root" user can retrieve the package information')
 
-            binaries = PackageManager.get_binary_versions(client=client, package_names=UpdateController._packages_core['storagedriver'])
-            installed = PackageManager.get_installed_versions(client=client, package_names=UpdateController.packages_core_all)
-            candidate = PackageManager.get_candidate_versions(client=client, package_names=UpdateController.packages_core_all)
+            package_manager = PackageFactory.get_manager()
+            service_manager = ServiceFactory.get_manager()
+
+            binaries = package_manager.get_binary_versions(client=client, package_names=UpdateController._packages_core['storagedriver'])
+            installed = package_manager.get_installed_versions(client=client, package_names=UpdateController.packages_core_all)
+            candidate = package_manager.get_candidate_versions(client=client, package_names=UpdateController.packages_core_all)
             not_installed = set(UpdateController.packages_core_all) - set(installed.keys())
             candidate_difference = set(UpdateController.packages_core_all) - set(candidate.keys())
 
@@ -173,7 +177,7 @@ class UpdateController(object):
                 component_info = {}
                 for package, services in info.iteritems():
                     for service in services:
-                        if not ServiceManager.has_service(service, client):
+                        if not service_manager.has_service(service, client):
                             # There's no service, so no need to restart it
                             continue
                         package_name = package
@@ -358,14 +362,17 @@ class UpdateController(object):
                         if key == 'framework':
                             framework_arakoons = set()
                             if arakoon_ovs_info['internal'] is True:
+                                # noinspection PyTypeChecker
                                 framework_arakoons.add(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_ovs_info['name']))
                             if arakoon_cacc_info['internal'] is True:
+                                # noinspection PyTypeChecker
                                 framework_arakoons.add(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_cacc_info['name']))
 
                             information[key]['services_post_update'].update(framework_arakoons)
                             if arakoon_ovs_info['down'] is True and ['ovsdb', None] not in information[key]['downtime']:
                                 information[key]['downtime'].append(['ovsdb', None])
                         elif arakoon_voldrv_info['internal'] is True:
+                            # noinspection PyTypeChecker
                             information[key]['services_post_update'].update({ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_voldrv_info['name'])})
                             if arakoon_voldrv_info['down'] is True and ['voldrv', None] not in information[key]['downtime']:
                                 information[key]['downtime'].append(['voldrv', None])
@@ -387,13 +394,14 @@ class UpdateController(object):
         """
         abort = False
         packages_updated = []
+        package_manager = PackageFactory.get_manager()
         for component in components:
             for pkg_name in UpdateController._packages_core.get(component, set()):
                 if pkg_name in package_info and pkg_name not in packages_updated:
                     pkg_info = package_info[pkg_name]
                     try:
                         UpdateController._logger.debug('{0}: Updating package {1} ({2} --> {3})'.format(client.ip, pkg_name, pkg_info['installed'], pkg_info['candidate']))
-                        PackageManager.install(package_name=pkg_name, client=client)
+                        package_manager.install(package_name=pkg_name, client=client)
                         packages_updated.append(pkg_name)
                         UpdateController._logger.debug('{0}: Updated package {1}'.format(client.ip, pkg_name))
                     except Exception as ex:
@@ -433,8 +441,9 @@ class UpdateController(object):
         if 'framework' not in components and 'storagedriver' not in components:
             return
 
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+        from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
+        service_manager = ServiceFactory.get_manager()
         # Remove services which have been renamed in the migration code
         for version_file in client.file_list(directory='/opt/OpenvStorage/run'):
             if not version_file.endswith('.remove'):
@@ -446,8 +455,8 @@ class UpdateController(object):
             if packages.issubset(UpdateController._packages_core['storagedriver'] | {'volumedriver-server'}) and 'storagedriver' in components:
                 service_name = version_file.replace('.remove', '').replace('.version', '')
                 UpdateController._logger.debug('{0}: Removing service {1}'.format(client.ip, service_name))
-                ServiceManager.stop_service(name=service_name, client=client)
-                ServiceManager.remove_service(name=service_name, client=client)
+                service_manager.stop_service(name=service_name, client=client)
+                service_manager.remove_service(name=service_name, client=client)
                 client.file_delete(filenames=['/opt/OpenvStorage/run/{0}'.format(version_file)])
 
         # Verify whether certain services need to be restarted
@@ -479,11 +488,11 @@ class UpdateController(object):
                         continue
 
                     if arakoon_metadata['internal'] is True:
-                        config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=master_ip)
-                        if client.ip in [node.ip for node in config.nodes]:
+                        arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
+                        arakoon_installer.load(ip=master_ip)
+                        if client.ip in [node.ip for node in arakoon_installer.config.nodes]:
                             UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
-                            ArakoonInstaller.restart_node(metadata=arakoon_metadata,
-                                                          client=client)
+                            arakoon_installer.restart_node(client=client)
             UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
 
     ################
@@ -790,6 +799,7 @@ class UpdateController(object):
         Stop/start services on SSH clients
         If action is start, we ignore errors and try to start other services on other nodes
         """
+        service_manager = ServiceFactory.get_manager()
         services = list(services)
         if action == 'start':
             services.reverse()  # Start services again in reverse order of stopping
@@ -797,7 +807,7 @@ class UpdateController(object):
             for ssh_client in ssh_clients:
                 description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
                 try:
-                    if ServiceManager.has_service(service_name, client=ssh_client):
+                    if service_manager.has_service(service_name, client=ssh_client):
                         Toolbox.change_service_state(client=ssh_client,
                                                      name=service_name,
                                                      state=action,

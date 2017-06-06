@@ -59,8 +59,8 @@ class Descriptor(object):
                 self._descriptor = Descriptor.descriptor_cache[object_type]
             else:
                 try:
-                    module = __import__(fqm_name, level=0, fromlist=[type_name])
-                    _ = getattr(module, type_name)
+                    mod = __import__(fqm_name, level=0, fromlist=[type_name])
+                    _ = getattr(mod, type_name)
                 except (ImportError, AttributeError):
                     Descriptor._logger.info('Received object type {0} is not a hybrid'.format(object_type))
                     raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
@@ -99,8 +99,8 @@ class Descriptor(object):
 
         if self._descriptor['identifier'] not in Descriptor.object_cache:
             type_name = self._descriptor['type']
-            module = __import__(self._descriptor['fqmn'], level=0, fromlist=[type_name])
-            cls = getattr(module, type_name)
+            mod = __import__(self._descriptor['fqmn'], level=0, fromlist=[type_name])
+            cls = getattr(mod, type_name)
             Descriptor.object_cache[self._descriptor['identifier']] = cls
         else:
             cls = Descriptor.object_cache[self._descriptor['identifier']]
@@ -162,8 +162,8 @@ class HybridRunner(object):
         for filename in os.listdir(path):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(module):
+                mod = imp.load_source(name, '/'.join([path, filename]))
+                for member in inspect.getmembers(mod):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name:
                         current_class = member[1]
@@ -317,11 +317,11 @@ class Migration(object):
         a always increasing by one
         """
 
-        def execute(function, start, end):
+        def execute(fct, start, end):
             """
             Executes a single migration, syncing versions
             """
-            version = function(start)
+            version = fct(start)
             if version > end:
                 end = version
             return end
@@ -338,8 +338,8 @@ class Migration(object):
         for filename in os.listdir(path):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(module):
+                mod = imp.load_source(name, '/'.join([path, filename]))
+                for member in inspect.getmembers(mod):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
                             and 'object' in [base.__name__ for base in member[1].__bases__]:

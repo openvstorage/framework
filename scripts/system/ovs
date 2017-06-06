@@ -132,7 +132,7 @@ elif [ "$1" = "remove" ] ; then
     fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then
-        python -c "from ovs.extensions.services.service import ServiceManager; ServiceManager.monitor_services()"
+        python -c "from ovs.extensions.services.servicefactory import ServiceFactory; ServiceManager.monitor_services()"
     elif [ "$2" = "heartbeat" ] ; then
         python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
     elif [ "$2" = "mds" ] ; then
@@ -146,7 +146,7 @@ elif [ "$1" = "stop" ] || [ "$1" = "start" ] ; then
             python -c """
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 print '{0}...'.format('Starting' if '$1' == 'start' else 'Stopping')
 ServiceManager.$1_service('watcher-framework', SSHClient(System.get_my_storagerouter(), username='root'))
 print 'Done'"""
@@ -155,7 +155,7 @@ print 'Done'"""
                 python -c """
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 for storagerouter in sorted(StorageRouterList.get_storagerouters(), key=lambda k: k.name):
     print '{0} on {1}...'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)
     try:
@@ -169,7 +169,7 @@ print 'Done'"""
                 python -c """
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 storagerouter = StorageRouterList.get_by_ip('$3')
 if storagerouter is None:
     print 'Could not find StorageRouter with ip $3'

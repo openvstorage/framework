@@ -37,16 +37,17 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs_extensions.api.client import OVSClient
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
-from ovs.extensions.generic.remote import remote
+from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.packages.package import PackageManager
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.packages.packagefactory import PackageFactory
+from ovs.extensions.services.servicefactory import ServiceFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
@@ -376,7 +377,8 @@ class StorageRouterController(object):
                                                    port=connection_info_fc['port'],
                                                    credentials=(connection_info_fc['client_id'],
                                                                 connection_info_fc['client_secret']),
-                                                   version=2)
+                                                   version=2,
+                                                   cache_store=VolatileFactory.get_client())
                             backend_dict_fc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_fc), params={'contents': 'name,usages'})
                             if backend_dict_fc['usages']['free'] < cache_quota * 10:
                                 raise RuntimeError('Requested Fragment Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_fc['name']))
@@ -404,7 +406,8 @@ class StorageRouterController(object):
                                                        port=connection_info_bc['port'],
                                                        credentials=(connection_info_bc['client_id'],
                                                                     connection_info_bc['client_secret']),
-                                                       version=2)
+                                                       version=2,
+                                                       cache_store=VolatileFactory.get_client())
                                 backend_dict_bc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_bc), params={'contents': 'name,usages'})
                             if backend_dict_bc['usages']['free'] < cache_quota * 10:
                                 raise RuntimeError('Requested Block Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_bc['name']))
@@ -506,7 +509,8 @@ class StorageRouterController(object):
                 ovs_client = OVSClient(ip=metadata['connection_info']['host'],
                                        port=metadata['connection_info']['port'],
                                        credentials=(metadata['connection_info']['client_id'], metadata['connection_info']['client_secret']),
-                                       version=2)
+                                       version=2,
+                                       cache_store=VolatileFactory.get_client())
                 preset_name = metadata['backend_info']['preset']
                 alba_backend_guid = metadata['backend_info']['alba_backend_guid']
                 arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(backend_guid=alba_backend_guid, ovs_client=ovs_client)
@@ -626,6 +630,7 @@ class StorageRouterController(object):
                         sdp_frags.append(sdp_frag)
 
                 w_size = int(size_to_be_used * write_cache_percentage / 1024 / 4096) * 4096
+                # noinspection PyArgumentList
                 sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
                                                                                                'role': DiskPartition.ROLES.WRITE,
                                                                                                'sub_role': StorageDriverPartition.SUBROLE.SCO,
@@ -943,28 +948,29 @@ class StorageRouterController(object):
         sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
 
+        service_manager = ServiceFactory.get_manager()
         watcher_volumedriver_service = 'watcher-volumedriver'
         try:
-            if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
-                ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
-                ServiceManager.start_service(watcher_volumedriver_service, client=root_client)
+            if not service_manager.has_service(watcher_volumedriver_service, client=root_client):
+                service_manager.add_service(watcher_volumedriver_service, client=root_client)
+                service_manager.start_service(watcher_volumedriver_service, client=root_client)
 
-            ServiceManager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
-            ServiceManager.start_service(dtl_service, client=root_client)
+            service_manager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
+            service_manager.start_service(dtl_service, client=root_client)
 
             for proxy in storagedriver.alba_proxies:
                 alba_proxy_params = {'VPOOL_NAME': vpool_name,
                                      'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
                                      'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid))}
                 alba_proxy_service = 'ovs-{0}'.format(proxy.service.name)
-                ServiceManager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
-                ServiceManager.start_service(alba_proxy_service, client=root_client)
+                service_manager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
+                service_manager.start_service(alba_proxy_service, client=root_client)
 
-            ServiceManager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
+            service_manager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
 
             storagedriver = StorageDriver(storagedriver.guid)
             current_startup_counter = storagedriver.startup_counter
-            ServiceManager.start_service(sd_service, client=root_client)
+            service_manager.start_service(sd_service, client=root_client)
         except Exception:
             StorageRouterController._logger.exception('Failed to start the relevant services for vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
             StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.FAILURE)
@@ -973,7 +979,7 @@ class StorageRouterController(object):
         tries = 60
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
             StorageRouterController._logger.debug('Waiting for the StorageDriver to start up for vPool {0} on StorageRouter {1} ...'.format(vpool.name, storagerouter.name))
-            if ServiceManager.get_service_status(sd_service, client=root_client) != 'active':
+            if service_manager.get_service_status(sd_service, client=root_client) != 'active':
                 StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.FAILURE)
                 raise RuntimeError('StorageDriver service failed to start (service not running)')
             tries -= 1
@@ -1133,6 +1139,7 @@ class StorageRouterController(object):
                     except Exception:
                         StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
 
+        service_manager = ServiceFactory.get_manager()
         # Disable and stop DTL, voldrv and albaproxy services
         if storage_router_online is True:
             dtl_service = 'dtl_{0}'.format(vpool.name)
@@ -1141,11 +1148,11 @@ class StorageRouterController(object):
 
             for service in [voldrv_service, dtl_service]:
                 try:
-                    if ServiceManager.has_service(service, client=client):
+                    if service_manager.has_service(service, client=client):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service))
-                        ServiceManager.stop_service(service, client=client)
+                        service_manager.stop_service(service, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service))
-                        ServiceManager.remove_service(service, client=client)
+                        service_manager.remove_service(service, client=client)
                 except Exception:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service))
                     errors_found = True
@@ -1154,9 +1161,9 @@ class StorageRouterController(object):
             if storage_drivers_left is False and Configuration.exists(sd_config_key):
                 try:
                     for proxy in storage_driver.alba_proxies:
-                        if ServiceManager.has_service(proxy.service.name, client=client):
+                        if service_manager.has_service(proxy.service.name, client=client):
                             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Starting proxy {1}'.format(storage_driver.guid, proxy.service.name))
-                            ServiceManager.start_service(proxy.service.name, client=client)
+                            service_manager.start_service(proxy.service.name, client=client)
                             tries = 10
                             running = False
                             port = proxy.service.ports[0]
@@ -1193,11 +1200,11 @@ class StorageRouterController(object):
             for proxy in storage_driver.alba_proxies:
                 service_name = proxy.service.name
                 try:
-                    if ServiceManager.has_service(service_name, client=client):
+                    if service_manager.has_service(service_name, client=client):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service_name))
-                        ServiceManager.stop_service(service_name, client=client)
+                        service_manager.stop_service(service_name, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service_name))
-                        ServiceManager.remove_service(service_name, client=client)
+                        service_manager.remove_service(service_name, client=client)
                 except Exception:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
                     errors_found = True
@@ -1338,9 +1345,10 @@ class StorageRouterController(object):
         :return: Version information
         :rtype: dict
         """
+        pacakge_manager = PackageFactory.get_manager()
         client = SSHClient(StorageRouter(storagerouter_guid))
         return {'storagerouter_guid': storagerouter_guid,
-                'versions': PackageManager.get_installed_versions(client)}
+                'versions': pacakge_manager.get_installed_versions(client)}
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_support_info')
@@ -1402,6 +1410,7 @@ class StorageRouterController(object):
         :rtype: bool
         """
         clients = []
+        service_manager = ServiceFactory.get_manager()
         try:
             for storagerouter in StorageRouterList.get_storagerouters():
                 clients.append((SSHClient(storagerouter), SSHClient(storagerouter, username='root')))
@@ -1414,13 +1423,13 @@ class StorageRouterController(object):
                 root_client.run('service openvpn stop')
                 root_client.file_delete('/etc/openvpn/ovs_*')
             if enable is True:
-                if not ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    ServiceManager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                if not service_manager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
+                    service_manager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                service_manager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
             else:
-                if ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    ServiceManager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                    ServiceManager.remove_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                if service_manager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
+                    service_manager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                    service_manager.remove_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
         return True
 
     @staticmethod

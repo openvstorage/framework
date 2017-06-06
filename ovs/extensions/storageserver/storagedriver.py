@@ -20,9 +20,9 @@ Wrapper class for the storagedriver client of the voldrv team
 import os
 import copy
 import json
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.remote import remote
+from ovs_extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 
@@ -334,7 +334,7 @@ class StorageDriverConfiguration(object):
         """
         Saves the configuration to a given file, optionally a remote one
         :param client: If provided, save remote configuration
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param force_reload: Make sure the 'update_configuration' gets triggered. Should be used when configuration changes have been applied from 'outside'
         :type force_reload: bool
         :return: Changes to the configuration
@@ -395,7 +395,7 @@ class StorageDriverConfiguration(object):
         return changes
 
     def __getattr__(self, item):
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+        from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
         if item.startswith('configure_'):
             section = ExtensionsToolbox.remove_prefix(item, 'configure_')

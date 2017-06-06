@@ -37,13 +37,13 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
-from ovs.extensions.generic import fakesleep
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
+from ovs_extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
-from ovs.extensions.services.tests.systemd import Systemd
+from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
+from ovs_extensions.services.mockups.systemd import SystemdMock
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -66,7 +66,6 @@ class DalHelper(object):
         """
         Execute several actions before starting a new UnitTest
         :param kwargs: Additional key word arguments
-        :type kwargs: dict
         """
         if kwargs.get('fake_sleep', False) is True:
             fakesleep.monkey_patch()
@@ -79,7 +78,6 @@ class DalHelper(object):
         """
         Execute several actions when ending a UnitTest
         :param kwargs: Additional key word arguments
-        :type kwargs: dict
         """
         if kwargs.get('fake_sleep', False) is True:
             fakesleep.monkey_restore()
@@ -97,7 +95,7 @@ class DalHelper(object):
         # noinspection PyProtectedMember
         SSHClient._clean()
         # noinspection PyProtectedMember
-        Systemd._clean()
+        SystemdMock._clean()
         # noinspection PyProtectedMember
         MDSClient._clean()
         # noinspection PyProtectedMember

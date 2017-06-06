@@ -36,14 +36,14 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.filemutex import file_mutex
-from ovs.extensions.generic.remote import remote
+from ovs_extensions.generic.filemutex import file_mutex
+from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
@@ -399,6 +399,7 @@ class GenericController(object):
             error_messages.append('vPool {0} does not have any valid StorageDrivers configured'.format(vpool.name))
             return
 
+        service_manager = ServiceFactory.get_manager()
         client = None
         lock_time = 5 * 60
         storagerouter = scrub_info['storage_router']
@@ -413,7 +414,7 @@ class GenericController(object):
                 client = SSHClient(storagerouter, 'root')
                 client.dir_create(scrub_directory)
                 client.dir_chmod(scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
-                if ServiceManager.has_service(name=alba_proxy_service, client=client) is True and ServiceManager.get_service_status(name=alba_proxy_service, client=client) == 'active':
+                if service_manager.has_service(name=alba_proxy_service, client=client) is True and service_manager.get_service_status(name=alba_proxy_service, client=client) == 'active':
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Re-using existing proxy service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
                     scrub_config = Configuration.get(scrub_config_key)
                 else:
@@ -449,8 +450,8 @@ class GenericController(object):
                     params = {'VPOOL_NAME': vpool.name,
                               'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
                               'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key)}
-                    ServiceManager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
-                    ServiceManager.start_service(name=alba_proxy_service, client=client)
+                    service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
+                    service_manager.start_service(name=alba_proxy_service, client=client)
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
 
                 backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
@@ -468,10 +469,10 @@ class GenericController(object):
             message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
             error_messages.append(message)
             GenericController._logger.exception(message)
-            if client is not None and ServiceManager.has_service(name=alba_proxy_service, client=client) is True:
-                if ServiceManager.get_service_status(name=alba_proxy_service, client=client) == 'active':
-                    ServiceManager.stop_service(name=alba_proxy_service, client=client)
-                ServiceManager.remove_service(name=alba_proxy_service, client=client)
+            if client is not None and service_manager.has_service(name=alba_proxy_service, client=client) is True:
+                if service_manager.get_service_status(name=alba_proxy_service, client=client) == 'active':
+                    service_manager.stop_service(name=alba_proxy_service, client=client)
+                service_manager.remove_service(name=alba_proxy_service, client=client)
             if Configuration.exists(scrub_config_key):
                 Configuration.delete(scrub_config_key)
 
@@ -501,9 +502,9 @@ class GenericController(object):
                 GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removing service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
                 client = SSHClient(storagerouter, 'root')
                 client.dir_delete(scrub_directory)
-                if ServiceManager.has_service(alba_proxy_service, client=client):
-                    ServiceManager.stop_service(alba_proxy_service, client=client)
-                    ServiceManager.remove_service(alba_proxy_service, client=client)
+                if service_manager.has_service(alba_proxy_service, client=client):
+                    service_manager.stop_service(alba_proxy_service, client=client)
+                    service_manager.remove_service(alba_proxy_service, client=client)
                 if Configuration.exists(scrub_config_key):
                     Configuration.delete(scrub_config_key)
                 GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removed service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
@@ -519,7 +520,7 @@ class GenericController(object):
         Collapse Arakoon's Tlogs
         :return: None
         """
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+        from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
         GenericController._logger.info('Arakoon collapse started')
         cluster_info = []
@@ -543,7 +544,7 @@ class GenericController(object):
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
             ip = storagerouter.ip if cluster in ['cacc', 'unittest-cacc'] else None
             try:
-                config = ArakoonClusterConfig(cluster, source_ip=ip)
+                config = ArakoonClusterConfig(cluster_id=cluster, source_ip=ip)
                 cluster_config_map[cluster] = config
             except:
                 GenericController._logger.exception('  Retrieving cluster information on {0} for {1} failed'.format(storagerouter.ip, cluster))
@@ -583,20 +584,20 @@ class GenericController(object):
         all_storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in all_storagerouters:
             information[storagerouter.ip] = {}
-            for function in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
+            for fct in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
                 try:
                     # We make use of these clients in Threads --> cached = False
                     client = SSHClient(endpoint=storagerouter, username='root', cached=False)
                 except UnableToConnectException:
                     information[storagerouter.ip]['errors'] = ['StorageRouter {0} is inaccessible'.format(storagerouter.name)]
                     break
-                thread = Thread(target=function,
+                thread = Thread(target=fct,
                                 args=(client, information))
                 thread.start()
                 threads.append(thread)
 
-        for function in Toolbox.fetch_hooks('update', 'get_package_info_single'):
-            thread = Thread(target=function,
+        for fct in Toolbox.fetch_hooks('update', 'get_package_info_single'):
+            thread = Thread(target=fct,
                             args=(information,))
             thread.start()
             threads.append(thread)

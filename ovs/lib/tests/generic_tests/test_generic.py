@@ -26,11 +26,11 @@ from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.tests.helpers import DalHelper
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
-from ovs.extensions.generic.threadhelpers import Waiter
+from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
+from ovs_extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
@@ -721,17 +721,18 @@ class Generic(unittest.TestCase):
                 cluster_name = cluster_info['name']
 
                 base_dir = DalHelper.CLUSTER_DIR.format(cluster_name)
-                info = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
-                                                       cluster_type=cluster_type,
-                                                       ip=storagerouter_1.ip,
-                                                       base_dir=base_dir,
-                                                       internal=internal)
-                ArakoonInstaller.start_cluster(metadata=info['metadata'],
-                                               ip=storagerouter_1.ip if filesystem is True else None)
-                ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
-                                                ip=storagerouter_1.ip if filesystem is True else None,
-                                                new_ip=storagerouter_2.ip,
-                                                base_dir=base_dir)
+                arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
+                arakoon_installer.create_cluster(cluster_type=cluster_type,
+                                                 ip=storagerouter_1.ip,
+                                                 base_dir=base_dir,
+                                                 internal=internal,
+                                                 log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                arakoon_installer.start_cluster()
+                arakoon_installer.extend_cluster(new_ip=storagerouter_2.ip,
+                                                 base_dir=base_dir,
+                                                 log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
 
                 service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
                 if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.ABM:
@@ -745,11 +746,11 @@ class Generic(unittest.TestCase):
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type,
                                              storagerouter=storagerouter_1,
-                                             ports=info['ports'])
+                                             ports=arakoon_installer.ports[storagerouter_1.ip])
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type,
                                              storagerouter=storagerouter_2,
-                                             ports=info['ports'])
+                                             ports=arakoon_installer.ports[storagerouter_2.ip])
                 else:
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type)
