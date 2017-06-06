@@ -270,7 +270,10 @@ class StorageRouterController(object):
         block_cache_on_write = parameters['block_cache_on_write']
 
         # Validate features
+        storagerouter.invalidate_dynamics(['features'])
         features = storagerouter.features
+        if features is None:
+            raise RuntimeError('Could not load available features')
         supports_block_cache = 'block-cache' in features['alba']['features']
         if supports_block_cache is False and (block_cache_on_read is True or block_cache_on_write is True):
             raise RuntimeError('Block cache is not a supported feature')
