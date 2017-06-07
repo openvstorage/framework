@@ -32,7 +32,7 @@ class ServiceFactory(_ServiceFactory):
     RUN_FILE_DIR = '/opt/OpenvStorage/run'
     SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
     CONFIG_TEMPLATE_DIR = '/opt/OpenvStorage/config/templates/{0}'
-    MONITOR_PREFIXES = 'ovs-'
+    MONITOR_PREFIXES = ['ovs-']
 
     def __init__(self):
         """Init method"""
