@@ -237,6 +237,7 @@
         "state": "State",
         "states": {
             "backend": {
+                "deleting": "Deleting",
                 "failure": "Failure",
                 "installing": "Installing",
                 "running": "Running",
