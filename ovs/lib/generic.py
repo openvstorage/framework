@@ -448,7 +448,7 @@ class GenericController(object):
                     Configuration.set(scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
 
                     params = {'VPOOL_NAME': vpool.name,
-                              'LOG_SINK': LogHandler.get_sink_path('albaproxy_{0}_{1}'.format(vpool.name, storagerouter.name.lower())),
+                              'LOG_SINK': LogHandler.get_sink_path(alba_proxy_service),
                               'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key)}
                     service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
                     service_manager.start_service(name=alba_proxy_service, client=client)
