@@ -940,13 +940,13 @@ class StorageRouterController(object):
                      'CONFIG_PATH': storagedriver_config.remote_path,
                      'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
                      'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
-                     'LOG_SINK': LogHandler.get_sink_path('storagedriver'),
+                     'LOG_SINK': LogHandler.get_sink_path('storagedriver_{0}'.format(storagedriver.storagedriver_id)),
                      'METADATASTORE_BITS': 5}
         dtl_params = {'DTL_PATH': sdp_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,
                       'DTL_PORT': str(storagedriver.ports['dtl']),
                       'DTL_TRANSPORT': StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport],
-                      'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
+                      'LOG_SINK': LogHandler.get_sink_path('storagedriver-dtl_{0}'.format(storagedriver.storagedriver_id))}
 
         sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
@@ -963,7 +963,7 @@ class StorageRouterController(object):
 
             for proxy in storagedriver.alba_proxies:
                 alba_proxy_params = {'VPOOL_NAME': vpool_name,
-                                     'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
+                                     'LOG_SINK': LogHandler.get_sink_path(proxy.service.name),
                                      'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid))}
                 alba_proxy_service = 'ovs-{0}'.format(proxy.service.name)
                 service_manager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
