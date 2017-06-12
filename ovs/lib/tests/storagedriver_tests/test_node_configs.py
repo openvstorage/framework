@@ -280,8 +280,8 @@ class NodeConfigTest(unittest.TestCase):
         arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
                                          ip=storagerouters[1].ip,
                                          base_dir='/tmp',
-                                         log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                         crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                                         log_sinks=LogHandler.get_sink_path('arakoon-server_voldrv'),
+                                         crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_voldrv'))
 
         # Initial run, it will now be configured
         StorageRouterClient.node_config_recordings = []

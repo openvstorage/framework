@@ -749,8 +749,8 @@ class NodeInstallationController(object):
                                              ip=cluster_ip,
                                              base_dir='/opt/OpenvStorage/db',
                                              locked=False,
-                                             log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                             crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                                             log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(arakoon_config_cluster)),
+                                             crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(arakoon_config_cluster)))
             arakoon_installer.start_cluster()
             contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
             target_client.file_write(Configuration.CACC_LOCATION, contents)
@@ -788,8 +788,8 @@ class NodeInstallationController(object):
                                              ip=cluster_ip,
                                              base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
                                              locked=False,
-                                             log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                             crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                                             log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(arakoon_ovsdb_cluster)),
+                                             crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(arakoon_ovsdb_cluster)))
             arakoon_installer.start_cluster()
             metadata = arakoon_installer.metadata
             arakoon_ports = arakoon_installer.ports[cluster_ip]

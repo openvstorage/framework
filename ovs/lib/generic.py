@@ -351,7 +351,7 @@ class GenericController(object):
                             for work_unit in work_units:
                                 res = locked_client.scrub(work_unit=work_unit,
                                                           scratch_dir=scrub_dir,
-                                                          log_sinks=[LogHandler.get_sink_path('scrubber', allow_override=True, forced_target_type='file')],
+                                                          log_sinks=[LogHandler.get_sink_path('scrubber_{0}'.format(vpool.name), allow_override=True, forced_target_type='file')],
                                                           backend_config=Configuration.get_configuration_path(backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                             if work_units:
@@ -448,7 +448,7 @@ class GenericController(object):
                     Configuration.set(scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
 
                     params = {'VPOOL_NAME': vpool.name,
-                              'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
+                              'LOG_SINK': LogHandler.get_sink_path('albaproxy_{0}_{1}'.format(vpool.name, storagerouter.name.lower())),
                               'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key)}
                     service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
                     service_manager.start_service(name=alba_proxy_service, client=client)

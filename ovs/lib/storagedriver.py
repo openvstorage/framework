@@ -348,8 +348,8 @@ class StorageDriverController(object):
                 arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
                                                  ip=storagerouter.ip,
                                                  base_dir=partition.folder,
-                                                 log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                                                 log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(arakoon_voldrv_cluster)),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(arakoon_voldrv_cluster)))
                 arakoon_installer.start_cluster()
                 ports = arakoon_installer.ports[storagerouter.ip]
                 metadata = arakoon_installer.metadata
@@ -378,8 +378,8 @@ class StorageDriverController(object):
                 arakoon_installer.load()
                 arakoon_installer.extend_cluster(new_ip=storagerouter.ip,
                                                  base_dir=partition.folder,
-                                                 log_sinks=LogHandler.get_sink_path('arakoon_server'),
-                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'))
+                                                 log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(cluster_name)),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(cluster_name)))
                 _add_service(service_storagerouter=storagerouter,
                              arakoon_ports=arakoon_installer.ports[storagerouter.ip],
                              service_name=ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
