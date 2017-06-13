@@ -21,7 +21,7 @@ Used for remote or local command execution
 import os
 import time
 from ovs.dal.helpers import Descriptor
-from ovs_extensions.generic.sshclient import SSHClient as _SSHClient, UnableToConnectException, NotAuthenticatedException, CalledProcessTimeout
+from ovs_extensions.generic.sshclient import SSHClient as _SSHClient, UnableToConnectException, NotAuthenticatedException, CalledProcessTimeout, TimeOutException
 
 
 class SSHClient(_SSHClient):
