@@ -117,12 +117,6 @@ define([
                         if (isNaN(parseFloat(quota))) {
                             fields.push('quota');
                             reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_nan'));
-                        } else if (quota < 0.1 || quota > 1024) {
-                            fields.push('quota');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_boundaries_exceeded'));
-                        } else if (self.data.backendBC() !== undefined && quota * Math.pow(1024, 3) * 10 > self.data.backendBC().usages.free) {
-                            fields.push('quota');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_too_much_requested'));
                         }
                     }
                 }
