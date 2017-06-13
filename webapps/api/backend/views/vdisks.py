@@ -197,8 +197,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type snapshot_id: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
-        :param cache_quota: Max disk space the new clone can consume for caching purposes (in Bytes)
-        :type cache_quota: int
+        :param cache_quota: Maximum caching space(s) the new clone can consume (in Bytes) per cache type.
+        :type cache_quota: dict
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
@@ -284,8 +284,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
-        :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
-        :type cache_quota: int
+        :param cache_quota: Maximum caching space(s) the new volume can consume (in Bytes) per cache type.
+        :type cache_quota: dict
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
@@ -351,8 +351,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
-        :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
-        :type cache_quota: int
+        :param cache_quota: Maximum caching space(s) the new volume can consume (in Bytes) per cache type.
+        :type cache_quota: dict
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
