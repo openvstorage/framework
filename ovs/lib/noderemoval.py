@@ -153,6 +153,12 @@ class NodeRemovalController(object):
             interactive = silent != '--force-yes'
             remove_asd_manager = not interactive  # Remove ASD manager if non-interactive else ask
             if interactive is True:
+                Toolbox.log(logger=NodeRemovalController._logger, messages='Certain nodes appear to be offline. These will not fully removed and will cause issues if they are not really offline.')
+                Toolbox.log(logger=NodeRemovalController._logger, messages='Offline nodes: {0}'.format(''.join(['\n  * {0}'.format(str(storagerouter.ip)) for storagerouter in storage_routers_offline])))
+                valid_node_info = Interactive.ask_yesno(message='Should we continue the removal with these being presumably offline?', default_value=False)
+                if valid_node_info is False:
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='Please validate the state of the nodes before removing.', title=True)
+                    sys.exit(1)
                 proceed = Interactive.ask_yesno(message='Are you sure you want to remove node {0}?'.format(storage_router_to_remove.name), default_value=False)
                 if proceed is False:
                     Toolbox.log(logger=NodeRemovalController._logger, messages='Abort removal', title=True)
