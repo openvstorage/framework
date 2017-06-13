@@ -65,7 +65,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
     }
     function formatBytes(value) {
         var units, counter;
-        units = ['b', 'kib', 'mib', 'gib', 'tib'];
+        units = ['b', 'kib', 'mib', 'gib', 'tib', 'pib'];
         counter = 0;
         while (value >= 1000) {
             value = value / 1024;
@@ -75,7 +75,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
     }
     function formatSpeed(value) {
         var units, counter;
-        units = ['b', 'kib', 'mib', 'gib', 'tib'];
+        units = ['b', 'kib', 'mib', 'gib', 'tib', 'pib'];
         counter = 0;
         while (value >= 1000) {
             value = value / 1024;

@@ -367,7 +367,7 @@ class StorageRouterController(object):
                 else:
                     try:
                         Toolbox.verify_required_params(actual_params=parameters,
-                                                       required_params={'cache_quota_fc': (int, {'min': 1024 ** 3 / 10, 'max': 1024.0 ** 4}, False),
+                                                       required_params={'cache_quota_fc': (int, None, False),
                                                                         'connection_info_fc': (dict, {'host': (str, Toolbox.regex_ip),
                                                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                                                       'client_id': (str, None),
@@ -383,8 +383,6 @@ class StorageRouterController(object):
                                                    version=2,
                                                    cache_store=VolatileFactory.get_client())
                             backend_dict_fc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_fc), params={'contents': 'name,usages'})
-                            if backend_dict_fc['usages']['free'] < cache_quota * 10:
-                                raise RuntimeError('Requested Fragment Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_fc['name']))
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
             if use_block_cache_backend is True:
@@ -393,7 +391,7 @@ class StorageRouterController(object):
                 else:
                     try:
                         Toolbox.verify_required_params(actual_params=parameters,
-                                                       required_params={'cache_quota_bc': (int, {'min': 1024 ** 3 / 10, 'max': 1024.0 ** 4}, False),
+                                                       required_params={'cache_quota_bc': (int, None, False),
                                                                         'connection_info_bc': (dict, {'host': (str, Toolbox.regex_ip),
                                                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                                                       'client_id': (str, None),
@@ -412,8 +410,6 @@ class StorageRouterController(object):
                                                        version=2,
                                                        cache_store=VolatileFactory.get_client())
                                 backend_dict_bc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_bc), params={'contents': 'name,usages'})
-                            if backend_dict_bc['usages']['free'] < cache_quota * 10:
-                                raise RuntimeError('Requested Block Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_bc['name']))
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
 
