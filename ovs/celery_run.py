@@ -176,6 +176,7 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
     _ = args, kwargs, kwds
     VolatileFactory.store = None
     PersistentFactory.store = None
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
 
 
 @after_setup_task_logger.connect
