@@ -190,9 +190,7 @@ define([
                     })
                 }
             });
-            self.refresher.init(function() {
-                self.loadStorageRouters();
-            }, 5000);
+            self.refresher.init(self.loadStorageRouters, 5000);
             self.refresher.start();
             self.refresher.run();
         };

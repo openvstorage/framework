@@ -690,7 +690,6 @@
             "title": "Scrub vDisk __vdisk__",
             "title_message": "Are you sure you want to scrub vDisk __vdisk__?"
         },
-
         "title": "vDisks"
     },
     "vpools": {

@@ -318,10 +318,10 @@ def return_list(object_type, default_sort=None):
                     start_number = (page - 1) * page_size  # Index - e.g. 0 for page 1, 10 for page 2
                     end_number = start_number + page_size  # Index - e.g. 10 for page 1, 20 for page 2
                 data_list = data_list[start_number: end_number]
-                page_metadata = dict(page_metadata.items() + {'current_page': max(1, page),
-                                                              'max_page': max(1, max_page),
-                                                              'start_number': start_number + 1,
-                                                              'end_number': min(total_items, end_number)}.items())
+                page_metadata.update({'current_page': max(1, page),
+                                      'max_page': max(1, max_page),
+                                      'start_number': start_number + 1,
+                                      'end_number': min(total_items, end_number)})
             else:
                 page_metadata['page_size'] = total_items
             timings['paging'] = [time.time() - start, 'Selecting current page']

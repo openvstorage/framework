@@ -29,6 +29,7 @@ define(['knockout'], function(ko){
             nodes          : undefined,
             identification : ko.observable(),
             releaseName    : '',
+            pluginData     : ko.observable({}),
             user           : {
                 username: ko.observable(),
                 guid    : ko.observable(),

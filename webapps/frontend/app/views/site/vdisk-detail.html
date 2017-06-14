@@ -93,6 +93,10 @@ but WITHOUT ANY WARRANTY of any kind.
                                    style: { color: $root.shared.user.roles().contains('manage') && childrenGuids().length === 0 ? '#428bca' : 'lightgrey' }">
                     <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                 </button>
+                <!-- Additional buttons for plugins -->
+                <!-- ko foreach: shared.hooks.pages['vdisk-detail'] -->
+                    <div data-bind="compose: $data.activator, visible: $data.info.type === 'detail-button'" style="display: inline-block; margin-left: 20px;"></div>
+                <!-- /ko -->
             </li>
         </ul>
         <div class="tab-content">
@@ -249,6 +253,10 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                     </table>
                 </div>
+                <!-- Additional table info for plugins -->
+                <!-- ko foreach: shared.hooks.pages['vdisk-detail'] -->
+                    <div class="tab-pane active" id="plugin_information" data-bind="compose: $data.activator, visible: $data.info.type === 'detail-tab-edge'"></div>
+                <!-- /ko -->
             </div>
             <div class="tab-pane" id="management" style="padding: 15px;" data-bind="visible: $root.shared.user.roles().contains('manage')">
                 <table class="table table-noborder" style="width: 100%;">

@@ -71,6 +71,11 @@ define([
                             router.navigateBack();
                             return deferred.reject();
                         }
+                        if (self.shared.pluginData().iscsi.vdiskdetail.vdisk === undefined) {
+                            var pluginData = self.shared.pluginData();
+                            pluginData.iscsi.vdiskdetail.vdisk = self.vDisk;
+                            self.shared.pluginData(pluginData);
+                        }
                     })
                     .then(self.loadStorageRouters)
                     .then(self.loadDomains)
@@ -480,11 +485,28 @@ define([
         // Durandal
         self.activate = function(mode, guid) {
             self.vDisk(new VDisk(guid));
+            var pluginData = self.shared.pluginData();
+            pluginData.iscsi = {vdiskdetail: {vdisk: self.vDisk, iscsiNodes: undefined}};
+            self.shared.pluginData(pluginData);
+            $.each(shared.hooks.pages, function(pageType, pages) {
+                if (pageType === 'vdisk-detail') {
+                    $.each(pages, function(index, page) {
+                        page.activator.activateItem(page.module);
+                    })
+                }
+            });
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
         };
         self.deactivate = function() {
+            $.each(shared.hooks.pages, function(pageType, pages) {
+                if (pageType === 'vdisk-detail') {
+                    $.each(pages, function(index, page) {
+                        page.activator.deactivateItem(page.module);
+                    });
+                }
+            });
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });

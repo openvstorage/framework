@@ -701,7 +701,8 @@ class NodeInstallationController(object):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configure Arakoon')
             if metadata is not None and metadata['internal'] is True:
                 try:
-                    ArakoonInstaller.delete_cluster()
+                    arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
+                    arakoon_installer.delete_cluster()
                 except Exception as ex:
                     Toolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to delete cluster', ex], loglevel='exception')
                 base_dir = required_info['/ovs/framework/paths|ovsdb']
