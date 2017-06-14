@@ -50,6 +50,7 @@ class NodeRemovalController(object):
         :type silent: str
         :return: None
         """
+        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
         from ovs.lib.storagedriver import StorageDriverController
         from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -97,19 +98,19 @@ class NodeRemovalController(object):
                     client = SSHClient(storage_router, username='root', timeout=10)
                 except (UnableToConnectException, NotAuthenticatedException, TimeOutException) as ex:
                     if isinstance(ex, UnableToConnectException):
-                        msg = 'Unable to connect'.format(storage_router.ip)
+                        msg = 'Unable to connect'
                     elif isinstance(ex, NotAuthenticatedException):
                         msg = 'Could not authenticate'
                     elif isinstance(ex, TimeOutException):
                         msg = 'Connection timed out'
-                    Toolbox.log(logger=NodeRemovalController._logger, messages='  {0} to node with IP {1:<15}'.format(msg, storage_router.ip))
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='  * Node with IP {0:<15}- {1}'.format(storage_router.ip, msg))
                     offline_reasons[storage_router.ip] = msg
                     storage_routers_offline.append(storage_router)
                     if storage_router == storage_router_to_remove:
                         storage_router_to_remove_online = False
                     continue
 
-                Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
+                Toolbox.log(logger=NodeRemovalController._logger, messages='  * Node with IP {0:<15}- Successfully connected'.format(storage_router.ip))
                 ip_client_map[storage_router.ip] = client
                 if storage_router != storage_router_to_remove and storage_router.node_type == 'MASTER':
                     master_ip = storage_router.ip
@@ -150,8 +151,7 @@ class NodeRemovalController(object):
                         loglevel='warning')
             sys.exit(1)
         except Exception as exception:
-            Toolbox.log(logger=NodeRemovalController._logger, messages=[str(exception)], boxed=True,
-                        loglevel='exception')
+            Toolbox.log(logger=NodeRemovalController._logger, messages=[str(exception)], boxed=True, loglevel='exception')
             sys.exit(1)
 
         #################
@@ -163,7 +163,7 @@ class NodeRemovalController(object):
             if interactive is True:
                 if len(storage_routers_offline) > 0:
                     Toolbox.log(logger=NodeRemovalController._logger, messages='Certain nodes appear to be offline. These will not fully removed and will cause issues if they are not really offline.')
-                    Toolbox.log(logger=NodeRemovalController._logger, messages='Offline nodes: {0}'.format(''.join(('\n  * {0} - {1}.'.format(ip, message) for ip, message in offline_reasons.iteritems()))))
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='Offline nodes: {0}'.format(''.join(('\n  * {0:<15}- {1}.'.format(ip, message) for ip, message in offline_reasons.iteritems()))))
                     valid_node_info = Interactive.ask_yesno(message='Continue the removal with these being presumably offline?', default_value=False)
                     if valid_node_info is False:
                         Toolbox.log(logger=NodeRemovalController._logger, messages='Please validate the state of the nodes before removing.', title=True)
