@@ -36,6 +36,7 @@ class NodeRemovalController(object):
     """
     This class contains all logic for removing a node from the cluster
     """
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     _logger = LogHandler.get('lib', name='node-removal')
     _logger.logger.propagate = False
 
@@ -73,7 +74,7 @@ class NodeRemovalController(object):
             storage_router_all_ips = set([storage_router.ip for storage_router in storage_router_all])
             storage_router_master_ips = set([storage_router.ip for storage_router in storage_router_masters])
             storage_router_to_remove = StorageRouterList.get_by_ip(node_ip)
-
+            offline_reasons = {}
             if node_ip not in storage_router_all_ips:
                 raise ValueError('Unknown IP specified\nKnown in model:\n - {0}\nSpecified for removal:\n - {1}'.format('\n - '.join(storage_router_all_ips), node_ip))
 
@@ -94,8 +95,15 @@ class NodeRemovalController(object):
             for storage_router in storage_router_all:
                 try:
                     client = SSHClient(storage_router, username='root', timeout=10)
-                except (UnableToConnectException, NotAuthenticatedException, TimeOutException):
-                    Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
+                except (UnableToConnectException, NotAuthenticatedException, TimeOutException) as ex:
+                    if isinstance(ex, UnableToConnectException):
+                        msg = 'Unable to connect'.format(storage_router.ip)
+                    elif isinstance(ex, NotAuthenticatedException):
+                        msg = 'Could not authenticate'
+                    elif isinstance(ex, TimeOutException):
+                        msg = 'Connection timed out'
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='  {0} to node with IP {1:<15}'.format(msg, storage_router.ip))
+                    offline_reasons[storage_router.ip] = msg
                     storage_routers_offline.append(storage_router)
                     if storage_router == storage_router_to_remove:
                         storage_router_to_remove_online = False
@@ -153,12 +161,13 @@ class NodeRemovalController(object):
             interactive = silent != '--force-yes'
             remove_asd_manager = not interactive  # Remove ASD manager if non-interactive else ask
             if interactive is True:
-                Toolbox.log(logger=NodeRemovalController._logger, messages='Certain nodes appear to be offline. These will not fully removed and will cause issues if they are not really offline.')
-                Toolbox.log(logger=NodeRemovalController._logger, messages='Offline nodes: {0}'.format(''.join(['\n  * {0}'.format(str(storagerouter.ip)) for storagerouter in storage_routers_offline])))
-                valid_node_info = Interactive.ask_yesno(message='Should we continue the removal with these being presumably offline?', default_value=False)
-                if valid_node_info is False:
-                    Toolbox.log(logger=NodeRemovalController._logger, messages='Please validate the state of the nodes before removing.', title=True)
-                    sys.exit(1)
+                if len(storage_routers_offline) > 0:
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='Certain nodes appear to be offline. These will not fully removed and will cause issues if they are not really offline.')
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='Offline nodes: {0}'.format(''.join(('\n  * {0} - {1}.'.format(ip, message) for ip, message in offline_reasons.iteritems()))))
+                    valid_node_info = Interactive.ask_yesno(message='Continue the removal with these being presumably offline?', default_value=False)
+                    if valid_node_info is False:
+                        Toolbox.log(logger=NodeRemovalController._logger, messages='Please validate the state of the nodes before removing.', title=True)
+                        sys.exit(1)
                 proceed = Interactive.ask_yesno(message='Are you sure you want to remove node {0}?'.format(storage_router_to_remove.name), default_value=False)
                 if proceed is False:
                     Toolbox.log(logger=NodeRemovalController._logger, messages='Abort removal', title=True)
