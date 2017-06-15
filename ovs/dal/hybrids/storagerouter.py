@@ -18,16 +18,21 @@
 StorageRouter module
 """
 
+import re
 import time
+from distutils.version import LooseVersion
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.log.log_handler import LogHandler
 
 
 class StorageRouter(DataObject):
     """
     A StorageRouter represents the Open vStorage software stack, any (v)machine on which it is installed
     """
+    _logger = LogHandler.get('dal', name='hybrid')
+
     __properties = [Property('name', str, unique=True, doc='Name of the Storage Router.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Router.'),
                     Property('machine_id', str, unique=True, mandatory=False, indexed=True, doc='The hardware identifier of the Storage Router'),
@@ -44,7 +49,8 @@ class StorageRouter(DataObject):
                   Dynamic('status', str, 10),
                   Dynamic('partition_config', dict, 3600),
                   Dynamic('regular_domains', list, 60),
-                  Dynamic('recovery_domains', list, 60)]
+                  Dynamic('recovery_domains', list, 60),
+                  Dynamic('features', dict, 3600)]
 
     def _statistics(self, dynamic):
         """
@@ -145,3 +151,43 @@ class StorageRouter(DataObject):
         :return: List of domain guids
         """
         return [junction.domain_guid for junction in self.domains if junction.backup is True]
+
+    def _features(self):
+        """
+        Returns information about installed/available features
+        :return: Dictionary containing edition and available features per component
+        """
+        try:
+            enterprise = 'enterprise'
+            community = 'community'
+            client = SSHClient(self, username='root')
+            enterprise_regex = re.compile('^(?P<edition>ee-)?(?P<version>.*)$')
+
+            version = client.run("volumedriver_fs --version | grep version: | awk '{print $2}'", allow_insecure=True, allow_nonzero=True)
+            volumedriver_version = enterprise_regex.match(version).groupdict()
+            volumedriver_edition = enterprise if volumedriver_version['edition'] == 'ee-' else community
+            volumedriver_version_lv = LooseVersion(volumedriver_version['version'])
+            volumedriver_features = [feature for feature, version
+                                     in {'directory_unlink': ('6.15.0', None)}.iteritems()
+                                     if volumedriver_version_lv >= LooseVersion(version[0])
+                                     and (version[1] is None or version[1] == volumedriver_edition)]
+
+            version = client.run("alba version --terse", allow_insecure=True, allow_nonzero=True)
+            alba_version = enterprise_regex.match(version).groupdict()
+            alba_edition = enterprise if alba_version['edition'] == 'ee-' else community
+            alba_version_lv = LooseVersion(alba_version['version'])
+            alba_features = [feature for feature, version
+                             in {'cache-quota': ('1.4.4', enterprise),
+                                 'block-cache': ('1.4.0', enterprise)}.iteritems()
+                             if alba_version_lv >= LooseVersion(version[0])
+                             and (version[1] is None or version[1] == alba_edition)]
+
+            return {'volumedriver': {'edition': volumedriver_edition,
+                                     'features': volumedriver_features},
+                    'alba': {'edition': alba_edition,
+                             'features': alba_features}}
+        except UnableToConnectException:
+            pass
+        except Exception:
+            StorageRouter._logger.exception('Could not load feature information')
+        return None

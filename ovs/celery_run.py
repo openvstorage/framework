@@ -23,17 +23,21 @@ import sys
 sys.path.append('/opt/OpenvStorage')
 
 import os
+import uuid
 import threading
+import traceback
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
+from celery.task.control import inspect
 from kombu import Queue
 from threading import Thread
-from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.storage.exceptions import KeyNotFoundException
+from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs_extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.messaging import MessageController
 from ovs.log.log_handler import LogHandler
 
@@ -47,7 +51,7 @@ class CeleryMockup(object):
         Celery task mockup
         Is used as a decorator, so should return a function, which does nothing (for now)
         """
-        _ = self, args, kwargs
+        _ = self
 
         def _wrapper(func):
             def _wrapped(*arguments, **kwarguments):
@@ -57,17 +61,30 @@ class CeleryMockup(object):
                 return func(*arguments, **kwarguments)
 
             def _delayed(*arguments, **kwarguments):
+                async_result = {'name': kwargs.get('name', args[0] if len(args) > 0 else None),
+                                'id': str(uuid.uuid4()),
+                                'thread': None,
+                                'exception': None}
+
                 def _catch_errors_in_function(*more_args, **more_kwargs):
                     try:
-                        return func(*more_args, **more_kwargs)
+                        InspectMockup.states['active'].append(async_result)
+                        async_result['result'] = func(*more_args, **more_kwargs)
+                        InspectMockup.states['active'].remove(async_result)
+                    except EnsureSingleTimeoutReached as ex:
+                        async_result['exception'] = ex
                     except Exception as ex:
+                        traceback.print_exc()
                         async_result['exception'] = ex
 
                 if 'bind' in kwargs:
-                    arguments = tuple([type('Task', (), {'request': type('Request', (), {'id': 0})})] + list(arguments))
-                thread = Thread(target=_catch_errors_in_function, name='{0}_delayed'.format(threading.current_thread().getName()), args=arguments, kwargs=kwarguments)
-                async_result = {'thread': thread,
-                                'exception': None}
+                    arguments = tuple([type('Task', (), {'request': type('Request', (), {'id': async_result['id']})})] + list(arguments))
+                if '_thread_name' in kwarguments:
+                    thread_name = kwarguments.pop('_thread_name')
+                else:
+                    thread_name = threading.current_thread().getName()
+                thread = Thread(target=_catch_errors_in_function, name='{0}_delayed'.format(thread_name), args=arguments, kwargs=kwarguments)
+                async_result['thread'] = thread
                 thread.start()
                 return async_result
 
@@ -78,7 +95,27 @@ class CeleryMockup(object):
         return _wrapper
 
 
+class InspectMockup(object):
+    """
+    Mockup class for the inspect module
+    """
+    states = {'active': []}
+    state_keys = ['active']
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def clean():
+        for key in InspectMockup.state_keys:
+            InspectMockup.states[key] = []
+
+    def __getattr__(self, item):
+        return lambda: {'unittests': InspectMockup.states[item]}
+
+
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
+    inspect = InspectMockup
     celery = CeleryMockup()
 else:
     memcache_servers = Configuration.get('/ovs/framework/memcache|endpoints')
@@ -139,7 +176,7 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
     _ = args, kwargs, kwds
     VolatileFactory.store = None
     PersistentFactory.store = None
-    ArakoonConfiguration.client = None
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
 
 
 @after_setup_task_logger.connect
@@ -150,14 +187,40 @@ def load_ovs_logger(**kwargs):
         kwargs['logger'] = LogHandler.get('celery', name='celery')
 
 
+def _clean_cache():
+    loghandler = LogHandler.get('celery', name='celery')
+    loghandler.info('Executing celery "clear_cache" startup script...')
+    from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
+    active = inspect().active()
+    active_tasks = []
+    if active is not None:
+        for tasks in active.itervalues():
+            active_tasks += [task['id'] for task in tasks]
+    cache = PersistentFactory.get_client()
+    for key in cache.prefix(ENSURE_SINGLE_KEY):
+        try:
+            with volatile_mutex(name=key, wait=5):
+                entry = cache.get(key)
+                values = entry.get('values', [])
+                new_values = []
+                for v in values:
+                    task_id = v.get('task_id')
+                    if task_id is not None and task_id in active_tasks:
+                        new_values.append(v)
+                if len(new_values) > 0:
+                    entry['values'] = new_values
+                    cache.set(key, entry)
+                    loghandler.info('Updated key {0}'.format(key))
+                else:
+                    cache.delete(key)
+                    loghandler.info('Deleted key {0}'.format(key))
+        except KeyNotFoundException:
+            pass
+    loghandler.info('Executing celery "clear_cache" startup script... done')
+
+
 if __name__ == '__main__':
     import sys
     if len(sys.argv) == 2 and sys.argv[1] == 'clear_cache':
-        from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
-
-        cache = PersistentFactory.get_client()
-        for key in cache.prefix(ENSURE_SINGLE_KEY):
-            try:
-                cache.delete(key)
-            except KeyNotFoundException:
-                pass
+        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
+        _clean_cache()

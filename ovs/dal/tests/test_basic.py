@@ -260,10 +260,10 @@ class Basic(unittest.TestCase):
                                               ('size', DataList.operator.GT, 6)]})
         self.assertGreaterEqual(len(dlist), 16, 'list should contain 16')  # at least disk 0, 1, 2, 7, 8, 9, 10-19
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                     'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),
-                                               {'type': DataList.where_operator.OR,
-                                                'items': [('size', DataList.operator.LT, 3),
-                                                          ('size', DataList.operator.GT, 6)]}]})
+                                    'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),
+                                              {'type': DataList.where_operator.OR,
+                                               'items': [('size', DataList.operator.LT, 3),
+                                                         ('size', DataList.operator.GT, 6)]}]})
         self.assertEqual(len(dlist), 6, 'list should contain 6')  # disk 0, 1, 2, 7, 8, 9
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('size', DataList.operator.LT, 3),
@@ -277,7 +277,7 @@ class Basic(unittest.TestCase):
                                                          ('size', DataList.operator.LT, 6)]}]})
         self.assertEqual(len(dlist), 2, 'list should contain 2')  # disk 4 and 5
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                     'items': [('machine.name', DataList.operator.EQUALS, 'machine'),
+                                    'items': [('machine.name', DataList.operator.EQUALS, 'machine'),
                                               ('name', DataList.operator.EQUALS, 'test_3')]})
         self.assertEqual(len(dlist), 1, 'list should contain 1')  # disk 3
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,

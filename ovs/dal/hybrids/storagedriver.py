@@ -83,9 +83,11 @@ class StorageDriver(DataObject):
                 clients.append({'key': '{0}:{1}'.format(item.ip, item.port),
                                 'object_id': item.object_id,
                                 'ip': item.ip,
-                                'port': item.port})
-        except Exception as ex:
-                StorageDriver._logger.error('Error loading edge clients from {0}: {1}'.format(self.storagedriver_id, ex))
+                                'port': item.port,
+                                'server_ip': self.storage_ip,
+                                'server_port': self.ports['edge']})
+        except Exception:
+            StorageDriver._logger.exception('Error loading edge clients from {0}'.format(self.storagedriver_id))
         clients.sort(key=lambda e: (e['ip'], e['port']))
         return clients
 
@@ -131,22 +133,44 @@ class StorageDriver(DataObject):
 
         cache_read = None
         cache_write = None
+        cache_quota_fc = None
+        cache_quota_bc = None
         backend_info = None
         connection_info = None
+        block_cache_read = None
+        block_cache_write = None
+        block_cache_backend_info = None
+        block_cache_connection_info = None
         metadata_key = 'backend_aa_{0}'.format(self.storagerouter_guid)
-        if metadata_key in self.vpool.metadata:  # Accelerated ALBA
+        if metadata_key in self.vpool.metadata:
             metadata = self.vpool.metadata[metadata_key]
             backend_info = metadata['backend_info']
             connection_info = metadata['connection_info']
+        metadata_key = 'backend_bc_{0}'.format(self.storagerouter_guid)
+        if metadata_key in self.vpool.metadata:
+            metadata = self.vpool.metadata[metadata_key]
+            block_cache_backend_info = metadata['backend_info']
+            block_cache_connection_info = metadata['connection_info']
+
         if self.storagerouter_guid in self.vpool.metadata['backend']['caching_info']:
             caching_info = self.vpool.metadata['backend']['caching_info'][self.storagerouter_guid]
             cache_read = caching_info['fragment_cache_on_read']
             cache_write = caching_info['fragment_cache_on_write']
+            cache_quota_fc = caching_info.get('quota_fc')
+            cache_quota_bc = caching_info.get('quota_bc')
+            block_cache_read = caching_info.get('block_cache_on_read')
+            block_cache_write = caching_info.get('block_cache_on_write')
 
         return {'cache_read': cache_read,
                 'cache_write': cache_write,
+                'cache_quota_fc': cache_quota_fc,
+                'cache_quota_bc': cache_quota_bc,
                 'backend_info': backend_info,
                 'connection_info': connection_info,
+                'block_cache_read': block_cache_read,
+                'block_cache_write': block_cache_write,
+                'block_cache_backend_info': block_cache_backend_info,
+                'block_cache_connection_info': block_cache_connection_info,
                 'global_write_buffer': global_write_buffer}
 
     def _cluster_node_config(self):

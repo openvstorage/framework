@@ -18,12 +18,11 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
-    '../wizards/clone/index', '../wizards/vdiskmove/index', '../wizards/rollback/index', '../wizards/snapshot/index',
-    '../wizards/scrub/index'
+    '../wizards/clone/index', '../wizards/vdiskmove/index', '../wizards/rollback/index', '../wizards/snapshot/index'
 ], function(
     $, app, dialog, ko, router, shared, generic, Refresher, api,
     VDisk, VPool, StorageRouter, Domain,
-    CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard, ScrubWizard
+    CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard
 ) {
     "use strict";
     return function() {
@@ -45,8 +44,10 @@ define([
             { key: undefined,       value: $.t('ovs:generic.actions'),     width: 60        }
         ];
         self.edgeClientHeaders = [
-            { key: 'ip',    value: $.t('ovs:generic.ip'),    width: 200       },
-            { key: 'port',  value: $.t('ovs:generic.port'),  width: undefined }
+            { key: 'clientIp',   value: $.t('ovs:vdisks.detail.client_ip'),   width: 150       },
+            { key: 'clientPort', value: $.t('ovs:vdisks.detail.client_port'), width: 100       },
+            { key: 'serverIp',   value: $.t('ovs:vdisks.detail.server_ip'),   width: 150       },
+            { key: 'serverPort', value: $.t('ovs:vdisks.detail.server_port'), width: undefined }
         ];
 
         // Observables
@@ -80,7 +81,7 @@ define([
                             vPoolGuid = vdisk.vpoolGuid();
                         if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
                             sr = new StorageRouter(storageRouterGuid);
-                            sr.load();
+                            sr.load('features');
                             vdisk.storageRouter(sr);
                         }
                         if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
@@ -102,6 +103,7 @@ define([
                 var vdisk = self.vDisk();
                 if (vdisk !== undefined && generic.xhrCompleted(self.loadDomainHandle)) {
                     self.loadDomainHandle = api.get('domains', { queryparams: {
+                        sort: 'name',
                         contents: 'storage_router_layout',
                         vdisk_guid: vdisk.guid()
                     }})
@@ -237,17 +239,49 @@ define([
         };
         self.scrub = function() {
             if (self.vDisk() !== undefined) {
-                dialog.show(new ScrubWizard({
-                    modal: true,
-                    vdisk: self.vDisk()
-                }));
+                var vd = self.vDisk();
+                app.showMessage(
+                        $.t('ovs:vdisks.scrub.title_message', {vdisk: vd.name()}),
+                        $.t('ovs:vdisks.scrub.title', {vdisk: vd.name()}),
+                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:generic.yes')) {
+                            generic.alertInfo(
+                                $.t('ovs:vdisks.scrub.started_title'),
+                                $.t('ovs:vdisks.scrub.started_message', {vdisk: vd.name()})
+                            );
+                            api.post('vdisks/' + vd.guid() + '/scrub')
+                                .then(self.shared.tasks.wait)
+                                .done(function() {
+                                    generic.alertSuccess(
+                                        $.t('ovs:vdisks.scrub.success_title'),
+                                        $.t('ovs:vdisks.scrub.success_message', {vdisk: vd.name()})
+                                    );
+                                })
+                                .fail(function(error) {
+                                    error = generic.extractErrorMessage(error);
+                                    generic.alertError(
+                                        $.t('ovs:vdisks.scrub.failed_title'),
+                                        $.t('ovs:vdisks.scrub.failed_message', {vdisk: vd.name(), why: error})
+                                    );
+                                });
+                        }
+                    });
             }
         };
         self.saveConfiguration = function() {
             if (self.vDisk() !== undefined) {
-                var vd = self.vDisk();
+                var vd = self.vDisk(), new_config = $.extend({}, vd.configuration());
+                if (!isNaN(new_config.cache_quota)) {
+                    new_config.cache_quota *= Math.pow(1024, 3);
+                } else {
+                    // Update current configuration to default value stored in vPool, otherwise 'Save' button will be enabled after saving
+                    var quota = vd.vpool().metadata().backend.caching_info[self.vDisk().storageRouterGuid()].quota;
+                    vd.configuration().cache_quota = quota / Math.pow(1024.0, 3);
+                }
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
-                    data: { new_config_params: vd.configuration() }
+                    data: { new_config_params: new_config }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {
@@ -408,6 +442,39 @@ define([
                 return $.t('ovs:vdisks.detail.is_clone');
             }
             return $.t('ovs:vdisks.detail.set_as_template');
+        });
+        self.equalsDefaultCacheQuota = ko.computed(function() {
+            var allFalse = {fragment: false, block: false};
+            if (self.vDisk() === undefined || self.vDisk().configuration() === undefined) {
+                return allFalse;
+            }
+            var vPool = self.vDisk().vpool();
+            if (vPool === undefined || vPool.metadata() === undefined) {
+                return allFalse;
+            }
+            if (vPool.metadata().backend.caching_info.hasOwnProperty(self.vDisk().storageRouterGuid())) {
+                var cachingInfo = vPool.metadata().backend.caching_info[self.vDisk().storageRouterGuid()],
+                    vPoolFragment = cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_fc', null) : null,
+                    vPoollock = cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_bc', null) : null,
+                    vDiskFragment = self.vDisk().fragmentCQ() !== undefined && self.vDisk().fragmentCQ() !== '' ? Math.round(self.vDisk().fragmentCQ() * Math.pow(1024.0, 3)) : null,
+                    vDiskBlock = self.vDisk().blockCQ() !== undefined && self.vDisk().blockCQ() !== '' ? Math.round(self.vDisk().blockCQ() * Math.pow(1024.0, 3)) : null;
+                return {fragment: vPoolFragment === vDiskFragment, block: vPoollock === vDiskBlock};
+            }
+            return allFalse;
+        });
+        self.hasCacheQuota = ko.computed(function() {
+            if (self.vDisk() !== undefined && self.vDisk().storageRouter() !== undefined && self.vDisk().storageRouter().features() !== undefined) {
+                var features = self.vDisk().storageRouter().features();
+                return features.alba.features !== undefined && features.alba.features.contains('cache-quota');
+            }
+            return false;
+        });
+        self.hasBlockCache = ko.computed(function() {
+            if (self.vDisk() !== undefined && self.vDisk().storageRouter() !== undefined && self.vDisk().storageRouter().features() !== undefined) {
+                var features = self.vDisk().storageRouter().features();
+                return features.alba.features !== undefined && features.alba.features.contains('block-cache');
+            }
+            return false;
         });
 
         // Durandal

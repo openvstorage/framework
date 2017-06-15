@@ -29,9 +29,9 @@ import subprocess
 from celery.schedules import crontab
 from ovs.dal.helpers import DalToolbox
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.interactive import Interactive
+from ovs_extensions.generic.interactive import Interactive
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.log.log_handler import LogHandler
 
 
@@ -67,8 +67,8 @@ class Toolbox(object):
         for filename in os.listdir(path):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(module):
+                mod = imp.load_source(name, '/'.join([path, filename]))
+                for member in inspect.getmembers(mod):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
                             and 'object' in [base.__name__ for base in member[1].__bases__]:
@@ -92,41 +92,39 @@ class Toolbox(object):
         :param logger: Logger object to use for logging
         :type logger: ovs.log.log_handler.LogHandler
         :param kwargs: Additional named arguments
-        :type kwargs: dict
         :return: Amount of functions executed
         """
         functions = Toolbox.fetch_hooks(component=component, sub_component=sub_component)
         functions_found = len(functions) > 0
         if logger is not None and functions_found is True:
             Toolbox.log(logger=logger, messages='Running "{0} - {1}" hooks'.format(component, sub_component), title=True)
-        for function in functions:
+        for fct in functions:
             if logger is not None:
-                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(function.__module__, function.__name__))
-            function(**kwargs)
+                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(fct.__module__, fct.__name__))
+            fct(**kwargs)
         return functions_found
 
     @staticmethod
-    def verify_required_params(required_params, actual_params, exact_match=False):
+    def verify_required_params(required_params, actual_params, verify_keys=False):
         """
         Verify whether the actual parameters match the required parameters
         :param required_params: Required parameters which actual parameters have to meet
         :type required_params: dict
-
         :param actual_params: Actual parameters to check for validity
         :type actual_params: dict
-
-        :param exact_match: Keys of both dictionaries must be identical
-        :type exact_match: bool
-
+        :param verify_keys: Verify whether the passed in keys are actually part of the required keys
+        :type verify_keys: bool
         :return: None
+        :rtype: NoneType
         """
-        error_messages = []
         if not isinstance(required_params, dict) or not isinstance(actual_params, dict):
             raise RuntimeError('Required and actual parameters must be of type dictionary')
 
-        if exact_match is True:
-            for key in set(actual_params.keys()).difference(required_params.keys()):
-                error_messages.append('Missing key "{0}" in required_params'.format(key))
+        error_messages = []
+        if verify_keys is True:
+            for key in actual_params:
+                if key not in required_params:
+                    error_messages.append('Specified parameter "{0}" is not valid'.format(key))
 
         for required_key, key_info in required_params.iteritems():
             expected_type = key_info[0]
@@ -164,6 +162,8 @@ class Toolbox(object):
                     maximum = expected_value.get('max', sys.maxint)
                     if not minimum <= actual_value <= maximum:
                         error_messages.append('{0} param "{1}" with value "{2}" should be in range: {3} - {4}'.format(mandatory_or_optional, required_key, actual_value, minimum, maximum))
+                    if actual_value in expected_value.get('exclude', []):
+                        error_messages.append('{0} param "{1}" cannot have value {2}'.format(mandatory_or_optional, required_key, actual_value))
             else:
                 if DalToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
                     error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
@@ -213,26 +213,27 @@ class Toolbox(object):
         :param state: State to put the service in
         :param logger: LogHandler Object
         """
+        service_manager = ServiceFactory.get_manager()
         action = None
-        status, _ = ServiceManager.get_service_status(name, client=client)
-        if status is False and state in ['start', 'restart']:
+        status = service_manager.get_service_status(name, client=client)
+        if status != 'active' and state in ['start', 'restart']:
             if logger is not None:
                 logger.debug('{0}: Starting service {1}'.format(client.ip, name))
-            ServiceManager.start_service(name, client=client)
+            service_manager.start_service(name, client=client)
             action = 'Started'
-        elif status is True and state == 'stop':
+        elif status == 'active' and state == 'stop':
             if logger is not None:
                 logger.debug('{0}: Stopping service {1}'.format(client.ip, name))
-            ServiceManager.stop_service(name, client=client)
+            service_manager.stop_service(name, client=client)
             action = 'Stopped'
-        elif status is True and state == 'restart':
+        elif status == 'active' and state == 'restart':
             if logger is not None:
                 logger.debug('{0}: Restarting service {1}'.format(client.ip, name))
-            ServiceManager.restart_service(name, client=client)
+            service_manager.restart_service(name, client=client)
             action = 'Restarted'
 
         if action is None:
-            print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
+            print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status == 'active' else 'halted')
         else:
             if logger is not None:
                 logger.debug('{0}: {1} service {2}'.format(client.ip, action, name))
@@ -243,21 +244,27 @@ class Toolbox(object):
         """
         Wait for service to enter status
         :param client: SSHClient to run commands
-        :param name: name of service
-        :param status: True - running/False - not running
+        :type client: ovs_extensions.generic.sshclient.SSHClient
+        :param name: Name of service
+        :type name: str
+        :param status: 'active' if running, 'inactive' if halted
+        :type status: str
         :param logger: Logging object
+        :type logger: ovs.log.log_handler.LogHandler
+        :return: None
+        :rtype: NoneType
         """
         tries = 10
+        service_manager = ServiceFactory.get_manager()
+        service_status = service_manager.get_service_status(name, client)
         while tries > 0:
-            service_status, _ = ServiceManager.get_service_status(name, client)
             if service_status == status:
-                break
+                return
             logger.debug('... waiting for service {0}'.format(name))
             tries -= 1
             time.sleep(10 - tries)
-        service_status, output = ServiceManager.get_service_status(name, client)
-        if service_status != status:
-            raise RuntimeError('Service {0} does not have expected status: {1}'.format(name, output))
+            service_status = service_manager.get_service_status(name, client)
+        raise RuntimeError('Service {0} does not have expected status: Expected: {1} - Actual: {2}'.format(name, status, service_status))
 
     @staticmethod
     def log(logger, messages, title=False, boxed=False, loglevel='info', silent=False):

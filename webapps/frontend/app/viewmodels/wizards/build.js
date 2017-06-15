@@ -95,19 +95,23 @@ define([
                         .fail(deferred.reject);
                 }).promise()
                     .done(function() {
-                        parent.step(parent.step() + 1);
-                        var step = parent.steps()[parent.step()];
-                        if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
-                            step.shouldSkip()
-                                .done(function(skip) {
-                                    if (skip === true && parent.step() < parent.stepsLength() - 1) {
-                                        parent.step(parent.step() + 1);
-                                    }
-                                    parent.activateStep();
-                                });
-                        } else {
-                            parent.activateStep();
+                        var next = true;
+                        while (next) {
+                            parent.step(parent.step() + 1);
+                            var step = parent.steps()[parent.step()];
+                            if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
+                                step.shouldSkip()
+                                    .done(function(skip) {
+                                        next = skip === true && parent.step() < parent.stepsLength() - 1;
+                                    })
+                                    .fail(function() {
+                                        next = false;
+                                    });
+                            } else {
+                                next = false;
+                            }
                         }
+                        parent.activateStep();
                     })
                     .always(function() {
                         parent.loadingNext(false);
@@ -119,19 +123,23 @@ define([
         };
         parent.previous = function() {
             if (parent.step() > 0) {
-                parent.step(parent.step() - 1);
-                var step = parent.steps()[parent.step()];
-                if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
-                    step.shouldSkip()
-                        .done(function(skip) {
-                            if (skip === true && parent.step() > 0) {
-                                parent.step(parent.step() - 1);
-                            }
-                            parent.activateStep();
-                        });
-                } else {
-                    parent.activateStep();
+                var next = true;
+                while (next) {
+                    parent.step(parent.step() - 1);
+                    var step = parent.steps()[parent.step()];
+                    if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
+                        step.shouldSkip()
+                            .done(function (skip) {
+                                next = skip === true && parent.step() > 0;
+                            })
+                            .fail(function() {
+                                next = false;
+                            })
+                    } else {
+                        next = false;
+                    }
                 }
+                parent.activateStep();
             }
         };
         parent.close = function(success) {

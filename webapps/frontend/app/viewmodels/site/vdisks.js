@@ -54,7 +54,7 @@ define([
         self.vPoolsHandle = undefined;
 
         // Observables
-        self.vPools = ko.observableArray([]);
+        self.runningVPool = ko.observable(false);
 
         // Functions
         self.addVDisk = function() {
@@ -77,7 +77,7 @@ define([
                                     return new VDisk(guid);
                                 },
                                 dependencyLoader: function(item) {
-                                    var vm, sr, pool,
+                                    var sr, pool,
                                         storageRouterGuid = item.storageRouterGuid(),
                                         vPoolGuid = item.vpoolGuid();
                                     if (storageRouterGuid && (item.storageRouter() === undefined || item.storageRouter().guid() !== storageRouterGuid)) {
@@ -112,23 +112,10 @@ define([
                 if (generic.xhrCompleted(self.vPoolsHandle)) {
                     self.vPoolsHandle = api.get('vpools', { queryparams: { contents: '' }})
                         .done(function(data) {
-                            var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                vpdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.vPools,
-                                function(guid) {
-                                    if (!self.vPoolCache.hasOwnProperty(guid)) {
-                                        self.vPoolCache[guid] = new VPool(guid);
-                                    }
-                                    return self.vPoolCache[guid];
-                                }, 'guid'
-                            );
-                            $.each(self.vPools(), function(index, item) {
-                                if (vpdata.hasOwnProperty(item.guid())) {
-                                    item.fillData(vpdata[item.guid()]);
+                                if (item.status === 'RUNNING') {
+                                    self.runningVPool(true);
+                                    return false;
                                 }
                             });
                         });

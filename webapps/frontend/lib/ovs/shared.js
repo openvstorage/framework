@@ -28,6 +28,7 @@ define(['knockout'], function(ko){
             footerData     : ko.observable(ko.observable()),
             nodes          : undefined,
             identification : ko.observable(),
+            releaseName    : '',
             user           : {
                 username: ko.observable(),
                 guid    : ko.observable(),

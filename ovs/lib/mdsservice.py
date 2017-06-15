@@ -72,91 +72,97 @@ class MDSServiceController(object):
         """
         from ovs.lib.storagedriver import StorageDriverController
 
-        # Fetch service sequence number based on MDS services for current vPool and current storage router
-        service_number = -1
-        for mds_service in vpool.mds_services:
-            if mds_service.service.storagerouter_guid == storagerouter.guid:
-                service_number = max(mds_service.number, service_number)
+        prepare_mds_lock = volatile_mutex('prepare_mds_{0}'.format(storagerouter.guid))
+        try:
+            prepare_mds_lock.acquire(30)
 
-        if fresh_only is True and service_number >= 0:
-            return  # There is already 1 or more MDS services running, aborting
+            # Fetch service sequence number based on MDS services for current vPool and current storage router
+            service_number = -1
+            for mds_service in vpool.mds_services:
+                if mds_service.service.storagerouter_guid == storagerouter.guid:
+                    service_number = max(mds_service.number, service_number)
 
-        # VALIDATIONS
-        # Verify passed on StorageRouter is part of the vPool
-        storagerouter.invalidate_dynamics(['vpools_guids'])
-        if vpool.guid not in storagerouter.vpools_guids:
-            raise ValueError('StorageRouter {0} is not part of vPool {1}'.format(storagerouter.name, vpool.name))
+            if fresh_only is True and service_number >= 0:
+                return  # There is already 1 or more MDS services running, aborting
 
-        # Find free port based on MDS services for all vPools on current StorageRouter
-        client = SSHClient(storagerouter)
-        mdsservice_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER)
-        occupied_ports = []
-        for service in mdsservice_type.services:
-            if service.storagerouter_guid == storagerouter.guid:
-                occupied_ports.extend(service.ports)
+            # VALIDATIONS
+            # Verify passed on StorageRouter is part of the vPool
+            storagerouter.invalidate_dynamics(['vpools_guids'])
+            if vpool.guid not in storagerouter.vpools_guids:
+                raise ValueError('StorageRouter {0} is not part of vPool {1}'.format(storagerouter.name, vpool.name))
 
-        mds_port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|mds'.format(System.get_my_machine_id(client)))
-        free_ports = System.get_free_ports(selected_range=mds_port_range,
-                                           exclude=occupied_ports,
-                                           nr=1,
-                                           client=client)
-        if not free_ports:
-            raise RuntimeError('Failed to find an available port on StorageRouter {0} within range {1}'.format(storagerouter.name, mds_port_range))
+            # Find free port based on MDS services for all vPools on current StorageRouter
+            client = SSHClient(storagerouter)
+            mdsservice_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER)
+            occupied_ports = []
+            for service in mdsservice_type.services:
+                if service.storagerouter_guid == storagerouter.guid:
+                    occupied_ports.extend(service.ports)
 
-        # Partition check
-        db_partition = None
-        for disk in storagerouter.disks:
-            for partition in disk.partitions:
-                if DiskPartition.ROLES.DB in partition.roles:
-                    db_partition = partition
-                    break
-        if db_partition is None:
-            raise RuntimeError('Could not find DB partition on StorageRouter {0}'.format(storagerouter.name))
+            mds_port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|mds'.format(System.get_my_machine_id(client)))
+            free_ports = System.get_free_ports(selected_range=mds_port_range,
+                                               exclude=occupied_ports,
+                                               nr=1,
+                                               client=client)
+            if not free_ports:
+                raise RuntimeError('Failed to find an available port on StorageRouter {0} within range {1}'.format(storagerouter.name, mds_port_range))
 
-        # Verify storage driver configured
-        storagedrivers = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid]
-        if not storagedrivers:
-            raise RuntimeError('Expected to find a configured StorageDriver for vpool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
-        storagedriver = storagedrivers[0]
+            # Partition check
+            db_partition = None
+            for disk in storagerouter.disks:
+                for partition in disk.partitions:
+                    if DiskPartition.ROLES.DB in partition.roles:
+                        db_partition = partition
+                        break
+            if db_partition is None:
+                raise RuntimeError('Could not find DB partition on StorageRouter {0}'.format(storagerouter.name))
 
-        # MODEL UPDATES
-        # Service and MDS service
-        service_number += 1
-        service = Service()
-        service.name = 'metadataserver_{0}_{1}'.format(vpool.name, service_number)
-        service.type = mdsservice_type
-        service.ports = [free_ports[0]]
-        service.storagerouter = storagerouter
-        service.save()
-        mds_service = MDSService()
-        mds_service.vpool = vpool
-        mds_service.number = service_number
-        mds_service.service = service
-        mds_service.save()
+            # Verify storage driver configured
+            storagedrivers = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid]
+            if not storagedrivers:
+                raise RuntimeError('Expected to find a configured StorageDriver for vpool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
+            storagedriver = storagedrivers[0]
 
-        # Storage driver partitions
-        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                           'role': DiskPartition.ROLES.DB,
-                                                                           'sub_role': StorageDriverPartition.SUBROLE.MDS,
-                                                                           'partition': db_partition,
-                                                                           'mds_service': mds_service})
+            # MODEL UPDATES
+            # Service and MDS service
+            service_number += 1
+            service = Service()
+            service.name = 'metadataserver_{0}_{1}'.format(vpool.name, service_number)
+            service.type = mdsservice_type
+            service.ports = [free_ports[0]]
+            service.storagerouter = storagerouter
+            service.save()
+            mds_service = MDSService()
+            mds_service.vpool = vpool
+            mds_service.number = service_number
+            mds_service.service = service
+            mds_service.save()
 
-        # CONFIGURATIONS
-        # Volumedriver
-        mds_nodes = []
-        for sd_partition in storagedriver.partitions:
-            if sd_partition.role == DiskPartition.ROLES.DB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS and sd_partition.mds_service is not None:
-                service = sd_partition.mds_service.service
-                mds_nodes.append({'host': service.storagerouter.ip,
-                                  'port': service.ports[0],
-                                  'db_directory': '{0}/db'.format(sd_partition.path),
-                                  'scratch_directory': '{0}/scratch'.format(sd_partition.path)})
+            # Storage driver partitions
+            StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                               'role': DiskPartition.ROLES.DB,
+                                                                               'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                               'partition': db_partition,
+                                                                               'mds_service': mds_service})
 
-        # Generate the correct section in the Storage Driver's configuration
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-        storagedriver_config.load()
-        storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
-        storagedriver_config.save(client)
+            # CONFIGURATIONS
+            # Volumedriver
+            mds_nodes = []
+            for sd_partition in storagedriver.partitions:
+                if sd_partition.role == DiskPartition.ROLES.DB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS and sd_partition.mds_service is not None:
+                    service = sd_partition.mds_service.service
+                    mds_nodes.append({'host': service.storagerouter.ip,
+                                      'port': service.ports[0],
+                                      'db_directory': '{0}/db'.format(sd_partition.path),
+                                      'scratch_directory': '{0}/scratch'.format(sd_partition.path)})
+
+            # Generate the correct section in the Storage Driver's configuration
+            storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+            storagedriver_config.load()
+            storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
+            storagedriver_config.save(client)
+        finally:
+            prepare_mds_lock.release()
 
         return mds_service
 
@@ -327,7 +333,7 @@ class MDSServiceController(object):
             vdisk.reload_client('storagedriver')
             vdisk.reload_client('objectregistry')
 
-            vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
+            vdisk.invalidate_dynamics('storagerouter_guid')
             if vdisk.storagerouter_guid is None:
                 raise SRCObjectNotFoundException('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
 
@@ -835,6 +841,7 @@ class MDSServiceController(object):
         Prints the current MDS layout
         :return: None
         """
+        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
         try:
             while True:
                 output = ['',

@@ -29,7 +29,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.vdisk import VDiskController
 
@@ -60,11 +60,12 @@ class VDiskTest(unittest.TestCase):
         :param storagerouters: StorageRouters to deploy and start a DTL service on
         :return: None
         """
+        service_manager = ServiceFactory.get_manager()
         service_name = 'dtl_{0}'.format(vpool.name)
         for sr in storagerouters.values():
             client = SSHClient(sr, 'root')
-            ServiceManager.add_service(name=service_name, client=client)
-            ServiceManager.start_service(name=service_name, client=client)
+            service_manager.add_service(name=service_name, client=client)
+            service_manager.start_service(name=service_name, client=client)
 
     def test_create_new(self):
         """

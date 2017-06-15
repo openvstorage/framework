@@ -334,21 +334,21 @@ class StorageRouterViewSet(viewsets.ViewSet):
             call_parameters['connection_info']['port'] = call_parameters['backend_connection_info'].get('port', '')
             call_parameters['connection_info']['client_id'] = call_parameters['backend_connection_info'].get('username', '')
             call_parameters['connection_info']['client_secret'] = call_parameters['backend_connection_info'].get('password', '')
-            call_parameters.pop('backend_connection_info')
+            del call_parameters['backend_connection_info']
 
             if 'backend_connection_info_aa' in call_parameters:
-                if 'backend_info_aa' not in call_parameters:
-                    call_parameters['backend_info_aa'] = {}
-                if 'connection_info_aa' not in call_parameters:
-                    call_parameters['connection_info_aa'] = {}
+                if 'backend_info_fc' not in call_parameters:
+                    call_parameters['backend_info_fc'] = {}
+                if 'connection_info_fc' not in call_parameters:
+                    call_parameters['connection_info_fc'] = {}
                 _validate_required_keys(section='backend_connection_info_aa')
-                call_parameters['backend_info_aa']['preset'] = call_parameters['backend_connection_info_aa']['backend']['metadata']
-                call_parameters['backend_info_aa']['alba_backend_guid'] = call_parameters['backend_connection_info_aa']['backend']['backend']
-                call_parameters['connection_info_aa']['host'] = call_parameters['backend_connection_info_aa']['host']
-                call_parameters['connection_info_aa']['port'] = call_parameters['backend_connection_info_aa'].get('port', '')
-                call_parameters['connection_info_aa']['client_id'] = call_parameters['backend_connection_info_aa'].get('username', '')
-                call_parameters['connection_info_aa']['client_secret'] = call_parameters['backend_connection_info_aa'].get('password', '')
-                call_parameters.pop('backend_connection_info_aa')
+                call_parameters['backend_info_fc']['preset'] = call_parameters['backend_connection_info_aa']['backend']['metadata']
+                call_parameters['backend_info_fc']['alba_backend_guid'] = call_parameters['backend_connection_info_aa']['backend']['backend']
+                call_parameters['connection_info_fc']['host'] = call_parameters['backend_connection_info_aa']['host']
+                call_parameters['connection_info_fc']['port'] = call_parameters['backend_connection_info_aa'].get('port', '')
+                call_parameters['connection_info_fc']['client_id'] = call_parameters['backend_connection_info_aa'].get('username', '')
+                call_parameters['connection_info_fc']['client_secret'] = call_parameters['backend_connection_info_aa'].get('password', '')
+                del call_parameters['backend_connection_info_aa']
 
         if version >= 6 and 'backend_connection_info' in call_parameters:
             raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" is deprecated',
@@ -359,8 +359,18 @@ class StorageRouterViewSet(viewsets.ViewSet):
             raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
                                              error='invalid_data')
         connection_info = call_parameters['connection_info']
-        connection_info_aa = call_parameters.get('connection_info_aa')
-        if connection_info['host'] == '' or (connection_info_aa is not None and connection_info_aa['host'] == ''):
+        if 'backend_info_aa' in call_parameters:
+            # Backwards compatibility
+            call_parameters['backend_info_fc'] = call_parameters['backend_info_aa']
+            del call_parameters['backend_info_aa']
+        if 'connection_info_aa' in call_parameters:
+            # Backwards compatibility
+            call_parameters['connection_info_fc'] = call_parameters['connection_info_aa']
+            del call_parameters['connection_info_aa']
+        connection_info_fc = call_parameters.get('connection_info_fc')
+        connection_info_bc = call_parameters.get('connection_info_bc')
+        if connection_info['host'] == '' or (connection_info_fc is not None and connection_info_fc['host'] == '') or \
+                                            (connection_info_bc is not None and connection_info_bc['host'] == ''):
             client = None
             for _client in request.client.user.clients:
                 if _client.ovs_type == 'INTERNAL' and _client.grant_type == 'CLIENT_CREDENTIALS':
@@ -374,12 +384,23 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 connection_info['host'] = local_storagerouter.ip
                 connection_info['port'] = 443
                 connection_info['local'] = True
-            if connection_info_aa is not None and connection_info_aa['host'] == '':
-                connection_info_aa['client_id'] = client.client_id
-                connection_info_aa['client_secret'] = client.client_secret
-                connection_info_aa['host'] = local_storagerouter.ip
-                connection_info_aa['port'] = 443
-                connection_info_aa['local'] = True
+            if connection_info_fc is not None and connection_info_fc['host'] == '':
+                connection_info_fc['client_id'] = client.client_id
+                connection_info_fc['client_secret'] = client.client_secret
+                connection_info_fc['host'] = local_storagerouter.ip
+                connection_info_fc['port'] = 443
+                connection_info_fc['local'] = True
+            if connection_info_bc is not None and connection_info_bc['host'] == '':
+                connection_info_bc['client_id'] = client.client_id
+                connection_info_bc['client_secret'] = client.client_secret
+                connection_info_bc['host'] = local_storagerouter.ip
+                connection_info_bc['port'] = 443
+                connection_info_bc['local'] = True
+
+        if 'block_cache_on_read' not in call_parameters:
+            call_parameters['block_cache_on_read'] = False
+        if 'block_cache_on_write' not in call_parameters:
+            call_parameters['block_cache_on_write'] = False
 
         call_parameters.pop('type', None)
         call_parameters.pop('readcache_size', None)

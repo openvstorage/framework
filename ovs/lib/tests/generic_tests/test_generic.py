@@ -18,7 +18,7 @@
 Generic test module
 """
 import os
-import json
+import re
 import time
 import datetime
 import unittest
@@ -26,11 +26,11 @@ from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.tests.helpers import DalHelper
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.tests.sshclient_mock import MockedSSHClient
-from ovs.extensions.generic.threadhelpers import Waiter
+from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
+from ovs_extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
@@ -268,11 +268,17 @@ class Generic(unittest.TestCase):
         * Scenario 2: 1 vPool, 10 vDisks, 1 scrub role
                       Scrubbing fails for 5 vDisks, check if scrubbing completed for all other vDisks
                       Run scrubbing a 2nd time and verify scrubbing now works for failed vDisks
-        * Scenario 3: 1 vPool, 10 vDisks, 5 scrub roles
+        * Scenario 3: 1 vPool, 11 vDisks, 5 scrub roles
+                      Check template vDisk is NOT scrubbed
                       Check if vDisks are divided among all threads
-        * Scenario 4: 3 vPools, 9 vDisks, 5 scrub roles
-                      Validate 6 threads will be spawned and used out of a potential of 15 (5 scrub roles * 3 vPools)
+        * Scenario 4: 3 vPools, 15 vDisks, 5 scrub roles
+                      Validate 12 threads will be spawned and used out of a potential of 30 (5 scrub roles * 3 vPools * 2 threads per StorageRouter)
                       We limit max amount of threads spawned per vPool to 2 in case 3 to 5 vPools are present
+        * Scenario 5: 2 vPools, 8 vDisks, 2 scrub roles
+                      Validate correct vDisks are scrubbed on expected location when specifying vpool_guids and/or vdisk_guids
+        * Scenario 6: Configure amount of threads per StorageRouter to 5 for SR1
+                      2 vPools, 20 vDisks, 2 scrub roles
+                      Validate expected amount of threads is spawned
         """
         ##############
         # Scenario 1 #
@@ -285,9 +291,7 @@ class Generic(unittest.TestCase):
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vdisk = structure['vdisks'][1]
-        vpool = structure['vpools'][1]
         storagerouter = structure['storagerouters'][1]
-        Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         LockedClient.scrub_controller = {'possible_threads': None,
                                          'volumes': {},
                                          'waiter': Waiter(1)}
@@ -295,28 +299,40 @@ class Generic(unittest.TestCase):
                                                                      'scrub_work': [0]}
 
         # Remove SCRUB partition from StorageRouter and try to scrub on it
+        expected_log = 'Scrubber - Storage Router {0} is not reachable'.format(storagerouter.ip)
         storagerouter.disks[0].partitions[0].roles = []
         storagerouter.disks[0].partitions[0].save()
-        with self.assertRaises(RuntimeError) as raise_info:
-            VDiskController.scrub_single_vdisk(vdisk.guid, storagerouter.guid)
-        self.assertEqual(first='No scrub locations found on StorageRouter {0}'.format(storagerouter.name),
-                         second=raise_info.exception.message,
-                         msg='Incorrect error message caught')
+        with self.assertRaises(ValueError) as raise_info:
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid])
+        self.assertIn(member='No scrub locations found',
+                      container=raise_info.exception.message)
+        self.assertNotIn(member=expected_log,
+                         container=LogHandler._logs['lib_generic tasks'])
 
-        # Restore SCRUB partition and attempt to scrub
+        # Restore SCRUB partition and make sure StorageRouter is unreachable
         storagerouter.disks[0].partitions[0].roles = [DiskPartition.ROLES.SCRUB]
         storagerouter.disks[0].partitions[0].save()
         storagerouter.invalidate_dynamics('partition_config')
+        SSHClient._raise_exceptions[storagerouter.ip] = {'users': ['root'], 'exception': UnableToConnectException('No route to host')}
+        with self.assertRaises(ValueError):
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid])
+        logs = LogHandler._logs['lib_generic tasks']
+        self.assertIn(member=expected_log,
+                      container=logs)
+        self.assertEqual(first=logs[expected_log],
+                         second='warning')
+
+        # Now actually attempt to scrub
+        SSHClient._raise_exceptions = {}
         with self.assertRaises(Exception) as raise_info:
-            VDiskController.scrub_single_vdisk(vdisk.guid, storagerouter.guid)
-        self.assertIn(member='Error when scrubbing vDisk {0}'.format(vdisk.guid),
-                      container=raise_info.exception.message,
-                      msg='Incorrect error message caught')
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid)
+        self.assertIn(member='StorageRouter {0} - vDisk {1} - Scrubbing failed'.format(storagerouter.name, vdisk.name),
+                      container=raise_info.exception.message)
 
         # Make sure scrubbing succeeds now
         LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                      'scrub_work': [0]}
-        VDiskController.scrub_single_vdisk(vdisk.guid, storagerouter.guid)
+        GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid)
         with vdisk.storagedriver_client.make_locked_client(vdisk.volume_id) as locked_client:
             self.assertEqual(first=len(locked_client.get_scrubbing_workunits()),
                              second=0,
@@ -340,8 +356,8 @@ class Generic(unittest.TestCase):
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
         storagerouter_3 = structure['storagerouters'][3]
-        Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
-        LockedClient.scrub_controller = {'possible_threads': ['scrub_{0}_{1}'.format(vpool.guid, storagerouter_1.guid)],
+        LockedClient.scrub_controller = {'possible_threads': ['execute_scrub_{0}_{1}_0'.format(vpool.guid, storagerouter_1.guid),
+                                                              'execute_scrub_{0}_{1}_1'.format(vpool.guid, storagerouter_1.guid)],
                                          'volumes': {},
                                          'waiter': Waiter(1)}
 
@@ -446,10 +462,10 @@ class Generic(unittest.TestCase):
         vdisk_11 = structure['vdisks'][11]
         vdisk_11.storagedriver_client.set_volume_as_template(volume_id=vdisk_11.volume_id)
 
-        storagerouters = structure['storagerouters']
-        Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
-
-        thread_names = ['scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid) for storagerouter in storagerouters.values()]
+        thread_names = []
+        for storagerouter in structure['storagerouters'].values():
+            for index in range(2):
+                thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index))
         LockedClient.scrub_controller = {'possible_threads': thread_names,
                                          'volumes': {},
                                          'waiter': Waiter(len(thread_names))}
@@ -459,9 +475,11 @@ class Generic(unittest.TestCase):
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
         GenericController.execute_scrub()
+        # Verify all threads have been 'consumed'
         self.assertEqual(first=len(LockedClient.thread_names),
-                         second=0,
-                         msg='Not all threads have been used in the process')
+                         second=0)
+        self.assertIn(member='Scrubber - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vpool.name, vdisk_11.guid, vdisk_11.name),
+                      container=LogHandler._logs['lib_generic tasks'])
 
         ##############
         # Scenario 4 #
@@ -470,8 +488,9 @@ class Generic(unittest.TestCase):
         self.persistent._clean()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2, 3],
-             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 2, 2, 2), (5, 2, 2, 2),
-                        (6, 2, 2, 2), (7, 3, 3, 3), (8, 3, 3, 3), (9, 3, 3, 3)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
+                        (6, 2, 2, 2), (7, 2, 2, 2), (8, 2, 2, 2), (9, 2, 2, 2), (10, 2, 2, 2),
+                        (11, 3, 3, 3), (12, 3, 3, 3), (13, 3, 3, 3), (14, 3, 3, 3), (15, 3, 3, 3)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1), (2, 2), (3, 3)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1, 2, 3, 4, 5],
              'storagedrivers': [(1, 1, 1), (2, 2, 1), (3, 3, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -480,14 +499,21 @@ class Generic(unittest.TestCase):
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
 
+        # Amount of actual threads calculation:
+        #   - Threads per VPool * vPools * 2 threads per StorageRouter
+        #   - Threads per vPool is 2 when 3 vPools and 5 StorageRouters
+        #   - Amount of threads that will be created: 2 * 3 * 2 = 12
+        # Amount of possible threads calculation:
+        #   - vPools * StorageRouters * 2 threads per StorageRouter
+        #   - Amount of possible threads to be created: 3 * 5 * 2 = 30
         thread_names = []
         for vpool in vpools.values():
-            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
             for storagerouter in storagerouters.values():
-                thread_names.append('scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid))
+                for index in range(2):
+                    thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index))
         LockedClient.scrub_controller = {'possible_threads': thread_names,
                                          'volumes': {},
-                                         'waiter': Waiter(len(thread_names) - 9)}
+                                         'waiter': Waiter(12)}
         LockedClient.thread_names = thread_names[:]
         for vdisk_id in sorted(vdisks):
             vdisk = vdisks[vdisk_id]
@@ -495,15 +521,172 @@ class Generic(unittest.TestCase):
                                                                          'scrub_work': range(vdisk_id)}
         GenericController.execute_scrub()
         self.assertEqual(first=len(LockedClient.thread_names),
-                         second=9,  # 5 srs * 3 vps = 15 threads, but only 2 will be spawned per vPool --> 15 - 6 = 9 left
+                         second=18,  # 30 possible thread_names - 12 which should be created and consumed
                          msg='Not all threads have been used in the process')
 
-        # 3 vPools will cause the scrubber to only launch 2 threads per vPool --> 1 possible thread should be unused per vPool
+        # Of the 18 threads which have been created and consumed, 6 should have been created for each vPool
         for vpool in vpools.values():
             threads_left = [thread_name for thread_name in LockedClient.thread_names if vpool.guid in thread_name]
             self.assertEqual(first=len(threads_left),
-                             second=3,
+                             second=6,
                              msg='Unexpected amount of threads left for vPool {0}'.format(vpool.name))
+
+        ##############
+        # Scenario 5 #
+        ##############
+        self.volatile._clean()
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1, 2],
+             'vdisks': [(1, 1, 1, 1), (2, 2, 1, 2), (3, 3, 2, 3), (4, 4, 2, 4),
+                        (5, 1, 1, 1), (6, 2, 1, 2), (7, 3, 2, 3), (8, 4, 2, 4)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)],  # (<id>, <storagedriver_id>)
+             'storagerouters': [1, 2],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        vpools = structure['vpools']
+        vdisks = structure['vdisks']
+        storagerouters = structure['storagerouters']
+
+        # Amount of actual threads calculation:
+        #   - Threads per VPool * vPools * 2 threads per StorageRouter
+        #   - Threads per vPool is 2 when 2 vPools and 2 StorageRouters
+        #   - Amount of threads that will be created: 2 * 2 * 2 = 8
+        # Amount of possible threads calculation:
+        #   - vPools * StorageRouters * 2 threads per StorageRouter
+        #   - Amount of possible threads to be created: 2 * 2 * 2 = 8
+        thread_names = []
+        for vpool in vpools.values():
+            for storagerouter in storagerouters.values():
+                for index in range(2):
+                    thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index))
+        LockedClient.scrub_controller = {'possible_threads': thread_names,
+                                         'volumes': {},
+                                         'waiter': Waiter(len(thread_names))}
+
+        # Scrub all volumes
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
+                                                                         'scrub_work': range(vdisk_id)}
+        GenericController.execute_scrub()
+        for vdisk in vdisks.values():
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=[])
+
+        # Scrub all volumes of vPool1
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
+        GenericController.execute_scrub(vpool_guids=[vpools[1].guid])
+        for vdisk_id, vdisk in vdisks.iteritems():
+            if vdisk.vpool == vpools[1]:
+                expected_work = []
+            else:
+                expected_work = range(vdisk_id)
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=expected_work)
+
+        # Scrub a specific vDisk
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
+        GenericController.execute_scrub(vdisk_guids=[vdisks[2].guid])
+        for vdisk_id, vdisk in vdisks.iteritems():
+            if vdisk == vdisks[2]:
+                expected_work = []
+            else:
+                expected_work = range(vdisk_id)
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=expected_work)
+
+        # Scrub a combination of a vPool and a vDisk
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
+        GenericController.execute_scrub(vpool_guids=[vpools[2].guid], vdisk_guids=[vdisks[2].guid])
+        for vdisk_id, vdisk in vdisks.iteritems():
+            if vdisk == vdisks[2] or vdisk.vpool == vpools[2]:
+                expected_work = []
+            else:
+                expected_work = range(vdisk_id)
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=expected_work)
+
+        # Scrub all volumes on specific StorageRouter
+        LogHandler._logs = {}
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
+        GenericController.execute_scrub(storagerouter_guid=storagerouters[2].guid)
+        for vdisk_id, vdisk in vdisks.iteritems():
+            self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
+                                 list2=[])
+        logs = LogHandler._logs['lib_generic tasks']
+        for log in logs:
+            self.assertNotRegexpMatches(text=log,
+                                        unexpected_regexp='.*Scrubber - vPool [{0}|{1}] - StorageRouter {2} - .*'.format(vpools[1].name, vpools[2].name, storagerouters[1].name))
+
+        ##############
+        # Scenario 6 #
+        ##############
+        self.volatile._clean()
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1, 2],
+             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
+                        (6, 2, 1, 2), (7, 2, 1, 2), (8, 2, 1, 2), (9, 2, 1, 2), (10, 2, 1, 2),
+                        (11, 3, 2, 3), (12, 3, 2, 3), (13, 3, 2, 3), (14, 3, 2, 3), (15, 3, 2, 3),
+                        (16, 4, 2, 4), (17, 4, 2, 4), (18, 4, 2, 4), (19, 4, 2, 4), (20, 4, 2, 4)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)],  # (<id>, <storagedriver_id>)
+             'storagerouters': [1, 2],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        vpools = structure['vpools']
+        vdisks = structure['vdisks']
+        storagerouters = structure['storagerouters']
+
+        # Set amount of stack threads for SR1 to 5 and leave for SR2 to default (2)
+        sr_1_threads = 5
+        sr_2_threads = 2
+        Configuration.set(key='/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(storagerouters[1].machine_id), value=sr_1_threads)
+        # Amount of actual threads calculation:
+        #   - Threads per VPool * vPools * <scrub_stack_threads> threads per StorageRouter
+        #   - Threads per vPool is 2 when 2 vPools and 2 StorageRouters
+        #   - Amount of threads that will be created:  2 * 2 * (2 + 5) / 2 = 14
+        #       - For StorageRouter 1: 10
+        #       - For StorageRouter 2: 4
+        # Amount of possible threads calculation:
+        #   - vPools * StorageRouters * <scrub_stack_threads> threads per StorageRouter
+        #   - Amount of possible threads to be created: 2 * 2 * (2 + 5) / 2 = 14
+        thread_names = []
+        for vpool in vpools.values():
+            for storagerouter in storagerouters.values():
+                stack_threads = sr_1_threads if storagerouter == storagerouters[1] else sr_2_threads
+                for index in range(stack_threads):
+                    thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index))
+        LockedClient.scrub_controller = {'possible_threads': thread_names,
+                                         'volumes': {},
+                                         'waiter': Waiter(14)}
+        LockedClient.thread_names = thread_names[:]
+        for vdisk_id in sorted(vdisks):
+            vdisk = vdisks[vdisk_id]
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
+                                                                         'scrub_work': range(vdisk_id)}
+        LogHandler._logs = {}
+        GenericController.execute_scrub()
+        # Verify all threads have been 'consumed'
+        self.assertEqual(first=len(LockedClient.thread_names),
+                         second=0)
+        counter = 0
+        for log in LogHandler._logs['lib_generic tasks']:
+            if 'threads for proxy service' in log:
+                match = re.match('^Scrubber - .*ovs-albaproxy_[1|2]_([1|2])_.*', log)
+                self.assertIsNotNone(match)
+                if match.groups()[0] == storagerouters[1].name:
+                    expected_threads = 5
+                else:
+                    expected_threads = 2
+                self.assertIn(member='Spawning {0} threads for proxy'.format(expected_threads),
+                              container=log)
+                counter += 1
+        self.assertEqual(first=4,  # Log entry for each combination of 2 vPools and 2 StorageRouters
+                         second=counter)
 
     def test_arakoon_collapse(self):
         """
@@ -538,17 +721,18 @@ class Generic(unittest.TestCase):
                 cluster_name = cluster_info['name']
 
                 base_dir = DalHelper.CLUSTER_DIR.format(cluster_name)
-                info = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
-                                                       cluster_type=cluster_type,
-                                                       ip=storagerouter_1.ip,
-                                                       base_dir=base_dir,
-                                                       internal=internal)
-                ArakoonInstaller.start_cluster(metadata=info['metadata'],
-                                               ip=storagerouter_1.ip if filesystem is True else None)
-                ArakoonInstaller.extend_cluster(cluster_name=cluster_name,
-                                                ip=storagerouter_1.ip if filesystem is True else None,
-                                                new_ip=storagerouter_2.ip,
-                                                base_dir=base_dir)
+                arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
+                arakoon_installer.create_cluster(cluster_type=cluster_type,
+                                                 ip=storagerouter_1.ip,
+                                                 base_dir=base_dir,
+                                                 internal=internal,
+                                                 log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(cluster_name)),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(cluster_name)))
+                arakoon_installer.start_cluster()
+                arakoon_installer.extend_cluster(new_ip=storagerouter_2.ip,
+                                                 base_dir=base_dir,
+                                                 log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(cluster_name)),
+                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(cluster_name)))
 
                 service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
                 if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.ABM:
@@ -562,11 +746,11 @@ class Generic(unittest.TestCase):
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type,
                                              storagerouter=storagerouter_1,
-                                             ports=info['ports'])
+                                             ports=arakoon_installer.ports[storagerouter_1.ip])
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type,
                                              storagerouter=storagerouter_2,
-                                             ports=info['ports'])
+                                             ports=arakoon_installer.ports[storagerouter_2.ip])
                 else:
                     DalHelper.create_service(service_name=service_name,
                                              service_type=service_type)

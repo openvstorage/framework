@@ -41,5 +41,6 @@ define([
         data.storageRouters([]);
         data.vPool(undefined);
         data.vPools([]);
+        data.vPoolUsableBackendMap({});
     };
 });

@@ -39,7 +39,7 @@ but WITHOUT ANY WARRANTY of any kind.
                           data-i18n="[html]ovs:icons.loading"></span>
                     <div data-bind="status: {
                                         colors: {
-                                            blue: liveStatus() === 'installing',
+                                            blue: ['installing', 'deleting'].contains(liveStatus()),
                                             green: liveStatus() === 'running',
                                             orange: liveStatus() === 'warning',
                                             red: liveStatus() === 'failure'

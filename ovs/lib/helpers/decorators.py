@@ -50,6 +50,7 @@ class Decorators(object):
         Decorators.unittest_thread_info_by_state = {'WAITING': [],
                                                     'FINISHED': []}
 
+
 def log(event_type):
     """
     Task logger
@@ -57,10 +58,10 @@ def log(event_type):
     :return: Pointer to function
     """
 
-    def wrap(function):
+    def wrap(f):
         """
         Wrapper function
-        :param function: Function to log something about
+        :param f: Function to log something about
         """
 
         def new_function(*args, **kwargs):
@@ -76,18 +77,18 @@ def log(event_type):
                 metadata = {}
             _logger = LogHandler.get('log', name=event_type.lower())
             _logger.info('[{0}.{1}] - {2} - {3} - {4}'.format(
-                function.__module__,
-                function.__name__,
+                f.__module__,
+                f.__name__,
                 json.dumps(list(args)),
                 json.dumps(kwargs),
                 json.dumps(metadata)
             ))
 
             # Call the function
-            return function(*args, **kwargs)
+            return f(*args, **kwargs)
 
-        new_function.__name__ = function.__name__
-        new_function.__module__ = function.__module__
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
 
     return wrap
@@ -148,10 +149,10 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
     """
     logger = LogHandler.get('lib', name='ensure single')
 
-    def wrap(function):
+    def wrap(f):
         """
         Wrapper function
-        :param function: Function to check
+        :param f: Function to check
         """
         def new_function(self, *args, **kwargs):
             """
@@ -207,7 +208,8 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
 
             now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
-            async_task = self.request.id is not None  # Async tasks have an ID, inline executed tasks have None as ID
+            task_id = self.request.id
+            async_task = task_id is not None  # Async tasks have an ID, inline executed tasks have None as ID
             task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
             thread_name = threading.current_thread().getName()
             unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
@@ -231,12 +233,13 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                 return callback(*args, **kwargs)
 
                     log_message('Setting key {0}'.format(persistent_key))
-                    persistent_client.set(persistent_key, {'mode': mode})
+                    persistent_client.set(persistent_key, {'mode': mode,
+                                                           'values': [{'task_id': task_id}]})
 
                 try:
                     if unittest_mode is True:
                         Decorators.unittest_thread_info_by_name[thread_name] = ('EXECUTING', None)
-                    output = function(*args, **kwargs)
+                    output = f(*args, **kwargs)
                     if unittest_mode is True:
                         Decorators.unittest_thread_info_by_name[thread_name] = ('FINISHED', None)
                         Decorators.unittest_thread_info_by_state['FINISHED'].append(thread_name)
@@ -256,7 +259,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 # Update kwargs with args
                 sleep = 1 if unittest_mode is False else 0.1
                 timeout = kwargs.pop('ensure_single_timeout', 10 if unittest_mode is True else global_timeout)
-                function_info = inspect.getargspec(function)
+                function_info = inspect.getargspec(f)
                 kwargs_dict = {}
                 for index, arg in enumerate(args):
                     kwargs_dict[function_info.args[index]] = arg
@@ -318,6 +321,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 update_value(key=persistent_key,
                              append=True,
                              value_to_update={'kwargs': kwargs_dict,
+                                              'task_id': task_id,
                                               'timestamp': now})
 
                 # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
@@ -328,6 +332,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                         queued_jobs = [v for v in values[0]['values'] if v['kwargs'] == kwargs_dict]
                         if len(queued_jobs) != 1:
                             if unittest_mode is True:
+                                Decorators.unittest_thread_info_by_name[thread_name] = ('WAITING', None)
                                 if thread_name not in Decorators.unittest_thread_info_by_state['WAITING']:
                                     Decorators.unittest_thread_info_by_state['WAITING'].append(thread_name)
                         else:
@@ -338,7 +343,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                                                                                                          slept))
                                 if unittest_mode is True:
                                     Decorators.unittest_thread_info_by_name[thread_name] = ('EXECUTING', None)
-                                output = function(*args, **kwargs)
+                                output = f(*args, **kwargs)
                                 if unittest_mode is True:
                                     Decorators.unittest_thread_info_by_name[thread_name] = ('FINISHED', None)
                                     Decorators.unittest_thread_info_by_state['FINISHED'].append(thread_name)
@@ -354,6 +359,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                         update_value(key=persistent_key,
                                      append=False,
                                      value_to_update={'kwargs': kwargs_dict,
+                                                      'task_id': task_id,
                                                       'timestamp': now})
                         log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
                                     level='error')
@@ -373,7 +379,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 # Update kwargs with args
                 sleep = 1 if unittest_mode is False else 0.1
                 timeout = kwargs.pop('ensure_single_timeout', 10 if unittest_mode is True else global_timeout)
-                function_info = inspect.getargspec(function)
+                function_info = inspect.getargspec(f)
                 kwargs_dict = {}
                 for index, arg in enumerate(args):
                     kwargs_dict[function_info.args[index]] = arg
@@ -432,6 +438,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                 update_value(key=persistent_key,
                              append=True,
                              value_to_update={'kwargs': kwargs_dict,
+                                              'task_id': task_id,
                                               'timestamp': now})
 
                 # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
@@ -451,7 +458,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                                                                                                                      slept))
                             if unittest_mode is True:
                                 Decorators.unittest_thread_info_by_name[thread_name] = ('EXECUTING', None)
-                            output = function(*args, **kwargs)
+                            output = f(*args, **kwargs)
                             if unittest_mode is True:
                                 Decorators.unittest_thread_info_by_name[thread_name] = ('FINISHED', None)
                                 Decorators.unittest_thread_info_by_state['FINISHED'].append(thread_name)
@@ -472,6 +479,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
                         update_value(key=persistent_key,
                                      append=False,
                                      value_to_update={'kwargs': kwargs_dict,
+                                                      'task_id': task_id,
                                                       'timestamp': now})
                         log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
                                     level='error')
@@ -484,8 +492,8 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
             else:
                 raise ValueError('Unsupported mode "{0}" provided'.format(mode))
 
-        new_function.__name__ = function.__name__
-        new_function.__module__ = function.__module__
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -496,18 +504,18 @@ def add_hooks(hook_type, hooks):
     :param hook_type: Type of hook
     :param hooks: Hooks to add to function
     """
-    def wrap(function):
+    def wrap(f):
         """
         Wrapper function
-        :param function: Function to add hooks on
+        :param f: Function to add hooks on
         """
-        if not hasattr(function, 'hooks'):
-            function.hooks = {}
-        if hook_type not in function.hooks:
-            function.hooks[hook_type] = []
+        if not hasattr(f, 'hooks'):
+            f.hooks = {}
+        if hook_type not in f.hooks:
+            f.hooks[hook_type] = []
         if isinstance(hooks, list):
-            function.hooks[hook_type] += hooks
+            f.hooks[hook_type] += hooks
         else:
-            function.hooks[hook_type].append(hooks)
-        return function
+            f.hooks[hook_type].append(hooks)
+        return f
     return wrap

@@ -31,7 +31,6 @@ if __name__ == '__main__':
         openstack_webservice_name = 'apache2'
 
     # Cleanup *.pyc files
-    # TODO: set owner:group only where it is really needed
     check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
     check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True)
 

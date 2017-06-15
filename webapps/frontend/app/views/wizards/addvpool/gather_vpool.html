@@ -113,6 +113,24 @@ but WITHOUT ANY WARRANTY of any kind.
                              }"></span>
         </div>
     </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" for="proxyAmount" data-i18n="ovs:wizards.add_vpool.gather_vpool.proxy_amount"></label>
+        <div class="col-lg-3">
+            <div class="input-group">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="button" data-bind="click: function() { data.proxyAmount(Math.max(1, parseInt('0' + data.proxyAmount(), 10) - 1)); }">
+                        <span class="fa fa-minus"></span>
+                    </button>
+                </span>
+                <input type="text" id="proxyAmount" class="form-control" data-bind="value: data.proxyAmount">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="button" data-bind="click: function() { data.proxyAmount(parseInt('0' + data.proxyAmount(), 10) + 1); }">
+                        <span class="fa fa-plus"></span>
+                    </button>
+                </span>
+            </div>
+        </div>
+    </div>
 
     <p data-i18n="ovs:wizards.add_vpool.gather_vpool.extended_info"></p>
     <div class="form-group">
@@ -147,10 +165,8 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable() && canContinue().value" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset_unavailable"></span>
     </div>
-    <div class="alert alert-info" data-bind="visible: canContinue().value && (loadingMetadata() || data.vPool() !== undefined)" style="margin-top: 20px;">
-        <span data-bind="visible: loadingMetadata()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
-        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.metadata_loading', visible: loadingMetadata()"></span>
-        <p data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.information_extend', visible: data.vPool() !== undefined"></p>
+    <div class="alert alert-info" data-bind="visible: canContinue().value && data.vPool() !== undefined" style="margin-top: 20px;">
+        <p data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.information_extend'"></p>
     </div>
     <div class="alert alert-danger" style="margin-bottom: -3px;"
          data-bind="visible: !canContinue().value || canContinue().showErrors">

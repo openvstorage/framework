@@ -35,6 +35,7 @@ define([
         self.dirty          = ko.observable(false);
         self._enable        = ko.observable();
         self._enableSupport = ko.observable();
+        self.releaseName    = ko.observable(shared.releaseName);
 
         // Handles
         self.supportInfoHandle     = {};

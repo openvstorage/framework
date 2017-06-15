@@ -28,10 +28,10 @@ from django.conf import settings
 from django.core.handlers.wsgi import WSGIRequest
 from functools import wraps
 from rest_framework import status
-from rest_framework.response import Response
 from rest_framework.request import Request
 from api.backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
 from api.backend.toolbox import ApiToolbox
+from api.helpers import OVSResponse
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -70,6 +70,7 @@ def required_roles(roles):
             """
             Wrapped function
             """
+            start = time.time()
             request = _find_request(args)
             if not hasattr(request, 'user') or not hasattr(request, 'client'):
                 raise HttpUnauthorizedException(error_description='Not authenticated',
@@ -81,7 +82,11 @@ def required_roles(roles):
             if not ApiToolbox.is_token_in_roles(request.token, roles):
                 raise HttpForbiddenException(error_description='This call requires roles: {0}'.format(', '.join(roles)),
                                              error='invalid_roles')
-            return f(*args, **kw)
+            duration = time.time() - start
+            result = f(*args, **kw)
+            if isinstance(result, OVSResponse):
+                result.timings['security'] = [duration, 'Security']
+            return result
 
         return new_function
     return wrap
@@ -132,6 +137,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             Wrapped function
             """
             request = _find_request(args)
+            start = time.time()
             new_kwargs = {}
             validation_new_kwargs = {}
             # Find out the arguments of the decorated function
@@ -215,8 +221,12 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             # Execute validator
             if validator is not None:
                 validator(args[0], **validation_new_kwargs)
+            duration = time.time() - start
             # Call the function
-            return f(args[0], **new_kwargs)
+            result = f(args[0], **new_kwargs)
+            if isinstance(result, OVSResponse):
+                result.timings['parsing'] = [duration, 'Request parsing']
+            return result
 
         return new_function
     return wrap
@@ -246,8 +256,10 @@ def return_list(object_type, default_sort=None):
             Wrapped function
             """
             request = _find_request(args)
+            timings = {}
 
             # 1. Pre-loading request data
+            start = time.time()
             sort = request.QUERY_PARAMS.get('sort')
             if sort is None and default_sort is not None:
                 sort = default_sort
@@ -259,18 +271,24 @@ def return_list(object_type, default_sort=None):
             page_size = page_size if page_size in [10, 25, 50, 100] else 10
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
+            timings['preload'] = [time.time() - start, 'Data preloading']
 
             # 2. Construct hints for decorated function (so it can provide full objects if required)
+            start = time.time()
             if 'hints' not in kwargs:
                 kwargs['hints'] = {}
             kwargs['hints']['full'] = sort is not None or contents is not None
+            timings['hinting'] = [time.time() - start, 'Request hinting']
 
             # 3. Fetch data
+            start = time.time()
             data_list = f(*args, **kwargs)
             guid_list = isinstance(data_list, list) and len(data_list) > 0 and isinstance(data_list[0], basestring)
+            timings['fetch'] = [time.time() - start, 'Fetching data']
 
             # 4. Sorting
             if sort is not None:
+                start = time.time()
                 if guid_list is True:
                     data_list = [object_type(guid) for guid in data_list]
                     guid_list = False  # The list is converted to objects
@@ -278,8 +296,10 @@ def return_list(object_type, default_sort=None):
                     desc = sort_item[0] == '-'
                     field = sort_item[1 if desc else 0:]
                     data_list.sort(key=lambda e: DalToolbox.extract_key(e, field), reverse=desc)
+                timings['sort'] = [time.time() - start, 'Sorting data']
 
             # 5. Paging
+            start = time.time()
             total_items = len(data_list)
             page_metadata = {'total_items': total_items,
                              'current_page': 1,
@@ -304,8 +324,10 @@ def return_list(object_type, default_sort=None):
                                                               'end_number': min(total_items, end_number)}.items())
             else:
                 page_metadata['page_size'] = total_items
+            timings['paging'] = [time.time() - start, 'Selecting current page']
 
             # 6. Serializing
+            start = time.time()
             if contents is not None:
                 if guid_list is True:
                     data_list = [object_type(guid) for guid in data_list]
@@ -314,6 +336,23 @@ def return_list(object_type, default_sort=None):
                 if guid_list is False:
                     data_list = [item.guid for item in data_list]
                 data = data_list
+            timings['serializing'] = [time.time() - start, 'Serializing']
+
+            if contents is not None and len(data_list) > 0:
+                object_timings = {}
+                for obj in data_list:
+                    dynamic_timings = obj.get_timings()
+                    for timing in dynamic_timings:
+                        key = 'dynamic_{0}'.format(timing)
+                        if key not in object_timings:
+                            object_timings[key] = []
+                        object_timings[key].append([dynamic_timings[timing], 'Load \'{0}\''.format(timing)])
+                for key in object_timings:
+                    times = [entry[0] for entry in object_timings[key]]
+                    timings[key] = [sum(times), object_timings[key][0][1]]
+                    timings['{0}_avg'.format(key)] = [sum(times) / len(times), '{0} (avg)'.format(object_timings[key][0][1])]
+                    timings['{0}_min'.format(key)] = [min(times), '{0} (min)'.format(object_timings[key][0][1])]
+                    timings['{0}_max'.format(key)] = [max(times), '{0} (max)'.format(object_timings[key][0][1])]
 
             result = {'data': data,
                       '_paging': page_metadata,
@@ -321,7 +360,9 @@ def return_list(object_type, default_sort=None):
                       '_sorting': [s for s in reversed(sort)] if sort else sort}
 
             # 7. Building response
-            return Response(result, status=status.HTTP_200_OK)
+            return OVSResponse(result,
+                               status=status.HTTP_200_OK,
+                               timings=timings)
 
         return new_function
     return wrap
@@ -355,12 +396,26 @@ def return_object(object_type, mode=None):
             Wrapped function
             """
             request = _find_request(args)
+            timings = {}
 
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
 
+            start = time.time()
             obj = f(*args, **kwargs)
-            return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=return_status)
+            timings['fetch'] = [time.time() - start, 'Fetching data']
+
+            obj.reset_timings()
+
+            start = time.time()
+            data = FullSerializer(object_type, contents=contents, instance=obj).data
+            timings['serializing'] = [time.time() - start, 'Serializing']
+
+            dynamic_timings = obj.get_timings()
+            for timing in dynamic_timings:
+                timings['dynamic_{0}'.format(timing)] = [dynamic_timings[timing], 'Load \'{0}\''.format(timing)]
+
+            return OVSResponse(data, status=return_status, timings=timings)
 
         return new_function
     return wrap
@@ -386,8 +441,11 @@ def return_task():
             """
             Wrapped function
             """
+            start = time.time()
             task = f(*args, **kwargs)
-            return Response(task.id, status=status.HTTP_200_OK)
+            return OVSResponse(task.id,
+                               status=status.HTTP_200_OK,
+                               timings={'launch': [time.time() - start, 'Launch task']})
 
         return new_function
     return wrap
@@ -419,10 +477,14 @@ def return_simple(mode=None):
             """
             Wrapped function
             """
+            start = time.time()
             result = f(*args, **kwargs)
             if result is None:
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            return Response(result, status=return_status)
+                return OVSResponse(status=status.HTTP_204_NO_CONTENT,
+                                   timings={'load': [time.time() - start, 'Load data']})
+            return OVSResponse(result,
+                               status=return_status,
+                               timings={'load': [time.time() - start, 'Load data']})
 
         return new_function
 
@@ -497,6 +559,8 @@ def log(log_slow=True):
             Wrapped function
             """
             request = _find_request(args)
+            logging_start = time.time()
+
             method_args = list(args)[:]
             method_args = method_args[method_args.index(request) + 1:]
 
@@ -518,6 +582,7 @@ def log(log_slow=True):
                 json.dumps(kwargs),
                 json.dumps(metadata)
             ))
+            logging_duration = time.time() - logging_start
 
             # Call the function
             start = time.time()
@@ -525,6 +590,8 @@ def log(log_slow=True):
             duration = time.time() - start
             if duration > 5 and log_slow is True:
                 logger.warning('API call {0}.{1} took {2}s'.format(f.__module__, f.__name__, round(duration, 2)))
+            if isinstance(return_value, OVSResponse):
+                return_value.timings['logging'] = [logging_duration, 'Logging']
             return return_value
 
         return new_function

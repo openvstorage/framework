@@ -18,12 +18,13 @@ define(['jquery', 'knockout'], function($, ko){
     "use strict";
     var singleton = function() {
         var wizardData = {
-            name:           ko.observable(''),
-            sizeEntry:      ko.observable(0).extend({ numeric: { min: 1, max: 65536 } }),
-            storageRouter:  ko.observable(),
-            storageRouters: ko.observableArray([]),
-            vPool:          ko.observable(),
-            vPools:         ko.observableArray([])
+            name:                  ko.observable(''),
+            sizeEntry:             ko.observable(0).extend({ numeric: { min: 1, max: 65536 } }),
+            storageRouter:         ko.observable(),
+            storageRouters:        ko.observableArray([]),
+            vPool:                 ko.observable(),
+            vPools:                ko.observableArray([]),
+            vPoolUsableBackendMap: ko.observable({})
         };
 
         // Computed

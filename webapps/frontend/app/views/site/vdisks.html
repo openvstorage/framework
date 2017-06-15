@@ -19,7 +19,7 @@ but WITHOUT ANY WARRANTY of any kind.
     <div>
         <h2 class="pull-left" data-i18n="ovs:vdisks.title"></h2>
         <button class="btn btn-default pull-right" id="buttonAddVdisk"
-                data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && vPools().length > 0"
+                data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && runningVPool()"
                 style="margin-top: 20px; margin-bottom: 10px;">
             <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
             <span data-i18n="ovs:vdisks.add"></span>

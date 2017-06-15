@@ -16,8 +16,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_config', './gather_vpool', './gather_backend', './confirm'
-], function($, generic, build, data, GatherConfig, GatherVPool, GatherBackend, Confirm) {
+    '../build', './data', './gather_config', './gather_vpool', './gather_fragment_cache', './gather_block_cache', './confirm'
+], function($, generic, build, data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -35,42 +35,61 @@ define([
             data.vPool(undefined);
             data.storageRouter(undefined);
         }
-        self.steps([new GatherVPool(), new GatherBackend(), new GatherConfig(), new Confirm()]);
+        self.steps([new GatherVPool(), new GatherFragmentCache(), new GatherBlockCache(), new GatherConfig(), new Confirm()]);
         data.completed = options.completed;
         self.step(0);
         self.activateStep();
 
-        // Cleaning data
+        // Cleaning data (main)
         data.backend(undefined);
-        data.backendAA(undefined);
         data.backends([]);
         data.clientID('');
-        data.clientIDAA('');
         data.clientSecret('');
-        data.clientSecretAA('');
         data.clusterSize(4);
         data.dtlEnabled(true);
         data.dtlMode({name: 'a_sync', disabled: false});
         data.dtlTransportMode({name: 'tcp'});
-        data.fragmentCacheOnRead(true);
-        data.fragmentCacheOnWrite(true);
         data.host('');
-        data.hostAA('');
         data.localHost(true);
-        data.localHostAA(true);
         data.name('');
         data.partitions(undefined);
         data.port(80);
-        data.portAA(80);
         data.preset(undefined);
-        data.presetAA(undefined);
         data.proxyAmount(2);
         data.scoSize(4);
         data.storageIP(undefined);
         data.storageRoutersAvailable([]);
         data.storageRoutersUsed([]);
-        data.useAA(false);
         data.writeBufferGlobal(1);
         data.writeBufferVolume(undefined);
+        
+        // Fragment cache
+        data.backendFC(undefined);
+        data.cacheQuotaFC(undefined);
+        data.cacheQuotaFCConfigured(false);
+        data.clientIDFC('');
+        data.clientSecretFC('');
+        data.fragmentCacheOnRead(true);
+        data.fragmentCacheOnWrite(true);
+        data.hostFC('');
+        data.localHostFC(true);
+        data.portFC(80);
+        data.presetFC(undefined);
+        data.useFC(false);
+        
+        // Block cache
+        data.backendBC(undefined);
+        data.cacheQuotaBC(undefined);
+        data.cacheQuotaBCConfigured(false);
+        data.blockCacheOnRead(true);
+        data.blockCacheOnWrite(true);
+        data.clientIDBC('');
+        data.clientSecretBC('');
+        data.hostBC('');
+        data.localHostBC(true);
+        data.portBC(80);
+        data.presetBC(undefined);
+        data.supportsBC(true);
+        data.useBC(false);
     };
 });
