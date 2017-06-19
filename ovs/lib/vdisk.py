@@ -188,7 +188,8 @@ class VDiskController(object):
         vdisk = VDisk(vdisk_guid)
         if len(vdisk.child_vdisks) > 0:
             raise RuntimeError('vDisk {0} has clones, cannot delete'.format(vdisk.name))
-
+        for _function in Toolbox.fetch_hooks('vdiskremoval', 'preremove'):
+            _function(vdisk_guid)
         vdisk.invalidate_dynamics('storagerouter_guid')
         storagerouter = StorageRouter(vdisk.storagerouter_guid)
         if 'directory_unlink' in storagerouter.features['volumedriver']['features']:
