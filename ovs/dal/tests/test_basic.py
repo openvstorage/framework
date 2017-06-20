@@ -1773,3 +1773,40 @@ class Basic(unittest.TestCase):
         self.assertEqual(len(dlist), 1)
         self.assertTrue(Basic._called)
         self.assertEqual(dlist.from_index, 'full')
+
+    def test_clone(self):
+        """
+        Validates whether the clone function works correct
+        """
+        machine1 = TestMachine()
+        machine1.name = 'test_machine1'
+        machine1.save()
+        machine2 = machine1.clone()
+        self.assertEqual(machine1.name, machine2.name)
+        self.assertEqual(machine1.guid, machine2.guid)
+        self.assertEqual(machine1._datastore_wins, machine2._datastore_wins)
+        self.assertEqual(machine1, machine2)
+        machine2.name = 'test_machine2'
+        machine2.save()
+        self.assertEqual(machine1.name, 'test_machine1')
+        self.assertEqual(machine2.name, 'test_machine2')
+
+        machine3 = TestMachine(volatile=True)
+        machine4 = machine3.clone()
+        with self.assertRaises(VolatileObjectException):
+            machine3.save()
+        with self.assertRaises(VolatileObjectException):
+            machine4.save()
+
+    def test_equal(self):
+        """
+        Verify the equality of 2 objects is done based on guid
+        """
+        machine1 = TestMachine()
+        machine1.name = 'test_machine1'
+        machine1.save()
+        machine2 = TestMachine(machine1.guid)
+        self.assertEqual(machine1, machine2)
+        machine2.name = 'test_machine2'
+        machine2.save()
+        self.assertEqual(machine1, machine2)
