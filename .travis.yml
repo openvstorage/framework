@@ -3,21 +3,25 @@ sudo: required
 dist: trusty
 notifications:
   email: false
+  slack:
+    rooms:
+      secure: jyJpbC15u14dCwjlfg9zqyW3Pw2QMp45ITT05hznJ9WZm8tN/aFG8y9ZmOUMCm3XPm+6SdJxWxVU65KnjJcI0LxlD29ePakBhjz5Wg+Oi4v08/RkxzeM7bORxJqGggoYyZHTNsAMDyrx7lMV9Qv8zmxhUz1fmPACWAdO0GSZABxcdOzeDFY/4uFbMdr3tfSMd76jT0hGifuynZ7U2oP2T/E2fvCFR+N01DAnZ0OKkutbIfquWGF6rfflRwVHnjTTw0QaGeNhTzFbdyitAAtGHKU+LegFoEIgO1424HPd5FNnj+ggN4LR6Cguyl/BzxrPIkt7v5ZTtI4A2KDjJmxdjDu/vUeEWtqvDXS/HnRSpvguqtFtNNq0DhJJJ4CDYlbzW5zg5ozfSsiZIE/QqrkwmGgHm1lvvcdKUrEDVd/2W42lmxyK3ZIcUu0VEKODVFdPrfly+WlHBwgRPxxKc1uyLWp6LtyfOI1c8UAoKshstLaHpat/rUUxJJp//eKgOIoXmHWy52OdGndM/goNklSjlWEWXGsgVILNvY56a8ZlOWf1P6poGpUS3I7M9iu+3HrsAwiQ5A6Lh6jp3Kfe6ATfnvleDXwsT9UO15hckFB0fIo8cHHSRkz0z/x9YLIRSU1M7/4qGVra619wEW5K10vl2yT0Z2GPVYoCshAQKBfzG8Y=
 before_install:
-  - sudo echo "deb http://apt.openvstorage.org `python scripts/travis/repo.py` main" | sudo tee -a /etc/apt/sources.list
-  - sudo rm -rf /var/lib/apt/lists/*
-  - sudo apt-get -qq update
-  - sudo apt-get install -y --force-yes openvstorage
+- sudo echo "deb http://apt.openvstorage.org `python scripts/travis/repo.py` main" | sudo tee -a /etc/apt/sources.list
+- sudo rm -rf /var/lib/apt/lists/*
+- sudo apt-get -qq update
+- sudo apt-get install -y --force-yes openvstorage
 before_script:
-  - sudo rm -rf /opt/OpenvStorage
-  - sudo chmod 777 /opt
-  - sudo chmod -R 777 /var/log/ovs
-  - sudo chmod 777 /run
-  - mv ../framework /opt/OpenvStorage
-  - sudo cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/
-  - sudo chmod 777 /usr/bin/ovs
-  - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/dist-packages
-  - cd /opt/OpenvStorage/webapps/api; export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput
-  - echo '{"configuration_store":"arakoon"}' > /opt/OpenvStorage/config/framework.json
+- sudo rm -rf /opt/OpenvStorage
+- sudo chmod 777 /opt
+- sudo chmod -R 777 /var/log/ovs
+- sudo chmod 777 /run
+- mv ../framework /opt/OpenvStorage
+- sudo cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/
+- sudo chmod 777 /usr/bin/ovs
+- export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/dist-packages
+- cd /opt/OpenvStorage/webapps/api; export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH;
+  python manage.py syncdb --noinput
+- echo '{"configuration_store":"arakoon"}' > /opt/OpenvStorage/config/framework.json
 script:
-  - ovs unittest
+- ovs unittest
