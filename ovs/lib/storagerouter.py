@@ -1396,6 +1396,7 @@ class StorageRouterController(object):
         client.run(['chmod', '666', '{0}/{1}'.format(webpath, logfilename)])
         return logfilename
 
+    # noinspection PyTypeChecker
     @staticmethod
     @ovs_task(name='ovs.storagerouter.create_hprm_config_files')
     def create_hprm_config_files(storagerouter_guid, local_storagerouter_guid, parameters):
@@ -1413,12 +1414,12 @@ class StorageRouterController(object):
         """
         # Validations
         required_params = {'port': (int, {'min': 1, 'max': 65535}),
-                           'vpool_guid': (str, Toolbox.regex_guid),
-                           'fragment_cache_on_read': (bool, None),
-                           'fragment_cache_on_write': (bool, None)}
+                           'identifier': (str, Toolbox.regex_vpool),
+                           'vpool_guid': (str, Toolbox.regex_guid)}
         Toolbox.verify_required_params(actual_params=parameters,
                                        required_params=required_params)
         vpool = VPool(parameters['vpool_guid'])
+        identifier = parameters['identifier']
         config_path = None
         storagerouter = StorageRouter(storagerouter_guid)
         local_storagerouter = StorageRouter(local_storagerouter_guid)
@@ -1430,93 +1431,100 @@ class StorageRouterController(object):
 
         if config_path is None:
             raise ValueError('vPool {0} has not been extended to StorageRouter {1}'.format(vpool.name, storagerouter.name))
-
-        path = parameters.get('path')
-        arakoon_config_ini = None
-        fragment_cache_on_read = parameters['fragment_cache_on_read']
-        fragment_cache_on_write = parameters['fragment_cache_on_write']
-        if fragment_cache_on_read is True or fragment_cache_on_write is True:
-            if path is not None:  # Local path for caching
-                path = path.strip()
-                if not path or path.endswith('/.') or '..' in path or '/./' in path:
-                    raise ValueError('Invalid path specified')
-                required_params.update({'path': (str, None),
-                                        'size': (int, {'min': 1, 'max': 10 * 1024})})
-                Toolbox.verify_required_params(actual_params=parameters,
-                                               required_params=required_params)
-            else:  # Accelerated Backend for caching
-                required_params.update({'backend_info': (dict, {'preset': (str, Toolbox.regex_preset),
-                                                                'alba_backend_guid': (str, Toolbox.regex_guid),
-                                                                'alba_backend_name': (str, Toolbox.regex_backend)}),
-                                        'connection_info': (dict, {'host': (str, Toolbox.regex_ip, False),
-                                                                   'port': (int, {'min': 1, 'max': 65535}, False),
-                                                                   'client_id': (str, Toolbox.regex_guid, False),
-                                                                   'client_secret': (str, None, False)})})
-                Toolbox.verify_required_params(actual_params=parameters,
-                                               required_params=required_params)
-                connection_info = parameters['connection_info']
-                if connection_info['host']:  # Remote Backend for accelerated Backend
-                    alba_backend_guid = parameters['backend_info']['alba_backend_guid']
-                    ovs_client = OVSClient(ip=connection_info['host'],
-                                           port=connection_info['port'],
-                                           credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                           version=2)
-                    arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid,
-                                                                                           ovs_client=ovs_client)
-                    arakoon_config_ini = ArakoonClusterConfig.convert_format(arakoon_config)
-                else:  # Local Backend for accelerated Backend
-                    alba_backend_name = parameters['backend_info']['alba_backend_name']
-                    if Configuration.dir_exists(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name)) is False:
-                        raise ValueError('Arakoon cluster for ALBA Backend {0} could not be retrieved'.format(alba_backend_name))
-                    arakoon_config_ini = Configuration.get(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name), raw=True)
-
-        # Create the configurations
         proxy_cfg = Configuration.get(key=config_path.format('main'))
-        if fragment_cache_on_read is False and fragment_cache_on_write is False:
-            fragment_cache_info = ['none']
-        elif path is not None:
-            path = path.strip()
-            while '//' in path:
-                path = path.replace('//', '/')
-            fragment_cache_info = ['local', {'path': path,
-                                             'max_size': parameters['size'] * 1024 ** 3,
-                                             'cache_on_read': fragment_cache_on_read,
-                                             'cache_on_write': fragment_cache_on_write}]
-        else:
-            fragment_cache_info = ['alba', {'albamgr_cfg_url': '/etc/hprm/{0}/accelerated_arakoon.ini'.format(vpool.name),
-                                            'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
-                                                                           'preset': parameters['backend_info']['preset']}],
-                                            'manifest_cache_size': proxy_cfg['manifest_cache_size'],
-                                            'cache_on_read': fragment_cache_on_read,
-                                            'cache_on_write': fragment_cache_on_write}]
 
-        tgz_name = 'hprm_config_files_{0}_{1}.tgz'.format(vpool.name, storagerouter.name)
-        config = json.dumps(indent=4,
-                            obj={'ips': ['127.0.0.1'],
-                                 'port': parameters['port'],
-                                 'pracc': {'uds_path': '/var/run/hprm/{0}/uds_path'.format(vpool.name),
-                                           'max_clients': 1000,
-                                           'max_read_buf_size': 64 * 1024,  # Buffer size for incoming requests (in bytes)
-                                           'thread_pool_size': 64},  # Amount of threads
-                                 'transport': 'tcp',
-                                 'log_level': 'info',
-                                 'fragment_cache': fragment_cache_info,
-                                 'read_preference': proxy_cfg['read_preference'],
-                                 'albamgr_cfg_url': '/etc/hprm/{0}/arakoon.ini'.format(vpool.name),
-                                 'manifest_cache_size': proxy_cfg['manifest_cache_size']})
-        file_contents_map = {'/opt/OpenvStorage/config/{0}/config.json'.format(vpool.name): config,
-                             '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(vpool.name): Configuration.get(key=config_path.format('abm'), raw=True)}
-        if arakoon_config_ini is not None:
-            file_contents_map['/opt/OpenvStorage/config/{0}/accelerated_arakoon.ini'.format(vpool.name)] = arakoon_config_ini
+        cache_info = {}
+        arakoons = {}
+        cache_types = ['fragment', 'block']
+        if not any(ctype in parameters for ctype in cache_types):
+            raise ValueError('At least one cache type should be passed: {0}'.format(', '.join(cache_types)))
+        for ctype in cache_types:
+            if ctype in parameters:
+                required_params.update({ctype: (dict, {'read': (bool, None),
+                                                       'write': (bool, None)})})
+                Toolbox.verify_required_params(actual_params=parameters,
+                                               required_params=required_params)
+                read = parameters[ctype]['read']
+                write = parameters[ctype]['write']
+                if read is True or write is True:
+                    path = parameters[ctype].get('path')
+                    if path is not None:
+                        path = path.strip()
+                        if not path or path.endswith('/.') or '..' in path or '/./' in path:
+                            raise ValueError('Invalid path specified')
+                        required_params[ctype][1].update({'path': (str, None),
+                                                          'size': (int, {'min': 1, 'max': 10 * 1024})})
+                        Toolbox.verify_required_params(actual_params=parameters,
+                                                       required_params=required_params)
+                        while '//' in path:
+                            path = path.replace('//', '/')
+                        cache_info[ctype] = ['local', {'path': path,
+                                                       'max_size': parameters[ctype]['size'] * 1024 ** 3,
+                                                       'cache_on_read': read,
+                                                       'cache_on_write': write}]
+                    else:
+                        required_params[ctype][1].update({'backend_info': (dict, {'preset': (str, Toolbox.regex_preset),
+                                                                                  'alba_backend_guid': (str, Toolbox.regex_guid),
+                                                                                  'alba_backend_name': (str, Toolbox.regex_backend)}),
+                                                          'connection_info': (dict, {'host': (str, Toolbox.regex_ip, False),
+                                                                                     'port': (int, {'min': 1, 'max': 65535}, False),
+                                                                                     'client_id': (str, Toolbox.regex_guid, False),
+                                                                                     'client_secret': (str, None, False)})})
+                        Toolbox.verify_required_params(actual_params=parameters,
+                                                       required_params=required_params)
+                        connection_info = parameters[ctype]['connection_info']
+                        if connection_info['host']:  # Remote Backend for accelerated Backend
+                            alba_backend_guid = parameters[ctype]['backend_info']['alba_backend_guid']
+                            ovs_client = OVSClient(ip=connection_info['host'],
+                                                   port=connection_info['port'],
+                                                   credentials=(connection_info['client_id'], connection_info['client_secret']),
+                                                   version=2)
+                            arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid,
+                                                                                                   ovs_client=ovs_client)
+                            arakoons[ctype] = ArakoonClusterConfig.convert_config_to(arakoon_config, return_type='INI')
+                        else:  # Local Backend for accelerated Backend
+                            alba_backend_name = parameters[ctype]['backend_info']['alba_backend_name']
+                            if Configuration.exists(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name), raw=True) is False:
+                                raise ValueError('Arakoon cluster for ALBA Backend {0} could not be retrieved'.format(alba_backend_name))
+                            arakoons[ctype] = Configuration.get(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name), raw=True)
+                        cache_info[ctype] = ['alba', {'albamgr_cfg_url': '/etc/hprm/{0}/{1}_cache_arakoon.ini'.format(identifier, ctype),
+                                                      'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
+                                                                                     'preset': parameters[ctype]['backend_info']['preset']}],
+                                                      'manifest_cache_size': proxy_cfg['manifest_cache_size'],
+                                                      'cache_on_read': read,
+                                                      'cache_on_write': write}]
+                else:
+                    cache_info[ctype] = ['none']
+
+        tgz_name = 'hprm_config_files_{0}_{1}.tgz'.format(identifier, storagerouter.name)
+        config = {'ips': ['127.0.0.1'],
+                  'port': parameters['port'],
+                  'pracc': {'uds_path': '/var/run/hprm/{0}/uds_path'.format(identifier),
+                            'max_clients': 1000,
+                            'max_read_buf_size': 64 * 1024,  # Buffer size for incoming requests (in bytes)
+                            'thread_pool_size': 64},  # Amount of threads
+                  'transport': 'tcp',
+                  'log_level': 'info',
+                  'read_preference': proxy_cfg['read_preference'],
+                  'albamgr_cfg_url': '/etc/hprm/{0}/arakoon.ini'.format(identifier),
+                  'manifest_cache_size': proxy_cfg['manifest_cache_size']}
+        file_contents_map = {}
+        for ctype in cache_types:
+            if ctype in cache_info:
+                config['{0}_cache'.format(ctype)] = cache_info[ctype]
+            if ctype in arakoons:
+                file_contents_map['/opt/OpenvStorage/config/{0}/{1}_cache_arakoon.ini'.format(identifier, ctype)] = arakoons[ctype]
+        file_contents_map.update({'/opt/OpenvStorage/config/{0}/config.json'.format(identifier): json.dumps(config, indent=4),
+                                  '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(identifier): Configuration.get(key=config_path.format('abm'), raw=True)})
 
         local_client = SSHClient(endpoint=local_storagerouter)
-        local_client.dir_create(directories='/opt/OpenvStorage/config/{0}'.format(vpool.name))
+        local_client.dir_create(directories='/opt/OpenvStorage/config/{0}'.format(identifier))
         local_client.dir_create(directories='/opt/OpenvStorage/webapps/frontend/downloads')
         for file_name, contents in file_contents_map.iteritems():
             local_client.file_write(contents=contents,
                                     filename=file_name)
-        local_client.run(command='tar --transform "s#^config/{0}#{0}#" -czf /opt/OpenvStorage/webapps/frontend/downloads/{1} config/{0}'.format(vpool.name, tgz_name), allow_insecure=True)
-        local_client.dir_delete(directories='/opt/OpenvStorage/config/{0}'.format(vpool.name))
+        local_client.run(command='tar --transform "s#^config/{0}#{0}#" -czf /opt/OpenvStorage/webapps/frontend/downloads/{1} config/{0}'.format(identifier, tgz_name), allow_insecure=True)
+        local_client.dir_delete(directories='/opt/OpenvStorage/config/{0}'.format(identifier))
         return tgz_name
 
     @staticmethod

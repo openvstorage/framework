@@ -17,6 +17,12 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <p data-i18n="ovs:wizards.create_hprm_configs.gather.general_info"></p>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('identifier') }">
+        <label class="col-lg-3 control-label" for="inputIdentifier" data-i18n="ovs:wizards.create_hprm_configs.gather.identifier"></label>
+        <div class="col-lg-5">
+            <input type="text" id="inputIdentifier" class="autofocus form-control" data-bind="value: data.identifier, valueUpdate: 'input'" />
+        </div>
+    </div>
     <div class="form-group">
         <label class="col-lg-3 control-label" for="hprmPort" data-i18n="ovs:wizards.create_hprm_configs.gather.hprm_port"></label>
         <div class="col-lg-2">
@@ -24,155 +30,14 @@ but WITHOUT ANY WARRANTY of any kind.
             <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: loadingProxyConfig() === true"></span>
         </div>
     </div>
-    <p data-i18n="ovs:wizards.create_hprm_configs.gather.caching_info"></p>
-    <div class="form-group">
-        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.create_hprm_configs.gather.fragment_cache_behavior" style="padding-top: 8px;"></label>
-        <div class="col-lg-9">
-            <span data-bind="dropdown: {
-                                 items: cacheBehaviors,
-                                 target: cacheBehavior,
-                                 text: function(item) {
-                                     return $.t('ovs:generic.fragmentcaches.' + item);
-                                 }
-                             },
-                             visible: loadingProxyConfig() === false">
-            </span>
-            <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: loadingProxyConfig() === true"></span>
-        </div>
-    </div>
-    <div data-bind="visible: (data.cacheOnRead() || data.cacheOnWrite()) && loadingProxyConfig() === false">
-        <div>
-            <div class="form-group">
-                <div class="col-lg-3"></div>
-                <div class="col-lg-7">
-                    <input type="radio" name="aaBackend" id="useAcceleratedAlbaNo" class="autofocus" data-bind="checked: data.cacheUseAlba, checkedValue: false" />
-                    <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.create_hprm_configs.gather.use_local" style="font-weight: normal;"></label><br />
-                    <input type="radio" name="aaBackend" id="useAcceleratedAlbaYes" class="autofocus" data-bind="checked: data.cacheUseAlba, checkedValue: true" />
-                    <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.create_hprm_configs.gather.use_backend_aa" style="font-weight: normal;"></label>
-                </div>
-            </div>
-        </div>
-        <div class="form-group" data-bind="visible: data.cacheUseAlba() === false, css: { 'has-error': canContinue().fields.contains('local_path') }">
-            <label class="col-lg-3 control-label" for="localPath" data-i18n="ovs:wizards.create_hprm_configs.gather.fragment_cache_local_path"></label>
-            <div class="col-lg-5">
-                <input type="text" id="localPath" class="autofocus form-control" data-bind="value: data.localPath, valueUpdate: 'afterkeydown'" />
-            </div>
-        </div>
-        <div class="form-group" data-bind="visible: data.cacheUseAlba() === false">
-            <label class="col-lg-3 control-label" for="localSize" data-i18n="ovs:wizards.create_hprm_configs.gather.fragment_cache_local_size"></label>
-            <div class="col-lg-2">
-                <input type="text" id="localSize" class="autofocus form-control" data-bind="value: data.localSize, valueUpdate: 'afterkeydown'" />
-            </div>
-            <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib" style="margin-left: -20px;"></label>
-        </div>
-        <div data-bind="visible: !loadingBackends() || reloadingBackends()">
-            <p data-bind="visible: data.cacheUseAlba()" data-i18n="ovs:wizards.create_hprm_configs.gather.accelerated_info"></p>
-            <div data-bind="visible: data.cacheUseAlba() && localBackendsAvailable()">
-                <div class="form-group">
-                    <div class="col-lg-3"></div>
-                    <div class="col-lg-7">
-                        <input type="checkbox" id="albaUseLocalBackend" class="autofocus" data-bind="checked: data.albaUseLocalBackend" />
-                        <label for="albaUseLocalBackend" data-i18n="ovs:wizards.create_hprm_configs.gather.local_host" style="font-weight: normal;"></label>
-                    </div>
-                </div>
-            </div>
-            <div data-bind="visible: data.cacheUseAlba() && !data.albaUseLocalBackend()">
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
-                    <label class="col-lg-3 control-label" for="albaHost" data-i18n="ovs:wizards.create_hprm_configs.gather.host"></label>
-                    <div class="col-lg-4">
-                        <input type="text" id="albaHost" class="autofocus form-control" data-bind="value: data.albaHost, valueUpdate: 'input'" />
-                    </div>
-                    <label class="col-lg-1 control-label" for="albaPort" data-i18n="ovs:wizards.create_hprm_configs.gather.port"></label>
-                    <div class="col-lg-2">
-                        <input type="text" id="albaPort" class="autofocus form-control" data-bind="value: data.albaPort, valueUpdate: 'input'" />
-                    </div>
-                </div>
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
-                    <label class="col-lg-3 control-label" for="albaClientID" data-i18n="ovs:wizards.create_hprm_configs.gather.client_id"></label>
-                    <div class="col-lg-7">
-                        <input type="text" id="albaClientID" class="autofocus form-control" data-bind="value: data.albaClientID, valueUpdate: 'input'" />
-                    </div>
-                </div>
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientsecret') }">
-                    <label class="col-lg-3 control-label" for="albaClientSecret" data-i18n="ovs:wizards.create_hprm_configs.gather.client_secret"></label>
-                    <div class="col-lg-7">
-                        <input type="password" id="albaClientSecret" class="autofocus form-control" data-bind="value: data.albaClientSecret, valueUpdate: 'input'" />
-                    </div>
-                </div>
-            </div>
-            <div class="form-group" data-bind="visible: data.cacheUseAlba()">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.create_hprm_configs.gather.alba_backend"></label>
-                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }">
-                    <!-- ko if: reloadingBackends() === false && (albaBackends() === undefined || albaBackends().length === 0) -->
-                        <i data-i18n="[html]ovs:wizards.create_hprm_configs.gather.no_backends" style="display: inline-block; margin-top: 7px;"></i>
-                    <!-- /ko -->
-                    <!-- ko if: reloadingBackends() === false && (albaBackends() !== undefined && albaBackends().length > 0) -->
-                        <span data-bind="dropdown: {
-                                             key: 'guid',
-                                             items: albaBackends,
-                                             target: data.albaBackend,
-                                             keyisfunction: false,
-                                             text: function(item) {
-                                                 if (item !== undefined) {
-                                                     return item.name;
-                                                 }
-                                             }
-                                         }">
-                        </span>
-                    <!-- /ko -->
-                    <button type='button' class="btn btn-default"
-                            data-bind="click: reloadBackends,
-                                       enable: !reloadingBackends(),
-                                       style: {'margin-top': reloadingBackends() || albaBackends() === undefined || albaBackends().length === 0 ? '': '-26px',
-                                               'margin-left': reloadingBackends() ? '': '10px'}">
-                        <span class="fa" data-bind="css: { 'fa-spin': reloadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
-                        <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
-                    </button>
-                </div>
-            </div>
-            <div class="form-group" data-bind="visible: data.cacheUseAlba() && data.albaBackend() !== undefined && reloadingBackends() === false">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.create_hprm_configs.gather.alba_preset"></label>
-                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('preset') }">
-                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: data.albaPreset() === undefined"></span>
-                    <span data-bind="visible: data.albaPreset() !== undefined,
-                                     dropdown: {
-                                         key: 'name',
-                                         items: data.albaPresetEnhanced,
-                                         target: data.albaPreset,
-                                         keyisfunction: false,
-                                         emptyisloading: false,
-                                         text: function(item) {
-                                             var policies = [];
-                                             if (item !== undefined) {
-                                                 $.each(item.policies, function(index, policy) {
-                                                     policies.push(policy.text);
-                                                 });
-                                                 return item.name + ': ' + policies.join(', ');
-                                             }
-                                         }
-                                     }">
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="alert alert-info" data-bind="visible: loadingProxyConfig() || (loadingBackends() && data.cacheUseAlba())" style="margin-top: 20px;">
-        <p data-bind="visible: loadingProxyConfig()">
-            <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
-            <span data-i18n="ovs:wizards.create_hprm_configs.gather.loading_config_information"></span>
-        </p>
-        <p data-bind="visible: loadingBackends() && data.cacheUseAlba()">
-            <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
-            <span data-i18n="ovs:wizards.create_hprm_configs.gather.loading_backend_information"></span>
-        </p>
-    </div>
-    <div class="alert alert-warning" data-bind="visible: !loadingProxyConfig() && !loadingBackends() && !isPresetAvailable() && canContinue().value" style="margin-top: 20px;">
-        <span data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset_unavailable"></span>
+    <div class="alert alert-info" data-bind="visible: loadingProxyConfig()" style="margin-top: 20px;">
+        <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+        <span data-i18n="ovs:wizards.create_hprm_configs.gather.loading_config_information"></span>
     </div>
     <div class="alert alert-danger" data-bind="visible: loadingProxyConfigFailed() && canContinue().value" style="margin-top: 20px;">
         <p data-i18n="ovs:wizards.create_hprm_configs.gather.load_config_failure"></p>
     </div>
-    <div class="alert alert-danger" data-bind="visible: !loadingProxyConfig() && !canContinue().value && !(loadingBackends() && data.cacheUseAlba())" style="margin-top: 20px;">
+    <div class="alert alert-danger" data-bind="visible: !loadingProxyConfig() && !canContinue().value" style="margin-top: 20px;">
         <p data-i18n="ovs:generic.followingerrorsfound"></p>
         <ul data-bind="foreach: canContinue().reasons">
             <li data-bind="text: $data"></li>

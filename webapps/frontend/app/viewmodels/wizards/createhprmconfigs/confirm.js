@@ -34,33 +34,65 @@ define([
         self.canContinue = ko.computed(function() {
             return { value: true, reasons: [], fields: [] };
         });
+        self.instructions = ko.computed(function() {
+            return $.t('ovs:wizards.create_hprm_configs.confirm.instruction_steps', {identifier: self.data.identifier()});
+        });
 
         // Functions
+        self.formatFloat = function(value) {
+            return parseFloat(value);
+        };
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.generateConfigFiles);
                 var parameters = {
                     port: self.data.hprmPort(),
+                    identifier: self.data.identifier(),
                     vpool_guid: self.data.vPool().guid(),
-                    fragment_cache_on_read: self.data.cacheOnRead(),
-                    fragment_cache_on_write: self.data.cacheOnWrite()
+                    fragment: {
+                        read: self.data.fragmentCacheOnRead(),
+                        write: self.data.fragmentCacheOnWrite()
+                    },
+                    block: {
+                        read: self.data.blockCacheOnRead(),
+                        write: self.data.blockCacheOnWrite()
+                    }
                 };
-                if (self.data.cacheOnRead() || self.data.cacheOnWrite()) {
-                    if (self.data.cacheUseAlba() === false) {
-                        parameters.path = self.data.localPath();
-                        parameters.size = self.data.localSize();
+                if (self.data.fragmentCacheOnRead() || self.data.fragmentCacheOnWrite()) {
+                    if (self.data.useFC() === false) {
+                        parameters.fragment.path = self.data.localPathFC();
+                        parameters.fragment.size = self.data.localSizeFC();
                     } else {
-                        parameters.connection_info = {
-                            host: self.data.albaHost(),
-                            port: self.data.albaPort(),
-                            local: self.data.albaUseLocalBackend(),
-                            client_id: self.data.albaClientID(),
-                            client_secret: self.data.albaClientSecret()
+                        parameters.fragment.connection_info = {
+                            host: self.data.hostFC(),
+                            port: self.data.portFC(),
+                            local: self.data.localHostFC(),
+                            client_id: self.data.clientIDFC(),
+                            client_secret: self.data.clientSecretFC()
                         };
-                        parameters.backend_info = {
-                            preset: self.data.albaPreset().name,
-                            alba_backend_guid: self.data.albaBackend().guid,
-                            alba_backend_name: self.data.albaBackend().name
+                        parameters.fragment.backend_info = {
+                            preset: self.data.presetFC().name,
+                            alba_backend_guid: self.data.backendFC().guid,
+                            alba_backend_name: self.data.backendFC().name
+                        };
+                    }
+                }
+                if (self.data.supportsBC() && (self.data.blockCacheOnRead() || self.data.blockCacheOnWrite())) {
+                    if (self.data.useBC() === false) {
+                        parameters.block.path = self.data.localPathBC();
+                        parameters.block.size = self.data.localSizeBC();
+                    } else {
+                        parameters.block.connection_info = {
+                            host: self.data.hostBC(),
+                            port: self.data.portBC(),
+                            local: self.data.localHostBC(),
+                            client_id: self.data.clientIDBC(),
+                            client_secret: self.data.clientSecretBC()
+                        };
+                        parameters.block.backend_info = {
+                            preset: self.data.presetBC().name,
+                            alba_backend_guid: self.data.backendBC().guid,
+                            alba_backend_name: self.data.backendBC().name
                         };
                     }
                 }
