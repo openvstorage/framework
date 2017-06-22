@@ -42,6 +42,9 @@ class Descriptor(object):
     def __init__(self, object_type=None, guid=None, cached=True):
         """
         Initializes a descriptor for a given type. Optionally already providing a guid for the instance
+        :param object_type: type of the object eg. VDisk
+        :param guid: guid of object
+        :param cached: cache the identifiers
         """
 
         # Initialize super class
@@ -54,9 +57,10 @@ class Descriptor(object):
 
             type_name = object_type.__name__
             module_name = object_type.__module__.split('.')[-1]
-            fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)
+            fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)  # Fully qualified module name
+            identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
             if object_type in Descriptor.descriptor_cache and cached is True:
-                self._descriptor = Descriptor.descriptor_cache[object_type]
+                self._descriptor = Descriptor.descriptor_cache[identifier]
             else:
                 try:
                     mod = __import__(fqm_name, level=0, fromlist=[type_name])
@@ -64,17 +68,17 @@ class Descriptor(object):
                 except (ImportError, AttributeError):
                     Descriptor._logger.info('Received object type {0} is not a hybrid'.format(object_type))
                     raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
-                identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
                 self._descriptor = {'fqmn': fqm_name,
                                     'type': type_name,
                                     'identifier': identifier,
-                                    'version': 3}
+                                    'version': 3}  # Versioning :D
                 Descriptor.descriptor_cache[identifier] = self._descriptor
             self._descriptor['guid'] = guid
 
     def load(self, descriptor):
         """
         Loads an instance from a descriptor dictionary representation
+        :param descriptor: descriptor dict
         """
         self._descriptor = copy.deepcopy(descriptor)
         self.initialized = True
@@ -93,6 +97,7 @@ class Descriptor(object):
     def get_object(self, instantiate=False):
         """
         This method will yield an instance or the class to which the descriptor points
+        :param instantiate: instantiate the class
         """
         if not self.initialized:
             raise RuntimeError('Descriptor not yet initialized')
@@ -136,8 +141,7 @@ class Descriptor(object):
 
 class HybridRunner(object):
     """
-    The HybridRunner provides access to generic properties from the hybrid object by means
-    of dynamic code reflection
+    The HybridRunner provides access to generic properties from the hybrid object by means of dynamic code reflection
     """
 
     cache = {}
@@ -148,10 +152,10 @@ class HybridRunner(object):
         Yields all hybrid classes
         """
         key = 'ovs_hybrid_structure'
-        if key in HybridRunner.cache:
+        if key in HybridRunner.cache:  # Check local cache
             return HybridRunner.cache[key]
         volatile = VolatileFactory.get_client()
-        hybrid_structure = volatile.get(key)
+        hybrid_structure = volatile.get(key)  # Check memcache
         if hybrid_structure is not None:
             HybridRunner.cache[key] = hybrid_structure
             return hybrid_structure
@@ -159,13 +163,12 @@ class HybridRunner(object):
         inherit_table = {}
         translation_table = {}
         path = '/'.join([os.path.dirname(__file__), 'hybrids'])
-        for filename in os.listdir(path):
+        for filename in os.listdir(path):  # Query filesystem
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name:
+                    if inspect.isclass(member[1]) and member[1].__module__ == name:
                         current_class = member[1]
                         try:
                             current_descriptor = Descriptor(current_class).descriptor
@@ -174,12 +177,12 @@ class HybridRunner(object):
                         current_identifier = current_descriptor['identifier']
                         if current_identifier not in translation_table:
                             translation_table[current_identifier] = current_descriptor
-                        if 'DataObject' in current_class.__base__.__name__:
+                        if 'DataObject' in current_class.__base__.__name__:  # Further inheritance?
                             if current_identifier not in base_hybrids:
                                 base_hybrids.append(current_identifier)
                             else:
                                 raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
-                        elif 'DataObject' not in current_class.__name__:
+                        elif 'DataObject' not in current_class.__name__:  # Further inheritance than dataobject
                             structure = []
                             this_class = None
                             for this_class in current_class.__mro__:
@@ -198,7 +201,7 @@ class HybridRunner(object):
         hybrids = {hybrid: None for hybrid in base_hybrids[:]}
         while items_replaced is True:
             items_replaced = False
-            for hybrid, replacement in inherit_table.iteritems():
+            for hybrid, replacement in inherit_table.iteritems():  # Upgrade the normal hybrid with the extended one
                 if hybrid in hybrids.keys() and hybrids[hybrid] is None:
                     hybrids[hybrid] = replacement
                     items_replaced = True
