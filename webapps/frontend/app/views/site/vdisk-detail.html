@@ -192,6 +192,10 @@ but WITHOUT ANY WARRANTY of any kind.
                     </tbody>
                 </table>
             </div>
+            <!-- Additional details for plugins -->
+            <!-- ko foreach: shared.hooks.pages['vdisk-detail'] -->
+                <div class="tab-pane active" id="plugin_general_info" data-bind="compose: $data.activator, visible: $data.info.type === 'detail-general'"></div>
+            <!-- /ko -->
         </div>
     </div>
     <div>
