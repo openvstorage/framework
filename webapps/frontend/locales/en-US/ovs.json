@@ -631,7 +631,7 @@
             "snapshots": "Snapshots",
             "title": "vDisk"
         },
-        "details": "Details",
+        "details": "vDisk Details",
         "performance": "Performance",
         "remove_snapshot": {
             "failed_msg": "Removing snapshot __what__ failed: __why__",

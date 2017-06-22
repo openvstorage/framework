@@ -71,9 +71,9 @@ define([
                             router.navigateBack();
                             return deferred.reject();
                         }
-                        if (self.shared.pluginData().iscsi.vdiskDetail.vdisk === undefined) {
+                        if (self.shared.pluginData().vdiskDetail.iscsi.vdisk === undefined) {
                             var pluginData = self.shared.pluginData();
-                            pluginData.iscsi.vdiskDetail.vdisk = self.vDisk;
+                            pluginData.vdiskDetail.iscsi.vdisk = self.vDisk;
                             self.shared.pluginData(pluginData);
                         }
                     })
@@ -486,12 +486,13 @@ define([
         self.activate = function(mode, guid) {
             self.vDisk(new VDisk(guid));
             var pluginData = self.shared.pluginData();
-            pluginData.iscsi = {
-                vdiskDetail: {
+            pluginData.vdiskDetail = {
+                iscsi: {
                     vdisk: self.vDisk,
                     iscsiNodes: ko.observableArray([]),
                     iscsiNodesLoaded: ko.observable(false)
-                }
+                },
+                blockedActions: ko.observableArray([])
             };
             self.shared.pluginData(pluginData);
             $.each(shared.hooks.pages, function(pageType, pages) {
