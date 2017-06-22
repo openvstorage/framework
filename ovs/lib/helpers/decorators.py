@@ -514,7 +514,7 @@ def add_hooks(hook_type, hooks):
         if hook_type not in f.hooks:
             f.hooks[hook_type] = []
         if isinstance(hooks, list):
-            f.hooks[hook_type] += hooks
+            f.hooks[hook_type].extend(hooks)
         else:
             f.hooks[hook_type].append(hooks)
         return f
