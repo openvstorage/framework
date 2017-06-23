@@ -59,7 +59,7 @@ class Descriptor(object):
             module_name = object_type.__module__.split('.')[-1]
             fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)  # Fully qualified module name
             identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
-            if object_type in Descriptor.descriptor_cache and cached is True:
+            if identifier in Descriptor.descriptor_cache and cached is True:
                 self._descriptor = Descriptor.descriptor_cache[identifier]
             else:
                 try:

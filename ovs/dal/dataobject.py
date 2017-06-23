@@ -222,20 +222,22 @@ class DataObject(object):
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._metadata['cache'] = None
-        if data is not None:
-            self._data = copy.deepcopy(data)
-        else:
-            self._data = self._volatile.get(self._key)
-            if self._data is None:
-                self._metadata['cache'] = False
-                try:
-                    self._data = self._persistent.get(self._key)
-                except KeyNotFoundException:
-                    raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
-                        self.__class__.__name__, self._guid
-                    ))
+        if not self._new:
+            if data is not None:
+                self._data = copy.deepcopy(data)
+                self._metadata['cache'] = None
             else:
-                self._metadata['cache'] = True
+                self._data = self._volatile.get(self._key)
+                if self._data is None:
+                    self._metadata['cache'] = False
+                    try:
+                        self._data = self._persistent.get(self._key)
+                    except KeyNotFoundException:
+                        raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
+                            self.__class__.__name__, self._guid
+                        ))
+                else:
+                    self._metadata['cache'] = True
 
         # Set default values on new fields
         for prop in self._properties:
