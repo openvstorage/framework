@@ -189,7 +189,7 @@ def relay(*args, **kwargs):
             status_code = ex.status_code
         logger = LogHandler.get('api', name='metadata')
         logger.exception('Error relaying call: {0}'.format(message))
-        return HttpResponse(json.dumps({'error_descirption': message,
+        return HttpResponse(json.dumps({'error_description': message,
                                         'error': 'relay_error'}),
                             content_type='application/json',
                             status=status_code)

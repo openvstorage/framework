@@ -29,6 +29,8 @@ class VPool(DataObject):
     deploy vDisks. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
     """
     STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
+    CACHES = DataObject.enumerator('Cache', {'BLOCK': 'block',
+                                             'FRAGMENT': 'fragment'})
 
     __properties = [Property('name', str, unique=True, indexed=True, doc='Name of the vPool'),
                     Property('description', str, mandatory=False, doc='Description of the vPool'),

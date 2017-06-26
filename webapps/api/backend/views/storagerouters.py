@@ -153,6 +153,44 @@ class StorageRouterViewSet(viewsets.ViewSet):
 
     @link()
     @log()
+    @required_roles(['read', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def get_proxy_config(self, storagerouter, vpool_guid):
+        """
+        Gets the ALBA proxy for a given Storage Router and vPool
+        :param storagerouter: StorageRouter on which the ALBA proxy is configured
+        :type storagerouter: StorageRouter
+        :param vpool_guid: Guid of the vPool for which the proxy is configured
+        :type vpool_guid: str
+        """
+        return StorageRouterController.get_proxy_config.delay(vpool_guid=vpool_guid,
+                                                              storagerouter_guid=storagerouter.guid)
+
+    @link()
+    @log()
+    @required_roles(['read', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def create_hprm_config_files(self, local_storagerouter, storagerouter, parameters):
+        """
+        Create the required configuration files to be able to make use of HPRM (aka PRACC)
+        These configuration will be zipped and made available for download
+        :param local_storagerouter: StorageRouter this call is executed on
+        :type local_storagerouter: StorageRouter
+        :param storagerouter: The StorageRouter for which a HPRM manager needs to be deployed
+        :type storagerouter: StorageRouter
+        :param parameters: Additional information required for the HPRM configuration files
+        :type parameters: dict
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
+        """
+        return StorageRouterController.create_hprm_config_files.delay(parameters=parameters,
+                                                                      storagerouter_guid=storagerouter.guid,
+                                                                      local_storagerouter_guid=local_storagerouter.guid)
+
+    @link()
+    @log()
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
