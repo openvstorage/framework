@@ -124,8 +124,8 @@ class VDiskController(object):
                 configuration = Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/abm'.format(vpool.guid, proxy.guid))
                 client = SSHClient(storagerouter)
                 if vdisk.cache_quota is not None:
-                    fcq = vdisk.cache_quota.get('fragment')
-                    bcq = vdisk.cache_quota.get('block')
+                    fcq = vdisk.cache_quota.get(VPool.CACHES.FRAGMENT)
+                    bcq = vdisk.cache_quota.get(VPool.CACHES.BLOCK)
                 else:
                     vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
                     metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
@@ -364,7 +364,7 @@ class VDiskController(object):
             if not 0.0 < pagecache_ratio <= 1:
                 raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            for quota_type in ['fragment', 'block']:
+            for quota_type in VPool.CACHES.values():
                 quota = cache_quota.get(quota_type)
                 if quota is not None:
                     if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
@@ -686,7 +686,7 @@ class VDiskController(object):
             if not 0.0 < pagecache_ratio <= 1:
                 raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            for quota_type in ['fragment', 'block']:
+            for quota_type in VPool.CACHES.values():
                 quota = cache_quota.get(quota_type)
                 if quota is not None:
                     if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
@@ -759,7 +759,7 @@ class VDiskController(object):
         if not 0.0 < pagecache_ratio <= 1:
             raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            for quota_type in ['fragment', 'block']:
+            for quota_type in VPool.CACHES.values():
                 quota = cache_quota.get(quota_type)
                 if quota is not None:
                     if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
@@ -845,8 +845,8 @@ class VDiskController(object):
         if cache_quota is None:
             vdisk.invalidate_dynamics('storagerouter_guid')
             metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
-            cache_quota = {'fragment': metadata.get('quota_fc'),
-                           'block': metadata.get('quota_bc')}
+            cache_quota = {VPool.CACHES.FRAGMENT: metadata.get('quota_fc'),
+                           VPool.CACHES.BLOCK: metadata.get('quota_bc')}
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
@@ -883,8 +883,8 @@ class VDiskController(object):
                                        required_params={'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys(), False),
                                                         'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys(), False),
                                                         'dtl_target': (list, Toolbox.regex_guid, False),
-                                                        'cache_quota': (dict, {'fragment': (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False),
-                                                                               'block': (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False)}, False),
+                                                        'cache_quota': (dict, {VPool.CACHES.FRAGMENT: (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False),
+                                                                               VPool.CACHES.BLOCK: (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False)}, False),
                                                         'write_buffer': (int, {'min': 128, 'max': 10 * 1024}, False),
                                                         'pagecache_ratio': (float, {'min': 0, 'max': 1, 'exclude': [0]}, False)})
 
