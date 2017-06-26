@@ -241,7 +241,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                             </th>
                                             <th data-i18n="ovs:vpools.fragment_caching"></th>
                                             <th data-i18n="ovs:vpools.block_caching"></th>
-                                            <th style="width: 70px;" data-i18n="ovs:generic.actions"></th>
+                                            <th style="width: 95px;" data-i18n="ovs:generic.actions"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -258,12 +258,12 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <td data-i18n="ovs:generic.null"></td>
                                                     <td style="height:37px;">
                                                         <button type="button"
-                                                            class="btn btn-mini btn-default hand"
-                                                            data-bind="click: $root.addStorageRouter,
-                                                                       tooltip: 'ovs:vpools.detail.extend',
-                                                                       enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
-                                                                       attr: { id: 'button_add_' + guid()},
-                                                                       visible: !$root.updatingStorageRouters()">
+                                                                class="btn btn-mini btn-default hand"
+                                                                data-bind="click: $root.addStorageRouter,
+                                                                           tooltip: 'ovs:vpools.detail.extend',
+                                                                           enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
+                                                                           attr: { id: 'button_add_' + guid()},
+                                                                           visible: !$root.updatingStorageRouters()">
                                                             <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
                                                         </button>
                                                     </td>
@@ -333,6 +333,14 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                            attr: { id: 'button_refresh_' + guid()},
                                                                            visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
                                                             <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>
+                                                        </button>
+                                                        <button type="button" class="btn btn-mini btn-default hand" id="buttonGenerate"
+                                                                data-bind="click: $root.generateHPRMConfigFiles,
+                                                                           tooltip: 'ovs:vpools.detail.generate_configs',
+                                                                           attr: { id: 'button_create_configs_' + guid()},
+                                                                           visible: $root.updatingStorageRouters() === false">
+                                                            <span class="hand fa" data-bind="visible: $root.generatingConfigs() === false" data-i18n="[html]ovs:icons.download"></span>
+                                                            <span class="hand fa fa-spin" data-bind="visible: $root.generatingConfigs() === true" data-i18n="[html]ovs:icons.loading"></span>
                                                         </button>
                                                         <button type="button"
                                                                 class="btn btn-mini btn-default hand"
