@@ -70,7 +70,7 @@ class LogHandler(object):
     counter = itertools.count()
     propagate_cache = {}
     defaults = {'logging_target': {'type': 'console'},
-                'level': 'DEBUG'}
+                'level': 'INFO'}
 
     def __init__(self, source, name, propagate):
         """
