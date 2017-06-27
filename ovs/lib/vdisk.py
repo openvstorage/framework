@@ -172,6 +172,8 @@ class VDiskController(object):
         with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=20):
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if vdisk is not None:
+                for _function in Toolbox.fetch_hooks('vdisk_removal', 'before_volume_remove'):
+                    _function(vdisk.guid)
                 VDiskController.clean_vdisk_from_model(vdisk)
             else:
                 VDiskController._logger.info('Volume {0} does not exist'.format(volume_id))
@@ -188,8 +190,6 @@ class VDiskController(object):
         vdisk = VDisk(vdisk_guid)
         if len(vdisk.child_vdisks) > 0:
             raise RuntimeError('vDisk {0} has clones, cannot delete'.format(vdisk.name))
-        for _function in Toolbox.fetch_hooks('vdiskremoval', 'preremove'):
-            _function(vdisk_guid)
         vdisk.invalidate_dynamics('storagerouter_guid')
         storagerouter = StorageRouter(vdisk.storagerouter_guid)
         if 'directory_unlink' in storagerouter.features['volumedriver']['features']:
@@ -233,6 +233,9 @@ class VDiskController(object):
         vdisk.size = volume_size
         vdisk.save()
         VDiskController._logger.info('Extended vDisk {0} to {1}B'.format(vdisk.name, volume_size))
+        VDiskController._logger.info('Running "after_volume_extend" hooks for vDisk {0}'.format(vdisk.guid))
+        for _function in Toolbox.fetch_hooks('vdisk_extend', 'after_volume_extend'):
+            _function(vdisk.guid)
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.resize_from_voldrv')
@@ -258,6 +261,7 @@ class VDiskController(object):
                 VDiskController._logger.warning('Ignoring resize_from_voldrv event for non-existing volume {0}'.format(volume_id))
                 return
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+
             if vdisk is None:
                 vdisk = VDisk()
                 vdisk.name = VDiskController.extract_volumename(volume_path)
@@ -269,6 +273,9 @@ class VDiskController(object):
                               'cluster_multiplier': vdisk.info['cluster_multiplier']}
             vdisk.save()
             VDiskController.vdisk_checkup(vdisk)
+            VDiskController._logger.info('Running "after_volume_extend" hooks for vDisk {0}'.format(vdisk.guid))
+            for _function in Toolbox.fetch_hooks('vdisk_extend', 'after_volume_extend'):
+                _function(vdisk.guid)
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.migrate_from_voldrv')
@@ -314,6 +321,7 @@ class VDiskController(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         vpool = storagedriver.vpool
         VDiskController._logger.debug('Processing rename on {0} from {1} to {2}'.format(vpool.name, old_path, new_path))
+        _hooked_functions = Toolbox.fetch_hooks('vdisk_rename', 'after_volume_rename')
         for vdisk in vpool.vdisks:
             devicename = vdisk.devicename
             if devicename.startswith(old_path):
@@ -325,6 +333,9 @@ class VDiskController(object):
                         vdisk.devicename = '{0}{1}'.format(new_path, ExtensionsToolbox.remove_prefix(devicename, old_path))
                         vdisk.save()
                         VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
+                        VDiskController._logger.info('Running "after_volume_rename" hooks for vDisk {0}'.format(vdisk.guid))
+                        for _function in _hooked_functions:
+                            _function(vdisk.guid)
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.clone')
