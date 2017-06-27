@@ -69,7 +69,8 @@ class LogHandler(object):
     cache = {}
     counter = itertools.count()
     propagate_cache = {}
-    defaults = {'logging_target': {'type': 'console'}}
+    defaults = {'logging_target': {'type': 'console'},
+                'level': 'DEBUG'}
 
     def __init__(self, source, name, propagate):
         """
@@ -103,7 +104,7 @@ class LogHandler(object):
         self.logger = logging.getLogger(name)
         self.logger.addHandler(self.handler)
         self.logger.propagate = propagate
-        self.logger.setLevel(getattr(logging, 'DEBUG'))
+        self.logger.setLevel(getattr(logging, LogHandler.get_level()))
         self._key = '{0}_{1}'.format(source, name)
 
     @staticmethod
@@ -166,6 +167,16 @@ class LogHandler(object):
         else:
             sink = 'console:'
         return sink
+
+    @staticmethod
+    def get_level():
+        level = LogHandler.defaults['level']
+        try:
+            from ovs.extensions.generic.configuration import Configuration
+            level = Configuration.get('/ovs/framework/logging').get('level', level)
+        except:
+            pass
+        return level.upper()
 
     @staticmethod
     def load_path(source):
