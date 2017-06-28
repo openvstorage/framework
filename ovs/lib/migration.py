@@ -179,7 +179,7 @@ class MigrationController(object):
                     # noinspection PyUnresolvedReferences
                     backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
                     # noinspection PyUnresolvedReferences
-                    backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 16 * 1024 ** 3
+                    backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 5000
                     # noinspection PyUnresolvedReferences
                     for key, value in backend_connection_manager[str(index)].items():
                         if key.startswith('backend_interface'):
