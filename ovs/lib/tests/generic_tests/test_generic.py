@@ -268,7 +268,7 @@ class Generic(unittest.TestCase):
         * Scenario 2: 1 vPool, 10 vDisks, 1 scrub role
                       Scrubbing fails for 5 vDisks, check if scrubbing completed for all other vDisks
                       Run scrubbing a 2nd time and verify scrubbing now works for failed vDisks
-        * Scenario 3: 1 vPool, 11 vDisks, 5 scrub roles
+        * Scenario 3: 1 vPool, 11 vDisks, 5 scrub roles (4 StorageRouters, one of then has 2 scrub roles)
                       Check template vDisk is NOT scrubbed
                       Check if vDisks are divided among all threads
         * Scenario 4: 3 vPools, 15 vDisks, 5 scrub roles
@@ -348,44 +348,21 @@ class Generic(unittest.TestCase):
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
                         (6, 1, 1, 1), (7, 1, 1, 1), (8, 1, 1, 1), (9, 1, 1, 1), (10, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
-             'storagerouters': [1, 2, 3],
+             'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
-        storagerouter_3 = structure['storagerouters'][3]
-        LockedClient.scrub_controller = {'possible_threads': ['execute_scrub_{0}_{1}_0'.format(vpool.guid, storagerouter_1.guid),
-                                                              'execute_scrub_{0}_{1}_1'.format(vpool.guid, storagerouter_1.guid)],
+        LockedClient.scrub_controller = {'possible_threads': ['execute_scrub_{0}_{1}_0'.format(vpool.guid, storagerouter_1.disks[0].partitions[0].guid),
+                                                              'execute_scrub_{0}_{1}_1'.format(vpool.guid, storagerouter_1.disks[0].partitions[0].guid)],
                                          'volumes': {},
                                          'waiter': Waiter(1)}
 
         # Have 1 StorageRouter with 0 SCRUB partitions
         storagerouter_2.disks[0].partitions[0].roles = []
         storagerouter_2.disks[0].partitions[0].save()
-
-        # Have 1 StorageRouter with multiple SCRUB partitions
-        partition = DiskPartition()
-        partition.offset = 0
-        partition.size = storagerouter_3.disks[0].size
-        partition.aliases = ['/dev/uda-2']
-        partition.state = 'OK'
-        partition.mountpoint = '/tmp/unittest/sr_3/disk_1/partition_2'
-        partition.disk = storagerouter_3.disks[0]
-        partition.roles = [DiskPartition.ROLES.SCRUB]
-        partition.save()
-
-        # Try to start scrubbing with a StorageRouter with multiple SCRUB partitions
-        with self.assertRaises(RuntimeError) as raise_info:
-            GenericController.execute_scrub()
-        self.assertEqual(first='Multiple SCRUB partitions defined for StorageRouter {0}'.format(storagerouter_3.name),
-                         second=raise_info.exception.message,
-                         msg='Incorrect error message caught')
-        storagerouter_3.disks[0].partitions[1].delete()
-        storagerouter_3.disks[0].partitions[0].roles = []
-        storagerouter_3.disks[0].partitions[0].save()
-        storagerouter_3.invalidate_dynamics('partition_config')
 
         # Have 0 SCRUB roles and verify error
         storagerouter_1.disks[0].partitions[0].roles = []
@@ -449,23 +426,34 @@ class Generic(unittest.TestCase):
         self.persistent._clean()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],  # vPool 2 has no vDisks attached to it
-             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
-                        (6, 1, 1, 1), (7, 1, 1, 1), (8, 1, 1, 1), (9, 1, 1, 1), (10, 1, 1, 1),
-                        (11, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'vdisks': [(i, 1, 1, 1) for i in xrange(1, 12)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
-             'storagerouters': [1, 2, 3, 4, 5],
+             'storagerouters': [1, 2, 3, 4],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
+        storagerouter_1 = structure['storagerouters'][1]
         # Have 1 volume as a template, scrubbing should not be triggered on it
-        vdisk_11 = structure['vdisks'][11]
-        vdisk_11.storagedriver_client.set_volume_as_template(volume_id=vdisk_11.volume_id)
+        vdisk_t = structure['vdisks'][11]
+        vdisk_t.storagedriver_client.set_volume_as_template(volume_id=vdisk_t.volume_id)
+
+        # Have 1 StorageRouter with multiple SCRUB partitions
+        partition = DiskPartition()
+        partition.offset = 0
+        partition.size = storagerouter_1.disks[0].size
+        partition.aliases = ['/dev/uda-2']
+        partition.state = 'OK'
+        partition.mountpoint = '/tmp/unittest/sr_1/disk_1/partition_2'
+        partition.disk = storagerouter_1.disks[0]
+        partition.roles = [DiskPartition.ROLES.SCRUB]
+        partition.save()
 
         thread_names = []
         for storagerouter in structure['storagerouters'].values():
-            for index in range(2):
-                thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index))
+            for partition in [p for disk in storagerouter.disks for p in disk.partitions]:
+                for index in range(2):
+                    thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition.guid, index))
         LockedClient.scrub_controller = {'possible_threads': thread_names,
                                          'volumes': {},
                                          'waiter': Waiter(len(thread_names))}
@@ -478,7 +466,7 @@ class Generic(unittest.TestCase):
         # Verify all threads have been 'consumed'
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
-        self.assertIn(member='Scrubber - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vpool.name, vdisk_11.guid, vdisk_11.name),
+        self.assertIn(member='Scrubber - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vpool.name, vdisk_t.guid, vdisk_t.name),
                       container=LogHandler._logs['lib_generic tasks'])
 
         ##############
@@ -509,8 +497,9 @@ class Generic(unittest.TestCase):
         thread_names = []
         for vpool in vpools.values():
             for storagerouter in storagerouters.values():
-                for index in range(2):
-                    thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index))
+                for partition in storagerouter.disks[0].partitions:
+                    for index in range(2):
+                        thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition.guid, index))
         LockedClient.scrub_controller = {'possible_threads': thread_names,
                                          'volumes': {},
                                          'waiter': Waiter(12)}
@@ -558,8 +547,9 @@ class Generic(unittest.TestCase):
         thread_names = []
         for vpool in vpools.values():
             for storagerouter in storagerouters.values():
-                for index in range(2):
-                    thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index))
+                for partition in storagerouter.disks[0].partitions:
+                    for index in range(2):
+                        thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition.guid, index))
         LockedClient.scrub_controller = {'possible_threads': thread_names,
                                          'volumes': {},
                                          'waiter': Waiter(len(thread_names))}
@@ -658,8 +648,9 @@ class Generic(unittest.TestCase):
         for vpool in vpools.values():
             for storagerouter in storagerouters.values():
                 stack_threads = sr_1_threads if storagerouter == storagerouters[1] else sr_2_threads
-                for index in range(stack_threads):
-                    thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index))
+                for partition in storagerouter.disks[0].partitions:
+                    for index in range(stack_threads):
+                        thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition.guid, index))
         LockedClient.scrub_controller = {'possible_threads': thread_names,
                                          'volumes': {},
                                          'waiter': Waiter(14)}

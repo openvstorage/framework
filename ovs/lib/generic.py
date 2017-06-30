@@ -228,15 +228,15 @@ class GenericController(object):
             scrub_partitions = storage_router.partition_config.get(DiskPartition.ROLES.SCRUB, [])
             if len(scrub_partitions) == 0:
                 continue
-            if len(scrub_partitions) > 1:
-                raise RuntimeError('Multiple {0} partitions defined for StorageRouter {1}'.format(DiskPartition.ROLES.SCRUB, storage_router.name))
 
-            partition = DiskPartition(scrub_partitions[0])
-            GenericController._logger.info('Scrubber - Storage Router {0} has {1} partition at {2}'.format(storage_router.ip, DiskPartition.ROLES.SCRUB, partition.folder))
             try:
                 SSHClient(endpoint=storage_router, username='root')
-                scrub_locations.append({'scrub_path': str(partition.folder),
-                                        'storage_router': storage_router})
+                for partition_guid in scrub_partitions:
+                    partition = DiskPartition(partition_guid)
+                    GenericController._logger.info('Scrubber - Storage Router {0} has {1} partition at {2}'.format(storage_router.ip, DiskPartition.ROLES.SCRUB, partition.folder))
+                    scrub_locations.append({'scrub_path': str(partition.folder),
+                                            'partition_guid': partition.guid,
+                                            'storage_router': storage_router})
             except UnableToConnectException:
                 GenericController._logger.warning('Scrubber - Storage Router {0} is not reachable'.format(storage_router.ip))
 
@@ -261,11 +261,11 @@ class GenericController(object):
 
         number_of_vpools = len(vpool_vdisk_map)
         if number_of_vpools >= 6:
-            max_threads_per_vpool = 1
+            max_stacks_per_vpool = 1
         elif number_of_vpools >= 3:
-            max_threads_per_vpool = 2
+            max_stacks_per_vpool = 2
         else:
-            max_threads_per_vpool = 5
+            max_stacks_per_vpool = 5
 
         threads = []
         counter = 0
@@ -289,16 +289,14 @@ class GenericController(object):
                     continue
                 vpool_queue.put(vd.guid)
 
-            threads_to_spawn = min(max_threads_per_vpool, len(scrub_locations))
-            GenericController._logger.info('Scrubber - vPool {0} - Spawning {1} thread{2}'.format(vp.name, threads_to_spawn, '' if threads_to_spawn == 1 else 's'))
-            for _ in range(threads_to_spawn):
+            stacks_to_spawn = min(max_stacks_per_vpool, len(scrub_locations))
+            GenericController._logger.info('Scrubber - vPool {0} - Spawning {1} stack{2}'.format(vp.name, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
+            for _ in xrange(stacks_to_spawn):
                 scrub_target = scrub_locations[counter % len(scrub_locations)]
-                storage_router = scrub_target['storage_router']
-                proxy_name = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vp.name, storage_router.name, uuid.uuid4())
-                thread = Thread(target=GenericController._deploy_proxy_and_scrub,
-                                args=(vpool_queue, vp, scrub_target, error_messages, proxy_name))
-                thread.start()
-                threads.append(thread)
+                stack = Thread(target=GenericController._deploy_stack_and_scrub,
+                               args=(vpool_queue, vp, scrub_target, error_messages))
+                stack.start()
+                threads.append(stack)
                 counter += 1
 
         for thread in threads:
@@ -377,7 +375,7 @@ class GenericController(object):
             GenericController._logger.exception(message)
 
     @staticmethod
-    def _deploy_proxy_and_scrub(queue, vpool, scrub_info, error_messages, alba_proxy_service):
+    def _deploy_stack_and_scrub(queue, vpool, scrub_info, error_messages):
         """
         Executes scrub work for a given vDisk queue and vPool, based on scrub_info
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
@@ -390,8 +388,6 @@ class GenericController(object):
         :type scrub_info: dict
         :param error_messages: A list of error messages to be filled (by reference)
         :type error_messages: list
-        :param alba_proxy_service: Name the scrub proxy service should get
-        :type alba_proxy_service: str
         :return: None
         :rtype: NoneType
         """
@@ -403,9 +399,11 @@ class GenericController(object):
         client = None
         lock_time = 5 * 60
         storagerouter = scrub_info['storage_router']
-        scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, storagerouter.name)
-        scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, storagerouter.guid)
-        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, storagerouter.guid)
+        partition_guid = scrub_info['partition_guid']
+        alba_proxy_service = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vpool.name, storagerouter.name, partition_guid)
+        scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, partition_guid)
+        scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, partition_guid)
+        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, partition_guid)
 
         # Deploy a proxy
         try:
@@ -422,26 +420,6 @@ class GenericController(object):
                     port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
                     with volatile_mutex('deploy_proxy_for_scrub_{0}'.format(storagerouter.guid), wait=30):
                         port = System.get_free_ports(selected_range=port_range, nr=1, client=client)[0]
-                    # Scrub config
-                    # {u'albamgr_cfg_url': u'arakoon://config/ovs/vpools/71e2f717-f270-4a41-bbb0-d4c8c084d43e/proxies/64759516-3471-4321-b912-fb424568fc5b/config/abm?ini=%2Fopt%2FOpenvStorage%2Fconfig%2Farakoon_cacc.ini',
-                    #  u'fragment_cache': [u'none'],
-                    #  u'ips': [u'127.0.0.1'],
-                    #  u'log_level': u'info',
-                    #  u'manifest_cache_size': 17179869184,
-                    #  u'port': 0,
-                    #  u'transport': u'tcp'}
-
-                    # Backend config
-                    # {u'backend_type': u'MULTI',
-                    #  u'backend_interface_retries_on_error': 5,
-                    #  u'backend_interface_retry_backoff_multiplier': 2.0,
-                    #  u'backend_interface_retry_interval_secs': 1,
-                    #  u'0': {u'alba_connection_host': u'10.100.193.155',
-                    #         u'alba_connection_port': 26204,
-                    #         u'alba_connection_preset': u'preset',
-                    #         u'alba_connection_timeout': 15,
-                    #         u'alba_connection_transport': u'TCP',
-                    #         u'backend_type': u'ALBA'}}
                     scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))
                     scrub_config['port'] = port
                     scrub_config['transport'] = 'tcp'
@@ -488,7 +466,7 @@ class GenericController(object):
         amount_threads = min(min(queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
         GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Spawning {2} threads for proxy service {3}'.format(vpool.name, storagerouter.name, amount_threads, alba_proxy_service))
         for index in range(amount_threads):
-            thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index),
+            thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition_guid, index),
                             target=GenericController._execute_scrub,
                             args=(queue, vpool, storagerouter, scrub_directory, error_messages))
             thread.start()
