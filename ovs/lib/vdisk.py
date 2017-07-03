@@ -173,7 +173,10 @@ class VDiskController(object):
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if vdisk is not None:
                 for _function in Toolbox.fetch_hooks('vdisk_removal', 'before_volume_remove'):
-                    _function(vdisk.guid)
+                    try:
+                        _function(vdisk.guid)
+                    except RuntimeError:
+                        VDiskController._logger.exception('Executing hook {0} failed'.format(_function.__name__))
                 VDiskController.clean_vdisk_from_model(vdisk)
             else:
                 VDiskController._logger.info('Volume {0} does not exist'.format(volume_id))
@@ -235,7 +238,10 @@ class VDiskController(object):
         VDiskController._logger.info('Extended vDisk {0} to {1}B'.format(vdisk.name, volume_size))
         VDiskController._logger.info('Running "after_volume_extend" hooks for vDisk {0}'.format(vdisk.guid))
         for _function in Toolbox.fetch_hooks('vdisk_extend', 'after_volume_extend'):
-            _function(vdisk.guid)
+            try:
+                _function(vdisk.guid)
+            except RuntimeError:
+                VDiskController._logger.exception('Executing hook {0} failed'.format(_function.__name__))
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.resize_from_voldrv')
@@ -275,7 +281,10 @@ class VDiskController(object):
             VDiskController.vdisk_checkup(vdisk)
             VDiskController._logger.info('Running "after_volume_extend" hooks for vDisk {0}'.format(vdisk.guid))
             for _function in Toolbox.fetch_hooks('vdisk_extend', 'after_volume_extend'):
-                _function(vdisk.guid)
+                try:
+                    _function(vdisk.guid)
+                except RuntimeError:
+                    VDiskController._logger.exception('Executing hook {0} failed'.format(_function.__name__))
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.migrate_from_voldrv')
@@ -335,7 +344,10 @@ class VDiskController(object):
                         VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
                         VDiskController._logger.info('Running "after_volume_rename" hooks for vDisk {0}'.format(vdisk.guid))
                         for _function in _hooked_functions:
-                            _function(vdisk.guid)
+                            try:
+                                _function(vdisk.guid)
+                            except RuntimeError:
+                                VDiskController._logger.exception('Executing hook {0} failed'.format(_function.__name__))
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.clone')
