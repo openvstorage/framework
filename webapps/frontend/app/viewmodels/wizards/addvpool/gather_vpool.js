@@ -214,12 +214,13 @@ define([
                             if (item.available === true) {
                                 getData.contents = 'name,usages,presets';
                                 if (item.scaling === 'LOCAL') {
-                                    getData.contents += ',asd_statistics';
+                                    getData.contents += ',osd_statistics';
                                 }
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.guid + '/', {queryparams: getData})
                                         .then(function (data) {
-                                            if ((data.asd_statistics !== undefined && Object.keys(data.asd_statistics).length > 0) || data.scaling === 'GLOBAL') {
+                                            var osd_statistics = data.osd_statistics;
+                                            if ((osd_statistics !== undefined && Object.keys(osd_statistics).length > 0) || data.scaling === 'GLOBAL') {
                                                 available_backends.push(data);
                                                 self.albaPresetMap()[data.guid] = {};
                                                 $.each(data.presets, function (_, preset) {
