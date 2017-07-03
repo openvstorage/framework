@@ -215,9 +215,10 @@ define([
                 self.pageLoading(true);
                 var chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
                 chainDeferred.resolve();
-                chainPromise.then(function() {
-                    return self.loadData(options);
-                })
+                chainPromise
+                    .then(function() {
+                        return self.loadData(options);
+                    })
                     .always(function() {
                         self.pageLoading(false);
                     });
