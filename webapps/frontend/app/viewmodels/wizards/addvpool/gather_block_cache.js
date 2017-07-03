@@ -196,7 +196,7 @@ define([
                             if (item.available === true) {
                                 getData.contents = 'name,ns_statistics,presets,usages';
                                 if (item.scaling === 'LOCAL') {
-                                    getData.contents += ',asd_statistics';
+                                    getData.contents += ',osd_statistics';
                                 }
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
