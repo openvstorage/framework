@@ -1785,7 +1785,7 @@ class Basic(unittest.TestCase):
         self.assertEqual(machine1.name, machine2.name)
         self.assertEqual(machine1.guid, machine2.guid)
         self.assertEqual(machine1._datastore_wins, machine2._datastore_wins)
-        self.assertEqual(machine1._data, machine2._data)
+        self.assertDictEqual(machine1._data, machine2._data)
         self.assertEqual(machine1, machine2)
         machine2.name = 'test_machine2'
         machine2.save()
