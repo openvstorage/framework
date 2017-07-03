@@ -953,6 +953,16 @@ class DataObject(object):
         for key in properties_to_copy:
             setattr(self, key, getattr(other_object, key))
 
+    def clone(self):
+        """
+        Make an identical clone of the DataObject
+        """
+        if self.volatile is True:
+            clone = self.__class__(self.guid, data=self._data, datastore_wins=self._datastore_wins, volatile=self.volatile)
+        else:
+            clone = self.__class__(self.guid)
+        return clone
+
     def updated_on_datastore(self):
         """
         Checks whether this object has been modified on the datastore
@@ -972,9 +982,15 @@ class DataObject(object):
         return this_version != backend_version
 
     def get_timings(self):
+        """
+        Retrieve the timings for collecting the dynamic properties of this DataObject
+        """
         return self._dynamic_timings
 
     def reset_timings(self):
+        """
+        Reset the timings it took for collecting the dynamic properties of this DataObject
+        """
         self._dynamic_timings = {}
 
     ##############

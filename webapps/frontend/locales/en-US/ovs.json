@@ -379,6 +379,7 @@
         "rollback": "&#xf01e;",
         "save": "&#xf0c7;",
         "scrub": "&#xf1b8;",
+        "search": "&#xf002;",
         "separator": "&#xf101;",
         "set_as_template": "&#xf023;",
         "snapshot": "&#xf030;",
@@ -630,7 +631,7 @@
             "snapshots": "Snapshots",
             "title": "vDisk"
         },
-        "details": "Details",
+        "details": "vDisk Details",
         "performance": "Performance",
         "remove_snapshot": {
             "failed_msg": "Removing snapshot __what__ failed: __why__",
@@ -690,7 +691,6 @@
             "title": "Scrub vDisk __vdisk__",
             "title_message": "Are you sure you want to scrub vDisk __vdisk__?"
         },
-
         "title": "vDisks"
     },
     "vpools": {

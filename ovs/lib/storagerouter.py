@@ -444,12 +444,12 @@ class StorageRouterController(object):
                     largest_sata = info['available']
                     largest_sata_write_partition = info['guid']
 
+            mountpoint_cache = None
             amount_of_proxies = parameters.get('parallelism', {}).get('proxies', 2)
-            local_amount_of_proxies = 0
             fragment_cache_on_read = parameters['fragment_cache_on_read']
             fragment_cache_on_write = parameters['fragment_cache_on_write']
+            local_amount_of_proxies = 0
             largest_write_mountpoint = None
-            mountpoint_fragment_cache = None
             if largest_ssd_write_partition is None and largest_sata_write_partition is None:
                 error_messages.append('No WRITE partition found to put the local caches on')
             else:
@@ -461,7 +461,7 @@ class StorageRouterController(object):
                     if block_cache_on_read is True or block_cache_on_write is True:  # Local block caching
                         local_amount_of_proxies += amount_of_proxies
                 if local_amount_of_proxies > 0:
-                    mountpoint_fragment_cache = largest_write_mountpoint
+                    mountpoint_cache = largest_write_mountpoint
                     one_gib = 1024 ** 3  # 1GiB
                     proportion = float(largest_ssd or largest_sata) * 100.0 / writecache_size_available
                     available = proportion * writecache_size_requested / 100 * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
@@ -614,8 +614,8 @@ class StorageRouterController(object):
                 proportion = available * 100.0 / writecache_size_available
                 size_to_be_used = proportion * writecache_size_requested / 100
                 write_cache_percentage = 0.98
-                if mountpoint_fragment_cache is not None and partition == mountpoint_fragment_cache:
-                    if fragment_cache_on_read is True or fragment_cache_on_write is True:  # Only in this case we actually make use of the fragment caching
+                if mountpoint_cache is not None and partition == mountpoint_cache:
+                    if fragment_cache_on_read is True or fragment_cache_on_write is True or block_cache_on_read is True or block_cache_on_write is True:  # Only in this case we actually make use of the fragment caching
                         frag_size = int(size_to_be_used * 0.10)  # Bytes
                         write_cache_percentage = 0.88
                     for _ in xrange(amount_of_proxies):

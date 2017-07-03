@@ -44,7 +44,7 @@ define([
             { key: undefined,       value: $.t('ovs:generic.actions'),     width: 60        }
         ];
         self.edgeClientHeaders = [
-            { key: 'clientIp',   value: $.t('ovs:vdisks.detail.client_ip'),   width: 150       },
+            { key: 'clientIp',   value: $.t('ovs:vdisks.detail.client_ip'),   width: 120       },
             { key: 'clientPort', value: $.t('ovs:vdisks.detail.client_port'), width: 100       },
             { key: 'serverIp',   value: $.t('ovs:vdisks.detail.server_ip'),   width: 150       },
             { key: 'serverPort', value: $.t('ovs:vdisks.detail.server_port'), width: undefined }
@@ -70,6 +70,11 @@ define([
                         if (self.vDisk().isVTemplate()) {
                             router.navigateBack();
                             return deferred.reject();
+                        }
+                        if (self.shared.pluginData().vdiskDetail.iscsi.vdisk === undefined) {
+                            var pluginData = self.shared.pluginData();
+                            pluginData.vdiskDetail.iscsi.vdisk = self.vDisk;
+                            self.shared.pluginData(pluginData);
                         }
                     })
                     .then(self.loadStorageRouters)
@@ -480,11 +485,35 @@ define([
         // Durandal
         self.activate = function(mode, guid) {
             self.vDisk(new VDisk(guid));
+            var pluginData = self.shared.pluginData();
+            pluginData.vdiskDetail = {
+                iscsi: {
+                    vdisk: self.vDisk,
+                    iscsiNodes: ko.observableArray([]),
+                    iscsiNodesLoaded: ko.observable(false)
+                },
+                blockedActions: ko.observableArray([])
+            };
+            self.shared.pluginData(pluginData);
+            $.each(shared.hooks.pages, function(pageType, pages) {
+                if (pageType === 'vdisk-detail') {
+                    $.each(pages, function(index, page) {
+                        page.activator.activateItem(page.module);
+                    })
+                }
+            });
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
         };
         self.deactivate = function() {
+            $.each(shared.hooks.pages, function(pageType, pages) {
+                if (pageType === 'vdisk-detail') {
+                    $.each(pages, function(index, page) {
+                        page.activator.deactivateItem(page.module);
+                    });
+                }
+            });
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });

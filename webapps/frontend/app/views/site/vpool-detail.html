@@ -17,6 +17,9 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <section data-bind="with: vPool()">
     <ol class="breadcrumb">
+        <li>
+            <a data-bind="attr: { href: $root.shared.routing.loadHash('vpools') }" data-i18n="ovs:vpools.title"></a>
+        </li>
         <li class="active" data-bind="text: name"></li>
     </ol>
     <div>
