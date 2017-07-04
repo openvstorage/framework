@@ -306,7 +306,7 @@ class GenericController(object):
             raise Exception('Errors occurred while scrubbing:\n  - {0}'.format('\n  - '.join(error_messages)))
 
     @staticmethod
-    def _execute_scrub(queue, vpool, storagerouter, scrub_dir, error_messages):
+    def _execute_scrub(queue, vpool, scrub_info, scrub_dir, error_messages):
         def _verify_mds_config(current_vdisk):
             current_vdisk.invalidate_dynamics('info')
             vdisk_configs = current_vdisk.info['metadata_backend_config']
@@ -314,8 +314,10 @@ class GenericController(object):
                 raise RuntimeError('Could not load MDS configuration')
             return vdisk_configs
 
+        storagerouter = scrub_info['storage_router']
+        partition_guid = scrub_info['partition_guid']
         volatile_client = VolatileFactory.get_client()
-        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, storagerouter.guid)
+        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, partition_guid)
         try:
             # Empty the queue with vDisks to scrub
             with remote(storagerouter.ip, [VDisk]) as rem:
@@ -468,7 +470,7 @@ class GenericController(object):
         for index in range(amount_threads):
             thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition_guid, index),
                             target=GenericController._execute_scrub,
-                            args=(queue, vpool, storagerouter, scrub_directory, error_messages))
+                            args=(queue, vpool, scrub_info, scrub_directory, error_messages))
             thread.start()
             threads.append(thread)
         for thread in threads:
