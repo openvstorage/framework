@@ -360,7 +360,6 @@ class StorageRouterController(object):
             if new_vpool is False and alba_backend_guid != vpool.metadata['backend']['backend_info']['alba_backend_guid']:
                 error_messages.append('Incorrect ALBA Backend guid specified')
 
-            backend_dict_fc = None
             if use_fragment_cache_backend is True:
                 if 'connection_info_fc' not in parameters:
                     error_messages.append('Missing the connection information for the Fragment Cache Backend')
@@ -373,16 +372,6 @@ class StorageRouterController(object):
                                                                                                       'client_id': (str, None),
                                                                                                       'client_secret': (str, None),
                                                                                                       'local': (bool, None, False)})})
-                        # Check cache quota is large enough for at least 10 vDisks
-                        cache_quota = parameters.get('cache_quota_fc')
-                        if cache_quota is not None:
-                            ovs_client = OVSClient(ip=connection_info_fc['host'],
-                                                   port=connection_info_fc['port'],
-                                                   credentials=(connection_info_fc['client_id'],
-                                                                connection_info_fc['client_secret']),
-                                                   version=2,
-                                                   cache_store=VolatileFactory.get_client())
-                            backend_dict_fc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_fc), params={'contents': 'name,usages'})
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
             if use_block_cache_backend is True:
@@ -397,19 +386,6 @@ class StorageRouterController(object):
                                                                                                       'client_id': (str, None),
                                                                                                       'client_secret': (str, None),
                                                                                                       'local': (bool, None, False)})})
-                        # Check cache quota is large enough for at least 10 vDisks
-                        cache_quota = parameters.get('cache_quota_bc')
-                        if cache_quota is not None:
-                            if backend_dict_fc is not None and alba_backend_guid_bc == alba_backend_guid_fc:
-                                backend_dict_bc = copy.deepcopy(backend_dict_fc)
-                            else:
-                                ovs_client = OVSClient(ip=connection_info_bc['host'],
-                                                       port=connection_info_bc['port'],
-                                                       credentials=(connection_info_bc['client_id'],
-                                                                    connection_info_bc['client_secret']),
-                                                       version=2,
-                                                       cache_store=VolatileFactory.get_client())
-                                backend_dict_bc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_bc), params={'contents': 'name,usages'})
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
 

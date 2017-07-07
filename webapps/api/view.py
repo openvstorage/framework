@@ -25,13 +25,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.conf import settings
 from api.backend.decorators import required_roles, load
-from api.backend.exceptions import HttpBadRequestException
 from api.middleware import OVSMiddleware
 from api.oauth2.decorators import auto_response, limit, authenticated
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.client import OVSClient
+from ovs_extensions.api.exceptions import HttpMethodNotAllowedException
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -160,8 +160,8 @@ def relay(*args, **kwargs):
                            raw_response=True,
                            cache_store=VolatileFactory.get_client())
         if not hasattr(client, method):
-            raise HttpBadRequestException(error='unavailable_call',
-                                          error_description='Method not available in relay')
+            raise HttpMethodNotAllowedException(error='unavailable_call',
+                                                error_description='Method not available in relay')
         client_kwargs = {'params': request.GET}
         if method != 'get':
             client_kwargs['data'] = request.POST

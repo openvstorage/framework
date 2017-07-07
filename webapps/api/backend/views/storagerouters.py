@@ -23,13 +23,13 @@ from rest_framework import viewsets
 from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
-from api.backend.exceptions import HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
@@ -299,12 +299,12 @@ class StorageRouterViewSet(viewsets.ViewSet):
         def _validate_required_keys(section):
             for required_key in ['host', 'backend']:
                 if required_key not in call_parameters[section]:
-                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" misses information about {1}'.format(section, required_key),
-                                                     error='invalid_data')
+                    raise HttpNotAcceptableException(error='invalid_data',
+                                                     error_description='Invalid data passed: "{0}" misses information about {1}'.format(section, required_key))
             for sub_required_key in ['backend', 'metadata']:
                 if sub_required_key not in call_parameters[section]['backend']:
-                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" missing information about {1}'.format(section, sub_required_key),
-                                                     error='invalid_data')
+                    raise HttpNotAcceptableException(error='invalid_data',
+                                                     error_description='Invalid data passed: "{0}" missing information about {1}'.format(section, sub_required_key))
 
         # API backwards compatibility
         if version <= 2:
@@ -321,8 +321,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
                                                                          'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
         if version < 6:
             if 'backend_connection_info' not in call_parameters:
-                raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" should be passed',
-                                                 error='invalid_data')
+                raise HttpNotAcceptableException(error='invalid_data',
+                                                 error_description='Invalid data passed: "backend_connection_info" should be passed')
             _validate_required_keys(section='backend_connection_info')
             if 'backend_info' not in call_parameters:
                 call_parameters['backend_info'] = {}
@@ -351,13 +351,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 del call_parameters['backend_connection_info_aa']
 
         if version >= 6 and 'backend_connection_info' in call_parameters:
-            raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" is deprecated',
-                                             error='invalid_data')
+            raise HttpNotAcceptableException(error='invalid_data',
+                                             error_description='Invalid data passed: "backend_connection_info" is deprecated')
 
         # API client translation (cover "local backend" selection in GUI)
         if 'backend_info' not in call_parameters or 'connection_info' not in call_parameters or 'config_params' not in call_parameters:
-            raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
-                                             error='invalid_data')
+            raise HttpNotAcceptableException(error='invalid_data',
+                                             error_description='Invalid call_parameters passed')
         connection_info = call_parameters['connection_info']
         if 'backend_info_aa' in call_parameters:
             # Backwards compatibility
@@ -376,8 +376,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 if _client.ovs_type == 'INTERNAL' and _client.grant_type == 'CLIENT_CREDENTIALS':
                     client = _client
             if client is None:
-                raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
-                                                 error='invalid_data')
+                raise HttpNotAcceptableException(error='invalid_data',
+                                                 error_description='Invalid call_parameters passed')
             if connection_info['host'] == '':
                 connection_info['client_id'] = client.client_id
                 connection_info['client_secret'] = client.client_secret

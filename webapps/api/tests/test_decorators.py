@@ -23,7 +23,6 @@ import uuid
 import hashlib
 import unittest
 from django.http import HttpResponse
-from api.backend.exceptions import HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException, HttpUnauthorizedException, HttpForbiddenException
 # noinspection PyUnresolvedReferences
 from api.backend.toolbox import ApiToolbox  # Required for the tests
 from api.oauth2.toolbox import OAuth2Toolbox
@@ -37,6 +36,7 @@ from ovs.dal.hybrids.user import User
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.tests.helpers import DalHelper
+from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException, HttpUnauthorizedException
 
 
 class Decorators(unittest.TestCase):

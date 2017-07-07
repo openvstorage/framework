@@ -22,7 +22,6 @@ from rest_framework import viewsets
 from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import load, log, required_roles, return_list, return_object, return_task
-from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -30,6 +29,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
 
@@ -141,8 +141,8 @@ class VDiskViewSet(viewsets.ViewSet):
         if version == 1 and 'dtl_target' in new_config_params:
             storage_router = StorageRouterList.get_by_ip(new_config_params['dtl_target'])
             if storage_router is None:
-                raise HttpNotAcceptableException(error_description='API version 1 requires a Storage Router IP',
-                                                 error='invalid_version')
+                raise HttpNotAcceptableException(error='invalid_version',
+                                                 error_description='API version 1 requires a Storage Router IP')
             new_config_params['dtl_target'] = [junction.domain_guid for junction in storage_router.domains]
 
         new_config_params.pop('dedupe_mode', None)
@@ -262,8 +262,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :rtype: celery.result.AsyncResult
         """
         if len(vdisk.child_vdisks) > 0:
-            raise HttpNotAcceptableException(error_description='vDisk has clones',
-                                             error='impossible_request')
+            raise HttpNotAcceptableException(error='impossible_request',
+                                             error_description='vDisk has clones')
         return VDiskController.set_as_template.delay(vdisk_guid=vdisk.guid)
 
     @action()
@@ -297,8 +297,8 @@ class VDiskViewSet(viewsets.ViewSet):
                                                         storagedriver_guid=storagedriver.guid,
                                                         pagecache_ratio=pagecache_ratio,
                                                         cache_quota=cache_quota)
-        raise HttpNotAcceptableException(error_description='No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid),
-                                         error='impossible_request')
+        raise HttpNotAcceptableException(error='impossible_request',
+                                         error_description='No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid))
 
     @action()
     @log()
@@ -391,8 +391,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :rtype: celery.result.AsyncResult
         """
         if len(vdisk.child_vdisks) > 0:
-            raise HttpNotAcceptableException(error_description='vDisk has clones',
-                                             error='impossible_request')
+            raise HttpNotAcceptableException(error='impossible_request',
+                                             error_description='vDisk has clones')
         return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
     @action()
@@ -409,11 +409,11 @@ class VDiskViewSet(viewsets.ViewSet):
         :rtype: celery.result.AsyncResult
         """
         if not vdisk.is_vtemplate:
-            raise HttpNotAcceptableException(error_description='vDisk should be a vTemplate',
-                                             error='impossible_request')
+            raise HttpNotAcceptableException(error='impossible_request',
+                                             error_description='vDisk should be a vTemplate')
         if len(vdisk.child_vdisks) > 0:
-            raise HttpNotAcceptableException(error_description='vTemplate has clones',
-                                             error='impossible_request')
+            raise HttpNotAcceptableException(error='impossible_request',
+                                             error_description='vTemplate has clones')
         return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
     @action()

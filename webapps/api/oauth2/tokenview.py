@@ -26,12 +26,12 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from api.oauth2.decorators import auto_response, limit, log
-from api.oauth2.exceptions import HttpBadRequestException
 from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
+from ovs_extensions.api.exceptions import HttpBadRequestException
 from ovs.log.log_handler import LogHandler
 
 

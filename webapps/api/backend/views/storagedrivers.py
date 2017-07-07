@@ -22,10 +22,10 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from api.backend.decorators import load, log, required_roles, return_list, return_object, return_simple, return_task
-from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.storagedriver import StorageDriverController
 
 

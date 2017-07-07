@@ -112,8 +112,8 @@ class OVSMiddleware(object):
         if len(bases) != 1:
             return False
         base = bases[0]
-        if base.__name__ != 'HttpException' and not base.__module__.endswith('backend.exceptions') and not base.__module__.endswith('oauth2.exceptions'):
+        if base.__name__ != 'HttpException' and not base.__module__.endswith('api.exceptions'):
             return False
-        if not exception.__class__.__module__.endswith('backend.exceptions') and not exception.__class__.__module__.endswith('oauth2.exceptions'):
+        if not exception.__class__.__module__.endswith('api.exceptions'):
             return False
         return True
