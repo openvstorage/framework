@@ -1,4 +1,4 @@
-# Copyright (C) 2016 iNuron NV
+# Copyright (C) 2017 iNuron NV
 #
 # This file is part of Open vStorage Open Source Edition (OSE),
 # as available from
@@ -13,7 +13,3 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
-
-"""
-This package contains service extensions
-"""

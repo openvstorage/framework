@@ -1,0 +1,130 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <p data-i18n="ovs:wizards.create_hprm_configs.confirm.basic_info"></p>
+    <ul>
+        <li><b data-i18n="ovs:wizards.create_hprm_configs.confirm.port"></b> <span data-bind="text: data.hprmPort"></span></li>
+        <li><b data-i18n="ovs:wizards.create_hprm_configs.confirm.identifier"></b> <span data-bind="text: data.identifier"></span></li>
+        <li>
+            <b data-i18n="ovs:wizards.create_hprm_configs.confirm.fragment_cache"></b>
+            <ul>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_read"></b>
+                    <span data-bind="translate: 'ovs:wizards.create_hprm_configs.confirm.cache_info.' + data.fragmentCacheOnRead()"></span>
+                </li>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_write"></b>
+                    <span data-bind="translate: 'ovs:wizards.create_hprm_configs.confirm.cache_info.' + data.fragmentCacheOnWrite()"></span>
+                </li>
+                <li data-bind="visible: data.useFC() && data.cacheQuotaFC() !== undefined && data.cacheQuotaFC() !== ''">
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_quota"></b> <span data-bind="text: formatFloat(data.cacheQuotaFC())"></span> <span data-i18n="ovs:generic.units.gib"></span>
+                </li>
+            </ul>
+            <div data-bind="visible: data.useFC()">
+                <ul>
+                    <li>
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.backend"></b>
+                        <span data-bind="text: data.backendFC() !== undefined ? data.backendFC().name : ''"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostFC()">
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.host"></b>
+                        <span data-bind="text: data.hostFC"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostFC()">
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.port"></b>
+                        <span data-bind="text: data.portFC"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostFC()">
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.client_id"></b> <span data-bind="text: data.clientIDFC"></span>
+                    </li>
+                    <li>
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.alba_preset"></b>
+                        <span data-bind="text: data.presetFC() !== undefined ? data.presetFC().name : ''"></span>
+                    </li>
+                </ul>
+            </div>
+            <div data-bind="visible: !data.useFC() && (data.fragmentCacheOnRead() || data.fragmentCacheOnWrite())">
+                <ul>
+                    <li>
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.local_path"></b>
+                        <span data-bind="text: data.localPathFC()"></span>
+                    </li>
+                    <li>
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.local_size"></b>
+                        <span data-bind="text: data.localSizeFC()"></span>
+                        <span data-i18n="ovs:generic.units.gib"></span>
+                    </li>
+                </ul>
+            </div>
+        </li>
+        <li data-bind="visible: data.supportsBC()">
+            <b data-i18n="ovs:wizards.create_hprm_configs.confirm.block_cache"></b>
+            <ul>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_read"></b>
+                    <span data-bind="translate: 'ovs:wizards.create_hprm_configs.confirm.cache_info.' + data.blockCacheOnRead()"></span>
+                </li>
+                <li>
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_write"></b>
+                    <span data-bind="translate: 'ovs:wizards.create_hprm_configs.confirm.cache_info.' + data.blockCacheOnWrite()"></span>
+                </li>
+                <li data-bind="visible: data.useBC() && data.cacheQuotaBC() !== undefined && data.cacheQuotaBC() !== ''">
+                    <b data-i18n="ovs:wizards.create_hprm_configs.confirm.cache_quota"></b> <span data-bind="text: formatFloat(data.cacheQuotaBC())"></span> <span data-i18n="ovs:generic.units.gib"></span>
+                </li>
+            </ul>
+            <div data-bind="visible: data.useBC()">
+                <ul>
+                    <li>
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.backend"></b>
+                        <span data-bind="text: data.backendBC() !== undefined ? data.backendBC().name : ''"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostBC()">
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.host"></b>
+                        <span data-bind="text: data.hostBC"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostBC()">
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.port"></b>
+                        <span data-bind="text: data.portBC"></span>
+                    </li>
+                    <li data-bind="visible: !data.localHostBC()">
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.client_id"></b> <span data-bind="text: data.clientIDBC"></span>
+                    </li>
+                    <li>
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.alba_preset"></b>
+                        <span data-bind="text: data.presetBC() !== undefined ? data.presetBC().name : ''"></span>
+                    </li>
+                </ul>
+            </div>
+            <div data-bind="visible: !data.useBC() && (data.blockCacheOnRead() || data.blockCacheOnWrite())">
+                <ul>
+                    <li>
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.local_path"></b>
+                        <span data-bind="text: data.localPathBC()"></span>
+                    </li>
+                    <li>
+                        <b data-i18n="ovs:wizards.create_hprm_configs.confirm.local_size"></b>
+                        <span data-bind="text: data.localSizeBC()"></span>
+                        <span data-i18n="ovs:generic.units.gib"></span>
+                    </li>
+                </ul>
+            </div>
+        </li>
+    </ul>
+    <p data-i18n="ovs:wizards.create_hprm_configs.confirm.instructions"></p>
+    <p data-bind="html: instructions()"></p>
+</div>

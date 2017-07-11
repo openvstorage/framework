@@ -9,3 +9,4 @@
 syntax: regexp
 \._.*
 .orig$
+.iml

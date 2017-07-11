@@ -17,7 +17,6 @@
 """
 OVS migration module
 """
-import os
 
 
 class OVSMigrator(object):

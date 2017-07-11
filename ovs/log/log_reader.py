@@ -20,7 +20,7 @@ import platform
 import subprocess
 import unicodedata
 from datetime import date, datetime, timedelta
-from ovs.extensions.generic.remote import remote
+from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -122,6 +122,8 @@ class LogFileTimeParser(object):
         :type password: str
         :param suppress_return: only write to file and not return contents
         :type suppress_return: Boolean
+        :param search_patterns: What error patterns should be recognized
+        :type search_patterns: list of str
         :return: Output of a file as string
         """
         # Validate parameter
@@ -166,11 +168,11 @@ class LogFileTimeParser(object):
         :type validate: bool
         :return:
         """
-        def _get_datetime(text, validate):
+        def _get_datetime(_text, _validate):
             # Supports Aug 16 14:59:01 , 2016-08-16 09:23:09 Jun 1 2005  1:33:06PM (with or without seconds, microseconds)
             # Supports datetime objects as well, no need to convert others to strings
-            if isinstance(text, datetime):
-                return text
+            if isinstance(_text, datetime):
+                return _text
             for fmt in ('%Y-%m-%d %H:%M:%S %f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
                         '%b %d %H:%M:%S %f', '%b %d %H:%M', '%b %d %H:%M:%S',
                         '%b %d %Y %H:%M:%S %f', '%b %d %Y %H:%M', '%b %d %Y %H:%M:%S',
@@ -178,15 +180,15 @@ class LogFileTimeParser(object):
                 try:
                     # Add a year stamp to Jan 01 formats -- else we get default 1900
                     if fmt in ['%b %d %H:%M:%S %f', '%b %d %H:%M', '%b %d %H:%M:%S']:
-                        return datetime.strptime(text, fmt).replace(datetime.now().year)
-                    return datetime.strptime(text, fmt)
+                        return datetime.strptime(_text, fmt).replace(datetime.now().year)
+                    return datetime.strptime(_text, fmt)
                 except ValueError:
                     pass
                 except TypeError:
                     return datetime.min
                     # Happens for weirdly formatted strings without escaped chars
-            if validate:
-                raise ValueError('No valid date format found for "{0}"'.format(text))
+            if _validate:
+                raise ValueError('No valid date format found for "{0}"'.format(_text))
             else:
                 # Cannot use NoneType to compare date times. Using minimum instead
                 return datetime.min
@@ -225,12 +227,12 @@ class LogFileTimeParser(object):
             return line_date, line
         else:
             opened_file.seek(0, 2)
-            bytes = opened_file.tell()
+            data_bytes = opened_file.tell()
             size = tail_amount + 1
             block = -1
             data = []
-            while size > 0 and bytes > 0:
-                if bytes - buf_size > 0:
+            while size > 0 and data_bytes > 0:
+                if data_bytes - buf_size > 0:
                     # Seek back one whole BUFSIZ
                     opened_file.seek(block * buf_size, 2)
                     # read BUFFER
@@ -239,10 +241,10 @@ class LogFileTimeParser(object):
                     # file too small, start from begining
                     opened_file.seek(0, 0)
                     # only read what was not read
-                    data.insert(0, opened_file.read(bytes))
+                    data.insert(0, opened_file.read(data_bytes))
                 lines_found = data[0].count('\n')
                 size -= lines_found
-                bytes -= buf_size
+                data_bytes -= buf_size
                 block -= 1
             # Extract line dates
             output = []
@@ -397,7 +399,6 @@ class LogFileTimeParser(object):
         # Set some initial values
         count = 0
         line_date = None
-        line = None
 
         size = os.stat(search_location)[stat.ST_SIZE]
 

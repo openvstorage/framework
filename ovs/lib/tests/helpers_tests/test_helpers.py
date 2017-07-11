@@ -23,7 +23,7 @@ import unittest
 import threading
 from threading import Event, Thread
 from ovs.dal.tests.helpers import DalHelper
-from ovs.extensions.generic.threadhelpers import Waiter
+from ovs_extensions.generic.threadhelpers import Waiter
 # noinspection PyProtectedMember
 from ovs.lib.helpers.decorators import Decorators, _ensure_single, ovs_task
 

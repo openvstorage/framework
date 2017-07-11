@@ -36,14 +36,14 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.filemutex import file_mutex
-from ovs.extensions.generic.remote import remote
+from ovs_extensions.generic.filemutex import file_mutex
+from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
@@ -228,15 +228,15 @@ class GenericController(object):
             scrub_partitions = storage_router.partition_config.get(DiskPartition.ROLES.SCRUB, [])
             if len(scrub_partitions) == 0:
                 continue
-            if len(scrub_partitions) > 1:
-                raise RuntimeError('Multiple {0} partitions defined for StorageRouter {1}'.format(DiskPartition.ROLES.SCRUB, storage_router.name))
 
-            partition = DiskPartition(scrub_partitions[0])
-            GenericController._logger.info('Scrubber - Storage Router {0} has {1} partition at {2}'.format(storage_router.ip, DiskPartition.ROLES.SCRUB, partition.folder))
             try:
                 SSHClient(endpoint=storage_router, username='root')
-                scrub_locations.append({'scrub_path': str(partition.folder),
-                                        'storage_router': storage_router})
+                for partition_guid in scrub_partitions:
+                    partition = DiskPartition(partition_guid)
+                    GenericController._logger.info('Scrubber - Storage Router {0} has {1} partition at {2}'.format(storage_router.ip, DiskPartition.ROLES.SCRUB, partition.folder))
+                    scrub_locations.append({'scrub_path': str(partition.folder),
+                                            'partition_guid': partition.guid,
+                                            'storage_router': storage_router})
             except UnableToConnectException:
                 GenericController._logger.warning('Scrubber - Storage Router {0} is not reachable'.format(storage_router.ip))
 
@@ -261,11 +261,11 @@ class GenericController(object):
 
         number_of_vpools = len(vpool_vdisk_map)
         if number_of_vpools >= 6:
-            max_threads_per_vpool = 1
+            max_stacks_per_vpool = 1
         elif number_of_vpools >= 3:
-            max_threads_per_vpool = 2
+            max_stacks_per_vpool = 2
         else:
-            max_threads_per_vpool = 5
+            max_stacks_per_vpool = 5
 
         threads = []
         counter = 0
@@ -289,16 +289,14 @@ class GenericController(object):
                     continue
                 vpool_queue.put(vd.guid)
 
-            threads_to_spawn = min(max_threads_per_vpool, len(scrub_locations))
-            GenericController._logger.info('Scrubber - vPool {0} - Spawning {1} thread{2}'.format(vp.name, threads_to_spawn, '' if threads_to_spawn == 1 else 's'))
-            for _ in range(threads_to_spawn):
+            stacks_to_spawn = min(max_stacks_per_vpool, len(scrub_locations))
+            GenericController._logger.info('Scrubber - vPool {0} - Spawning {1} stack{2}'.format(vp.name, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
+            for _ in xrange(stacks_to_spawn):
                 scrub_target = scrub_locations[counter % len(scrub_locations)]
-                storage_router = scrub_target['storage_router']
-                proxy_name = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vp.name, storage_router.name, uuid.uuid4())
-                thread = Thread(target=GenericController._deploy_proxy_and_scrub,
-                                args=(vpool_queue, vp, scrub_target, error_messages, proxy_name))
-                thread.start()
-                threads.append(thread)
+                stack = Thread(target=GenericController._deploy_stack_and_scrub,
+                               args=(vpool_queue, vp, scrub_target, error_messages))
+                stack.start()
+                threads.append(stack)
                 counter += 1
 
         for thread in threads:
@@ -308,7 +306,7 @@ class GenericController(object):
             raise Exception('Errors occurred while scrubbing:\n  - {0}'.format('\n  - '.join(error_messages)))
 
     @staticmethod
-    def _execute_scrub(queue, vpool, storagerouter, scrub_dir, error_messages):
+    def _execute_scrub(queue, vpool, scrub_info, scrub_dir, error_messages):
         def _verify_mds_config(current_vdisk):
             current_vdisk.invalidate_dynamics('info')
             vdisk_configs = current_vdisk.info['metadata_backend_config']
@@ -316,8 +314,10 @@ class GenericController(object):
                 raise RuntimeError('Could not load MDS configuration')
             return vdisk_configs
 
+        storagerouter = scrub_info['storage_router']
+        partition_guid = scrub_info['partition_guid']
         volatile_client = VolatileFactory.get_client()
-        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, storagerouter.guid)
+        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, partition_guid)
         try:
             # Empty the queue with vDisks to scrub
             with remote(storagerouter.ip, [VDisk]) as rem:
@@ -351,7 +351,7 @@ class GenericController(object):
                             for work_unit in work_units:
                                 res = locked_client.scrub(work_unit=work_unit,
                                                           scratch_dir=scrub_dir,
-                                                          log_sinks=[LogHandler.get_sink_path('scrubber', allow_override=True, forced_target_type='file')],
+                                                          log_sinks=[LogHandler.get_sink_path('scrubber_{0}'.format(vpool.name), allow_override=True, forced_target_type='file')],
                                                           backend_config=Configuration.get_configuration_path(backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                             if work_units:
@@ -377,7 +377,7 @@ class GenericController(object):
             GenericController._logger.exception(message)
 
     @staticmethod
-    def _deploy_proxy_and_scrub(queue, vpool, scrub_info, error_messages, alba_proxy_service):
+    def _deploy_stack_and_scrub(queue, vpool, scrub_info, error_messages):
         """
         Executes scrub work for a given vDisk queue and vPool, based on scrub_info
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
@@ -390,8 +390,6 @@ class GenericController(object):
         :type scrub_info: dict
         :param error_messages: A list of error messages to be filled (by reference)
         :type error_messages: list
-        :param alba_proxy_service: Name the scrub proxy service should get
-        :type alba_proxy_service: str
         :return: None
         :rtype: NoneType
         """
@@ -399,12 +397,15 @@ class GenericController(object):
             error_messages.append('vPool {0} does not have any valid StorageDrivers configured'.format(vpool.name))
             return
 
+        service_manager = ServiceFactory.get_manager()
         client = None
         lock_time = 5 * 60
         storagerouter = scrub_info['storage_router']
-        scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, storagerouter.name)
-        scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, storagerouter.guid)
-        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, storagerouter.guid)
+        partition_guid = scrub_info['partition_guid']
+        alba_proxy_service = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vpool.name, storagerouter.name, partition_guid)
+        scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, partition_guid)
+        scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, partition_guid)
+        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, partition_guid)
 
         # Deploy a proxy
         try:
@@ -413,7 +414,7 @@ class GenericController(object):
                 client = SSHClient(storagerouter, 'root')
                 client.dir_create(scrub_directory)
                 client.dir_chmod(scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
-                if ServiceManager.has_service(name=alba_proxy_service, client=client) is True and ServiceManager.get_service_status(name=alba_proxy_service, client=client) == 'active':
+                if service_manager.has_service(name=alba_proxy_service, client=client) is True and service_manager.get_service_status(name=alba_proxy_service, client=client) == 'active':
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Re-using existing proxy service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
                     scrub_config = Configuration.get(scrub_config_key)
                 else:
@@ -421,36 +422,16 @@ class GenericController(object):
                     port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
                     with volatile_mutex('deploy_proxy_for_scrub_{0}'.format(storagerouter.guid), wait=30):
                         port = System.get_free_ports(selected_range=port_range, nr=1, client=client)[0]
-                    # Scrub config
-                    # {u'albamgr_cfg_url': u'arakoon://config/ovs/vpools/71e2f717-f270-4a41-bbb0-d4c8c084d43e/proxies/64759516-3471-4321-b912-fb424568fc5b/config/abm?ini=%2Fopt%2FOpenvStorage%2Fconfig%2Farakoon_cacc.ini',
-                    #  u'fragment_cache': [u'none'],
-                    #  u'ips': [u'127.0.0.1'],
-                    #  u'log_level': u'info',
-                    #  u'manifest_cache_size': 17179869184,
-                    #  u'port': 0,
-                    #  u'transport': u'tcp'}
-
-                    # Backend config
-                    # {u'backend_type': u'MULTI',
-                    #  u'backend_interface_retries_on_error': 5,
-                    #  u'backend_interface_retry_backoff_multiplier': 2.0,
-                    #  u'backend_interface_retry_interval_secs': 1,
-                    #  u'0': {u'alba_connection_host': u'10.100.193.155',
-                    #         u'alba_connection_port': 26204,
-                    #         u'alba_connection_preset': u'preset',
-                    #         u'alba_connection_timeout': 15,
-                    #         u'alba_connection_transport': u'TCP',
-                    #         u'backend_type': u'ALBA'}}
                     scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))
                     scrub_config['port'] = port
                     scrub_config['transport'] = 'tcp'
                     Configuration.set(scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
 
                     params = {'VPOOL_NAME': vpool.name,
-                              'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
+                              'LOG_SINK': LogHandler.get_sink_path(alba_proxy_service),
                               'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key)}
-                    ServiceManager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
-                    ServiceManager.start_service(name=alba_proxy_service, client=client)
+                    service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
+                    service_manager.start_service(name=alba_proxy_service, client=client)
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
 
                 backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
@@ -468,10 +449,10 @@ class GenericController(object):
             message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
             error_messages.append(message)
             GenericController._logger.exception(message)
-            if client is not None and ServiceManager.has_service(name=alba_proxy_service, client=client) is True:
-                if ServiceManager.get_service_status(name=alba_proxy_service, client=client) == 'active':
-                    ServiceManager.stop_service(name=alba_proxy_service, client=client)
-                ServiceManager.remove_service(name=alba_proxy_service, client=client)
+            if client is not None and service_manager.has_service(name=alba_proxy_service, client=client) is True:
+                if service_manager.get_service_status(name=alba_proxy_service, client=client) == 'active':
+                    service_manager.stop_service(name=alba_proxy_service, client=client)
+                service_manager.remove_service(name=alba_proxy_service, client=client)
             if Configuration.exists(scrub_config_key):
                 Configuration.delete(scrub_config_key)
 
@@ -487,9 +468,9 @@ class GenericController(object):
         amount_threads = min(min(queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
         GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Spawning {2} threads for proxy service {3}'.format(vpool.name, storagerouter.name, amount_threads, alba_proxy_service))
         for index in range(amount_threads):
-            thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(vpool.guid, storagerouter.guid, index),
+            thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition_guid, index),
                             target=GenericController._execute_scrub,
-                            args=(queue, vpool, storagerouter, scrub_directory, error_messages))
+                            args=(queue, vpool, scrub_info, scrub_directory, error_messages))
             thread.start()
             threads.append(thread)
         for thread in threads:
@@ -501,9 +482,9 @@ class GenericController(object):
                 GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removing service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
                 client = SSHClient(storagerouter, 'root')
                 client.dir_delete(scrub_directory)
-                if ServiceManager.has_service(alba_proxy_service, client=client):
-                    ServiceManager.stop_service(alba_proxy_service, client=client)
-                    ServiceManager.remove_service(alba_proxy_service, client=client)
+                if service_manager.has_service(alba_proxy_service, client=client):
+                    service_manager.stop_service(alba_proxy_service, client=client)
+                    service_manager.remove_service(alba_proxy_service, client=client)
                 if Configuration.exists(scrub_config_key):
                     Configuration.delete(scrub_config_key)
                 GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removed service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
@@ -519,7 +500,7 @@ class GenericController(object):
         Collapse Arakoon's Tlogs
         :return: None
         """
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+        from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
         GenericController._logger.info('Arakoon collapse started')
         cluster_info = []
@@ -543,7 +524,7 @@ class GenericController(object):
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
             ip = storagerouter.ip if cluster in ['cacc', 'unittest-cacc'] else None
             try:
-                config = ArakoonClusterConfig(cluster, source_ip=ip)
+                config = ArakoonClusterConfig(cluster_id=cluster, source_ip=ip)
                 cluster_config_map[cluster] = config
             except:
                 GenericController._logger.exception('  Retrieving cluster information on {0} for {1} failed'.format(storagerouter.ip, cluster))
@@ -583,20 +564,20 @@ class GenericController(object):
         all_storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in all_storagerouters:
             information[storagerouter.ip] = {}
-            for function in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
+            for fct in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
                 try:
                     # We make use of these clients in Threads --> cached = False
                     client = SSHClient(endpoint=storagerouter, username='root', cached=False)
                 except UnableToConnectException:
                     information[storagerouter.ip]['errors'] = ['StorageRouter {0} is inaccessible'.format(storagerouter.name)]
                     break
-                thread = Thread(target=function,
+                thread = Thread(target=fct,
                                 args=(client, information))
                 thread.start()
                 threads.append(thread)
 
-        for function in Toolbox.fetch_hooks('update', 'get_package_info_single'):
-            thread = Thread(target=function,
+        for fct in Toolbox.fetch_hooks('update', 'get_package_info_single'):
+            thread = Thread(target=fct,
                             args=(information,))
             thread.start()
             threads.append(thread)

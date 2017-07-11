@@ -31,7 +31,7 @@ from ovs.dal.helpers import Descriptor, DalToolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
 from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
-from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
+from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
@@ -42,6 +42,7 @@ class MetaClass(type):
     This metaclass provides dynamic __doc__ generation feeding doc generators
     """
 
+    # noinspection PyInitNewSignature
     def __new__(mcs, name, bases, dct):
         """
         Overrides instance creation of all DataObject instances
@@ -115,6 +116,7 @@ class DataObjectAttributeEncoder(json.JSONEncoder):
         return "{0}: {1}".format(type(obj), obj)
 
 
+# noinspection PyProtectedMember
 class DataObject(object):
     """
     This base class contains all logic to support our multiple backends and the caching
@@ -157,6 +159,7 @@ class DataObject(object):
         identifier = Descriptor(cls).descriptor['identifier']
         if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
             new_class = Descriptor().load(hybrid_structure[identifier]).get_object()
+            # noinspection PyArgumentList
             return super(cls, new_class).__new__(new_class, *args)
         return super(DataObject, cls).__new__(cls)
 
@@ -326,7 +329,7 @@ class DataObject(object):
         setattr(self.__class__, relation.name, property(fget, fset))
         setattr(self.__class__, '{0}_guid'.format(relation.name), property(gget))
 
-    def _add_list_property(self, attribute, list):
+    def _add_list_property(self, attribute, islist):
         """
         Adds a list (readonly) property to the object
         """
@@ -335,7 +338,7 @@ class DataObject(object):
         gget = lambda s: s._get_list_guid_property(attribute)
         # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget))
-        setattr(self.__class__, ('{0}_guids' if list else '{0}_guid').format(attribute), property(gget))
+        setattr(self.__class__, ('{0}_guids' if islist else '{0}_guid').format(attribute), property(gget))
 
     def _add_dynamic_property(self, dynamic):
         """
@@ -950,6 +953,16 @@ class DataObject(object):
         for key in properties_to_copy:
             setattr(self, key, getattr(other_object, key))
 
+    def clone(self):
+        """
+        Make an identical clone of the DataObject
+        """
+        if self.volatile is True:
+            clone = self.__class__(self.guid, data=self._data, datastore_wins=self._datastore_wins, volatile=self.volatile)
+        else:
+            clone = self.__class__(self.guid)
+        return clone
+
     def updated_on_datastore(self):
         """
         Checks whether this object has been modified on the datastore
@@ -969,9 +982,15 @@ class DataObject(object):
         return this_version != backend_version
 
     def get_timings(self):
+        """
+        Retrieve the timings for collecting the dynamic properties of this DataObject
+        """
         return self._dynamic_timings
 
     def reset_timings(self):
+        """
+        Reset the timings it took for collecting the dynamic properties of this DataObject
+        """
         self._dynamic_timings = {}
 
     ##############
@@ -989,7 +1008,7 @@ class DataObject(object):
     # Helper methods #
     ##################
 
-    def _backend_property(self, function, dynamic):
+    def _backend_property(self, fct, dynamic):
         """
         Handles the internal caching of dynamic properties
         """
@@ -1003,12 +1022,12 @@ class DataObject(object):
                     mutex.acquire()
                     cached_data = self._volatile.get(cache_key)
                 if cached_data is None:
-                    function_info = inspect.getargspec(function)
+                    function_info = inspect.getargspec(fct)
                     start = time.time()
                     if 'dynamic' in function_info.args:
-                        dynamic_data = function(dynamic=dynamic)  # Load data from backend
+                        dynamic_data = fct(dynamic=dynamic)  # Load data from backend
                     else:
-                        dynamic_data = function()
+                        dynamic_data = fct()
                     self._dynamic_timings[caller_name] = time.time() - start
                     correct, allowed_types, given_type = DalToolbox.check_type(dynamic_data, dynamic.return_type)
                     if not correct:
@@ -1067,12 +1086,12 @@ class DataObject(object):
             istart = time.time()
             for dynamic in dynamics:
                 start = time.time()
-                function = getattr(self, '_{0}'.format(dynamic.name))
-                function_info = inspect.getargspec(function)
+                fct = getattr(self, '_{0}'.format(dynamic.name))
+                function_info = inspect.getargspec(fct)
                 if 'dynamic' in function_info.args:
-                    function(dynamic=dynamic)
+                    fct(dynamic=dynamic)
                 else:
-                    function()
+                    fct()
                 duration = time.time() - start
                 if dynamic.name not in stats:
                     stats[dynamic.name] = []

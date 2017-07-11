@@ -21,10 +21,11 @@ import unittest
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.tests.helpers import DalHelper
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonInstaller
+from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.log.log_handler import LogHandler
 
 
 class NodeConfigTest(unittest.TestCase):
@@ -275,10 +276,12 @@ class NodeConfigTest(unittest.TestCase):
         )
         storagerouters = structure['storagerouters']
         vpool = structure['vpools'][1]
-        ArakoonInstaller.create_cluster(cluster_name='voldrv',
-                                        cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
-                                        ip=storagerouters[1].ip,
-                                        base_dir='/tmp')
+        arakoon_installer = ArakoonInstaller(cluster_name='voldrv')
+        arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
+                                         ip=storagerouters[1].ip,
+                                         base_dir='/tmp',
+                                         log_sinks=LogHandler.get_sink_path('arakoon-server_voldrv'),
+                                         crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_voldrv'))
 
         # Initial run, it will now be configured
         StorageRouterClient.node_config_recordings = []

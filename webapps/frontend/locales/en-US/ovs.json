@@ -237,6 +237,7 @@
         "state": "State",
         "states": {
             "backend": {
+                "deleting": "Deleting",
                 "failure": "Failure",
                 "installing": "Installing",
                 "running": "Running",
@@ -306,6 +307,10 @@
             "mi": "Mi",
             "mib": "MiB",
             "mibs": "MiB/s",
+            "p": "P",
+            "pi": "Pi",
+            "pib": "PiB",
+            "pibs": "PiB/s",
             "t": "T",
             "ti": "Ti",
             "tib": "TiB",
@@ -374,6 +379,7 @@
         "rollback": "&#xf01e;",
         "save": "&#xf0c7;",
         "scrub": "&#xf1b8;",
+        "search": "&#xf002;",
         "separator": "&#xf101;",
         "set_as_template": "&#xf023;",
         "snapshot": "&#xf030;",
@@ -501,6 +507,7 @@
     },
     "support": {
         "alba": "Alba",
+        "alba-ee": "Alba Enterprise Edition",
         "arakoon": "Arakoon",
         "callhome": "Call Home settings",
         "clusterid": "Cluster ID:",
@@ -624,7 +631,7 @@
             "snapshots": "Snapshots",
             "title": "vDisk"
         },
-        "details": "Details",
+        "details": "vDisk Details",
         "performance": "Performance",
         "remove_snapshot": {
             "failed_msg": "Removing snapshot __what__ failed: __why__",
@@ -684,7 +691,6 @@
             "title": "Scrub vDisk __vdisk__",
             "title_message": "Are you sure you want to scrub vDisk __vdisk__?"
         },
-
         "title": "vDisks"
     },
     "vpools": {
@@ -704,6 +710,8 @@
         "cluster_size": "Cluster Size",
         "configuration": "Configuration",
         "detail": {
+            "generate_configs": "Generate HPRM configuration files",
+            "generating_configs": "Generating HPRM configuration files",
             "extend": "Extend",
             "refresh": {
                 "failed_msg": "Refreshing configuration on StorageRouter __sr__ for vPool __vpool__ failed: __why__",
@@ -840,11 +848,13 @@
                 "information_extend_quota": "and the caching quota",
                 "invalid_alba_info": "The entered connection info and credentials are invalid",
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
-                "invalid_quota_boundaries_exceeded": "Quota boundaries exceeded (Min: 0.1 - Max: 1024)",
+                "invalid_local_path": "The given local path is invalid",
+                "invalid_local_size": "The given size is invalid",
                 "invalid_quota_nan": "Quota should be a number",
-                "invalid_quota_too_much_requested": "No more than 10 vDisks can be created. Please lower the default quota requirements or add more ASDs",
                 "loading_backend_information": "Backend information is being loaded",
                 "local_host": "Use local Open vStorage backend",
+                "local_path": "Local path",
+                "local_size": "Size",
                 "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
@@ -872,11 +882,13 @@
                 "information_extend_quota": "and the caching quota",
                 "invalid_alba_info": "The entered connection info and credentials are invalid",
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
-                "invalid_quota_boundaries_exceeded": "Quota boundaries exceeded (Min: 0.1 - Max: 1024)",
+                "invalid_local_path": "The given local path is invalid",
+                "invalid_local_size": "The given size is invalid",
                 "invalid_quota_nan": "Quota should be a number",
-                "invalid_quota_too_much_requested": "No more than 10 vDisks can be created. Please lower the default quota requirements or add more ASDs",
                 "loading_backend_information": "Backend information is being loaded",
                 "local_host": "Use local Open vStorage backend",
+                "local_path": "Local path",
+                "local_size": "Size",
                 "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
@@ -1019,6 +1031,44 @@
                 "started": "Create started",
                 "success": "Creating from vTemplate __what__ was successful"
             }
+        },
+        "create_hprm_configs": {
+            "confirm": {
+                "alba_preset": "Preset:",
+                "backend": "Backend:",
+                "basic_info": "Validate the information",
+                "block_cache": "Block Cache:",
+                "cache_info": {
+                    "true": "Active",
+                    "false": "Inactive"
+                },
+                "cache_read": "Read:",
+                "cache_write": "Write:",
+                "cache_quota": "Cache quota:",
+                "client_id": "Client ID:",
+                "failure_msg": "Failed to generate configuration files for vPool __vpool__ on StorageRouter __storagerouter__: __why__",
+                "fragment_cache": "Fragment Cache:",
+                "host": "Host:",
+                "identifier": "HPRM identifier",
+                "instructions": "Instructions",
+                "instruction_steps": "<ul><li><b>Copy</b> the .tgz file to the correct node</li><li><b>Extract</b> the .tgz <code>(tar xzvf &lt;filename&gt; -C /etc/hprm)</code></li><li><b>Enable</b> the HPRM service <code>(systemctl enable hprm@__identifier__.service)</code></li><li><b>Start</b> the HPRM service <code>(systemctl start hprm@__identifier__.service)</code></li></ul>",
+                "local_path": "Local Path:",
+                "local_size": "Local Size:",
+                "port": "Port:",
+                "started": "Generating",
+                "started_msg": "Generating HPRM configuration files for vPool __vpool__ on StorageRouter __storagerouter__",
+                "success": "Generated",
+                "success_msg": "Successfully generated configuration files for vPool __vpool__ on StorageRouter __storagerouter__"
+            },
+            "gather": {
+                "general_info": "General information",
+                "hprm_port": "Port:",
+                "identifier": "HPRM identifier:",
+                "invalid_identifier": "Invalid identifier. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 20 characters has to be maintained.",
+                "load_config_failure": "Failed to load the proxy configuration. Please fill out the fields manually or try again",
+                "loading_config_information": "Loading proxy configuration"
+            },
+            "title": "Generate HPRM configuration files"
         },
         "extend_vpool": {
             "confirm": {

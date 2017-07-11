@@ -20,12 +20,13 @@ define([
     './data'
 ], function($, ko, api, generic, shared, data) {
     "use strict";
-    return function() {
+    return function(options) {
         var self = this;
 
         // Variables
-        self.data   = data;
-        self.shared = shared;
+        self.data    = options !== undefined && options.data !== undefined ? options.data : data;
+        self.shared  = shared;
+        self.options = options;
 
         // Handles
         self.fetchAlbaVPoolHandle = undefined;
@@ -117,13 +118,20 @@ define([
                         if (isNaN(parseFloat(quota))) {
                             fields.push('quota');
                             reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_nan'));
-                        } else if (quota < 0.1 || quota > 1024) {
-                            fields.push('quota');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_boundaries_exceeded'));
-                        } else if (self.data.backendBC() !== undefined && quota * Math.pow(1024, 3) * 10 > self.data.backendBC().usages.free) {
-                            fields.push('quota');
-                            reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_too_much_requested'));
                         }
+                    }
+                }
+            } else if (self.options !== undefined && self.options.customlocal === true && (self.data.blockCacheOnRead() || self.data.blockCacheOnWrite())) {
+                var path = self.data.localPathBC();
+                if (path === '' || path.endsWith('/.') || path.includes('..') || path.includes('/./')) {
+                    fields.push('local_path');
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_local_path'));
+                }
+                var localSize = self.data.localSizeBC();
+                if (localSize !== undefined && localSize !== '') {
+                    if (isNaN(parseFloat(localSize))) {
+                        fields.push('localsize');
+                        reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_local_size'));
                     }
                 }
             }
@@ -193,7 +201,7 @@ define([
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
                                         .then(function(data) {
-                                            if (data.guid !== self.data.backend().guid) {
+                                            if (self.data.backend() === undefined || data.guid !== self.data.backend().guid) {
                                                 if ((data.asd_statistics !== undefined && Object.keys(data.asd_statistics).length > 0) || data.scaling === 'GLOBAL') {
                                                     available_backends.push(data);
                                                     self.albaPresetMap()[data.guid] = {};
@@ -285,13 +293,15 @@ define([
                 }
             });
 
-            var localBackendsRequiredAmount = self.data.localHost() === true ? 2 : 1;
-            if (self.data.backends().length >= localBackendsRequiredAmount) {
-                self.data.localHostBC(true);
-                self.localBackendsAvailable(true);
-            } else {
-                self.data.localHostBC(false);
-                self.localBackendsAvailable(false);
+            if (options === undefined || options.allowlocalbackend !== true) {
+                var localBackendsRequiredAmount = self.data.localHost() === true ? 2 : 1;
+                if (self.data.backends().length >= localBackendsRequiredAmount) {
+                    self.data.localHostBC(true);
+                    self.localBackendsAvailable(true);
+                } else {
+                    self.data.localHostBC(false);
+                    self.localBackendsAvailable(false);
+                }
             }
 
             if (self.data.backend() !== undefined && self.data.backendBC() !== undefined && self.data.backend().guid === self.data.backendBC().guid) {

@@ -26,6 +26,7 @@ import sys
 import time
 import inspect
 import unittest
+from ovs.log.log_handler import LogHandler
 
 
 class UnitTest(object):
@@ -38,6 +39,8 @@ class UnitTest(object):
     _SUCCESS = '\033[92mSUCCESS\033[0m'
     _FAILURE = '\033[93mFAILURE\033[0m'
     _OVS_PATH = '/opt/OpenvStorage'
+
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
 
     def __init__(self):
         """
@@ -103,14 +106,14 @@ class UnitTest(object):
                         name = filename.replace('.py', '')
                         filepath = os.path.join(root, filename)
                         try:
-                            module = inspect.imp.load_source(name, filepath)
+                            mod = inspect.imp.load_source(name, filepath)
                         except Exception as ex:
                             if silent_invalid_modules is False:
                                 print 'Test file {0} could not be loaded. Error: {1}'.format(filepath, ex)
                             UnitTest._invalid_test_modules.append(filepath)
                             continue
                         filepath = filepath.replace('.py', '')
-                        for member in inspect.getmembers(module):
+                        for member in inspect.getmembers(mod):
                             if inspect.isclass(member[1]) and \
                                member[1].__module__ == name and \
                                'TestCase' in [base.__name__ for base in member[1].__bases__]:
@@ -119,7 +122,7 @@ class UnitTest(object):
                                     full_class_path = '{0}.{1}'.format(filepath, class_name)
 
                                     if filepath not in UnitTest._test_info:
-                                        UnitTest._test_info[filepath] = {'tests': unittest.TestLoader().loadTestsFromModule(module),
+                                        UnitTest._test_info[filepath] = {'tests': unittest.TestLoader().loadTestsFromModule(mod),
                                                                          'use_case': 'test-module'}
 
                                     if full_class_path not in UnitTest._test_info:

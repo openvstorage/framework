@@ -267,5 +267,8 @@ define([
             self.refresher.run();
             self.refresher.start();
         };
+        self.deactivate = function() {
+            self.refresher.stop();
+        };
     };
 });

@@ -212,7 +212,16 @@ define([
                 options.sort = self.sortingKey()
             }
             if (self.external()) {
-                self.loadData(options);
+                self.pageLoading(true);
+                var chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
+                chainDeferred.resolve();
+                chainPromise
+                    .then(function() {
+                        return self.loadData(options);
+                    })
+                    .always(function() {
+                        self.pageLoading(false);
+                    });
             } else {
                 self.pageLoading(true);
                 $.each(self.viewportItems(), function (index, item) {

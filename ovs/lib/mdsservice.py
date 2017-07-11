@@ -841,6 +841,7 @@ class MDSServiceController(object):
         Prints the current MDS layout
         :return: None
         """
+        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
         try:
             while True:
                 output = ['',

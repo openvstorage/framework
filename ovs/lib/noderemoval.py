@@ -21,13 +21,12 @@ Module for NodeRemovalController
 import os
 import re
 import sys
-from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.interactive import Interactive
-from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.interactive import Interactive
+from ovs_extensions.generic.remote import remote
+from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, TimeOutException, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.nodetype import NodeTypeController
 from ovs.log.log_handler import LogHandler
@@ -37,6 +36,7 @@ class NodeRemovalController(object):
     """
     This class contains all logic for removing a node from the cluster
     """
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     _logger = LogHandler.get('lib', name='node-removal')
     _logger.logger.propagate = False
 
@@ -50,13 +50,14 @@ class NodeRemovalController(object):
         :type silent: str
         :return: None
         """
+        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
         from ovs.lib.storagedriver import StorageDriverController
         from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.lists.storagerouterlist import StorageRouterList
-        from ovs.extensions.generic.sshclient import NotAuthenticatedException
 
         Toolbox.log(logger=NodeRemovalController._logger, messages='Remove node', boxed=True)
         Toolbox.log(logger=NodeRemovalController._logger, messages='WARNING: Some of these steps may take a very long time, please check the logs for more information\n\n')
+        service_manager = ServiceFactory.get_manager()
 
         ###############
         # VALIDATIONS #
@@ -73,7 +74,7 @@ class NodeRemovalController(object):
             storage_router_all_ips = set([storage_router.ip for storage_router in storage_router_all])
             storage_router_master_ips = set([storage_router.ip for storage_router in storage_router_masters])
             storage_router_to_remove = StorageRouterList.get_by_ip(node_ip)
-
+            offline_reasons = {}
             if node_ip not in storage_router_all_ips:
                 raise ValueError('Unknown IP specified\nKnown in model:\n - {0}\nSpecified for removal:\n - {1}'.format('\n - '.join(storage_router_all_ips), node_ip))
 
@@ -93,15 +94,22 @@ class NodeRemovalController(object):
             storage_router_to_remove_online = True
             for storage_router in storage_router_all:
                 try:
-                    client = SSHClient(storage_router, username='root')
-                except (UnableToConnectException, NotAuthenticatedException):
-                    Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
+                    client = SSHClient(storage_router, username='root', timeout=10)
+                except (UnableToConnectException, NotAuthenticatedException, TimeOutException) as ex:
+                    if isinstance(ex, UnableToConnectException):
+                        msg = 'Unable to connect'
+                    elif isinstance(ex, NotAuthenticatedException):
+                        msg = 'Could not authenticate'
+                    elif isinstance(ex, TimeOutException):
+                        msg = 'Connection timed out'
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='  * Node with IP {0:<15}- {1}'.format(storage_router.ip, msg))
+                    offline_reasons[storage_router.ip] = msg
                     storage_routers_offline.append(storage_router)
                     if storage_router == storage_router_to_remove:
                         storage_router_to_remove_online = False
                     continue
 
-                Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
+                Toolbox.log(logger=NodeRemovalController._logger, messages='  * Node with IP {0:<15}- Successfully connected'.format(storage_router.ip))
                 ip_client_map[storage_router.ip] = client
                 if storage_router != storage_router_to_remove and storage_router.node_type == 'MASTER':
                     master_ip = storage_router.ip
@@ -134,6 +142,13 @@ class NodeRemovalController(object):
                               sub_component='validate_removal',
                               logger=NodeRemovalController._logger,
                               cluster_ip=storage_router_to_remove.ip)
+        except KeyboardInterrupt:
+            Toolbox.log(logger=NodeRemovalController._logger, messages='\n')
+            Toolbox.log(logger=NodeRemovalController._logger,
+                        messages='Removal has been aborted during the validation step. No changes have been applied.',
+                        boxed=True,
+                        loglevel='warning')
+            sys.exit(1)
         except Exception as exception:
             Toolbox.log(logger=NodeRemovalController._logger, messages=[str(exception)], boxed=True, loglevel='exception')
             sys.exit(1)
@@ -141,28 +156,46 @@ class NodeRemovalController(object):
         #################
         # CONFIRMATIONS #
         #################
-        interactive = silent != '--force-yes'
-        remove_asd_manager = not interactive  # Remove ASD manager if non-interactive else ask
-        if interactive is True:
-            proceed = Interactive.ask_yesno(message='Are you sure you want to remove node {0}?'.format(storage_router_to_remove.name), default_value=False)
-            if proceed is False:
-                Toolbox.log(logger=NodeRemovalController._logger, messages='Abort removal', title=True)
-                sys.exit(1)
+        try:
+            interactive = silent != '--force-yes'
+            remove_asd_manager = not interactive  # Remove ASD manager if non-interactive else ask
+            if interactive is True:
+                if len(storage_routers_offline) > 0:
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='Certain nodes appear to be offline. These will not fully removed and will cause issues if they are not really offline.')
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='Offline nodes: {0}'.format(''.join(('\n  * {0:<15}- {1}.'.format(ip, message) for ip, message in offline_reasons.iteritems()))))
+                    valid_node_info = Interactive.ask_yesno(message='Continue the removal with these being presumably offline?', default_value=False)
+                    if valid_node_info is False:
+                        Toolbox.log(logger=NodeRemovalController._logger, messages='Please validate the state of the nodes before removing.', title=True)
+                        sys.exit(1)
+                proceed = Interactive.ask_yesno(message='Are you sure you want to remove node {0}?'.format(storage_router_to_remove.name), default_value=False)
+                if proceed is False:
+                    Toolbox.log(logger=NodeRemovalController._logger, messages='Abort removal', title=True)
+                    sys.exit(1)
 
-            remove_asd_manager = True
-            if storage_router_to_remove_online is True:
-                client = SSHClient(endpoint=storage_router_to_remove, username='root')
-                if ServiceManager.has_service(name='asd-manager', client=client):
-                    remove_asd_manager = Interactive.ask_yesno(message='Do you also want to remove the ASD manager and related ASDs?', default_value=False)
+                remove_asd_manager = True
+                if storage_router_to_remove_online is True:
+                    client = SSHClient(endpoint=storage_router_to_remove, username='root')
+                    if service_manager.has_service(name='asd-manager', client=client):
+                        remove_asd_manager = Interactive.ask_yesno(message='Do you also want to remove the ASD manager and related ASDs?', default_value=False)
 
-            if remove_asd_manager is True or storage_router_to_remove_online is False:
-                for function in Toolbox.fetch_hooks('noderemoval', 'validate_asd_removal'):
-                    validation_output = function(storage_router_to_remove.ip)
-                    if validation_output['confirm'] is True:
-                        if Interactive.ask_yesno(message=validation_output['question'], default_value=False) is False:
-                            remove_asd_manager = False
-                            break
-
+                if remove_asd_manager is True or storage_router_to_remove_online is False:
+                    for fct in Toolbox.fetch_hooks('noderemoval', 'validate_asd_removal'):
+                        validation_output = fct(storage_router_to_remove.ip)
+                        if validation_output['confirm'] is True:
+                            if Interactive.ask_yesno(message=validation_output['question'], default_value=False) is False:
+                                remove_asd_manager = False
+                                break
+        except KeyboardInterrupt:
+            Toolbox.log(logger=NodeRemovalController._logger, messages='\n')
+            Toolbox.log(logger=NodeRemovalController._logger,
+                        messages='Removal has been aborted during the confirmation step. No changes have been applied.',
+                        boxed=True,
+                        loglevel='warning')
+            sys.exit(1)
+        except Exception as exception:
+            Toolbox.log(logger=NodeRemovalController._logger, messages=[str(exception)], boxed=True,
+                        loglevel='exception')
+            sys.exit(1)
         ###########
         # REMOVAL #
         ###########
@@ -196,10 +229,10 @@ class NodeRemovalController(object):
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 NodeRemovalController.remove_services(client=client, node_type=storage_router_to_remove.node_type.lower(), logger=NodeRemovalController._logger)
                 service = 'watcher-config'
-                if ServiceManager.has_service(service, client=client):
+                if service_manager.has_service(service, client=client):
                     Toolbox.log(logger=NodeRemovalController._logger, messages='Removing service {0}'.format(service))
-                    ServiceManager.stop_service(service, client=client)
-                    ServiceManager.remove_service(service, client=client)
+                    service_manager.stop_service(service, client=client)
+                    service_manager.remove_service(service, client=client)
 
             Toolbox.run_hooks(component='noderemoval',
                               sub_component='remove',
@@ -225,7 +258,7 @@ class NodeRemovalController(object):
 
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
-                client.file_delete(filenames=[ArakoonConfiguration.CACC_LOCATION])
+                client.file_delete(filenames=[Configuration.CACC_LOCATION])
                 client.file_delete(filenames=[Configuration.BOOTSTRAP_CONFIG_LOCATION])
             storage_router_to_remove.delete()
             Toolbox.log(logger=NodeRemovalController._logger, messages='Successfully removed node\n')
@@ -252,7 +285,7 @@ class NodeRemovalController(object):
         """
         Remove all services managed by OVS
         :param client: Client on which to remove the services
-        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param node_type: Type of node, can be 'master' or 'extra'
         :type node_type: str
         :param logger: Logger object used for logging
@@ -260,6 +293,7 @@ class NodeRemovalController(object):
         :return: None
         """
         Toolbox.log(logger=logger, messages='Removing services')
+        service_manager = ServiceFactory.get_manager()
         stop_only = ['rabbitmq-server', 'memcached']
         services = ['workers', 'support-agent', 'watcher-framework']
         if node_type == 'master':
@@ -270,9 +304,9 @@ class NodeRemovalController(object):
                 services.append('memcached')
 
         for service in services:
-            if ServiceManager.has_service(service, client=client):
+            if service_manager.has_service(service, client=client):
                 Toolbox.log(logger=logger,
                             messages='{0} service {1}'.format('Removing' if service not in stop_only else 'Stopping', service))
-                ServiceManager.stop_service(service, client=client)
+                service_manager.stop_service(service, client=client)
                 if service not in stop_only:
-                    ServiceManager.remove_service(service, client=client)
+                    service_manager.remove_service(service, client=client)

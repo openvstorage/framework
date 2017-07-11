@@ -34,6 +34,7 @@ from ovs.dal.helpers import DalToolbox
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 
+# noinspection PyProtectedMember
 class LotsOfObjects(object):
     """
     Executes a performance test by working with a large set of objects

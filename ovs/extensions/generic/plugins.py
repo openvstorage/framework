@@ -17,9 +17,10 @@
 """
 Plugin module
 """
-from ovs.extensions.services.service import ServiceManager
+
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs.extensions.services.servicefactory import ServiceFactory
 
 
 class PluginManager(object):
@@ -32,7 +33,8 @@ class PluginManager(object):
         """
         (Re)load plugins
         """
-        if ServiceManager.has_service('ovs-watcher-framework', SSHClient('127.0.0.1', username='root')):
+        manager = ServiceFactory.get_manager()
+        if manager.has_service('ovs-watcher-framework', SSHClient('127.0.0.1', username='root')):
             # If the watcher is running, 'ovs setup' was executed and we need to restart everything to load
             # the plugin. In the other case, the plugin will be loaded once 'ovs setup' is executed
             print 'Installing plugin into Open vStorage'
@@ -48,16 +50,16 @@ class PluginManager(object):
             memcached = 'memcached'
             watcher = 'watcher-framework'
             for sr in masters + slaves:
-                if ServiceManager.has_service(watcher, clients[sr]):
+                if manager.has_service(watcher, clients[sr]):
                     print '- Stopping watcher on {0} ({1})'.format(sr.name, sr.ip)
-                    ServiceManager.stop_service(watcher, clients[sr])
+                    manager.stop_service(watcher, clients[sr])
             for sr in masters:
                 print '- Restarting memcached on {0} ({1})'.format(sr.name, sr.ip)
-                ServiceManager.restart_service(memcached, clients[sr])
+                manager.restart_service(memcached, clients[sr])
             for sr in masters + slaves:
-                if ServiceManager.has_service(watcher, clients[sr]):
+                if manager.has_service(watcher, clients[sr]):
                     print '- Starting watcher on {0} ({1})'.format(sr.name, sr.ip)
-                    ServiceManager.start_service(watcher, clients[sr])
+                    manager.start_service(watcher, clients[sr])
 
             print '- Execute model migrations'
             from ovs.dal.helpers import Migration
@@ -68,6 +70,6 @@ class PluginManager(object):
             functions = Toolbox.fetch_hooks('plugin', 'postinstall')
             if len(functions) > 0:
                 print '- Execute post installation scripts'
-            for function in functions:
-                function(ip=ip)
+            for fct in functions:
+                fct(ip=ip)
             print 'Installing plugin into Open vStorage: Completed'

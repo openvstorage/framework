@@ -260,10 +260,10 @@ class Basic(unittest.TestCase):
                                               ('size', DataList.operator.GT, 6)]})
         self.assertGreaterEqual(len(dlist), 16, 'list should contain 16')  # at least disk 0, 1, 2, 7, 8, 9, 10-19
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                     'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),
-                                               {'type': DataList.where_operator.OR,
-                                                'items': [('size', DataList.operator.LT, 3),
-                                                          ('size', DataList.operator.GT, 6)]}]})
+                                    'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),
+                                              {'type': DataList.where_operator.OR,
+                                               'items': [('size', DataList.operator.LT, 3),
+                                                         ('size', DataList.operator.GT, 6)]}]})
         self.assertEqual(len(dlist), 6, 'list should contain 6')  # disk 0, 1, 2, 7, 8, 9
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('size', DataList.operator.LT, 3),
@@ -277,7 +277,7 @@ class Basic(unittest.TestCase):
                                                          ('size', DataList.operator.LT, 6)]}]})
         self.assertEqual(len(dlist), 2, 'list should contain 2')  # disk 4 and 5
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                     'items': [('machine.name', DataList.operator.EQUALS, 'machine'),
+                                    'items': [('machine.name', DataList.operator.EQUALS, 'machine'),
                                               ('name', DataList.operator.EQUALS, 'test_3')]})
         self.assertEqual(len(dlist), 1, 'list should contain 1')  # disk 3
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
@@ -1773,3 +1773,41 @@ class Basic(unittest.TestCase):
         self.assertEqual(len(dlist), 1)
         self.assertTrue(Basic._called)
         self.assertEqual(dlist.from_index, 'full')
+
+    def test_clone(self):
+        """
+        Validates whether the clone function works correctly
+        """
+        machine1 = TestMachine()
+        machine1.name = 'test_machine1'
+        machine1.save()
+        machine2 = machine1.clone()
+        self.assertEqual(machine1.name, machine2.name)
+        self.assertEqual(machine1.guid, machine2.guid)
+        self.assertEqual(machine1._datastore_wins, machine2._datastore_wins)
+        self.assertDictEqual(machine1._data, machine2._data)
+        self.assertEqual(machine1, machine2)
+        machine2.name = 'test_machine2'
+        machine2.save()
+        self.assertEqual(machine1.name, 'test_machine1')
+        self.assertEqual(machine2.name, 'test_machine2')
+
+        machine3 = TestMachine(volatile=True)
+        machine4 = machine3.clone()
+        with self.assertRaises(VolatileObjectException):
+            machine3.save()
+        with self.assertRaises(VolatileObjectException):
+            machine4.save()
+
+    def test_equal(self):
+        """
+        Verify the equality of 2 objects is done based on guid
+        """
+        machine1 = TestMachine()
+        machine1.name = 'test_machine1'
+        machine1.save()
+        machine2 = TestMachine(machine1.guid)
+        self.assertEqual(machine1, machine2)
+        machine2.name = 'test_machine2'
+        machine2.save()
+        self.assertEqual(machine1, machine2)

@@ -1,0 +1,46 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <p data-i18n="ovs:wizards.create_hprm_configs.gather.general_info"></p>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('identifier') }">
+        <label class="col-lg-3 control-label" for="inputIdentifier" data-i18n="ovs:wizards.create_hprm_configs.gather.identifier"></label>
+        <div class="col-lg-5">
+            <input type="text" id="inputIdentifier" class="autofocus form-control" data-bind="value: data.identifier, valueUpdate: 'input'" />
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" for="hprmPort" data-i18n="ovs:wizards.create_hprm_configs.gather.hprm_port"></label>
+        <div class="col-lg-2">
+            <input type="text" id="hprmPort" class="autofocus form-control" data-bind="value: data.hprmPort, valueUpdate: 'input', visible: loadingProxyConfig() === false" />
+            <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: loadingProxyConfig() === true"></span>
+        </div>
+    </div>
+    <div class="alert alert-info" data-bind="visible: loadingProxyConfig()" style="margin-top: 20px;">
+        <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+        <span data-i18n="ovs:wizards.create_hprm_configs.gather.loading_config_information"></span>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: loadingProxyConfigFailed() && canContinue().value" style="margin-top: 20px;">
+        <p data-i18n="ovs:wizards.create_hprm_configs.gather.load_config_failure"></p>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: !loadingProxyConfig() && !canContinue().value" style="margin-top: 20px;">
+        <p data-i18n="ovs:generic.followingerrorsfound"></p>
+        <ul data-bind="foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

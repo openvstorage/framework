@@ -26,8 +26,10 @@ class Backend(DataObject):
     """
     A Backend represents an instance of the supported backend types that has been setup with the OVS GUI
     """
+    STATUSES = DataObject.enumerator('Status', ['INSTALLING', 'RUNNING', 'FAILURE', 'WARNING', 'DELETING'])
+    
     __properties = [Property('name', str, unique=True, doc='Name of the Backend.'),
-                    Property('status', ['INSTALLING', 'RUNNING', 'FAILURE', 'WARNING'], default='INSTALLING', doc='State of the backend')]
+                    Property('status', STATUSES.keys(), default='INSTALLING', doc='State of the backend')]
     __relations = [Relation('backend_type', BackendType, 'backends', doc='Type of the backend.')]
     __dynamics = [Dynamic('linked_guid', str, 3600),
                   Dynamic('available', bool, 60),

@@ -15,38 +15,27 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Generic persistent factory.
+Overrides persistent factory.
 """
-import os
 from ovs.extensions.generic.configuration import Configuration
+from ovs_extensions.storage.persistentfactory import PersistentFactory as _PersistentFactory
 
 
-class PersistentFactory(object):
+class PersistentFactory(_PersistentFactory):
     """
     The PersistentFactory will generate certain default clients.
     """
 
-    @staticmethod
-    def get_client(client_type=None):
-        """
-        Returns a persistent storage client
-        :param client_type: Type of store client
-        """
-        if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
-            if os.environ.get('RUNNING_UNITTESTS') == 'True':
-                client_type = 'dummy'
+    @classmethod
+    def _get_store_info(cls):
+        client_type = Configuration.get('/ovs/framework/stores|persistent')
+        if client_type not in ['pyrakoon', 'arakoon']:
+            raise RuntimeError('Configured client type {0} is not implemented'.format(client_type))
+        cluster = Configuration.get('/ovs/framework/arakoon_clusters|ovsdb')
+        contents = Configuration.get('/ovs/arakoon/{0}/config'.format(cluster), raw=True)
+        return {'cluster': cluster,
+                'configuration': contents}
 
-            if client_type is None:
-                client_type = Configuration.get('/ovs/framework/stores|persistent')
-
-            PersistentFactory.store = None
-            if client_type in ['pyrakoon', 'arakoon']:
-                from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                PersistentFactory.store = PyrakoonStore(str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb')))
-            if client_type == 'dummy':
-                from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
-                PersistentFactory.store = DummyPersistentStore()
-
-        if PersistentFactory.store is None:
-            raise RuntimeError('Invalid client_type specified')
-        return PersistentFactory.store
+    @classmethod
+    def _get_client_type(cls):
+        return Configuration.get('/ovs/framework/stores|persistent')

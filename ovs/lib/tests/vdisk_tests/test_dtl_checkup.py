@@ -31,7 +31,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, DTLMode
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -94,11 +94,12 @@ class DTLCheckup(unittest.TestCase):
         :param storagerouters: StorageRouters to deploy and start a DTL service on
         :return: None
         """
+        service_manager = ServiceFactory.get_manager()
         service_name = 'dtl_{0}'.format(vpool.name)
         for sr in storagerouters.values():
             client = SSHClient(sr, 'root')
-            ServiceManager.add_service(name=service_name, client=client)
-            ServiceManager.start_service(name=service_name, client=client)
+            service_manager.add_service(name=service_name, client=client)
+            service_manager.start_service(name=service_name, client=client)
 
     def test_single_node(self):
         """

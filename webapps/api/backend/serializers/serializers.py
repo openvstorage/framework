@@ -21,6 +21,7 @@ from ovs.dal.relations import RelationMapper
 from rest_framework import serializers
 
 
+# noinspection PyProtectedMember
 class FullSerializer(serializers.Serializer):
     """
     Serializes the persistent and dynamic stack of a hybrid object

@@ -190,4 +190,4 @@ class StorageRouter(DataObject):
             pass
         except Exception:
             StorageRouter._logger.exception('Could not load feature information')
-        return {}
+        return None

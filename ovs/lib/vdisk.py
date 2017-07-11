@@ -39,7 +39,7 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import log, ovs_task
@@ -124,8 +124,8 @@ class VDiskController(object):
                 configuration = Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/abm'.format(vpool.guid, proxy.guid))
                 client = SSHClient(storagerouter)
                 if vdisk.cache_quota is not None:
-                    fcq = vdisk.cache_quota.get('fragment')
-                    bcq = vdisk.cache_quota.get('block')
+                    fcq = vdisk.cache_quota.get(VPool.CACHES.FRAGMENT)
+                    bcq = vdisk.cache_quota.get(VPool.CACHES.BLOCK)
                 else:
                     vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
                     metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
@@ -172,6 +172,11 @@ class VDiskController(object):
         with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=20):
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if vdisk is not None:
+                for _function in Toolbox.fetch_hooks('vdisk_removal', 'before_volume_remove'):
+                    try:
+                        _function(vdisk.guid)
+                    except RuntimeError:
+                        VDiskController._logger.exception('Executing hook {0} failed'.format(_function.__name__))
                 VDiskController.clean_vdisk_from_model(vdisk)
             else:
                 VDiskController._logger.info('Volume {0} does not exist'.format(volume_id))
@@ -188,7 +193,6 @@ class VDiskController(object):
         vdisk = VDisk(vdisk_guid)
         if len(vdisk.child_vdisks) > 0:
             raise RuntimeError('vDisk {0} has clones, cannot delete'.format(vdisk.name))
-
         vdisk.invalidate_dynamics('storagerouter_guid')
         storagerouter = StorageRouter(vdisk.storagerouter_guid)
         if 'directory_unlink' in storagerouter.features['volumedriver']['features']:
@@ -232,6 +236,12 @@ class VDiskController(object):
         vdisk.size = volume_size
         vdisk.save()
         VDiskController._logger.info('Extended vDisk {0} to {1}B'.format(vdisk.name, volume_size))
+        VDiskController._logger.info('Running "after_volume_extend" hooks for vDisk {0}'.format(vdisk.guid))
+        for _function in Toolbox.fetch_hooks('vdisk_extend', 'after_volume_extend'):
+            try:
+                _function(vdisk.guid)
+            except RuntimeError:
+                VDiskController._logger.exception('Executing hook {0} failed'.format(_function.__name__))
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.resize_from_voldrv')
@@ -257,6 +267,7 @@ class VDiskController(object):
                 VDiskController._logger.warning('Ignoring resize_from_voldrv event for non-existing volume {0}'.format(volume_id))
                 return
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+
             if vdisk is None:
                 vdisk = VDisk()
                 vdisk.name = VDiskController.extract_volumename(volume_path)
@@ -268,6 +279,12 @@ class VDiskController(object):
                               'cluster_multiplier': vdisk.info['cluster_multiplier']}
             vdisk.save()
             VDiskController.vdisk_checkup(vdisk)
+            VDiskController._logger.info('Running "after_volume_extend" hooks for vDisk {0}'.format(vdisk.guid))
+            for _function in Toolbox.fetch_hooks('vdisk_extend', 'after_volume_extend'):
+                try:
+                    _function(vdisk.guid)
+                except RuntimeError:
+                    VDiskController._logger.exception('Executing hook {0} failed'.format(_function.__name__))
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.migrate_from_voldrv')
@@ -306,13 +323,14 @@ class VDiskController(object):
         :return: None
         :rtype: NoneType
         """
-        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+        from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
         old_path = '/{0}/'.format(old_path.strip('/'))
         new_path = '/{0}/'.format(new_path.strip('/'))
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         vpool = storagedriver.vpool
         VDiskController._logger.debug('Processing rename on {0} from {1} to {2}'.format(vpool.name, old_path, new_path))
+        _hooked_functions = Toolbox.fetch_hooks('vdisk_rename', 'after_volume_rename')
         for vdisk in vpool.vdisks:
             devicename = vdisk.devicename
             if devicename.startswith(old_path):
@@ -324,6 +342,12 @@ class VDiskController(object):
                         vdisk.devicename = '{0}{1}'.format(new_path, ExtensionsToolbox.remove_prefix(devicename, old_path))
                         vdisk.save()
                         VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
+                        VDiskController._logger.info('Running "after_volume_rename" hooks for vDisk {0}'.format(vdisk.guid))
+                        for _function in _hooked_functions:
+                            try:
+                                _function(vdisk.guid)
+                            except RuntimeError:
+                                VDiskController._logger.exception('Executing hook {0} failed'.format(_function.__name__))
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.clone')
@@ -364,7 +388,7 @@ class VDiskController(object):
             if not 0.0 < pagecache_ratio <= 1:
                 raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            for quota_type in ['fragment', 'block']:
+            for quota_type in VPool.CACHES.values():
                 quota = cache_quota.get(quota_type)
                 if quota is not None:
                     if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
@@ -686,7 +710,7 @@ class VDiskController(object):
             if not 0.0 < pagecache_ratio <= 1:
                 raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            for quota_type in ['fragment', 'block']:
+            for quota_type in VPool.CACHES.values():
                 quota = cache_quota.get(quota_type)
                 if quota is not None:
                     if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
@@ -759,7 +783,7 @@ class VDiskController(object):
         if not 0.0 < pagecache_ratio <= 1:
             raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
         if cache_quota is not None:
-            for quota_type in ['fragment', 'block']:
+            for quota_type in VPool.CACHES.values():
                 quota = cache_quota.get(quota_type)
                 if quota is not None:
                     if not 0.1 * 1024.0 ** 3 <= quota <= 1024 ** 4:
@@ -845,8 +869,8 @@ class VDiskController(object):
         if cache_quota is None:
             vdisk.invalidate_dynamics('storagerouter_guid')
             metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
-            cache_quota = {'fragment': metadata.get('quota_fc'),
-                           'block': metadata.get('quota_bc')}
+            cache_quota = {VPool.CACHES.FRAGMENT: metadata.get('quota_fc'),
+                           VPool.CACHES.BLOCK: metadata.get('quota_bc')}
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
@@ -883,8 +907,8 @@ class VDiskController(object):
                                        required_params={'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys(), False),
                                                         'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys(), False),
                                                         'dtl_target': (list, Toolbox.regex_guid, False),
-                                                        'cache_quota': (dict, {'fragment': (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False),
-                                                                               'block': (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False)}, False),
+                                                        'cache_quota': (dict, {VPool.CACHES.FRAGMENT: (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False),
+                                                                               VPool.CACHES.BLOCK: (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False)}, False),
                                                         'write_buffer': (int, {'min': 128, 'max': 10 * 1024}, False),
                                                         'pagecache_ratio': (float, {'min': 0, 'max': 1, 'exclude': [0]}, False)})
 
@@ -1059,6 +1083,8 @@ class VDiskController(object):
         :return: None
         :rtype: NoneType
         """
+        service_manager = ServiceFactory.get_manager()
+
         if vpool_guid is not None and vdisk_guid is not None:
             raise ValueError('vPool and vDisk are mutually exclusive')
         if storagerouters_to_exclude is None:
@@ -1187,7 +1213,7 @@ class VDiskController(object):
                                 try:
                                     root_client = SSHClient(endpoint=storagerouter, username='root')
                                     service_name = 'dtl_{0}'.format(vpool.name)
-                                    if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client) == 'active':
+                                    if service_manager.has_service(service_name, client=root_client) is True and service_manager.get_service_status(service_name, client=root_client) == 'active':
                                         root_client_map[storagerouter] = root_client
                                     else:
                                         VDiskController._logger.warning('    DTL service on Storage Router with IP {0} is not reachable'.format(storagerouter.ip))
@@ -1455,12 +1481,13 @@ class VDiskController(object):
         :return: None
         :rtype: NoneType
         """
+        service_manager = ServiceFactory.get_manager()
         if vdisk.vpool.metadata_store_bits is None:
             bits = None
             for storagedriver in vdisk.vpool.storagedrivers:
-                entries = ServiceManager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vdisk.vpool.name),
-                                                                   client=SSHClient(endpoint=storagedriver.storagerouter, username='root'),
-                                                                   entries=['METADATASTORE_BITS='])
+                entries = service_manager.extract_from_service_file(name='ovs-volumedriver_{0}'.format(vdisk.vpool.name),
+                                                                    client=SSHClient(endpoint=storagedriver.storagerouter, username='root'),
+                                                                    entries=['METADATASTORE_BITS='])
                 if len(entries) == 1:
                     bits = entries[0].split('=')[-1]
                     bits = int(bits) if bits.isdigit() else 5
@@ -1478,6 +1505,7 @@ class VDiskController(object):
         storagedriver_config.load()
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
+        # noinspection PyTypeChecker
         metadata_page_size = float(2 ** vdisk.vpool.metadata_store_bits * cluster_size)
         cache_capacity = int(math.ceil(vdisk.size / metadata_page_size * ratio))
 

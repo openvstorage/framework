@@ -132,7 +132,7 @@ elif [ "$1" = "remove" ] ; then
     fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then
-        python -c "from ovs.extensions.services.service import ServiceManager; ServiceManager.monitor_services()"
+        python -c "from ovs.extensions.services.servicefactory import ServiceFactory; ServiceFactory.get_manager().monitor_services()"
     elif [ "$2" = "heartbeat" ] ; then
         python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
     elif [ "$2" = "mds" ] ; then
@@ -146,16 +146,16 @@ elif [ "$1" = "stop" ] || [ "$1" = "start" ] ; then
             python -c """
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 print '{0}...'.format('Starting' if '$1' == 'start' else 'Stopping')
-ServiceManager.$1_service('watcher-framework', SSHClient(System.get_my_storagerouter(), username='root'))
+ServiceFactory.get_manager().$1_service('watcher-framework', SSHClient(System.get_my_storagerouter(), username='root'))
 print 'Done'"""
         elif [ "$#" -eq 3 ] ; then
             if [ "$3" == "all" ] ; then
                 python -c """
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 for storagerouter in sorted(StorageRouterList.get_storagerouters(), key=lambda k: k.name):
     print '{0} on {1}...'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)
     try:
@@ -163,13 +163,13 @@ for storagerouter in sorted(StorageRouterList.get_storagerouters(), key=lambda k
     except UnableToConnectException:
         print '{0} on {1}... failed (Node unreachable)'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)
         continue
-    ServiceManager.$1_service('watcher-framework', client)
+    ServiceFactory.get_manager().$1_service('watcher-framework', client)
 print 'Done'"""
             else
                 python -c """
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.servicefactory import ServiceFactory
 storagerouter = StorageRouterList.get_by_ip('$3')
 if storagerouter is None:
     print 'Could not find StorageRouter with ip $3'
@@ -177,7 +177,7 @@ else:
     print '{0} on {1}...'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)
     try:
         client = SSHClient(storagerouter, username='root')
-        ServiceManager.$1_service('watcher-framework', client)
+        ServiceFactory.get_manager().$1_service('watcher-framework', client)
         print 'Done'
     except UnableToConnectException:
         print '{0} on {1}... failed (Node unreachable)'.format('Starting' if '$1' == 'start' else 'Stopping', storagerouter.name)"""

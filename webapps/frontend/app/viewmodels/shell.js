@@ -123,7 +123,7 @@ define([
                         .done(function(metadata) {
                             var metadataHandlers = [], backendsActive = false;
                             $.each(metadata.plugins, function(plugin, types) {
-                                if ($.inArray('gui', types) !== -1) {
+                                if (types.contains('gui')) {
                                     var moduleHandler = $.Deferred(function(translationDeferred) {
                                         i18n.loadNamespace(plugin, function () {
                                             translationDeferred.resolve();
@@ -131,7 +131,7 @@ define([
                                     }).promise();
                                     moduleHandler.then(function() {
                                         return $.Deferred(function(moduleDeferred) {
-                                            require(['ovs/hooks/' + plugin], function(hook) {
+                                            require(['ovs/hooks/' + plugin], function(hook) { // webapps/frontend/lib/ovs/hooks
                                                 routing.extraRoutes.push(hook.routes);
                                                 routing.routePatches.push(hook.routePatches);
                                                 $.each(hook.dashboards, function(index, dashboard) {
@@ -158,19 +158,30 @@ define([
                                                             });
                                                         });
                                                 });
-                                                $.each(hook.pages, function(page, pageName) {
+                                                $.each(hook.pages, function(page, pageInfo) {
                                                     if (!shared.hooks.pages.hasOwnProperty(page)) {
                                                         shared.hooks.pages[page] = [];
                                                     }
-                                                    system.acquire('viewmodels/site/' + pageName)
-                                                        .then(function(module) {
-                                                            var moduleInstance = new module();
-                                                            shared.hooks.pages[page].push({
-                                                                name: pageName,
-                                                                module: moduleInstance,
-                                                                activator: activator.create()
+                                                    $.each(pageInfo, function(index, info) {
+                                                        var moduleName;
+                                                        if (typeof info === 'string') {
+                                                            moduleName = info;
+                                                            info = {type: 'generic', module: moduleName};
+                                                        } else {
+                                                            moduleName = info.module;
+                                                        }
+                                                        system.acquire('viewmodels/site/' + moduleName)
+                                                            .then(function(module) {
+                                                                var moduleInstance = new module();
+                                                                shared.hooks.pages[page].push({
+                                                                    info: info,
+                                                                    name: moduleName,
+                                                                    module: moduleInstance,
+                                                                    activator: activator.create()
+                                                                });
                                                             });
-                                                        });
+                                                    });
+
                                                 });
                                                 moduleDeferred.resolve();
                                             });
@@ -178,7 +189,7 @@ define([
                                     });
                                     metadataHandlers.push(moduleHandler);
                                 }
-                                if ($.inArray('backend', types) !== -1 && !backendsActive) {
+                                if (types.contains('backend') && !backendsActive) {
                                     routing.siteRoutes.push({
                                         route: 'backends',
                                         moduleId: 'backends',

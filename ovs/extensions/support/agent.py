@@ -27,7 +27,7 @@ from subprocess import check_output
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.packages.package import PackageManager
+from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.log.log_handler import LogHandler
 
 
@@ -68,7 +68,8 @@ class SupportAgent(object):
 
         try:
             # Versions
-            data['metadata']['versions'] = PackageManager.get_installed_versions()  # Fallback to check_output
+            manager = PackageFactory.get_manager()
+            data['metadata']['versions'] = manager.get_installed_versions()  # Fallback to check_output
         except Exception, ex:
             data['errors'].append(str(ex))
         try:
@@ -190,6 +191,7 @@ class SupportAgent(object):
 
 
 if __name__ == '__main__':
+    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     logger = LogHandler.get('support', name='agent')
     try:
         if Configuration.get('/ovs/framework/support|enabled') is False:

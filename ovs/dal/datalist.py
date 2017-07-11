@@ -30,6 +30,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.dal.relations import RelationMapper
 
 
+# noinspection PyProtectedMember
 class DataList(object):
     """
     The DataList is a class that provide query functionality for the hybrid DAL
@@ -47,7 +48,7 @@ class DataList(object):
 
     class Operator(object):
         """
-        The Operator class provides enum-alike properties for equalitation-operators
+        The Operator class provides enum-alike properties for equation-operators
         """
         # In case more operators are required, add them here, and implement them in
         # the _evaluate method below
@@ -400,6 +401,7 @@ class DataList(object):
             self.from_cache = True
             self._guids = cached_data
 
+            # noinspection PyTypeChecker
             keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
             entries = list(self._persistent.get_multi(keys, must_exist=False))
 
@@ -422,7 +424,7 @@ class DataList(object):
         :param object_type: The object type for this invalidations run
         :param items: The query items that need to be used for building invalidations
         """
-        def add(cname, field):
+        def _add(cname, field):
             if cname not in invalidations:
                 invalidations[cname] = []
             if field not in invalidations[cname]:
@@ -444,18 +446,18 @@ class DataList(object):
                         break
                     elif pitem in (prop.name for prop in value._properties):
                         # The pitem is in the properties, so it's a simple property (e.g. vmachine.name)
-                        add(class_name, pitem)
+                        _add(class_name, pitem)
                         break
                     elif pitem in (relation.name for relation in value._relations):
                         # The pitem is in the relations, so it's a relation property (e.g. vdisk.vmachine)
-                        add(class_name, pitem)
+                        _add(class_name, pitem)
                         relation = [relation for relation in value._relations if relation.name == pitem][0]
                         if relation.foreign_type is not None:
                             value = relation.foreign_type
                         continue
                     elif pitem.endswith('_guid') and pitem.replace('_guid', '') in (relation.name for relation in value._relations):
                         # The pitem is the guid pointing to a relation, so it can be handled like a simple property (e.g. vdisk.vmachine_guid)
-                        add(class_name, pitem.replace('_guid', ''))
+                        _add(class_name, pitem.replace('_guid', ''))
                         break
                     elif pitem in (dynamic.name for dynamic in value._dynamics):
                         # The pitem is a dynamic property, which will be ignored anyway
@@ -468,7 +470,7 @@ class DataList(object):
                         if relations is not None:
                             if cleaned_pitem in relations:
                                 value = Descriptor().load(relations[cleaned_pitem]['class']).get_object()
-                                add(value.__name__.lower(), relations[cleaned_pitem]['key'])
+                                _add(value.__name__.lower(), relations[cleaned_pitem]['key'])
                                 continue
                     raise RuntimeError('Invalid path given: {0}, currently pointing to {1}'.format(path, pitem))
 
@@ -534,8 +536,9 @@ class DataList(object):
         * Sorting (guids) of this list
         * Cached objects from both lists
         :param other: The list that must be used to update this lists query results
+        :type other: ovs.dal.datalist.DataList
         """
-        # Validating and esure that the guids are available
+        # Validating and ensure that the guids are available
         if not isinstance(other, DataList):
             raise TypeError('Both operands should be of type DataList')
         if Descriptor(self._object_type) != Descriptor(other._object_type):
@@ -554,6 +557,7 @@ class DataList(object):
         for guid in old_guids:
             if guid in new_guids:
                 self._guids.append(guid)
+        # noinspection PyTypeChecker
         for guid in new_guids:
             if guid not in self._guids:
                 self._guids.append(guid)
@@ -648,6 +652,7 @@ class DataList(object):
         """
         __add__ operator for DataList
         :param other: A DataList instance that must be added to this instance
+        :type other: ovs.dal.datalist.DataList
         """
         if not isinstance(other, DataList):
             raise TypeError('Both operands should be of type DataList')
@@ -659,6 +664,7 @@ class DataList(object):
             other._execute_query()
         new_datalist = DataList(self._object_type, {})
         guids = self._guids[:]
+        # noinspection PyTypeChecker
         for guid in other._guids:
             if guid not in guids:
                 guids.append(guid)
@@ -721,6 +727,7 @@ class DataList(object):
         """
         if self._executed is False and self._guids is None:
             self._execute_query()
+        # noinspection PyTypeChecker
         return len(self._guids)
 
     def __getitem__(self, item):
@@ -735,6 +742,9 @@ class DataList(object):
             guids = self._guids[item.start:item.stop]
             new_datalist = DataList(self._object_type, {})
             new_datalist._guids = guids
+            new_datalist._executed = True  # Will always be True at this point, since _execute_query is executed if False
+            new_datalist._data = dict((key, copy.deepcopy(value)) for key, value in self._data.iteritems() if key in guids)
+            new_datalist._objects = dict((key, value.clone()) for key, value in self._objects.iteritems() if key in guids)
             return new_datalist
         else:
             guid = self._guids[item]

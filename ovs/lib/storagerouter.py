@@ -37,16 +37,17 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig
+from ovs_extensions.api.client import OVSClient
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
-from ovs.extensions.generic.remote import remote
+from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.packages.package import PackageManager
-from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.packages.packagefactory import PackageFactory
+from ovs.extensions.services.servicefactory import ServiceFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
@@ -269,7 +270,10 @@ class StorageRouterController(object):
         block_cache_on_write = parameters['block_cache_on_write']
 
         # Validate features
+        storagerouter.invalidate_dynamics(['features'])
         features = storagerouter.features
+        if features is None:
+            raise RuntimeError('Could not load available features')
         supports_block_cache = 'block-cache' in features['alba']['features']
         if supports_block_cache is False and (block_cache_on_read is True or block_cache_on_write is True):
             raise RuntimeError('Block cache is not a supported feature')
@@ -363,7 +367,7 @@ class StorageRouterController(object):
                 else:
                     try:
                         Toolbox.verify_required_params(actual_params=parameters,
-                                                       required_params={'cache_quota_fc': (int, {'min': 1024 ** 3 / 10, 'max': 1024.0 ** 4}, False),
+                                                       required_params={'cache_quota_fc': (int, None, False),
                                                                         'connection_info_fc': (dict, {'host': (str, Toolbox.regex_ip),
                                                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                                                       'client_id': (str, None),
@@ -376,10 +380,9 @@ class StorageRouterController(object):
                                                    port=connection_info_fc['port'],
                                                    credentials=(connection_info_fc['client_id'],
                                                                 connection_info_fc['client_secret']),
-                                                   version=2)
+                                                   version=2,
+                                                   cache_store=VolatileFactory.get_client())
                             backend_dict_fc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_fc), params={'contents': 'name,usages'})
-                            if backend_dict_fc['usages']['free'] < cache_quota * 10:
-                                raise RuntimeError('Requested Fragment Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_fc['name']))
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
             if use_block_cache_backend is True:
@@ -388,7 +391,7 @@ class StorageRouterController(object):
                 else:
                     try:
                         Toolbox.verify_required_params(actual_params=parameters,
-                                                       required_params={'cache_quota_bc': (int, {'min': 1024 ** 3 / 10, 'max': 1024.0 ** 4}, False),
+                                                       required_params={'cache_quota_bc': (int, None, False),
                                                                         'connection_info_bc': (dict, {'host': (str, Toolbox.regex_ip),
                                                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                                                       'client_id': (str, None),
@@ -404,10 +407,9 @@ class StorageRouterController(object):
                                                        port=connection_info_bc['port'],
                                                        credentials=(connection_info_bc['client_id'],
                                                                     connection_info_bc['client_secret']),
-                                                       version=2)
+                                                       version=2,
+                                                       cache_store=VolatileFactory.get_client())
                                 backend_dict_bc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_bc), params={'contents': 'name,usages'})
-                            if backend_dict_bc['usages']['free'] < cache_quota * 10:
-                                raise RuntimeError('Requested Block Cache quota is too high, please lower the quota or add more ASDs to ALBA Backend {0}'.format(backend_dict_bc['name']))
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
 
@@ -442,12 +444,12 @@ class StorageRouterController(object):
                     largest_sata = info['available']
                     largest_sata_write_partition = info['guid']
 
+            mountpoint_cache = None
             amount_of_proxies = parameters.get('parallelism', {}).get('proxies', 2)
-            local_amount_of_proxies = 0
             fragment_cache_on_read = parameters['fragment_cache_on_read']
             fragment_cache_on_write = parameters['fragment_cache_on_write']
+            local_amount_of_proxies = 0
             largest_write_mountpoint = None
-            mountpoint_fragment_cache = None
             if largest_ssd_write_partition is None and largest_sata_write_partition is None:
                 error_messages.append('No WRITE partition found to put the local caches on')
             else:
@@ -459,7 +461,7 @@ class StorageRouterController(object):
                     if block_cache_on_read is True or block_cache_on_write is True:  # Local block caching
                         local_amount_of_proxies += amount_of_proxies
                 if local_amount_of_proxies > 0:
-                    mountpoint_fragment_cache = largest_write_mountpoint
+                    mountpoint_cache = largest_write_mountpoint
                     one_gib = 1024 ** 3  # 1GiB
                     proportion = float(largest_ssd or largest_sata) * 100.0 / writecache_size_available
                     available = proportion * writecache_size_requested / 100 * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
@@ -506,10 +508,11 @@ class StorageRouterController(object):
                 ovs_client = OVSClient(ip=metadata['connection_info']['host'],
                                        port=metadata['connection_info']['port'],
                                        credentials=(metadata['connection_info']['client_id'], metadata['connection_info']['client_secret']),
-                                       version=2)
+                                       version=2,
+                                       cache_store=VolatileFactory.get_client())
                 preset_name = metadata['backend_info']['preset']
                 alba_backend_guid = metadata['backend_info']['alba_backend_guid']
-                arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(backend_guid=alba_backend_guid, ovs_client=ovs_client)
+                arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
                 backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
@@ -611,8 +614,8 @@ class StorageRouterController(object):
                 proportion = available * 100.0 / writecache_size_available
                 size_to_be_used = proportion * writecache_size_requested / 100
                 write_cache_percentage = 0.98
-                if mountpoint_fragment_cache is not None and partition == mountpoint_fragment_cache:
-                    if fragment_cache_on_read is True or fragment_cache_on_write is True:  # Only in this case we actually make use of the fragment caching
+                if mountpoint_cache is not None and partition == mountpoint_cache:
+                    if fragment_cache_on_read is True or fragment_cache_on_write is True or block_cache_on_read is True or block_cache_on_write is True:  # Only in this case we actually make use of the fragment caching
                         frag_size = int(size_to_be_used * 0.10)  # Bytes
                         write_cache_percentage = 0.88
                     for _ in xrange(amount_of_proxies):
@@ -626,6 +629,7 @@ class StorageRouterController(object):
                         sdp_frags.append(sdp_frag)
 
                 w_size = int(size_to_be_used * write_cache_percentage / 1024 / 4096) * 4096
+                # noinspection PyArgumentList
                 sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
                                                                                                'role': DiskPartition.ROLES.WRITE,
                                                                                                'sub_role': StorageDriverPartition.SUBROLE.SCO,
@@ -862,7 +866,7 @@ class StorageRouterController(object):
                                                       'alba_connection_timeout': 15,
                                                       'alba_connection_use_rora': True,
                                                       'alba_connection_transport': 'TCP',
-                                                      'alba_connection_rora_manifest_cache_capacity': manifest_cache_size,
+                                                      'alba_connection_rora_manifest_cache_capacity': 5000,
                                                       'alba_connection_asd_connection_pool_capacity': 20,
                                                       'alba_connection_rora_timeout_msecs': 50,
                                                       'backend_type': 'ALBA'}
@@ -932,39 +936,40 @@ class StorageRouterController(object):
                      'CONFIG_PATH': storagedriver_config.remote_path,
                      'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
                      'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
-                     'LOG_SINK': LogHandler.get_sink_path('storagedriver'),
+                     'LOG_SINK': LogHandler.get_sink_path('storagedriver_{0}'.format(storagedriver.storagedriver_id)),
                      'METADATASTORE_BITS': 5}
         dtl_params = {'DTL_PATH': sdp_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,
                       'DTL_PORT': str(storagedriver.ports['dtl']),
                       'DTL_TRANSPORT': StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport],
-                      'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
+                      'LOG_SINK': LogHandler.get_sink_path('storagedriver-dtl_{0}'.format(storagedriver.storagedriver_id))}
 
         sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
 
+        service_manager = ServiceFactory.get_manager()
         watcher_volumedriver_service = 'watcher-volumedriver'
         try:
-            if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
-                ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
-                ServiceManager.start_service(watcher_volumedriver_service, client=root_client)
+            if not service_manager.has_service(watcher_volumedriver_service, client=root_client):
+                service_manager.add_service(watcher_volumedriver_service, client=root_client)
+                service_manager.start_service(watcher_volumedriver_service, client=root_client)
 
-            ServiceManager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
-            ServiceManager.start_service(dtl_service, client=root_client)
+            service_manager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
+            service_manager.start_service(dtl_service, client=root_client)
 
             for proxy in storagedriver.alba_proxies:
                 alba_proxy_params = {'VPOOL_NAME': vpool_name,
-                                     'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
+                                     'LOG_SINK': LogHandler.get_sink_path(proxy.service.name),
                                      'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid))}
                 alba_proxy_service = 'ovs-{0}'.format(proxy.service.name)
-                ServiceManager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
-                ServiceManager.start_service(alba_proxy_service, client=root_client)
+                service_manager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
+                service_manager.start_service(alba_proxy_service, client=root_client)
 
-            ServiceManager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
+            service_manager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
 
             storagedriver = StorageDriver(storagedriver.guid)
             current_startup_counter = storagedriver.startup_counter
-            ServiceManager.start_service(sd_service, client=root_client)
+            service_manager.start_service(sd_service, client=root_client)
         except Exception:
             StorageRouterController._logger.exception('Failed to start the relevant services for vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
             StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.FAILURE)
@@ -973,7 +978,7 @@ class StorageRouterController(object):
         tries = 60
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
             StorageRouterController._logger.debug('Waiting for the StorageDriver to start up for vPool {0} on StorageRouter {1} ...'.format(vpool.name, storagerouter.name))
-            if ServiceManager.get_service_status(sd_service, client=root_client) != 'active':
+            if service_manager.get_service_status(sd_service, client=root_client) != 'active':
                 StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.FAILURE)
                 raise RuntimeError('StorageDriver service failed to start (service not running)')
             tries -= 1
@@ -1133,6 +1138,7 @@ class StorageRouterController(object):
                     except Exception:
                         StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
 
+        service_manager = ServiceFactory.get_manager()
         # Disable and stop DTL, voldrv and albaproxy services
         if storage_router_online is True:
             dtl_service = 'dtl_{0}'.format(vpool.name)
@@ -1141,11 +1147,11 @@ class StorageRouterController(object):
 
             for service in [voldrv_service, dtl_service]:
                 try:
-                    if ServiceManager.has_service(service, client=client):
+                    if service_manager.has_service(service, client=client):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service))
-                        ServiceManager.stop_service(service, client=client)
+                        service_manager.stop_service(service, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service))
-                        ServiceManager.remove_service(service, client=client)
+                        service_manager.remove_service(service, client=client)
                 except Exception:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service))
                     errors_found = True
@@ -1154,9 +1160,9 @@ class StorageRouterController(object):
             if storage_drivers_left is False and Configuration.exists(sd_config_key):
                 try:
                     for proxy in storage_driver.alba_proxies:
-                        if ServiceManager.has_service(proxy.service.name, client=client):
+                        if service_manager.has_service(proxy.service.name, client=client):
                             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Starting proxy {1}'.format(storage_driver.guid, proxy.service.name))
-                            ServiceManager.start_service(proxy.service.name, client=client)
+                            service_manager.start_service(proxy.service.name, client=client)
                             tries = 10
                             running = False
                             port = proxy.service.ports[0]
@@ -1193,11 +1199,11 @@ class StorageRouterController(object):
             for proxy in storage_driver.alba_proxies:
                 service_name = proxy.service.name
                 try:
-                    if ServiceManager.has_service(service_name, client=client):
+                    if service_manager.has_service(service_name, client=client):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service_name))
-                        ServiceManager.stop_service(service_name, client=client)
+                        service_manager.stop_service(service_name, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service_name))
-                        ServiceManager.remove_service(service_name, client=client)
+                        service_manager.remove_service(service_name, client=client)
                 except Exception:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
                     errors_found = True
@@ -1338,9 +1344,10 @@ class StorageRouterController(object):
         :return: Version information
         :rtype: dict
         """
+        pacakge_manager = PackageFactory.get_manager()
         client = SSHClient(StorageRouter(storagerouter_guid))
         return {'storagerouter_guid': storagerouter_guid,
-                'versions': PackageManager.get_installed_versions(client)}
+                'versions': pacakge_manager.get_installed_versions(client)}
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_support_info')
@@ -1389,6 +1396,160 @@ class StorageRouterController(object):
         client.run(['chmod', '666', '{0}/{1}'.format(webpath, logfilename)])
         return logfilename
 
+    # noinspection PyTypeChecker
+    @staticmethod
+    @ovs_task(name='ovs.storagerouter.create_hprm_config_files')
+    def create_hprm_config_files(storagerouter_guid, local_storagerouter_guid, parameters):
+        """
+        Create the required configuration files to be able to make use of HPRM (aka PRACC)
+        This configuration will be zipped and made available for download
+        :param storagerouter_guid: The guid of the StorageRouter for which a HPRM manager needs to be deployed
+        :type storagerouter_guid: str
+        :param local_storagerouter_guid: The guid of the StorageRouter the API was requested on
+        :type local_storagerouter_guid: str
+        :param parameters: Additional information required for the HPRM configuration files
+        :type parameters: dict
+        :return: Name of the zipfile containing the configuration files
+        :rtype: str
+        """
+        # Validations
+        required_params = {'port': (int, {'min': 1, 'max': 65535}),
+                           'identifier': (str, Toolbox.regex_vpool),
+                           'vpool_guid': (str, Toolbox.regex_guid)}
+        Toolbox.verify_required_params(actual_params=parameters,
+                                       required_params=required_params)
+        vpool = VPool(parameters['vpool_guid'])
+        identifier = parameters['identifier']
+        config_path = None
+        storagerouter = StorageRouter(storagerouter_guid)
+        local_storagerouter = StorageRouter(local_storagerouter_guid)
+        for sd in vpool.storagedrivers:
+            if sd.storagerouter_guid == storagerouter.guid:
+                if len(sd.alba_proxies) == 0:
+                    raise ValueError('No ALBA proxies configured for vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
+                config_path = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, sd.alba_proxies[0].guid)
+
+        if config_path is None:
+            raise ValueError('vPool {0} has not been extended to StorageRouter {1}'.format(vpool.name, storagerouter.name))
+        proxy_cfg = Configuration.get(key=config_path.format('main'))
+
+        cache_info = {}
+        arakoons = {}
+        cache_types = VPool.CACHES.values()
+        if not any(ctype in parameters for ctype in cache_types):
+            raise ValueError('At least one cache type should be passed: {0}'.format(', '.join(cache_types)))
+        for ctype in cache_types:
+            if ctype not in parameters:
+                continue
+            required_dict = {'read': (bool, None),
+                             'write': (bool, None)}
+            required_params.update({ctype: (dict, required_dict)})
+            Toolbox.verify_required_params(actual_params=parameters,
+                                           required_params=required_params)
+            read = parameters[ctype]['read']
+            write = parameters[ctype]['write']
+            if read is False and write is False:
+                cache_info[ctype] = ['none']
+                continue
+            path = parameters[ctype].get('path')
+            if path is not None:
+                path = path.strip()
+                if not path or path.endswith('/.') or '..' in path or '/./' in path:
+                    raise ValueError('Invalid path specified')
+                required_dict.update({'path': (str, None),
+                                      'size': (int, {'min': 1, 'max': 10 * 1024})})
+                Toolbox.verify_required_params(actual_params=parameters,
+                                               required_params=required_params)
+                while '//' in path:
+                    path = path.replace('//', '/')
+                cache_info[ctype] = ['local', {'path': path,
+                                               'max_size': parameters[ctype]['size'] * 1024 ** 3,
+                                               'cache_on_read': read,
+                                               'cache_on_write': write}]
+            else:
+                required_dict.update({'backend_info': (dict, {'preset': (str, Toolbox.regex_preset),
+                                                              'alba_backend_guid': (str, Toolbox.regex_guid),
+                                                              'alba_backend_name': (str, Toolbox.regex_backend)}),
+                                      'connection_info': (dict, {'host': (str, Toolbox.regex_ip, False),
+                                                                 'port': (int, {'min': 1, 'max': 65535}, False),
+                                                                 'client_id': (str, Toolbox.regex_guid, False),
+                                                                 'client_secret': (str, None, False)})})
+                Toolbox.verify_required_params(actual_params=parameters,
+                                               required_params=required_params)
+                connection_info = parameters[ctype]['connection_info']
+                if connection_info['host']:  # Remote Backend for accelerated Backend
+                    alba_backend_guid = parameters[ctype]['backend_info']['alba_backend_guid']
+                    ovs_client = OVSClient(ip=connection_info['host'],
+                                           port=connection_info['port'],
+                                           credentials=(connection_info['client_id'], connection_info['client_secret']),
+                                           version=2)
+                    arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid,
+                                                                                           ovs_client=ovs_client)
+                    arakoons[ctype] = ArakoonClusterConfig.convert_config_to(arakoon_config, return_type='INI')
+                else:  # Local Backend for accelerated Backend
+                    alba_backend_name = parameters[ctype]['backend_info']['alba_backend_name']
+                    if Configuration.exists(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name), raw=True) is False:
+                        raise ValueError('Arakoon cluster for ALBA Backend {0} could not be retrieved'.format(alba_backend_name))
+                    arakoons[ctype] = Configuration.get(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name), raw=True)
+                cache_info[ctype] = ['alba', {'albamgr_cfg_url': '/etc/hprm/{0}/{1}_cache_arakoon.ini'.format(identifier, ctype),
+                                              'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
+                                                                             'preset': parameters[ctype]['backend_info']['preset']}],
+                                              'manifest_cache_size': proxy_cfg['manifest_cache_size'],
+                                              'cache_on_read': read,
+                                              'cache_on_write': write}]
+
+        tgz_name = 'hprm_config_files_{0}_{1}.tgz'.format(identifier, storagerouter.name)
+        config = {'ips': ['127.0.0.1'],
+                  'port': parameters['port'],
+                  'pracc': {'uds_path': '/var/run/hprm/{0}/uds_path'.format(identifier),
+                            'max_clients': 1000,
+                            'max_read_buf_size': 64 * 1024,  # Buffer size for incoming requests (in bytes)
+                            'thread_pool_size': 64},  # Amount of threads
+                  'transport': 'tcp',
+                  'log_level': 'info',
+                  'read_preference': proxy_cfg['read_preference'],
+                  'albamgr_cfg_url': '/etc/hprm/{0}/arakoon.ini'.format(identifier),
+                  'manifest_cache_size': proxy_cfg['manifest_cache_size']}
+        file_contents_map = {}
+        for ctype in cache_types:
+            if ctype in cache_info:
+                config['{0}_cache'.format(ctype)] = cache_info[ctype]
+            if ctype in arakoons:
+                file_contents_map['/opt/OpenvStorage/config/{0}/{1}_cache_arakoon.ini'.format(identifier, ctype)] = arakoons[ctype]
+        file_contents_map.update({'/opt/OpenvStorage/config/{0}/config.json'.format(identifier): json.dumps(config, indent=4),
+                                  '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(identifier): Configuration.get(key=config_path.format('abm'), raw=True)})
+
+        local_client = SSHClient(endpoint=local_storagerouter)
+        local_client.dir_create(directories='/opt/OpenvStorage/config/{0}'.format(identifier))
+        local_client.dir_create(directories='/opt/OpenvStorage/webapps/frontend/downloads')
+        for file_name, contents in file_contents_map.iteritems():
+            local_client.file_write(contents=contents,
+                                    filename=file_name)
+        local_client.run(command=['tar', '--transform', 's#^config/{0}#{0}#'.format(identifier),
+                                  '-czf', '/opt/OpenvStorage/webapps/frontend/downloads/{0}'.format(tgz_name),
+                                  'config/{0}'.format(identifier)])
+        local_client.dir_delete(directories='/opt/OpenvStorage/config/{0}'.format(identifier))
+        return tgz_name
+
+    @staticmethod
+    @ovs_task(name='ovs.storagerouter.get_proxy_config')
+    def get_proxy_config(vpool_guid, storagerouter_guid):
+        """
+        Gets the ALBA proxy for a given Storage Router and vPool
+        :param storagerouter_guid: Guid of the StorageRouter on which the ALBA proxy is configured
+        :type storagerouter_guid: str
+        :param vpool_guid: Guid of the vPool for which the proxy is configured
+        :type vpool_guid: str
+        """
+        vpool = VPool(vpool_guid)
+        storagerouter = StorageRouter(storagerouter_guid)
+        for sd in vpool.storagedrivers:
+            if sd.storagerouter_guid == storagerouter.guid:
+                if len(sd.alba_proxies) == 0:
+                    raise ValueError('No ALBA proxies configured for vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
+                return Configuration.get('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, sd.alba_proxies[0].guid))
+        raise ValueError('vPool {0} has not been extended to StorageRouter {1}'.format(vpool.name, storagerouter.name))
+
     @staticmethod
     @ovs_task(name='ovs.storagerouter.configure_support')
     def configure_support(enable, enable_support):
@@ -1402,6 +1563,7 @@ class StorageRouterController(object):
         :rtype: bool
         """
         clients = []
+        service_manager = ServiceFactory.get_manager()
         try:
             for storagerouter in StorageRouterList.get_storagerouters():
                 clients.append((SSHClient(storagerouter), SSHClient(storagerouter, username='root')))
@@ -1414,13 +1576,13 @@ class StorageRouterController(object):
                 root_client.run('service openvpn stop')
                 root_client.file_delete('/etc/openvpn/ovs_*')
             if enable is True:
-                if not ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    ServiceManager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                if not service_manager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
+                    service_manager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                service_manager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
             else:
-                if ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    ServiceManager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                    ServiceManager.remove_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                if service_manager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
+                    service_manager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                    service_manager.remove_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
         return True
 
     @staticmethod
@@ -1615,17 +1777,17 @@ class StorageRouterController(object):
         return mountpoints
 
     @staticmethod
-    def _retrieve_alba_arakoon_config(backend_guid, ovs_client):
+    def _retrieve_alba_arakoon_config(alba_backend_guid, ovs_client):
         """
         Retrieve the ALBA Arakoon configuration
-        :param backend_guid: Guid of the ALBA Backend
-        :type backend_guid: str
+        :param alba_backend_guid: Guid of the ALBA Backend
+        :type alba_backend_guid: str
         :param ovs_client: OVS client object
         :type ovs_client: OVSClient
         :return: Arakoon configuration information
         :rtype: dict
         """
-        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(backend_guid))
+        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(alba_backend_guid))
         successful, arakoon_config = ovs_client.wait_for_task(task_id, timeout=300)
         if successful is False:
             raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))

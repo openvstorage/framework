@@ -18,11 +18,11 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vpool', '../containers/storagedriver', '../containers/storagerouter', '../containers/vdisk',
-    '../wizards/addvpool/index'
+    '../wizards/addvpool/index', '../wizards/createhprmconfigs/index'
 ], function($, app, dialog, ko, router,
             shared, generic, Refresher, api,
             VPool, StorageDriver, StorageRouter, VDisk,
-            ExtendVPool) {
+            ExtendVPool, CreateHPRMConfigsWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -50,11 +50,13 @@ define([
         });
 
         // Handles
-        self.vDisksHandle             = {};
+        self.loadConfigFiles          = undefined;
         self.loadStorageDriversHandle = undefined;
         self.loadStorageRoutersHandle = undefined;
+        self.vDisksHandle             = {};
 
         // Observables
+        self.generatingConfigs      = ko.observable(false);
         self.refreshList            = ko.observableArray([]);
         self.srSDMap                = ko.observable({});
         self.storageDrivers         = ko.observableArray([]);
@@ -211,6 +213,24 @@ define([
                         self.updatingStorageRouters(false);
                     });
             }
+        };
+        self.generateHPRMConfigFiles = function(sr) {
+            self.updatingStorageRouters(true);
+
+            var deferred = $.Deferred(),
+                wizard = new CreateHPRMConfigsWizard({
+                    modal: true,
+                    completed: deferred,
+                    vPool: self.vPool(),
+                    storageRouter: sr
+                });
+            wizard.closing.always(function() {
+                deferred.resolve();
+            });
+            dialog.show(wizard);
+            deferred.always(function() {
+                self.updatingStorageRouters(false);
+            });
         };
         self.removeStorageRouter = function(sr) {
             var single = generic.keys(self.srSDMap()).length === 1;

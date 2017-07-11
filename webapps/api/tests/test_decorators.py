@@ -448,19 +448,19 @@ class Decorators(unittest.TestCase):
 
         time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
-        for function in [the_function_rl_1, the_function_rl_2]:
+        for fct in [the_function_rl_1, the_function_rl_2]:
             request.QUERY_PARAMS = {}
-            response = function(1, request)
+            response = fct(1, request)
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(output_values['kwargs']['hints']['full'], function.__name__ == 'the_function_rl_2')
+            self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
             self.assertEqual(len(response.data), len(data_list_machines))
-            if function.__name__ == 'the_function_rl_2':
+            if fct.__name__ == 'the_function_rl_2':
                 self.assertListEqual(response.data['data'], [guid_table['aa']['bb'],
                                                              guid_table['aa']['cc'],
                                                              guid_table['bb']['aa'],
                                                              guid_table['bb']['dd']])
             request.QUERY_PARAMS['sort'] = 'name,-description'
-            response = function(2, request)
+            response = fct(2, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_machines))
@@ -469,7 +469,7 @@ class Decorators(unittest.TestCase):
                                                          guid_table['bb']['dd'],
                                                          guid_table['bb']['aa']])
             request.QUERY_PARAMS['sort'] = '-name,-description'
-            response = function(3, request)
+            response = fct(3, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_machines))
@@ -478,7 +478,7 @@ class Decorators(unittest.TestCase):
                                                          guid_table['aa']['cc'],
                                                          guid_table['aa']['bb']])
             request.QUERY_PARAMS['sort'] = 'description,name'
-            response = function(4, request)
+            response = fct(4, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_machines))
@@ -487,11 +487,11 @@ class Decorators(unittest.TestCase):
                                                          guid_table['aa']['cc'],
                                                          guid_table['bb']['dd']])
             request.QUERY_PARAMS['contents'] = ''
-            response = function(5, request)
+            response = fct(5, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_machines))
-            if function.__name__ == 'the_function_rl_1':
+            if fct.__name__ == 'the_function_rl_1':
                 self.assertIsInstance(response.data['data']['instance'], DataList)
                 self.assertIsInstance(response.data['data']['instance'][0], TestMachine)
                 self.assertIn(response.data['data']['instance'][0].name, ['aa', 'bb'])
