@@ -126,25 +126,16 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VDisk)
-    def set_config_params(self, vdisk, new_config_params, version):
+    def set_config_params(self, vdisk, new_config_params):
         """
         Sets configuration parameters to a given vdisk.
         :param vdisk: Guid of the virtual disk to configure
         :type vdisk: VDisk
         :param new_config_params: Configuration settings for the virtual disk
         :type new_config_params: dict
-        :param version: Client version
-        :type version: int
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
-        if version == 1 and 'dtl_target' in new_config_params:
-            storage_router = StorageRouterList.get_by_ip(new_config_params['dtl_target'])
-            if storage_router is None:
-                raise HttpNotAcceptableException(error='invalid_version',
-                                                 error_description='API version 1 requires a Storage Router IP')
-            new_config_params['dtl_target'] = [junction.domain_guid for junction in storage_router.domains]
-
         new_config_params.pop('dedupe_mode', None)
         new_config_params.pop('cache_strategy', None)
         new_config_params.pop('readcache_limit', None)

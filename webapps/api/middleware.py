@@ -61,7 +61,6 @@ class OVSMiddleware(object):
         Processes requests
         """
         _ = self
-        start = time.time()
         # Processes CORS preflight requests
         if request.method == 'OPTIONS' and 'HTTP_ACCESS_CONTROL_REQUEST_METHOD' in request.META:
             return HttpResponse()
@@ -70,12 +69,11 @@ class OVSMiddleware(object):
         regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
         if path != '/api/' and '/api/oauth2/' not in path and '/swagger.json' not in path:
             if 'HTTP_ACCEPT' not in request.META or regex.match(request.META['HTTP_ACCEPT']) is None:
-                return OVSResponse(
+                return HttpResponse(
                     json.dumps({'error': 'missing_header',
                                 'error_description': "The version required by the client should be added to the Accept header. E.g.: 'Accept: application/json; version=1'"}),
                     status=406,
-                    content_type='application/json',
-                    timings={'total': [time.time() - start, 'Total']}
+                    content_type='application/json'
                 )
         request._entry_time = time.time()
         return None
@@ -88,6 +86,7 @@ class OVSMiddleware(object):
         # Timings
         if isinstance(response, OVSResponse):
             if hasattr(request, '_entry_time'):
+                # noinspection PyProtectedMember
                 response.timings['total'] = [time.time() - request._entry_time, 'Total']
             response.build_timings()
         # Process CORS responses
@@ -104,7 +103,7 @@ class OVSMiddleware(object):
     @staticmethod
     def is_own_httpexception(exception):
         """
-        This is some sad, sad code and the only known workaround to ceck whether the given exception
+        This is some sad, sad code and the only known workaround to check whether the given exception
         is an instance of one of our own exceptions. No, isinstance doesn't work as it somehow is convinced
         that the same classes imported from relatively a different path are in fact different classes.
         """

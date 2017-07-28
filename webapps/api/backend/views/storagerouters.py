@@ -240,32 +240,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read'])
     @return_task()
-    @load(StorageRouter, max_version=5)
-    def check_s3(self, host, port, accesskey, secretkey):
-        """
-        Validates whether connection to a given S3 backend can be made
-        :param host: The host of an S3 endpoint
-        :type host: str
-        :param port: The port of an S3 endpoint
-        :type port: int
-        :param accesskey: The accesskey to be used when validating the S3 endpoint
-        :type accesskey: str
-        :param secretkey: The secretkey to be used when validating the S3 endpoint
-        :type secretkey: str
-        """
-        parameters = {'host': host,
-                      'port': port,
-                      'accesskey': accesskey,
-                      'secretkey': secretkey}
-        for field in parameters:
-            if not isinstance(parameters[field], int):
-                parameters[field] = str(parameters[field])
-        return StorageRouterController.check_s3.delay(**parameters)
-
-    @action()
-    @log()
-    @required_roles(['read'])
-    @return_task()
     @load(StorageRouter)
     def check_mtpt(self, storagerouter, name):
         """
@@ -282,75 +256,18 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def add_vpool(self, storagerouter, call_parameters, version, local_storagerouter, request):
+    def add_vpool(self, call_parameters, local_storagerouter, request):
         """
         Adds a vPool to a given Storage Router
-        :param storagerouter: StorageRouter to add the vPool to
-        :type storagerouter: StorageRouter
         :param call_parameters: A complex (JSON encoded) dictionary containing all various parameters to create the vPool
         :type call_parameters: dict
-        :param version: Client version
-        :type version: int
         :param local_storagerouter: StorageRouter on which the call is executed
         :type local_storagerouter: StorageRouter
         :param request: The raw request
         :type request: Request
         """
-        def _validate_required_keys(section):
-            for required_key in ['host', 'backend']:
-                if required_key not in call_parameters[section]:
-                    raise HttpNotAcceptableException(error='invalid_data',
-                                                     error_description='Invalid data passed: "{0}" misses information about {1}'.format(section, required_key))
-            for sub_required_key in ['backend', 'metadata']:
-                if sub_required_key not in call_parameters[section]['backend']:
-                    raise HttpNotAcceptableException(error='invalid_data',
-                                                     error_description='Invalid data passed: "{0}" missing information about {1}'.format(section, sub_required_key))
-
         # API backwards compatibility
-        if version <= 2:
-            call_parameters['storagerouter_ip'] = storagerouter.ip
-            call_parameters['fragment_cache_on_read'] = True
-            call_parameters['fragment_cache_on_write'] = False
-            call_parameters['backend_connection_info'] = {'host': call_parameters.pop('connection_host'),
-                                                          'port': call_parameters.pop('connection_port'),
-                                                          'username': call_parameters.pop('connection_username'),
-                                                          'password': call_parameters.pop('connection_password')}
-            if 'connection_backend' in call_parameters:
-                connection_backend = call_parameters.pop('connection_backend')
-                call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
-                                                                         'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
-        if version < 6:
-            if 'backend_connection_info' not in call_parameters:
-                raise HttpNotAcceptableException(error='invalid_data',
-                                                 error_description='Invalid data passed: "backend_connection_info" should be passed')
-            _validate_required_keys(section='backend_connection_info')
-            if 'backend_info' not in call_parameters:
-                call_parameters['backend_info'] = {}
-            if 'connection_info' not in call_parameters:
-                call_parameters['connection_info'] = {}
-            call_parameters['backend_info']['preset'] = call_parameters['backend_connection_info']['backend']['metadata']
-            call_parameters['backend_info']['alba_backend_guid'] = call_parameters['backend_connection_info']['backend']['backend']
-            call_parameters['connection_info']['host'] = call_parameters['backend_connection_info']['host']
-            call_parameters['connection_info']['port'] = call_parameters['backend_connection_info'].get('port', '')
-            call_parameters['connection_info']['client_id'] = call_parameters['backend_connection_info'].get('username', '')
-            call_parameters['connection_info']['client_secret'] = call_parameters['backend_connection_info'].get('password', '')
-            del call_parameters['backend_connection_info']
-
-            if 'backend_connection_info_aa' in call_parameters:
-                if 'backend_info_fc' not in call_parameters:
-                    call_parameters['backend_info_fc'] = {}
-                if 'connection_info_fc' not in call_parameters:
-                    call_parameters['connection_info_fc'] = {}
-                _validate_required_keys(section='backend_connection_info_aa')
-                call_parameters['backend_info_fc']['preset'] = call_parameters['backend_connection_info_aa']['backend']['metadata']
-                call_parameters['backend_info_fc']['alba_backend_guid'] = call_parameters['backend_connection_info_aa']['backend']['backend']
-                call_parameters['connection_info_fc']['host'] = call_parameters['backend_connection_info_aa']['host']
-                call_parameters['connection_info_fc']['port'] = call_parameters['backend_connection_info_aa'].get('port', '')
-                call_parameters['connection_info_fc']['client_id'] = call_parameters['backend_connection_info_aa'].get('username', '')
-                call_parameters['connection_info_fc']['client_secret'] = call_parameters['backend_connection_info_aa'].get('password', '')
-                del call_parameters['backend_connection_info_aa']
-
-        if version >= 6 and 'backend_connection_info' in call_parameters:
+        if 'backend_connection_info' in call_parameters:
             raise HttpNotAcceptableException(error='invalid_data',
                                              error_description='Invalid data passed: "backend_connection_info" is deprecated')
 
