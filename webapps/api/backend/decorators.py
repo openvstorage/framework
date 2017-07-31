@@ -35,7 +35,8 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException, HttpUnauthorizedException
+from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException,\
+    HttpTooManyRequestsException, HttpUnauthorizedException, HttpUpgradeNeededException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
@@ -96,6 +97,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
     """
     Parameter discovery decorator
     """
+    logger = LogHandler.get('api')
+
     regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
     def wrap(f):
@@ -164,7 +167,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 version = versions[1]
             version = int(version)
             if version < versions[0] or version > versions[1]:
-                raise HttpNotAcceptableException(error='invalid_version',
+                logger.warning('API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version))
+                raise HttpUpgradeNeededException(error='invalid_version',
                                                  error_description='API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version))
             # Load some information
             instance = None
