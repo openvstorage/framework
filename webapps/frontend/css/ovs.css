@@ -227,3 +227,17 @@ code {
 .table-hover-tbodies > tbody:hover{
     background-color:#f5f5f5
 }
+
+.notification-message * {
+    color: #d71c16;
+    font-size: 0.9em;
+}
+
+.notification-message a {
+    text-decoration: underline;
+}
+
+.notification-message a:hover,
+.notification-message a:focus {
+    color: #d71c16;
+}
