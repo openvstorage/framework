@@ -98,7 +98,6 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
     Parameter discovery decorator
     """
     logger = LogHandler.get('api')
-
     regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
     def wrap(f):

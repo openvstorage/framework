@@ -67,7 +67,7 @@ class MetadataView(View):
             try:
                 data['release']['name'] = System.get_release_name()
             except:
-                MetadataView._logger.exception('Could not load releasename')
+                MetadataView._logger.exception('Could not load release name')
 
             # Gather plugin metadata
             plugins = {}
@@ -178,6 +178,7 @@ def relay(*args, **kwargs):
         return _relay(*args, **kwargs)
     except Exception as ex:
         if OVSMiddleware.is_own_httpexception(ex):
+            # noinspection PyUnresolvedReferences
             return HttpResponse(ex.data,
                                 status=ex.status_code,
                                 content_type='application/json')

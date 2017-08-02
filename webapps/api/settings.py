@@ -34,6 +34,9 @@ BASE_WWW_DIR = os.path.dirname(__file__)
 
 BASE_FOLDER = '/opt/OpenvStorage/webapps/{0}'.format(APP_NAME)
 VERSION = (6, 7, 8, 9)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
+# WARNING: When removing oldest version(s) 
+#     All occurrences of OVSClient need to be checked whether POST data changes are required
+#     Bump the version to newest lowest version for each OVSClient
 # 2016-02-12: * Introduced version 2
 # 2016-04-13: * Introduced version 3
 # 2016-06-23: * Introduced version 4
