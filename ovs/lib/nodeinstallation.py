@@ -128,9 +128,6 @@ class NodeInstallationController(object):
                 if execute_rollback is False:  # Only overrule cmdline if setting was not passed
                     execute_rollback = config.get('rollback', False)
 
-            if logging_target is not None:
-                LogHandler.defaults['logging_target'] = logging_target
-
             # Support resume setup - store entered parameters so when retrying, we have the values
             resume_config = {}
             resume_config_file = '/opt/OpenvStorage/config/openvstorage_resumeconfig.json'

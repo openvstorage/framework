@@ -23,7 +23,7 @@ import json
 import random
 import string
 # noinspection PyUnresolvedReferences
-from ovs_extensions.generic.configuration import NotFoundException, ConnectionException, Configuration as _Configuration
+from ovs_extensions.generic.configuration import Configuration as _Configuration, ConnectionException, NotFoundException
 
 
 class Configuration(_Configuration):
