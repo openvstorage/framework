@@ -5,6 +5,6 @@
     "source_contents": "--transform 's,^,{0}-{1}/,' scripts/install scripts/system config ovs webapps *.txt",
     "version": {
         "major": 2,
-        "minor": 9
+        "minor": 10
     }
 }
