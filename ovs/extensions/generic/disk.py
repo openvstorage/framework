@@ -24,7 +24,7 @@ class DiskTools(_DiskTools):
     """
     This class contains various helper methods wrt Disk maintenance
     """
-    
+
     @classmethod
     def _get_os_manager(cls):
         return OSFactory.get_manager()
