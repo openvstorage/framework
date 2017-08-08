@@ -421,15 +421,25 @@ class Schedule(object):
 
     def generate_schedule(self, name):
         """
-        Generate a schedule
-        :param name: Name to generate
+        Generate a schedule for a Celery task
+        :param name: Name of the Celery task to generate a schedule for
+        :type name: str
         :return: Crontab and additional information about scheduling
+        :rtype: tuple
         """
+        Schedule._logger.debug('Generating schedule for {0}'.format(name))
+        schedule_key = '/ovs/framework/scheduling/celery'
         try:
-            schedules = Configuration.get('/ovs/framework/scheduling/celery', default={})
-        except Exception as ex:
-            Schedule._logger.error('Error loading celery scheduling configuration for {0}: {1}'.format(name, ex))
+            schedules = Configuration.get(key=schedule_key, default={})
+        except Exception:
+            Schedule._logger.exception('Error loading celery scheduling configuration for {0}'.format(name))
             schedules = {}
+
+        if schedules in ['', None]:  # Can occur when key has once been set and afterwards been emptied
+            schedules = {}
+        if not isinstance(schedules, dict):
+            raise ValueError('Value for key "{0}" should be a dictionary'.format(schedule_key))
+
         if name in schedules:
             schedule = schedules[name]
             if schedule is None:
@@ -438,8 +448,11 @@ class Schedule(object):
         else:
             schedule = self.kwargs
             source = 'scheduled from code'
+
+        schedule_msg = ', '.join(['{0}="{1}"'.format(key, value) for key, value in schedule.iteritems()])
+        Schedule._logger.debug('Generated schedule for {0}: {1}'.format(name, schedule_msg))
         try:
-            return crontab(**schedule), '{0}: {1}'.format(source, ', '.join(['{0}="{1}"'.format(key, value) for key, value in schedule.iteritems()]))
-        except Exception as ex:
-            Schedule._logger.error('Could not generate crontab for {0} with data {1} {2}: {3}'.format(name, schedule, source, ex))
-            return None, 'error in configuration'
+            return crontab(**schedule), '{0}: {1}'.format(source, schedule_msg)
+        except TypeError:
+            Schedule._logger.error('Invalid crontab schedule specified for task name {0}. Schedule: {1}'.format(name, schedule_msg))
+            raise

@@ -27,10 +27,10 @@ import unittest
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
+from ovs_extensions.log.log_handler import LogHandler
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import DTLConfig
 from ovs.lib.vdisk import VDiskController
-from ovs.log.log_handler import LogHandler
 
 
 class VDiskTest(unittest.TestCase):

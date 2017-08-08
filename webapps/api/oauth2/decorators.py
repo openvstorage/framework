@@ -24,9 +24,9 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.http import HttpResponse
 from functools import wraps
 from rest_framework.request import Request
-from api.oauth2.exceptions import HttpForbiddenException, HttpTooManyRequestsException
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs_extensions.api.exceptions import HttpForbiddenException, HttpTooManyRequestsException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
 
 
@@ -181,8 +181,8 @@ def authenticated():
             request = _find_request(args)
             user = authenticate(request=request, native_django=True)
             if user is None:
-                raise HttpForbiddenException(error_description='Authentication credentials were not provided.',
-                                             error='not_authenticated')
+                raise HttpForbiddenException(error='missing_credentials',
+                                             error_description='Authentication credentials were not provided.')
             login(request, user)
             return f(*args, **kwargs)
 

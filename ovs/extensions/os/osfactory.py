@@ -27,6 +27,9 @@ class OSFactory(_OSFactory):
     Factory class returning specialized classes
     """
 
+    def __init__(self):
+        raise RuntimeError('Cannot be instantiated, please use OSFactory.get_manager() instead')
+
     @classmethod
     def _get_configuration(cls):
         return Configuration

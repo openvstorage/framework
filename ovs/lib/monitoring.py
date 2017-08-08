@@ -38,7 +38,7 @@ class MonitoringController(object):
     @staticmethod
     def test_ssh_connectivity():
         """
-        Validates whether all nodes can SSH into eachother
+        Validates whether all nodes can SSH into each other
         """
         MonitoringController._logger.info('Starting SSH connectivity test...')
         ips = [sr.ip for sr in StorageRouterList.get_storagerouters()]
@@ -89,7 +89,7 @@ class MonitoringController(object):
                     ovs_client = OVSClient(ip=alba_backend_host,
                                            port=connection_info['port'],
                                            credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                           version=2,
+                                           version=6,
                                            cache_store=VolatileFactory.get_client())
                     try:
                         alba_guid_size_map[alba_backend_guid] = {'name': alba_backend_name,

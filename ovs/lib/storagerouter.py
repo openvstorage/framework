@@ -17,6 +17,7 @@
 """
 StorageRouter module
 """
+
 import os
 import copy
 import json
@@ -45,6 +46,7 @@ from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -99,8 +101,6 @@ class StorageRouterController(object):
         """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter)
-        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", allow_insecure=True).strip().splitlines()
-        ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses if ipaddr.strip() != '127.0.0.1']
         services_mds = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER).services
         services_arakoon = [service for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services if service.name != 'arakoon-ovsdb' and service.is_internal is True]
 
@@ -153,7 +153,7 @@ class StorageRouterController(object):
                                              'in_use': in_use,
                                              'usable': True,  # Sizes smaller than 1GiB and smaller than 5% of largest WRITE partition will be un-usable
                                              'available': available if available > 0 else 0,
-                                             'mountpoint': disk_partition.folder,  # Equals to mountpoint unless mountpoint is root ('/'), then we pre-pend mountpoint with '/mnt/storage'
+                                             'mountpoint': disk_partition.folder,  # Equals to mount point unless mount point is root ('/'), then we pre-pend mount point with '/mnt/storage'
                                              'storagerouter_guid': storagerouter_guid})
 
         # Strip out WRITE caches which are smaller than 5% of largest write cache size and smaller than 1GiB
@@ -166,7 +166,7 @@ class StorageRouterController(object):
                 partitions[DiskPartition.ROLES.WRITE][index]['usable'] = False
 
         return {'partitions': partitions,
-                'ipaddresses': ipaddresses,
+                'ipaddresses': OSFactory.get_manager().get_ip_addresses(client=client),
                 'scrub_available': StorageRouterController._check_scrub_partition_present()}
 
     @staticmethod
@@ -308,20 +308,20 @@ class StorageRouterController(object):
         partitions_mutex = volatile_mutex('add_vpool_partitions_{0}'.format(storagerouter.guid))
         try:
             partitions_mutex.acquire(wait=60)
-            # Check mountpoint
+            # Check mount point
             metadata = StorageRouterController.get_metadata(storagerouter.guid)
             error_messages = []
             partition_info = metadata['partitions']
             if StorageRouterController.mountpoint_exists(name=vpool_name, storagerouter_guid=storagerouter.guid):
-                error_messages.append('The mountpoint for vPool {0} already exists'.format(vpool_name))
+                error_messages.append('The mount point for vPool {0} already exists'.format(vpool_name))
 
-            # Check mountpoints are mounted
+            # Check mount points are mounted
             for role, part_info in partition_info.iteritems():
                 if role not in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]:
                     continue
                 for part in part_info:
                     if not client.is_mounted(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
-                        error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
+                        error_messages.append('Mount point {0} is not mounted'.format(part['mountpoint']))
 
             # Check required roles
             if metadata['scrub_available'] is False:
@@ -360,7 +360,6 @@ class StorageRouterController(object):
             if new_vpool is False and alba_backend_guid != vpool.metadata['backend']['backend_info']['alba_backend_guid']:
                 error_messages.append('Incorrect ALBA Backend guid specified')
 
-            backend_dict_fc = None
             if use_fragment_cache_backend is True:
                 if 'connection_info_fc' not in parameters:
                     error_messages.append('Missing the connection information for the Fragment Cache Backend')
@@ -373,16 +372,6 @@ class StorageRouterController(object):
                                                                                                       'client_id': (str, None),
                                                                                                       'client_secret': (str, None),
                                                                                                       'local': (bool, None, False)})})
-                        # Check cache quota is large enough for at least 10 vDisks
-                        cache_quota = parameters.get('cache_quota_fc')
-                        if cache_quota is not None:
-                            ovs_client = OVSClient(ip=connection_info_fc['host'],
-                                                   port=connection_info_fc['port'],
-                                                   credentials=(connection_info_fc['client_id'],
-                                                                connection_info_fc['client_secret']),
-                                                   version=2,
-                                                   cache_store=VolatileFactory.get_client())
-                            backend_dict_fc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_fc), params={'contents': 'name,usages'})
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
             if use_block_cache_backend is True:
@@ -397,19 +386,6 @@ class StorageRouterController(object):
                                                                                                       'client_id': (str, None),
                                                                                                       'client_secret': (str, None),
                                                                                                       'local': (bool, None, False)})})
-                        # Check cache quota is large enough for at least 10 vDisks
-                        cache_quota = parameters.get('cache_quota_bc')
-                        if cache_quota is not None:
-                            if backend_dict_fc is not None and alba_backend_guid_bc == alba_backend_guid_fc:
-                                backend_dict_bc = copy.deepcopy(backend_dict_fc)
-                            else:
-                                ovs_client = OVSClient(ip=connection_info_bc['host'],
-                                                       port=connection_info_bc['port'],
-                                                       credentials=(connection_info_bc['client_id'],
-                                                                    connection_info_bc['client_secret']),
-                                                       version=2,
-                                                       cache_store=VolatileFactory.get_client())
-                                backend_dict_bc = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid_bc), params={'contents': 'name,usages'})
                     except RuntimeError as rte:
                         error_messages.append(rte.message)
 
@@ -508,7 +484,7 @@ class StorageRouterController(object):
                 ovs_client = OVSClient(ip=metadata['connection_info']['host'],
                                        port=metadata['connection_info']['port'],
                                        credentials=(metadata['connection_info']['client_id'], metadata['connection_info']['client_secret']),
-                                       version=2,
+                                       version=6,
                                        cache_store=VolatileFactory.get_client())
                 preset_name = metadata['backend_info']['preset']
                 alba_backend_guid = metadata['backend_info']['alba_backend_guid']
@@ -599,9 +575,9 @@ class StorageRouterController(object):
 
             # StorageDriver Partitions
             # * Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
-            # * Once the free space on a mountpoint is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
+            # * Once the free space on a mount point is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
             # * make sure that <backoff_gap> free space is available => backoff_gap must be <= size of the partition
-            # * Both backoff_gap and trigger_gap apply to each mountpoint individually, but cannot be configured on a per mountpoint base
+            # * Both backoff_gap and trigger_gap apply to each mount point individually, but cannot be configured on a per mount point base
 
             # Assign WRITE / Fragment cache
             frag_size = None
@@ -1069,7 +1045,7 @@ class StorageRouterController(object):
                 if sr == storage_router:
                     mtpt_pids = temp_client.run("lsof -t +D '/mnt/{0}' || true".format(vpool.name.replace(r"'", r"'\''")), allow_insecure=True).splitlines()
                     if len(mtpt_pids) > 0:
-                        raise RuntimeError('vPool cannot be deleted. Following processes keep the vPool mountpoint occupied: {0}'.format(', '.join(mtpt_pids)))
+                        raise RuntimeError('vPool cannot be deleted. Following processes keep the vPool mount point occupied: {0}'.format(', '.join(mtpt_pids)))
                 with remote(temp_client.ip, [LocalStorageRouterClient]) as rem:
                     sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
                     if Configuration.exists(sd_key) is True:
@@ -1263,7 +1239,7 @@ class StorageRouterController(object):
                     if dir_name and client.dir_exists(dir_name) and dir_name not in mountpoints and dir_name != '/':
                         client.dir_delete(dir_name)
             except Exception:
-                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Failed to retrieve mountpoint information or delete directories'.format(storage_driver.guid))
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Failed to retrieve mount point information or delete directories'.format(storage_driver.guid))
                 StorageRouterController._logger.warning('Remove Storage Driver - Guid {0} - Following directories should be checked why deletion is prevented: {1}'.format(storage_driver.guid, ', '.join(dirs_to_remove)))
                 errors_found = True
 
@@ -1482,7 +1458,7 @@ class StorageRouterController(object):
                     ovs_client = OVSClient(ip=connection_info['host'],
                                            port=connection_info['port'],
                                            credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                           version=2)
+                                           version=6)
                     arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid,
                                                                                            ovs_client=ovs_client)
                     arakoons[ctype] = ArakoonClusterConfig.convert_config_to(arakoon_config, return_type='INI')
@@ -1589,12 +1565,12 @@ class StorageRouterController(object):
     @ovs_task(name='ovs.storagerouter.mountpoint_exists')
     def mountpoint_exists(name, storagerouter_guid):
         """
-        Checks whether a given mountpoint for a vPool exists
-        :param name: Name of the mountpoint to check
+        Checks whether a given mount point for a vPool exists
+        :param name: Name of the mount point to check
         :type name: str
-        :param storagerouter_guid: Guid of the StorageRouter on which to check for mountpoint existence
+        :param storagerouter_guid: Guid of the StorageRouter on which to check for mount point existence
         :type storagerouter_guid: str
-        :return: True if mountpoint not in use else False
+        :return: True if mount point not in use else False
         :rtype: bool
         """
         client = SSHClient(StorageRouter(storagerouter_guid))
@@ -1726,7 +1702,7 @@ class StorageRouterController(object):
 
         # Mount the partition and add to FSTab
         if partition.mountpoint is None:
-            StorageRouterController._logger.debug('Configuring mountpoint')
+            StorageRouterController._logger.debug('Configuring mount point')
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
                 counter = 1
                 mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
@@ -1735,7 +1711,7 @@ class StorageRouterController(object):
                         break
                     counter += 1
                     mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
-                StorageRouterController._logger.debug('Found mountpoint: {0}'.format(mountpoint))
+                StorageRouterController._logger.debug('Found mount point: {0}'.format(mountpoint))
                 rem.DiskTools.add_fstab(partition_aliases=partition.aliases,
                                         mountpoint=mountpoint,
                                         filesystem=partition.filesystem)
@@ -1743,8 +1719,8 @@ class StorageRouterController(object):
             DiskController.sync_with_reality(storagerouter_guid)
             partition = DiskPartition(partition.guid)
             if partition.mountpoint != mountpoint:
-                raise RuntimeError('Unexpected mountpoint')
-            StorageRouterController._logger.debug('Mountpoint configured')
+                raise RuntimeError('Unexpected mount point')
+            StorageRouterController._logger.debug('Mount point configured')
         partition.roles = roles
         partition.save()
         StorageRouterController._logger.debug('Partition configured')
@@ -1765,9 +1741,9 @@ class StorageRouterController(object):
     @staticmethod
     def _get_mountpoints(client):
         """
-        Retrieve the mountpoints
-        :param client: SSHClient to retrieve the mountpoints on
-        :return: List of mountpoints
+        Retrieve the mount points
+        :param client: SSHClient to retrieve the mount points on
+        :return: List of mount points
         """
         mountpoints = []
         for mountpoint in client.run(['mount', '-v']).strip().splitlines():

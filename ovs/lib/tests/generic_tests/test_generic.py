@@ -31,11 +31,11 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs_extensions.generic.threadhelpers import Waiter
+from ovs_extensions.log.log_handler import LogHandler
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.vdisk import VDiskController
-from ovs.log.log_handler import LogHandler
 
 
 class Generic(unittest.TestCase):

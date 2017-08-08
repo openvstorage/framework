@@ -22,7 +22,6 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import return_object, return_list, load, required_roles, log, return_simple
-from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from api.backend.toolbox import ApiToolbox
 from ovs.dal.lists.backendlist import BackendList
@@ -34,6 +33,7 @@ from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.j_backendclient import BackendClient
 from ovs.dal.hybrids.j_backenddomain import BackendDomain
 from ovs.dal.hybrids.j_backenduser import BackendUser
+from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException
 from ovs.lib.generic import GenericController
 
 
@@ -105,8 +105,8 @@ class BackendViewSet(viewsets.ViewSet):
         if duplicate is None:
             backend.save()
             return backend
-        raise HttpNotAcceptableException(error_description='Backend with this name already exists',
-                                         error='duplicate')
+        raise HttpNotAcceptableException(error='duplicate',
+                                         error_description='Backend with this name already exists')
 
     @action()
     @log()

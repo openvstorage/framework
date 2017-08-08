@@ -21,7 +21,6 @@ import os
 import copy
 import json
 import time
-import uuid
 from datetime import datetime, timedelta
 from Queue import Empty, Queue
 from threading import Thread
@@ -351,7 +350,7 @@ class GenericController(object):
                             for work_unit in work_units:
                                 res = locked_client.scrub(work_unit=work_unit,
                                                           scratch_dir=scrub_dir,
-                                                          log_sinks=[LogHandler.get_sink_path('scrubber_{0}'.format(vpool.name), allow_override=True, forced_target_type='file')],
+                                                          log_sinks=[LogHandler.get_sink_path('scrubber_{0}'.format(vpool.name), allow_override=True, forced_target_type=LogHandler.TARGET_TYPE_FILE)],
                                                           backend_config=Configuration.get_configuration_path(backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                             if work_units:

@@ -20,15 +20,15 @@ Module for clients
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
-from api.backend.serializers.serializers import FullSerializer
 from api.backend.decorators import required_roles, return_object, return_list, load, log, return_simple
+from api.backend.serializers.serializers import FullSerializer
 from api.backend.toolbox import ApiToolbox
 from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.lists.clientlist import ClientList
+from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException
 
 
 class ClientViewSet(viewsets.ViewSet):

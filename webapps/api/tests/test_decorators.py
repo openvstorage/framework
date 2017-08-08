@@ -22,11 +22,14 @@ import time
 import uuid
 import hashlib
 import unittest
+from django.conf import settings
 from django.http import HttpResponse
-from api.backend.exceptions import HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException, HttpUnauthorizedException, HttpForbiddenException
+from django.test import RequestFactory
+from api.backend.decorators import limit, required_roles, return_list, return_object, return_task
 # noinspection PyUnresolvedReferences
 from api.backend.toolbox import ApiToolbox  # Required for the tests
 from api.oauth2.toolbox import OAuth2Toolbox
+from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
@@ -37,12 +40,17 @@ from ovs.dal.hybrids.user import User
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.tests.helpers import DalHelper
+from ovs_extensions.api.exceptions import \
+    HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException,\
+    HttpTooManyRequestsException, HttpUnauthorizedException, HttpUpgradeNeededException
 
 
 class Decorators(unittest.TestCase):
     """
     The decorators test suite will validate all backend decorators
     """
+    original_versions = None
+
     @classmethod
     def setUpClass(cls):
         """
@@ -145,9 +153,8 @@ class Decorators(unittest.TestCase):
                         roleclient.role = role
                         roleclient.save()
 
-        from django.conf import settings
+        cls.original_versions = settings.VERSION
         settings.VERSION = (1, 2, 3)
-        from django.test import RequestFactory
         cls.factory = RequestFactory()
 
     @classmethod
@@ -156,13 +163,12 @@ class Decorators(unittest.TestCase):
         Clean up the unittest
         """
         DalHelper.teardown(fake_sleep=True)
+        settings.VERSION = cls.original_versions
 
     def test_ratelimit(self):
         """
         Validates whether the rate limiter behaves correctly
         """
-        from api.backend.decorators import limit
-
         @limit(amount=2, per=2, timeout=2)
         def the_function(input_value, *args, **kwargs):
             """
@@ -204,8 +210,6 @@ class Decorators(unittest.TestCase):
         """
         Validates whether the required_roles decorator works
         """
-        from api.backend.decorators import required_roles
-
         @required_roles(['read', 'write', 'manage'])
         def the_function_rr(input_value, *args, **kwargs):
             """
@@ -258,9 +262,11 @@ class Decorators(unittest.TestCase):
         """
         Validates whether the load decorator works
         """
-        from api.backend.decorators import load
+        from api.backend import decorators
+        # Reload this module, because the 'load' decorator gets loaded with default min_version and max_version of 6 and 9 (currently) and in this test we overrule these versions with 1 and 3
+        reload(decorators)
 
-        @load(User, min_version=2, max_version=2)
+        @decorators.load(User, min_version=2, max_version=2)
         def the_function_tl_1(input_value, request, user, version, mandatory, optional='default'):
             """
             Decorated function
@@ -272,7 +278,7 @@ class Decorators(unittest.TestCase):
                                'user': user}
             return HttpResponse(json.dumps(input_value))
 
-        @load(User)
+        @decorators.load(User)
         def the_function_tl_2(input_value, request, user, pk, version):
             """
             Decorated function
@@ -287,9 +293,9 @@ class Decorators(unittest.TestCase):
         output = {'value': None}
         user = UserList.get_user_by_username('user')
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
-        with self.assertRaises(HttpNotAcceptableException) as context:
+        with self.assertRaises(HttpUpgradeNeededException) as context:
             the_function_tl_1(1, request)
-        self.assertEqual(context.exception.status_code, 406)
+        self.assertEqual(context.exception.status_code, 426)
         self.assertEqual(context.exception.error, 'invalid_version')
         self.assertEqual(context.exception.error_description, 'API version requirements: {0} <= <version> <= {1}. Got {2}'.format(2, 2, 1))
 
@@ -352,8 +358,6 @@ class Decorators(unittest.TestCase):
         """
         Validates whether the return_task decorator will return a task ID
         """
-        from api.backend.decorators import return_task
-
         @return_task()
         def the_function_rt(input_value, *args, **kwargs):
             """
@@ -372,8 +376,6 @@ class Decorators(unittest.TestCase):
         Validates whether the return_object decorator works:
         * Parses the 'contents' parameter, and passes it into the serializer
         """
-        from api.backend.decorators import return_object
-
         @return_object(User)
         def the_function_ro(input_value, *args, **kwargs):
             """
@@ -412,9 +414,6 @@ class Decorators(unittest.TestCase):
           * If contents are specified: Runs the list trough the serializer
           * Else, return the guid list
         """
-        from api.backend.decorators import return_list
-        from ovs.dal.datalist import DataList
-
         @return_list(TestMachine)
         def the_function_rl_1(*args, **kwargs):
             """

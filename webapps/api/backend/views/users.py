@@ -25,13 +25,13 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, load, return_object, return_list, log, return_simple
-from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from api.backend.toolbox import ApiToolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.hybrids.user import User
 from ovs.dal.lists.userlist import UserList
+from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException
 
 
 class UserViewSet(viewsets.ViewSet):
@@ -87,8 +87,8 @@ class UserViewSet(viewsets.ViewSet):
         serializer = FullSerializer(User, instance=User(), data=request.DATA, allow_passwords=True)
         user = serializer.deserialize()
         if UserList.get_user_by_username(user.username) is not None:
-            raise HttpNotAcceptableException(error_description='User with this username already exists',
-                                             error='duplicate')
+            raise HttpNotAcceptableException(error='duplicate',
+                                             error_description='User with this username already exists')
         user.save()
         pw_client = Client()
         pw_client.ovs_type = 'INTERNAL'
