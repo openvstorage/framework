@@ -34,11 +34,11 @@ class LogHandler(_LogHandler):
 
     LOG_PATH = '/var/log/ovs'
 
-    def __init__(self, source, name, propagate):
+    def __init__(self, source, name, propagate, target_type):
         """
         Dummy init method
         """
-        _ = self, source, name, propagate
+        _ = self, source, name, propagate, target_type
         parent_invoker = inspect.stack()[1]
         if not __file__.startswith(parent_invoker[1]) or parent_invoker[3] != 'get':
             raise RuntimeError('Cannot invoke instance from outside this class. Please use LogHandler.get(source, name=None) instead')

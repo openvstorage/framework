@@ -20,9 +20,10 @@ Django settings module
 import os
 from subprocess import check_output
 from ovs.extensions.generic.system import System
+from ovs.extensions.os.osfactory import OSFactory
 from django.conf.global_settings import TEMPLATE_CONTEXT_PROCESSORS
 
-IPADDRESSES = [ip.strip() for ip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
+IPADDRESSES = OSFactory.get_manager().get_ip_addresses(remove_local_host_ips=False)
 
 DEBUG = False
 TEMPLATE_DEBUG = DEBUG
@@ -34,7 +35,7 @@ BASE_WWW_DIR = os.path.dirname(__file__)
 
 BASE_FOLDER = '/opt/OpenvStorage/webapps/{0}'.format(APP_NAME)
 VERSION = (6, 7, 8, 9)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
-# WARNING: When removing oldest version(s) 
+# WARNING: When removing oldest version(s)
 #     All occurrences of OVSClient need to be checked whether POST data changes are required
 #     Bump the version to newest lowest version for each OVSClient
 # 2016-02-12: * Introduced version 2

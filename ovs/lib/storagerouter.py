@@ -17,6 +17,7 @@
 """
 StorageRouter module
 """
+
 import os
 import copy
 import json
@@ -45,6 +46,7 @@ from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -99,8 +101,6 @@ class StorageRouterController(object):
         """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter)
-        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", allow_insecure=True).strip().splitlines()
-        ipaddresses = [found_ip.strip() for found_ip in ipaddresses if not found_ip.strip().startswith('127.')]
         services_mds = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER).services
         services_arakoon = [service for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services if service.name != 'arakoon-ovsdb' and service.is_internal is True]
 
@@ -166,7 +166,7 @@ class StorageRouterController(object):
                 partitions[DiskPartition.ROLES.WRITE][index]['usable'] = False
 
         return {'partitions': partitions,
-                'ipaddresses': ipaddresses,
+                'ipaddresses': OSFactory.get_manager().get_ip_addresses(client=client),
                 'scrub_available': StorageRouterController._check_scrub_partition_present()}
 
     @staticmethod

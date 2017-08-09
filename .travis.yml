@@ -10,7 +10,7 @@ before_install:
 - sudo echo "deb http://apt.openvstorage.org `python scripts/travis/repo.py` main" | sudo tee -a /etc/apt/sources.list
 - sudo rm -rf /var/lib/apt/lists/*
 - sudo apt-get -qq update
-- sudo apt-get install -y --force-yes openvstorage
+- sudo apt-get install -y --force-yes openvstorage openvstorage-extensions
 before_script:
 - sudo rm -rf /opt/OpenvStorage
 - sudo chmod 777 /opt
@@ -20,8 +20,7 @@ before_script:
 - sudo cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/
 - sudo chmod 777 /usr/bin/ovs
 - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/dist-packages
-- cd /opt/OpenvStorage/webapps/api; export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH;
-  python manage.py syncdb --noinput
+- cd /opt/OpenvStorage/webapps/api; export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput
 - echo '{"configuration_store":"arakoon"}' > /opt/OpenvStorage/config/framework.json
 script:
 - ovs unittest

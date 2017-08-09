@@ -30,6 +30,7 @@ from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
+from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.toolbox import Toolbox
@@ -141,8 +142,7 @@ class NodeInstallationController(object):
             root_client = SSHClient(endpoint='127.0.0.1', username='root')
             unique_id = System.get_my_machine_id(root_client)
 
-            ipaddresses = root_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", allow_insecure=True).strip().splitlines()
-            NodeInstallationController.host_ips = set([found_ip.strip() for found_ip in ipaddresses if not found_ip.strip().startswith('127.')])
+            NodeInstallationController.host_ips = set(OSFactory.get_manager().get_ip_addresses(client=root_client))
 
             setup_completed = False
             promote_completed = False
