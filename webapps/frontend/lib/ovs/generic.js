@@ -14,7 +14,7 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define, window, document, location */
-define(['jquery', 'jqp/pnotify'], function($) {
+define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
     "use strict";
 
     var ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
@@ -507,6 +507,113 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return true;
     }
+
+    function _ArraygetItem(array, prop, index){
+        var foundItem = undefined;
+        if (index > array.length|| index < 0){
+            return foundItem
+        }
+        var _foundItem = array[index];
+        if (ko.isObservable(_foundItem)) {
+            _foundItem = _foundItem()
+        }
+        if (typeof prop !== 'undefined') {
+            _foundItem = _foundItem[prop];
+            if (ko.isObservable(_foundItem)) {
+                foundItem = _foundItem()
+            }
+            else {
+                foundItem = _foundItem
+            }
+        }
+        else {
+            foundItem = _foundItem;
+
+        }
+        return foundItem
+    }
+    function ArraybinarySearch(array, value, prop){
+        var middle = Math.floor(array.length / 2);
+        var foundItem = _ArraygetItem(array, prop, middle);
+        if (array.length === 0) {
+            return -1;
+        }
+        if (value === found_item) {
+            return middle;
+        }
+        if (value > found_item) {
+            return middle + array.slice(middle,array.length).brSearch(value, prop);
+        }
+        else {
+            return array.slice(0, middle).brSearch(value, prop);
+        }
+    }
+
+    /**
+     * @return {number}
+     */
+    function ArrayBinarySearchFirst(array, value, prop, startIndex, stopIndex){
+        /**
+         * Only works on a sorted list
+         * Faster than index of or contains
+         * Worst case time: O(log(n)
+         */
+        startIndex = (typeof startIndex !== 'undefined') ? startIndex : 0;
+        stopIndex = (typeof stopIndex !== 'undefined') ? stopIndex : array.length - 1;
+        if (stopIndex < startIndex) {
+            return -1;
+        }
+        var middle =  Math.floor(startIndex + (stopIndex - startIndex) / 2);
+        var foundItem = _ArraygetItem(array, prop, middle);
+        var previousItem = _ArraygetItem(array, prop, middle - 1);
+        if ((previousItem === undefined || value > previousItem) && foundItem === value) {
+            return middle
+        }
+        else if (value > foundItem) {
+            return ArrayBinarySearchFirst(array, value, prop, (middle + 1), stopIndex)
+        }
+        else {
+            return ArrayBinarySearchFirst(array, value, prop, startIndex, (middle - 1))
+        }
+    }
+    /**
+     * @return {number}
+     */
+    function ArrayBinarySearchLast(array, value, prop, startIndex, stopIndex) {
+        /**
+         * * Only works on a sorted list
+         * Faster than index of or contains
+         * Worst case time: O(log(n)
+         */
+        startIndex = (typeof startIndex !== 'undefined') ? startIndex : 0;
+        stopIndex = (typeof stopIndex !== 'undefined') ? stopIndex : array.length - 1;
+        if (stopIndex < startIndex) {
+            return -1;
+        }
+        var middle =  Math.floor(startIndex + (stopIndex - startIndex)/2);
+        var foundItem = _ArraygetItem(array, prop, middle);
+        var nextItem = (middle !== array.length -1) ? _ArraygetItem(array, prop, middle + 1): undefined;
+        if ((nextItem === undefined || value < nextItem) && foundItem === value) {
+            return middle
+        }
+        else if (value < foundItem) {
+            return ArrayBinarySearchLast(array, value, prop, startIndex, (middle - 1))
+        }
+        else {
+            return ArrayBinarySearchLast(array, value, prop, (middle + 1), stopIndex)
+        }
+    }
+
+    Array.prototype.brSearch = function(value, prop) {
+        return ArraybinarySearch(this, value, prop);
+    };
+
+    Array.prototype.brSearchFirst = function(value, prop) {
+        return ArrayBinarySearchFirst(this, value, prop);
+    };
+    Array.prototype.brSearchLast = function(value, prop) {
+        return ArrayBinarySearchLast(this, value, prop);
+    };
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
