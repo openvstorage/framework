@@ -328,6 +328,9 @@ define([
          */
         questions = (typeof questions !== 'undefined') ? questions : formQuestions;
         fieldMapping = (typeof fieldMapping !== 'undefined') ? fieldMapping : formFieldMapping;
+        if (ko.isObservable(index)) {
+            index = index()
+        }
         var formItem =questions.splice(index, 1)[0];
         // Remove left over data entries
         fieldMapping()[formItem().field()].observable.remove(formItem().data);
