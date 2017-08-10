@@ -507,114 +507,111 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         }
         return true;
     }
-
-    function _ArraygetItem(array, prop, index){
+    function _arrayGetItem(array, prop, index){
         var foundItem = undefined;
-        if (index > array.length|| index < 0){
-            return foundItem
+        if (index > array.length - 1 || index < 0){
+            return foundItem;
         }
-        var _foundItem = array[index];
-        if (ko.isObservable(_foundItem)) {
-            _foundItem = _foundItem()
+        foundItem = array[index];
+        if (ko.isObservable(foundItem)) {
+            foundItem = foundItem();
         }
         if (typeof prop !== 'undefined') {
-            _foundItem = _foundItem[prop];
-            if (ko.isObservable(_foundItem)) {
-                foundItem = _foundItem()
-            }
-            else {
-                foundItem = _foundItem
+            foundItem = foundItem[prop];
+            if (ko.isObservable(foundItem)) {
+                foundItem = foundItem();
             }
         }
-        else {
-            foundItem = _foundItem;
-
-        }
-        return foundItem
+        return foundItem;
     }
-    function ArraybinarySearch(array, value, prop){
-        var middle = Math.floor(array.length / 2);
-        var foundItem = _ArraygetItem(array, prop, middle);
+    function _arrayBinarySearch(array, value, prop){
+        /**
+         * Only works on a sorted list
+         * Returns the index of the item search for or -1 if not found
+         * Faster than indexing or contains
+         * Worst case time: O(log(n)
+         * @returns: Number
+         */
         if (array.length === 0) {
             return -1;
         }
-        if (value === found_item) {
-            return middle;
+        var middleIndex = Math.floor(array.length / 2);
+        var middleItem = _arrayGetItem(array, prop, middleIndex);
+        if (array.length === 1 && middleItem !== value) {
+            return -1;  // Item not present
         }
-        if (value > found_item) {
-            return middle + array.slice(middle,array.length).brSearch(value, prop);
+        if (value === middleItem) {
+            return middleIndex;
         }
-        else {
-            return array.slice(0, middle).brSearch(value, prop);
+        if (value > middleItem) {
+            var additionalIndex = array.slice(middleIndex + 1, array.length).brSearch(value, prop);
+            if (additionalIndex === -1) {
+                return -1;
+            }
+            return middleIndex + 1 + additionalIndex;
         }
+        return array.slice(0, middleIndex).brSearch(value, prop);
     }
-
-    /**
-     * @return {number}
-     */
-    function ArrayBinarySearchFirst(array, value, prop, startIndex, stopIndex){
+    function _arrayBinarySearchFirst(array, value, prop, startIndex, stopIndex){
         /**
          * Only works on a sorted list
-         * Faster than index of or contains
+         * Returns the index of the 1st element found (in case multiple identical would be present) or -1 if none found
+         * Faster than indexing or contains
          * Worst case time: O(log(n)
+         * @returns: Number
          */
-        startIndex = (typeof startIndex !== 'undefined') ? startIndex : 0;
-        stopIndex = (typeof stopIndex !== 'undefined') ? stopIndex : array.length - 1;
+        startIndex = startIndex === undefined ? 0 : startIndex;
+        stopIndex = stopIndex === undefined ? array.length - 1 : stopIndex;
         if (stopIndex < startIndex) {
             return -1;
         }
-        var middle =  Math.floor(startIndex + (stopIndex - startIndex) / 2);
-        var foundItem = _ArraygetItem(array, prop, middle);
-        var previousItem = _ArraygetItem(array, prop, middle - 1);
-        if ((previousItem === undefined || value > previousItem) && foundItem === value) {
-            return middle
+        var middleIndex = Math.floor(startIndex + (stopIndex - startIndex) / 2);
+        var middleItem = _arrayGetItem(array, prop, middleIndex);
+        var previousItem = _arrayGetItem(array, prop, middleIndex - 1);
+        if ((previousItem === undefined || value > previousItem) && middleItem === value) {
+            return middleIndex;
         }
-        else if (value > foundItem) {
-            return ArrayBinarySearchFirst(array, value, prop, (middle + 1), stopIndex)
+        if (value > middleItem) {
+            // Don't use slice here since we potentially lose duplicate values
+            return array.brSearchFirst(value, prop, (middleIndex + 1), stopIndex);
         }
-        else {
-            return ArrayBinarySearchFirst(array, value, prop, startIndex, (middle - 1))
-        }
+        return array.brSearchFirst(value, prop, startIndex, (middleIndex - 1));
     }
-    /**
-     * @return {number}
-     */
-    function ArrayBinarySearchLast(array, value, prop, startIndex, stopIndex) {
+    function _arrayBinarySearchLast(array, value, prop, startIndex, stopIndex) {
         /**
-         * * Only works on a sorted list
-         * Faster than index of or contains
+         * Only works on a sorted list
+         * Returns the index of the last element found (in case multiple identical would be present) or -1 if none found
+         * Faster than indexing or contains
          * Worst case time: O(log(n)
+         * @returns: Number
          */
-        startIndex = (typeof startIndex !== 'undefined') ? startIndex : 0;
-        stopIndex = (typeof stopIndex !== 'undefined') ? stopIndex : array.length - 1;
+        startIndex = startIndex === undefined ? 0 : startIndex;
+        stopIndex = stopIndex === undefined ? array.length - 1 : stopIndex;
         if (stopIndex < startIndex) {
             return -1;
         }
-        var middle =  Math.floor(startIndex + (stopIndex - startIndex)/2);
-        var foundItem = _ArraygetItem(array, prop, middle);
-        var nextItem = (middle !== array.length -1) ? _ArraygetItem(array, prop, middle + 1): undefined;
-        if ((nextItem === undefined || value < nextItem) && foundItem === value) {
-            return middle
+        var middleIndex = Math.floor(startIndex + (stopIndex - startIndex) / 2);
+        var middleItem = _arrayGetItem(array, prop, middleIndex);
+        var nextItem = _arrayGetItem(array, prop, middleIndex + 1);
+        if ((nextItem === undefined || value < nextItem) && middleItem === value) {
+            return middleIndex;
         }
-        else if (value < foundItem) {
-            return ArrayBinarySearchLast(array, value, prop, startIndex, (middle - 1))
+        if (value < middleItem) {
+            // Don't use slice here since we potentially lose duplicate values
+            return array.brSearchLast(value, prop, startIndex, (middleIndex - 1));
         }
-        else {
-            return ArrayBinarySearchLast(array, value, prop, (middle + 1), stopIndex)
-        }
+        return array.brSearchLast(value, prop, (middleIndex + 1), stopIndex);
     }
 
     Array.prototype.brSearch = function(value, prop) {
-        return ArraybinarySearch(this, value, prop);
+        return _arrayBinarySearch(this, value, prop);
     };
-
-    Array.prototype.brSearchFirst = function(value, prop) {
-        return ArrayBinarySearchFirst(this, value, prop);
+    Array.prototype.brSearchFirst = function(value, prop, start, end) {
+        return _arrayBinarySearchFirst(this, value, prop, start, end);
     };
-    Array.prototype.brSearchLast = function(value, prop) {
-        return ArrayBinarySearchLast(this, value, prop);
+    Array.prototype.brSearchLast = function(value, prop, start, end) {
+        return _arrayBinarySearchLast(this, value, prop, start, end);
     };
-
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
     };

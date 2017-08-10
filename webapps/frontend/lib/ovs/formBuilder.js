@@ -26,7 +26,7 @@ define([
             'inputItems': null  // default if missing
         },
         'port': {
-            'extender': {numeric: {min: 1, max: 65536}}
+            'extender': {numeric: {min: 1, max: 65535}}
         },
         'integer': {
             'inputType': 'text',
@@ -40,14 +40,14 @@ define([
     function generateFormData(metadata, actionMapping) {
         /**
          * Generate formData that can be used to generate a form
-         * @param metadata: metadata to base form generation on. This is an object with possible actions and metadata about that action
+         * @param metadata: Metadata to base form generation on. This is an object with possible actions and metadata about that action
          * If a particular action can be done (value = true) and the metadata surrounding the actions is also present: this form builder will
-         * return an array with questions to be asked and validation based on the types provided via the metadata
-         * The metadata aspect is an object filled with the name of param the api expects and the type
+         * return an array with questions to be asked and validation based on the types provided via the metadata.
+         * The metadata aspect is an object filled with the name of the param expected by the API and the type.
          * Current supported types: ip, port, integer and their list_of_ variants
          * Example: {clear: true, fill: true, fill_add: false, fill_metadata: {count: "integer"}}
          * @param actionMapping: Additional mutations to the form data
-         * Consists of an object with keys that are identical to the param the api expects and value
+         * Consists of an object with keys that are identical to the params and value the API expects
          * Text types:
          * {
             'extender': {regex: generic.ipRegex}, // Custom extender to use
@@ -56,7 +56,7 @@ define([
             'group': 0,  // Sorting purposes
             'displayOn': ['gather']  // Display on a particular step
            }
-         * Dropdown
+         * Dropdown:
          * 'osd_type': {
             'fieldMap': 'type',  // Translate osd_type to type so in the form it will be self.data.formdata().type
             'inputType': 'dropdown',  // Generate dropdown, needs items
@@ -110,7 +110,7 @@ define([
     function gatherItemData(field, type, actionMapping, fieldMapping) {
         /**
          * Gather all relevant data to generate a form item
-         * @param fieldMapping: optional param, used by special formBuilders
+         * @param fieldMapping: Optional param, used by special formBuilders
          */
         // Defaults
         actionMapping = (typeof actionMapping !== 'undefined') ? actionMapping : {};
@@ -125,7 +125,7 @@ define([
         // Check if list of known types
         if (type !== undefined && type.startsWith(listPrefix)) {
             arrayType = true;
-            type = type.slice(listPrefix.length)  // Slice of the prefix (slice to start at the beginning)
+            type = type.slice(listPrefix.length);  // Slice of the prefix (slice to start at the beginning)
         }
         // Check based on known types
         if (type in typeMapping) {
@@ -183,7 +183,7 @@ define([
     function generateFormItem(observable, field, group, display, target, inputType, inputItems, linkedObservable, fieldMapping) {
         /**
          * Generate a form item
-         * @param fieldMapping: optional param. This fieldmapping should be filled in
+         * @param fieldMapping: Optional param. This fieldmapping should be filled in
          */
         // Defaults
         group = (typeof group !== 'undefined') ? group : undefined;
@@ -198,7 +198,7 @@ define([
         if (linkedObservable !== undefined && linkedObservable.isObservableArray) {
             extendable = true;
             if (!linkedObservable().contains(observable)) {
-                id += linkedObservable.push(observable) -1;
+                id += linkedObservable.push(observable) - 1;  // Push returns the amount of elements in the observableArray
             }
         }
         var formItem = ko.observable({
@@ -234,7 +234,6 @@ define([
          * Keeps sorting in mind
          */
         questions = (typeof questions !== 'undefined') ? questions : formQuestions;
-        var insertIndex = -1;
         if (questions().length === 0) {
             return 0
         }
@@ -245,6 +244,7 @@ define([
             return questions().length - 1
         }
         // Get a quick search of to see if the group value is actually in
+        var insertIndex = -1;
         var firstIndex = questions().brSearchFirst(formItem().group(), 'group');
         // If it has been found, this will result in faster lookup speed
         if (firstIndex !== -1) {
@@ -256,7 +256,7 @@ define([
             $.each(questions(), function(index, _formItem){
                 if (_formItem().group() > formItem().group()) {
                     insertIndex = index + 1;
-                    return false // Break
+                    return false; // Break
                 }
 
             });
@@ -269,9 +269,9 @@ define([
          * Used to insert a new question dynamically into the form
          * Think of a PLUS icon to add new entries to a list
          * These items should always be grouped with a separate group
-         * @param field: field to insert a form item for
-         * @param metadata: metadata to use
-         * @param questions: observable array, defaults to the cached questions
+         * @param field: Field to insert a form item for
+         * @param metadata: Metadata to use
+         * @param questions: Observable array, defaults to the cached questions
          */
         questions = (typeof questions !== 'undefined') ? questions : formQuestions;
         fieldMapping = (typeof fieldMapping !== 'undefined') ? fieldMapping : formFieldMapping;
@@ -322,9 +322,9 @@ define([
     function removeFormItem(index, questions, fieldMapping) {
         /**
          * Remove an item from the form
-         * @index: required param. Index of the item to remove
-         * @param questions: optional param: questions to use, required if fieldMapping is provided
-         * @param fieldMapping: optional param, fieldMapping to use ,required if questions is provided
+         * @param index: Required param. Index of the item to remove
+         * @param questions: Optional param: questions to use, required if fieldMapping is provided
+         * @param fieldMapping: Optional param, fieldMapping to use ,required if questions is provided
          */
         questions = (typeof questions !== 'undefined') ? questions : formQuestions;
         fieldMapping = (typeof fieldMapping !== 'undefined') ? fieldMapping : formFieldMapping;
@@ -342,7 +342,7 @@ define([
     function validateForm(translatePrefix, questions) {
         /**
          * Validates a form based on questions this formbuilder could make.
-         * @param questions: array of observables
+         * @param questions: Array of observables
          */
         questions = (typeof questions !== 'undefined') ? questions : formQuestions;
         var reasons = [], fields = [];
@@ -369,7 +369,7 @@ define([
             if (!data.hasOwnProperty(field)) {
                 continue;
             }
-            data[field] = data[field].observable  // Just get the observable value
+            data[field] = data[field].observable;  // Just get the observable value
         }
         return data
     }
