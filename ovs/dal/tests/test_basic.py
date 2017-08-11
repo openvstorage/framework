@@ -31,7 +31,8 @@ from ovs.dal.hybrids.t_teststoragedriver import TestStorageDriver
 from ovs.dal.hybrids.t_teststoragerouter import TestStorageRouter
 from ovs.dal.hybrids.t_testvpool import TestVPool
 from ovs.dal.tests.helpers import DalHelper
-from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
+from ovs_extensions.generic.volatilemutex import NoLockAvailableException
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
@@ -143,7 +144,7 @@ class Basic(unittest.TestCase):
         disk.save()
         disk2.name = 'two'
         disk2.save()
-        # With datastore_wins set to True, the datastore wins concurrency conflicts
+        # With datastore_wins set to True, the data-store wins concurrency conflicts
         self.assertEqual(disk2.name, 'one', 'Data should be overwritten')
 
     def test_datastoreloses(self):
@@ -158,7 +159,7 @@ class Basic(unittest.TestCase):
         disk.save()
         disk2.name = 'two'
         disk2.save()
-        # With datastore_wins set to False, the datastore loses concurrency conflicts
+        # With datastore_wins set to False, the data-store loses concurrency conflicts
         self.assertEqual(disk2.name, 'two', 'Data should not be overwritten')
 
     def test_silentdatarefresh(self):
@@ -175,7 +176,7 @@ class Basic(unittest.TestCase):
         disk2.name = 'two'
         disk2.save()
         disk.save()  # This should not overwrite anything but instead refresh data
-        # With datastore_wins set to False, the datastore loses concurrency conflicts
+        # With datastore_wins set to False, the data-store loses concurrency conflicts
         self.assertEqual(disk2.name, 'two', 'Data should not be overwritten')
         self.assertEqual(disk.name, 'two', 'Data should be refreshed')
 
@@ -967,11 +968,11 @@ class Basic(unittest.TestCase):
         machine_x = TestMachine(machine.guid)
         machine_x.name = 'machine1'
         machine_x.save()
-        self.assertTrue(machine.updated_on_datastore(), 'Machine should be updated on datastore')
+        self.assertTrue(machine.updated_on_datastore(), 'Machine should be updated on data-store')
         machine.name = 'machine2'
         machine.save()
         self.assertEqual(machine._data['_version'], 4, 'Version should be 4, is {0}'.format(machine._data['_version']))
-        self.assertFalse(machine.updated_on_datastore(), 'Machine should not be updated on datastore')
+        self.assertFalse(machine.updated_on_datastore(), 'Machine should not be updated on data-store')
 
     def test_outdated_listobjects(self):
         """

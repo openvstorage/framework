@@ -38,7 +38,8 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
+from ovs_extensions.generic.volatilemutex import NoLockAvailableException
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        StorageDriverClient, StorageDriverConfiguration
@@ -341,7 +342,7 @@ class VDiskController(object):
                     if devicename.startswith(old_path):
                         vdisk.devicename = '{0}{1}'.format(new_path, ExtensionsToolbox.remove_prefix(devicename, old_path))
                         vdisk.save()
-                        VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
+                        VDiskController._logger.info('Renamed device name from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
                         VDiskController._logger.info('Running "after_volume_rename" hooks for vDisk {0}'.format(vdisk.guid))
                         for _function in _hooked_functions:
                             try:
@@ -362,7 +363,7 @@ class VDiskController(object):
         :type snapshot_id: str
         :param storagerouter_guid: Guid of the StorageRouter
         :type storagerouter_guid: str
-        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :param pagecache_ratio: Ratio of the page cache size (compared to a 100% cache)
         :type pagecache_ratio: float
         :param cache_quota: Max disk space the new clone can consume for caching (both fragment as block) purposes (in Bytes)
         :type cache_quota: dict
@@ -619,7 +620,7 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
         :type target_storagerouter_guid: str
-        :param force: Indicates whether to force the migration or not (forcing can lead to dataloss)
+        :param force: Indicates whether to force the migration or not (forcing can lead to data loss)
         :type force: bool
         :return: None
         """
@@ -682,7 +683,7 @@ class VDiskController(object):
         :type name: str
         :param storagerouter_guid: Guid of the Storage Router on which the vDisk should be started
         :type storagerouter_guid: str
-        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :param pagecache_ratio: Ratio of the page cache size (compared to a 100% cache)
         :type pagecache_ratio: float
         :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
         :type cache_quota: dict
@@ -764,7 +765,7 @@ class VDiskController(object):
         :type volume_size: int
         :param storagedriver_guid: Guid of the Storagedriver
         :type storagedriver_guid: str
-        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :param pagecache_ratio: Ratio of the page cache size (compared to a 100% cache)
         :type pagecache_ratio: float
         :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
         :type cache_quota: dict
@@ -1427,7 +1428,7 @@ class VDiskController(object):
                                 devicename = fsmetadata_client.lookup(volume_id)
                                 name = VDiskController.extract_volumename(devicename)
                             except FeatureNotAvailableException:
-                                VDiskController._logger.exception('Could not load devicename from StorageDriver')
+                                VDiskController._logger.exception('Could not load device name from StorageDriver')
                                 devicename = '/{0}.raw'.format(volume_id)
                                 name = volume_id
                             new_vdisk.name = name
@@ -1520,7 +1521,7 @@ class VDiskController(object):
         Clean a name into a usable filename
         :param name: Name of the device
         :type name: str
-        :return: A cleaned devicename
+        :return: A cleaned device name
         :rtype: str
         """
         name = name.strip('/').replace(' ', '_')
@@ -1535,10 +1536,10 @@ class VDiskController(object):
     @staticmethod
     def extract_volumename(devicename):
         """
-        Extracts a reasonable volume name out of a given devicename
-        :param devicename: A raw devicename of a volume (e.g. /foo/bar.raw)
+        Extracts a reasonable volume name out of a given device name
+        :param devicename: A raw device name of a volume (e.g. /foo/bar.raw)
         :type devicename: str
-        :return: A cleaned up volumename (e.g. bar)
+        :return: A cleaned up volume name (e.g. bar)
         """
         return devicename.rsplit('/', 1)[-1].rsplit('.', 1)[0]
 
