@@ -335,6 +335,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def get_update_status(self, storagerouter):
         """
         Return available updates for framework, volumedriver, ...
+        DEPRECATED API call
         :param storagerouter: StorageRouter to get the update information from
         :type storagerouter: StorageRouter
         """
@@ -397,6 +398,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def update_framework(self, storagerouter):
         """
         Initiate a task on the given StorageRouter to update the framework on ALL StorageRouters
+        DEPRECATED API call - use update_components in the future
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
         """
@@ -411,6 +413,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def update_volumedriver(self, storagerouter):
         """
         Initiate a task on the given StorageRouter to update the volumedriver on ALL StorageRouters
+        DEPRECATED API call - use update_components in the future
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
         """

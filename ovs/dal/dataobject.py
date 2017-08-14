@@ -30,7 +30,8 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 from ovs.dal.helpers import Descriptor, DalToolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
-from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
+from ovs_extensions.generic.volatilemutex import NoLockAvailableException
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -168,7 +169,7 @@ class DataObject(object):
         Loads an object with a given guid. If no guid is given, a new object
         is generated with a new guid.
         * guid: The guid indicating which object should be loaded
-        * datastoreWins: Optional boolean indicating save conflict resolve management.
+        * datastore_wins: Optional boolean indicating save conflict resolve management.
         ** True: when saving, external modified fields will not be saved
         ** False: when saving, all changed data will be saved, regardless of external updates
         ** None: in case changed field were also changed externally, an error will be raised
@@ -578,9 +579,9 @@ class DataObject(object):
                             # In case we didn't set a policy, we raise the conflicts
                             data_conflicts.append(attribute)
                         elif self._datastore_wins is False:
-                            # If the datastore should not win, we just overwrite the data
+                            # If the data-store should not win, we just overwrite the data
                             data[attribute] = self._data[attribute]
-                        # If the datastore should win, we discard/ignore our change
+                        # If the data-store should win, we discard/ignore our change
                     else:
                         # Normal scenario, saving data
                         data[attribute] = self._data[attribute]
@@ -965,7 +966,7 @@ class DataObject(object):
 
     def updated_on_datastore(self):
         """
-        Checks whether this object has been modified on the datastore
+        Checks whether this object has been modified on the data-store
         """
         if self.volatile is True:
             return False

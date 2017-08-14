@@ -91,7 +91,7 @@ define(['jquery', 'knockout'], function($, ko){
             localHost:               ko.observable(true),
             name:                    ko.observable('').extend({regex: nameRegex}),
             partitions:              ko.observable(),
-            port:                    ko.observable(80).extend({ numeric: {min: 1, max: 65536}}),
+            port:                    ko.observable(80).extend({ numeric: {min: 1, max: 65535}}),
             preset:                  ko.observable(),
             proxyAmount:             ko.observable(2).extend({numeric: {min: 1, max: 16}}),
             scoSize:                 ko.observable(4),
@@ -114,7 +114,7 @@ define(['jquery', 'knockout'], function($, ko){
             fragmentCacheOnWrite:    ko.observable(true),
             hostFC:                  ko.observable('').extend({regex: hostRegex}),
             localHostFC:             ko.observable(true),
-            portFC:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
+            portFC:                  ko.observable(80).extend({numeric: {min: 1, max: 65535}}),
             presetFC:                ko.observable(),
             useFC:                   ko.observable(false),
             // Block cache
@@ -127,7 +127,7 @@ define(['jquery', 'knockout'], function($, ko){
             clientSecretBC:          ko.observable('').extend({removeWhiteSpaces: null}),
             hostBC:                  ko.observable('').extend({regex: hostRegex}),
             localHostBC:             ko.observable(true),
-            portBC:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
+            portBC:                  ko.observable(80).extend({numeric: {min: 1, max: 65535}}),
             presetBC:                ko.observable(),
             supportsBC:              ko.observable(true),
             useBC:                   ko.observable(false)

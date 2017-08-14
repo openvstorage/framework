@@ -17,7 +17,9 @@
 """
 Volatile mutex module
 """
-from ovs_extensions.generic.volatilemutex import volatile_mutex as _volatile_mutex, NoLockAvailableException
+
+from ovs_extensions.generic.volatilemutex import volatile_mutex as _volatile_mutex
+from ovs.log.log_handler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
@@ -27,6 +29,21 @@ class volatile_mutex(_volatile_mutex):
     locking. However, this mutex is volatile and thus can fail. You want to make sure you don't
     lock for longer than a few hundred milliseconds to prevent this.
     """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Init method
+        """
+        super(volatile_mutex, self).__init__(*args, **kwargs)
+        self._logger = LogHandler.get(source='extensions', name='volatile_mutex')
+
+    # Only present to fool PEP8 that this class is a ContextManager
+    def __enter__(self):
+        super(volatile_mutex, self).__enter__()
+
+    # Only present to fool PEP8 that this class is a ContextManager
+    def __exit__(self, *args, **kwargs):
+        super(volatile_mutex, self).__exit__(*args, **kwargs)
 
     @classmethod
     def _get_volatile_client(cls):

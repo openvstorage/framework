@@ -149,6 +149,7 @@ class VDiskViewSet(viewsets.ViewSet):
     def get_children(self, vdisk):
         """
         Returns a list of vDisk guid(s) of children of a given vDisk
+        DEPRECATED API call - vDisk has new relation vDisk.child_vdisks
         :param vdisk: Vdisk to get the children from
         :type vdisk: VDisk
         :return: Guids of the child vDisks
