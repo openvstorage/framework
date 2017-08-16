@@ -216,7 +216,7 @@ class MigrationController(object):
                 ExtensionsToolbox.edit_version_file(client=root_client,
                                                     package_name='volumedriver',
                                                     old_service_name='volumedriver_{0}'.format(vpool.name))
-                if service_manager.ImplementationClass == Systemd:
+                if service_manager.__class__ == Systemd:
                     root_client.run(['systemctl', 'daemon-reload'])
 
         ########################################
