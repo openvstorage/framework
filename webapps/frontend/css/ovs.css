@@ -241,3 +241,7 @@ code {
 .notification-message a:focus {
     color: #d71c16;
 }
+
+.label-missing {
+    background-color: buttonface;
+}
