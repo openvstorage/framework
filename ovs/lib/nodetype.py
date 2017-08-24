@@ -229,9 +229,7 @@ class NodeTypeController(object):
             arakoon_installer = ArakoonInstaller(cluster_name='config')
             arakoon_installer.load(ip=master_ip)
             arakoon_installer.extend_cluster(new_ip=cluster_ip,
-                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                             log_sinks=LogHandler.get_sink_path('arakoon-server_config'),
-                                             crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_config'))
+                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
             arakoon_installer.restart_cluster_after_extending(new_ip=cluster_ip)
             service_manager.register_service(node_name=machine_id,
                                              service_metadata=arakoon_installer.service_metadata[cluster_ip])
@@ -252,9 +250,7 @@ class NodeTypeController(object):
             arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cluster_name)
             arakoon_installer.load()
             arakoon_installer.extend_cluster(new_ip=cluster_ip,
-                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                             log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(arakoon_cluster_name)),
-                                             crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(arakoon_cluster_name)))
+                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
             arakoon_installer.restart_cluster_after_extending(new_ip=cluster_ip)
             arakoon_ports = arakoon_installer.ports[cluster_ip]
 
