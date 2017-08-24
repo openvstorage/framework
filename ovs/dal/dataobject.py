@@ -1060,8 +1060,8 @@ class DataObject(object):
     def _benchmark(self, iterations=100, dynamics=None):
         """
         Benchmark the dynamics
-        CAUTION: when a dynamic calls another dynamic in its implemenations, the timings might be off
-        as the implementing dynamic might be cachede
+        CAUTION: when a dynamic calls another dynamic in its implementations, the timings might be off
+        as the implementing dynamic might be cached
         :param iterations:  amount of iterations
         :param dynamics: dynamics to benchmark
         :return:
