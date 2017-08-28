@@ -20,6 +20,7 @@ define([
     'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications'
 ], function($, router, system, activator, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
     "use strict";
+    // Initially load in all routes
     router.map(routing.mainRoutes)
           .buildNavigationModel()
           .mapUnknownRoutes('viewmodels/404');
@@ -130,6 +131,7 @@ define([
                                         });
                                     }).promise();
                                     moduleHandler.then(function() {
+                                        // Load in hooks
                                         return $.Deferred(function(moduleDeferred) {
                                             require(['ovs/hooks/' + plugin], function(hook) { // webapps/frontend/lib/ovs/hooks
                                                 routing.extraRoutes.push(hook.routes);
@@ -192,7 +194,7 @@ define([
                                 if (types.contains('backend') && !backendsActive) {
                                     routing.siteRoutes.push({
                                         route: 'backends',
-                                        moduleId: 'backends',
+                                        moduleId: 'backend/backends',
                                         title: $.t('ovs:backends.title'),
                                         titlecode: 'ovs:backends.title',
                                         nav: true,

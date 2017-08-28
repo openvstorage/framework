@@ -17,8 +17,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/user', '../containers/client', '../containers/group', '../containers/role',
-    '../wizards/changepassword/index'
+    '../../containers/user', '../../containers/client', '../../containers/group', '../../containers/role',
+    '../../wizards/changepassword/index'
 ], function($, app, dialog, ko, shared, generic, Refresher, api, User, Client, Group, Role, ChangePasswordWizard) {
     "use strict";
     return function () {
