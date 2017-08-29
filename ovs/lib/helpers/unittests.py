@@ -26,7 +26,6 @@ import sys
 import time
 import inspect
 import unittest
-from ovs.log.log_handler import LogHandler
 
 
 class UnitTest(object):
@@ -39,8 +38,6 @@ class UnitTest(object):
     _SUCCESS = '\033[92mSUCCESS\033[0m'
     _FAILURE = '\033[93mFAILURE\033[0m'
     _OVS_PATH = '/opt/OpenvStorage'
-
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
 
     def __init__(self):
         """

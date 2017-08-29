@@ -31,8 +31,8 @@ from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
-from ovs.log.log_handler import LogHandler
 
 
 # noinspection PyProtectedMember
@@ -40,7 +40,7 @@ class OpenAPIView(View):
     """
     Implements retrieval of generic metadata about the services
     """
-    _logger = LogHandler.get('api', name='openapi')
+    _logger = Logger('api')
 
     @auto_response(beautify=True)
     @load()

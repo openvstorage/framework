@@ -26,6 +26,7 @@ import time
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -34,15 +35,13 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.toolbox import Toolbox
-from ovs.log.log_handler import LogHandler
 
 
 class NodeTypeController(object):
     """
     This class contains all logic for promoting and demoting nodes in the cluster
     """
-    _logger = LogHandler.get('lib', name='node-type')
-    _logger.logger.propagate = False
+    _logger = Logger('lib')
 
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
@@ -517,7 +516,7 @@ class NodeTypeController(object):
         :param clients: Clients on which to restart these services
         :type clients: dict
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :param offline_node_ips: IP addresses of offline nodes in the cluster
         :type offline_node_ips: list
         :return: None
@@ -554,7 +553,7 @@ class NodeTypeController(object):
         :param client: Client on which to configure Memcached
         :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         Toolbox.log(logger=logger, messages='Setting up Memcached')
@@ -570,7 +569,7 @@ class NodeTypeController(object):
         :param client: Client on which to configure RabbitMQ
         :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         Toolbox.log(logger=logger, messages='Setting up RabbitMQ')
@@ -634,7 +633,7 @@ class NodeTypeController(object):
         :param client: Client on which to check RabbitMQ
         :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         service_manager = ServiceFactory.get_manager()
@@ -654,7 +653,7 @@ class NodeTypeController(object):
         :param client: Client on which to check for Avahi
         :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: True if Avahi is installed, False otherwise
         :rtype: bool
         """
@@ -698,7 +697,7 @@ class NodeTypeController(object):
         :param node_type: Type of the node ('master' or 'extra')
         :type node_type: str
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         valid_avahi = NodeTypeController.validate_avahi_cluster_name(ip=client.ip,
@@ -729,7 +728,7 @@ class NodeTypeController(object):
         :param node_type: Type of node ('master' or 'extra')
         :type node_type: str
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         Toolbox.log(logger=logger, messages='Adding services')

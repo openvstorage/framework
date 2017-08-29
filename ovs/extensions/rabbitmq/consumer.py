@@ -26,9 +26,9 @@ import pika
 import inspect
 import logging
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.rabbitmq.processor import process
-from ovs.log.log_handler import LogHandler
 
 mapping = {}
 
@@ -56,8 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--durable', dest='queue_durable', action='store_const', default=False, const=True,
                         help='Declare queue as durable')
 
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
-    logger = LogHandler.get('extensions', name='consumer')
+    logger = Logger('extensions-rabbitmq')
 
     args = parser.parse_args()
     try:
@@ -117,7 +116,7 @@ if __name__ == '__main__':
             durable = args.queue_durable
             channel.queue_declare(queue=queue, durable=durable)
             logger.info('Waiting for messages on {0}...'.format(queue))
-            logger.info('To exit press CTRL+C', print_msg=True)
+            logger.info('To exit press CTRL+C', extra={'print_msg': True})
 
             channel.basic_qos(prefetch_count=1)
             channel.basic_consume(callback, queue=queue)

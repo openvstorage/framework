@@ -26,17 +26,17 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponseRedirect
 from api.oauth2.decorators import auto_response, limit, log
 from api.oauth2.toolbox import OAuth2Toolbox
-from ovs.extensions.generic.configuration import Configuration
-from ovs.log.log_handler import LogHandler
 from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.rolelist import RoleList
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 
 
 class OAuth2RedirectView(View):
     """
     Implements OAuth 2 redirect views
     """
-    _logger = LogHandler.get('api', 'oauth2')
+    _logger = Logger('oauth2')
 
     @log()
     @auto_response()

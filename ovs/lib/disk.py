@@ -22,16 +22,16 @@ import time
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.lib.helpers.decorators import ovs_task
-from ovs.log.log_handler import LogHandler
 
 
 class DiskController(object):
     """
     Contains all BLL wrt physical Disks
     """
-    _logger = LogHandler.get('lib', name='disk')
+    _logger = Logger('lib')
 
     @staticmethod
     @ovs_task(name='ovs.disk.sync_with_reality', ensure_single_info={'mode': 'CHAINED'})

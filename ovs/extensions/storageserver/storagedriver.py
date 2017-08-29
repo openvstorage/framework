@@ -22,8 +22,8 @@ import copy
 import json
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger as OVSLogger
 from ovs_extensions.generic.remote import remote
-from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 
 # Import below classes so the rest of the framework can always import from this module:
@@ -77,7 +77,7 @@ class StorageDriverClient(object):
     """
     Client to access storagedriver client
     """
-    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -194,8 +194,8 @@ class MetadataServerClient(object):
     """
     Builds a MDSClient
     """
-    _logger = LogHandler.get('extensions', name='storagedriver')
-    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    _logger = OVSLogger('extensions')
+    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -306,11 +306,11 @@ class StorageDriverConfiguration(object):
         if config_type != 'storagedriver':
             raise RuntimeError('Invalid configuration type. Allowed: storagedriver')
 
-        storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+        storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
         # noinspection PyArgumentList
         storagerouterclient.Logger.enableLogging()
 
-        self._logger = LogHandler.get('extensions', name='storagedriver')
+        self._logger = OVSLogger('extensions')
         self.config_type = config_type
         self.configuration = {}
         self.key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool_guid, storagedriver_id)

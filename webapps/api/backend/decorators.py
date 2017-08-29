@@ -37,9 +37,9 @@ from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException,\
     HttpTooManyRequestsException, HttpUnauthorizedException, HttpUpgradeNeededException
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.log_handler import LogHandler
 
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from api.backend.serializers.mockups import FullSerializer
@@ -97,7 +97,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
     """
     Parameter discovery decorator
     """
-    logger = LogHandler.get('api')
+    logger = Logger('api')
     regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
     def wrap(f):
@@ -498,7 +498,7 @@ def limit(amount, per, timeout):
     """
     Rate-limits the decorated call
     """
-    logger = LogHandler.get('api')
+    logger = Logger('api')
 
     def wrap(f):
         """
@@ -549,7 +549,7 @@ def log(log_slow=True):
     Task logger
     :param log_slow: Indicates whether a slow call should be logged
     """
-    logger = LogHandler.get('api')
+    logger = Logger('api')
 
     def wrap(f):
         """
@@ -576,8 +576,7 @@ def log(log_slow=True):
                 for key in metadata[mtype]:
                     if 'password' in key:
                         metadata[mtype][key] = '**********************'
-            _logger = LogHandler.get('log', name='api')
-            _logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
+            logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
                 f.__module__,
                 f.__name__,
                 getattr(request, 'client').user_guid if hasattr(request, 'client') else None,

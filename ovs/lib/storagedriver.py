@@ -30,6 +30,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -37,7 +38,6 @@ from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalS
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import VolumeDriverEvents_pb2
 
 
@@ -45,7 +45,7 @@ class StorageDriverController(object):
     """
     Contains all BLL related to Storage Drivers
     """
-    _logger = LogHandler.get('lib', name='storagedriver')
+    _logger = Logger('lib')
 
     ################
     # CELERY TASKS #

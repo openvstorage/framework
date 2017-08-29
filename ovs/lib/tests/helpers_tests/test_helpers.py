@@ -536,7 +536,6 @@ class Helpers(unittest.TestCase):
                 current_state = Decorators.unittest_thread_info_by_name.get(_thread_name, [None])[0]
                 if current_state == _state:
                     return True
-                # print 'Waiting for {0}, currently {1}'.format(_state, current_state)
                 return False
             return _check
 

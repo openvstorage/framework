@@ -30,9 +30,9 @@ from celery.schedules import crontab
 from ovs.dal.helpers import DalToolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.interactive import Interactive
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.log.log_handler import LogHandler
 
 
 class Toolbox(object):
@@ -90,7 +90,7 @@ class Toolbox(object):
         :param sub_component: Name of the sub-component, eg: pre-install, post-install
         :type sub_component: str
         :param logger: Logger object to use for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :param kwargs: Additional named arguments
         :return: Amount of functions executed
         """
@@ -189,7 +189,7 @@ class Toolbox(object):
         :param command: Command to retry
         :param max_count: Maximum retries
         :param time_sleep: Seconds of sleep in between tries
-        :param logger: LogHandler Object
+        :param logger: Logger Object
         """
         cpe = None
         retry = 0
@@ -211,7 +211,7 @@ class Toolbox(object):
         :param client: SSHClient on which to connect and change service state
         :param name: Name of the service
         :param state: State to put the service in
-        :param logger: LogHandler Object
+        :param logger: Logger Object
         """
         service_manager = ServiceFactory.get_manager()
         action = None
@@ -249,8 +249,8 @@ class Toolbox(object):
         :type name: str
         :param status: 'active' if running, 'inactive' if halted
         :type status: str
-        :param logger: Logging object
-        :type logger: ovs.log.log_handler.LogHandler
+        :param logger: Logger object
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         :rtype: NoneType
         """
@@ -271,7 +271,7 @@ class Toolbox(object):
         """
         Print a message on stdout and log to file
         :param logger: Logger object to use for the logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :param messages: Messages to print and log
         :type messages: str or list
         :param title: If True some extra chars will be pre- and appended
@@ -341,7 +341,7 @@ class Toolbox(object):
         :param ip: IP of the node on which we want to validate / ask the password
         :type ip: str
         :param logger: Logger object to use for the logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :param username: Username to login with
         :type username: str
         :param previous: Previously used password for another node in the cluster
@@ -414,7 +414,7 @@ class Schedule(object):
     """
     This decorator adds a schedule to a function. All arguments are these from celery's "crontab" class
     """
-    _logger = LogHandler.get('lib', name='scheduler')
+    _logger = Logger('lib')
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs

@@ -26,6 +26,7 @@ import signal
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
@@ -36,16 +37,13 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.nodetype import NodeTypeController
 from ovs.lib.noderemoval import NodeRemovalController
-from ovs.log.log_handler import LogHandler
 
 
 class NodeInstallationController(object):
     """
     This class contains all logic for setting up an environment, installed with system-native packages
     """
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
-    _logger = LogHandler.get('lib', name='node-installation')
-    _logger.logger.propagate = False
+    _logger = Logger('lib')
 
     nodes = {}
     host_ips = set()

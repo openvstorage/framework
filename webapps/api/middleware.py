@@ -25,7 +25,7 @@ from django.http import HttpResponse
 from api.helpers import OVSResponse
 from ovs.dal.exceptions import MissingMandatoryFieldsException
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.log.log_handler import LogHandler
+from ovs.extensions.generic.logger import Logger
 
 
 class OVSMiddleware(object):
@@ -38,7 +38,7 @@ class OVSMiddleware(object):
         Logs information about the given error
         """
         _ = self, request
-        logger = LogHandler.get('api', 'middleware')
+        logger = Logger('api')
         if OVSMiddleware.is_own_httpexception(exception):
             return HttpResponse(exception.data,
                                 status=exception.status_code,

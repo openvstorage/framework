@@ -37,6 +37,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
@@ -46,7 +47,6 @@ from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode,
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
 
 
@@ -54,10 +54,10 @@ class VDiskController(object):
     """
     Contains all BLL regarding VDisks
     """
-    _logger = LogHandler.get('lib', name='vdisk')
+    _logger = Logger('lib')
     _VOLDRV_EVENT_KEY = 'voldrv_event_vdisk_{0}'
 
-    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'))
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 

@@ -38,6 +38,7 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -48,7 +49,6 @@ from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
-from ovs.log.log_handler import LogHandler
 
 
 class GenericController(object):
@@ -56,7 +56,7 @@ class GenericController(object):
     This controller contains all generic task code. These tasks can be
     executed at certain intervals and should be self-containing
     """
-    _logger = LogHandler.get('lib', name='generic tasks')
+    _logger = Logger('lib')
 
     @staticmethod
     @ovs_task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'), ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['ovs.generic.delete_snapshots']})
@@ -350,7 +350,8 @@ class GenericController(object):
                             for work_unit in work_units:
                                 res = locked_client.scrub(work_unit=work_unit,
                                                           scratch_dir=scrub_dir,
-                                                          log_sinks=[LogHandler.get_sink_path('scrubber_{0}'.format(vpool.name), allow_override=True, forced_target_type=LogHandler.TARGET_TYPE_FILE)],
+                                                          log_sinks=[Logger.get_sink_path(source='scrubber_{0}'.format(vpool.name),
+                                                                                          forced_target_type=Logger.TARGET_TYPE_FILE)],
                                                           backend_config=Configuration.get_configuration_path(backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                             if work_units:
@@ -427,7 +428,7 @@ class GenericController(object):
                     Configuration.set(scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
 
                     params = {'VPOOL_NAME': vpool.name,
-                              'LOG_SINK': LogHandler.get_sink_path(alba_proxy_service),
+                              'LOG_SINK': Logger.get_sink_path(alba_proxy_service),
                               'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key)}
                     service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
                     service_manager.start_service(name=alba_proxy_service, client=client)

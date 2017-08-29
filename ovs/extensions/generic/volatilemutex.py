@@ -18,8 +18,8 @@
 Volatile mutex module
 """
 
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.volatilemutex import volatile_mutex as _volatile_mutex
-from ovs.log.log_handler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
@@ -35,7 +35,7 @@ class volatile_mutex(_volatile_mutex):
         Init method
         """
         super(volatile_mutex, self).__init__(*args, **kwargs)
-        self._logger = LogHandler.get(source='extensions', name='volatile_mutex')
+        self._logger = Logger('extensions-generic')
 
     # Only present to fool PEP8 that this class is a ContextManager
     def __enter__(self):

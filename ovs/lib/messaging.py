@@ -17,10 +17,10 @@
 """
 Messaging module
 """
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.generic.filemutex import file_mutex
-from ovs.log.log_handler import LogHandler
+from ovs.extensions.generic.logger import Logger
+from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
 def synchronized():
@@ -57,7 +57,7 @@ class MessageController(object):
     """
     TIMEOUT = 300
     _cache = VolatileFactory.get_client()
-    _logger = LogHandler.get('lib', name='messaging')
+    _logger = Logger('lib')
 
     class Type(object):
         """
