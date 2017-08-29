@@ -32,10 +32,10 @@ define(['jquery'], function($) {
         { route: 'vdisk/:guid',          moduleId: 'vdisk/vdisk-detail',                    title: $.t('ovs:vdisks.detail.title'),         titlecode: 'ovs:vdisks.detail.title',         nav: false, main: false },
         { route: 'vtemplates',           moduleId: 'vtemplates/vtemplates',                 title: $.t('ovs:vtemplates.title'),            titlecode: 'ovs:vtemplates.title',            nav: true,  main: true  },
         { route: 'login',                moduleId: 'login/login',                           title: $.t('ovs:login.title'),                 titlecode: 'ovs:login.title',                 nav: false, main: false },
-        { route: 'domains',              moduleId: 'domain/domains',                        title: $.t('ovs:domains.title'),               titlecode: 'ovs:domains.title',               nav: true,  main: false },
-        { route: 'users',                moduleId: 'user/users',                            title: $.t('ovs:users.title'),                 titlecode: 'ovs:users.title',                 nav: true,  main: false },
-        { route: 'support',              moduleId: 'support/support',                       title: $.t('ovs:support.title'),               titlecode: 'ovs:support.title',               nav: true,  main: false },
-        { route: 'updates',              moduleId: 'updates/updates',                       title: $.t('ovs:updates.title'),               titlecode: 'ovs:updates.title',               nav: true,  main: false }
+        { route: 'domains',              moduleId: 'admin/domains',                        title: $.t('ovs:domains.title'),               titlecode: 'ovs:domains.title',               nav: true,  main: false },
+        { route: 'users',                moduleId: 'admin/users',                            title: $.t('ovs:users.title'),                 titlecode: 'ovs:users.title',                 nav: true,  main: false },
+        { route: 'support',              moduleId: 'admin/support',                       title: $.t('ovs:support.title'),               titlecode: 'ovs:support.title',               nav: true,  main: false },
+        { route: 'updates',              moduleId: 'admin/updates',                       title: $.t('ovs:updates.title'),               titlecode: 'ovs:updates.title',               nav: true,  main: false }
     ];
     extraRoutes = [];
     routePatches = [];
