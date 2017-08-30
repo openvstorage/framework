@@ -1,5 +1,5 @@
 # Open vStorage Concepts
 Some important Open vStorage concepts:
-* [Master and Extra Nodes](docs/masterextra.md)
-* [The watchers](docs/watchers.md)
-* [The scrubber](docs/watchers.md)
+* [Master and Extra Nodes](masterextra.md)
+* [The watchers](watchers.md)
+* [The scrubber](watchers.md)
