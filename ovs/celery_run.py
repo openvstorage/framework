@@ -115,6 +115,7 @@ class InspectMockup(object):
         return lambda: {'unittests': InspectMockup.states[item]}
 
 
+ovs_logger = Logger('celery')
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     inspect = InspectMockup
     celery = CeleryMockup()
@@ -165,7 +166,6 @@ def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs
     try:
         MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
     except Exception:
-        ovs_logger = Logger('celery')
         ovs_logger.exception('Caught error during post-run handler')
 
 
@@ -184,11 +184,10 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 def load_ovs_logger(**kwargs):
     """Load a logger."""
     if 'logger' in kwargs:
-        kwargs['logger'].handlers = [Logger('celery').handlers[0]]  # Overrule the default celery handlers with OVSes custom handler
+        kwargs['logger'].handlers = [ovs_logger.handlers[0]]  # Overrule the default celery handlers with OVSes custom handler
 
 
 def _clean_cache():
-    ovs_logger = Logger('celery')
     ovs_logger.info('Executing celery "clear_cache" startup script...')
     from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
     active = inspect().active()
