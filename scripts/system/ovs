@@ -62,6 +62,7 @@ function show_help {
     echo "  * Configuration editing:"
     echo "    - ovs config edit some/key                   Opens the contents of 'some/key' in your EDITOR, and updates it after editing"
     echo "    - ovs config list [some]                     Lists all keys [under 'some']"
+    echo "    - ovs config list-recursive [some]           Lists all keys recursively [under 'some']"
     echo "    - ovs config get some/key                    Prints the contents of 'some/key'"
     echo ""
     echo "  * Custom Open vStorage modules:"
@@ -261,6 +262,12 @@ with open('$TEMP', 'r') as f:
         python -c """
 from ovs.extensions.generic.configuration import Configuration
 for entry in Configuration.list('$3'):
+    print entry
+"""
+    elif [ "$2" = "list-recursive" ] ; then
+        python -c """
+from ovs.extensions.generic.configuration import Configuration
+for entry in Configuration.list('$3', recursive=True):
     print entry
 """
     elif [ "$2" = "get" ] ; then
