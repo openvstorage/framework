@@ -1,36 +1,61 @@
 #!/usr/bin/env python
-import re
+# Copyright (C) 2017 iNuron NV
+#
+# This file is part of Open vStorage Open Source Edition (OSE),
+# as available from
+#
+#      http://www.openvstorage.org and
+#      http://www.openvstorage.com.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+# as published by the Free Software Foundation, in version 3 as it comes
+# in the LICENSE.txt file of the Open vStorage OSE distribution.
+#
+# Open vStorage is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY of any kind.
+
+"""
+class RepoMapper
+"""
+
 import os
+import re
 from subprocess import Popen, PIPE
 
 
 class RepoMapper(object):
-
-    mapping = {'master': 'unstable',
+    """
+    Class responsible for fetching the repository based on the branch that Travis is building
+    """
+    MAPPING = {'master': 'unstable',
                'develop': 'fwk-develop'}
 
     @classmethod
     def get_repository(cls):
         """
         Gets the repository associated with the branch travis is working on
-        :return:
+        :return: Name of the repository
+        :rtype: str
         """
         branch = os.environ.get('TRAVIS_BRANCH')
-        mapping = {'master': 'unstable',
-                   'develop': 'fwk-develop'}
-        if branch not in mapping:
+        if branch not in cls.MAPPING:
             # If the branch is not in the mapping by default, figure out it's parent
             branch = cls.determine_parent()  # Let it throw an error when it could not determine the parent
-            if branch not in mapping:
-                raise RuntimeError('Unable to fetch the right repository for branch {0}'.format(branch))
-        return mapping[branch]
+            if branch not in cls.MAPPING:
+                raise RuntimeError('Unable to fetch the right release for branch {0}'.format(branch))
+        return cls.MAPPING[branch]
 
     @classmethod
     def determine_parent(cls):
         """
         When working with a branch which branched of from either master or develop
         knowing which branch it was is necessary to install the correct packaged
-        :return: parent branch
+        :raises RunTimeError: If the branch to build is being used to go into a different branch than develop/master
+        :raises RunTimeError: If the current HEAD cannot be determined
+        :raises RunTimeError: If the parent branch name could not be found
+        :return: Parent branch
+        :rtype: str
         """
         # Validation
         if os.environ.get('TRAVIS_PULL_REQUEST') is False:
@@ -49,7 +74,7 @@ class RepoMapper(object):
         # +    [Documentation-typo] Correct typo  -> all the lines labelled with a * are commits on the HEAD branch (note how the + or * or - line up with the columns on the top)
         #  +   [active_drive] Review comments     -> all of the lines labelled with + are commits on another branch
         #  +   [active_drive^] Alba json cleanup  -> Any lines labelled with - (none in the example diagram) are merge commits
-        current_branch_name = Popen(['git',  'rev-parse', '--abbrev-ref', 'HEAD'], stdout=PIPE, stderr=PIPE).communicate()[0].replace('\n', '')  # Alternative to git branch | grep \* | cut -d ' ' -f2
+        current_branch_name = Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=PIPE, stderr=PIPE).communicate()[0].replace('\n', '')  # Alternative to git branch | grep \* | cut -d ' ' -f2
         # Check on which column the current branch lives
         show_branch_output = Popen(['git', 'show-branch', '--all'], stdout=PIPE, stderr=PIPE).communicate()[0]
         table_separator = re.compile("^[\-]*$")  # Table is separated from its header with only ---
@@ -57,29 +82,27 @@ class RepoMapper(object):
         matching_commit_regex = None
         # Figure out on what column the current head resides
         in_table_header = True
-        commit_message_start = None
+        current_branch_column = None
         parent_branch_name = None
         for line in show_branch_output.splitlines():
-            if line.strip().startswith('*'):
-                # Found the current head line, determine the column
-                commit_message_start = line.index('*')
-                # Avoid fetching the commits with '*   ' as the columns should be completely filled
-                matching_commit_regex = re.compile("^.{%s}[^ ]" % commit_message_start)
-                continue
-            if re.match(table_separator, line.strip()):
-                in_table_header = False
-                continue
-            if in_table_header is False:
-                if commit_message_start is None:
+            if in_table_header is True:
+                if line.strip().startswith('*'):
+                    # Found the current head line, determine the column
+                    current_branch_column = line.index('*')
+                    # Avoid fetching the commits with '*   ' as the columns should be completely filled
+                    matching_commit_regex = re.compile("^.{%s}[^ ].*\[(origin/)?([\w-]*).*\].*" % current_branch_column)
+                    continue
+                if re.match(table_separator, line.strip()):
+                    in_table_header = False
+            else:
+                if current_branch_column is None:
                     raise RuntimeError('Could not check the current head')
                 if not re.match(branch_filter, line):
-                    if re.match(matching_commit_regex, line):
-                        # Match found, extract the name from in between []
-                        parent_branch_name = line.split('[', 1)[1].split(']', 1)[0]
+                    match = re.match(matching_commit_regex, line)
+                    if match:
+                        # Match found, name is within the second group
+                        parent_branch_name = match.groups()[1]
                         # Clean it up
-                        pattern = re.compile('[\^~].*')
-                        parent_branch_name = re.sub(pattern, '', parent_branch_name)
-                        parent_branch_name = cls.remove_prefix(parent_branch_name, 'origin/')
                         break
         if parent_branch_name is None:
             raise RuntimeError('Unable to fetch the parent branch name')
@@ -87,6 +110,12 @@ class RepoMapper(object):
 
     @staticmethod
     def restore_git_head():
+        """
+        Attempts to restore a detached HEAD back to its HEAD
+        Reconfigure the git config to fetch all remote metadata
+        :return: None
+        :rtype: NoneType
+        """
         branch = os.environ.get('TRAVIS_BRANCH')
         travis_commit = os.environ.get('TRAVIS_COMMIT')
         # Restore HEAD reference by checking it out and discarding other commits up to the commit the build was triggered
@@ -99,9 +128,18 @@ class RepoMapper(object):
 
     @staticmethod
     def remove_prefix(text, prefix):
+        """
+        Removes a given prefix from a string
+        :param text: String to remove prefix from
+        :param prefix: Prefix to remove
+        :return: Passed in text with or without the prefix
+        :rtype: str
+        """
         if text.startswith(prefix):
             return text[len(prefix):]
         return text  # or whatever
 
+
 if __name__ == '__main__':
+    # Make sure it gets outputted to stdout for the Travis build to capture
     print RepoMapper.get_repository()
