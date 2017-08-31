@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import re
 import os
-from subprocess import check_output
+from subprocess import Popen, PIPE
 
 
 class RepoMapper(object):
@@ -49,9 +49,9 @@ class RepoMapper(object):
         # +    [Documentation-typo] Correct typo  -> all the lines labelled with a * are commits on the HEAD branch (note how the + or * or - line up with the columns on the top)
         #  +   [active_drive] Review comments     -> all of the lines labelled with + are commits on another branch
         #  +   [active_drive^] Alba json cleanup  -> Any lines labelled with - (none in the example diagram) are merge commits
-        current_branch_name = check_output('git rev-parse --abbrev-ref HEAD', shell=True).replace('\n', '')  # Alternative to git branch | grep \* | cut -d ' ' -f2
+        current_branch_name = Popen(['git',  'rev-parse', '--abbrev-ref', 'HEAD'], stdout=PIPE, stderr=PIPE).communicate()[0].replace('\n', '')  # Alternative to git branch | grep \* | cut -d ' ' -f2
         # Check on which column the current branch lives
-        show_branch_output = check_output('git show-branch --all', shell=True)
+        show_branch_output = Popen(['git', 'show-branch', '--all'], stdout=PIPE, stderr=PIPE).communicate()[0]
         table_separator = re.compile("^[\-]*$")  # Table is separated from its header with only ---
         branch_filter = re.compile("^[^\[]*\[{0}".format(current_branch_name))  # Filter out results from own branch
         matching_commit_regex = None
@@ -89,13 +89,13 @@ class RepoMapper(object):
     def restore_git_head():
         branch = os.environ.get('TRAVIS_BRANCH')
         travis_commit = os.environ.get('TRAVIS_COMMIT')
-        print "Resetting branch {0} to {1}".format(branch, travis_commit)
         # Restore HEAD reference by checking it out and discarding other commits up to the commit the build was triggered
-        check_output('git checkout {0}'.format(branch), shell=True)
-        check_output('git reset --hard {0}'.format(travis_commit))
+
+        Popen(['git', 'checkout', str(branch)], stdout=PIPE, stderr=PIPE).communicate()
+        Popen(['git', 'reset', '--hard', str(travis_commit)], stdout=PIPE, stderr=PIPE).communicate()
         # Fetch references to other branches to make sure we can detect of which branch we currently branch off
-        check_output('git config --replace-all remote.origin.fetch +refs/heads/*:refs/remotes/origin/*')
-        check_output('git fetch')
+        Popen(['git', 'config', '--replace-all', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*'], stdout=PIPE, stderr=PIPE).communicate()
+        Popen(['git', 'fetch'], stdout=PIPE, stderr=PIPE).communicate()
 
     @staticmethod
     def remove_prefix(text, prefix):
