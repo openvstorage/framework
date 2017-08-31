@@ -32,6 +32,14 @@ class RepoMapper(object):
         knowing which branch it was is necessary to install the correct packaged
         :return: parent branch
         """
+        # Validation
+        if os.environ.get('TRAVIS_PULL_REQUEST') is False:
+            # Travis will be performing a merge and run the tests on the result of the merge when it's a PR
+            # To currently check which apt-repo to use, we need to restore the HEAD reference by checking out the branch we would test on
+            # However this would mean we'd lose the merge and thus would be testing the wrong things
+            raise RuntimeError('Travis is currently not supporting pull requests on branches other than master and develop')
+        # Restore HEAD
+        cls.restore_git_head()
         # Git show branch will output something like: (https://wincent.com/wiki/Understanding_the_output_of_%22git_show-branch%22)
         # ! [Documentation-typo] Correct typo     -> non head branch (indicated by the !) + latest commit
         #  ! [active_drive] Review comments       -> Currently checked out head (indicated by the *) + latest commit
@@ -76,6 +84,18 @@ class RepoMapper(object):
         if parent_branch_name is None:
             raise RuntimeError('Unable to fetch the parent branch name')
         return parent_branch_name
+
+    @staticmethod
+    def restore_git_head():
+        branch = os.environ.get('TRAVIS_BRANCH')
+        travis_commit = os.environ.get('TRAVIS_COMMIT')
+        print "Resetting branch {0} to {1}".format(branch, travis_commit)
+        # Restore HEAD reference by checking it out and discarding other commits up to the commit the build was triggered
+        check_output('git checkout {0}'.format(branch), shell=True)
+        check_output('git reset --hard {0}'.format(travis_commit))
+        # Fetch references to other branches to make sure we can detect of which branch we currently branch off
+        check_output('git config --replace-all remote.origin.fetch +refs/heads/*:refs/remotes/origin/*')
+        check_output('git fetch')
 
     @staticmethod
     def remove_prefix(text, prefix):
