@@ -47,7 +47,7 @@ class OAuth2TokenView(View):
         """
         Handles token post
         """
-        logger = Logger('oauth2')
+        logger = Logger('api')
         _ = args, kwargs
         if 'grant_type' not in request.POST:
             raise HttpBadRequestException(error='invalid_request',
