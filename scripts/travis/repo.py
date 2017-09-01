@@ -90,7 +90,7 @@ class RepoMapper(object):
                     # Found the current head line, determine the column
                     current_branch_column = line.index('*')
                     # Avoid fetching the commits with '*   ' as the columns should be completely filled
-                    matching_commit_regex = re.compile("^.{%s}[^ ].*\[(origin/)?([\w-]*).*\].*" % current_branch_column)
+                    matching_commit_regex = re.compile("^.{%s}[^ ].*\[(?:origin/)?(?P<branch>[\w-]*).*\].*" % current_branch_column)
                     continue
                 if re.match(table_separator, line.strip()):
                     in_table_header = False
@@ -101,7 +101,7 @@ class RepoMapper(object):
                     match = re.match(matching_commit_regex, line)
                     if match:
                         # Match found, name is within the second group
-                        parent_branch_name = match.groups()[1]
+                        parent_branch_name = match.groupdict()['branch']
                         # Clean it up
                         break
         if parent_branch_name is None:
