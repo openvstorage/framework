@@ -7,6 +7,7 @@ notifications:
     rooms:
       secure: Ze8lCMV8b38bfesOMfmAYchAde0c23BMkz4PVc1g1p4sdGBSvrfGx15l8Mp4hfoOme51+wctGa38z42HiESCe0hjM2mEkh2OljxNs39Ug/ZpCBveEi63tt/tIfqBjm16Fvi73Y9LvjTOSKB7isaPaUMgh4QDEZJ0SgN7aIhP/9DOnKVPwX0AcYDO4Bk4Gu9wM9jMoe8wAE1lalZa7iTtTG5L+EtTbok3NhiRKxKRuNOSAtP/8aHsp46lZL64Fix3i6RKXE+DjU5hzXchMwF3Qp0hr63S9G+KnK6H3JRQEsUUdjYQ7nKDMZRI9VQUlncGCjTgz1xLcknhMZ/eAagm82youMkzPgE/HDpfirwWF+G0Vu8DIbKiAuXcfVElhw+d4aoE8HWQkTFxaP057br28NPI2QgPTMDldq3ZakoEgI3PvGyZx4mxYRUWqKKzgl8PQu9cMEfp2x3y+tvEqCxByDvfjZOYn627O1MvxsrLpKEP+6TNRY15q+bKbMXuAJmqD+Ez0KVMbxKVlHot+FXGbEjLQsZqfrD4nQqdweaeMa5Na3NUHXhzOQFk5TrD1PSmjaG7t47qn3T5aDkgBwsbgY8WR2eFkQhGSAHYE96QoSpxibe4eYYf+zXX0gcgHUMWh7T5tW5kvaq/vAcFT99hgsL07UWQ5DGOZCOpIctE2Ik=
 before_install:
+- env | sort
 - sudo echo "deb http://apt.openvstorage.org `python scripts/travis/repo.py` main" | sudo tee -a /etc/apt/sources.list
 - sudo rm -rf /var/lib/apt/lists/*
 - sudo apt-get -qq update
