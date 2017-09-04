@@ -32,7 +32,7 @@ from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
 from ovs_extensions.api.exceptions import HttpBadRequestException
-from ovs.log.log_handler import LogHandler
+from ovs.extensions.generic.logger import Logger
 
 
 class OAuth2TokenView(View):
@@ -47,7 +47,7 @@ class OAuth2TokenView(View):
         """
         Handles token post
         """
-        logger = LogHandler.get('api', 'oauth2')
+        logger = Logger('api')
         _ = args, kwargs
         if 'grant_type' not in request.POST:
             raise HttpBadRequestException(error='invalid_request',

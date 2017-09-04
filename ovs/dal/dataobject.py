@@ -30,12 +30,12 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 from ovs.dal.helpers import Descriptor, DalToolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.log_handler import LogHandler
 
 
 class MetaClass(type):
@@ -147,7 +147,7 @@ class DataObject(object):
     _properties = []  # Blueprint data of the object type
     _dynamics = []    # Timeout of readonly object properties cache
     _relations = []   # Blueprint for relations
-    _logger = LogHandler.get('dal', name='dataobject')
+    _logger = Logger('dal')
 
     NAMESPACE = 'ovs_data'  # Arakoon namespace
 

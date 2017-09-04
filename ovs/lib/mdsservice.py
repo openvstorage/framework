@@ -33,13 +33,13 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient, SRCObjectNotFoundException, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
-from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 
 
@@ -47,9 +47,9 @@ class MDSServiceController(object):
     """
     Contains all BLL related to MDSServices
     """
-    _logger = LogHandler.get('lib', name='mds')
+    _logger = Logger('lib')
 
-    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'))
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -841,7 +841,6 @@ class MDSServiceController(object):
         Prints the current MDS layout
         :return: None
         """
-        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
         try:
             while True:
                 output = ['',

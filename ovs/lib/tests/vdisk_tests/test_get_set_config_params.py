@@ -27,7 +27,7 @@ import unittest
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.log.log_handler import LogHandler
+from ovs_extensions.log.logger import Logger
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import DTLConfig
 from ovs.lib.vdisk import VDiskController
@@ -169,10 +169,10 @@ class VDiskTest(unittest.TestCase):
         vdisk = vdisks[1]
         with self.assertRaises(Exception):
             VDiskController.set_config_params(vdisk.guid, new_config_params={'dtl_mode': 'a_sync'})
-        logs = [log for log in LogHandler._logs['lib_vdisk'] if 'No possible StorageRouters' in log and vdisk.name in log]
+        logs = [log for log in Logger._logs['lib'] if 'No possible StorageRouters' in log and vdisk.name in log]
         vdisk.discard()
         self.assertEqual(first=1, second=len(logs))
-        self.assertEqual(first='error', second=LogHandler._logs['lib_vdisk'][logs[0]])
+        self.assertEqual(first='ERROR', second=Logger._logs['lib'][logs[0]])
         self.assertFalse(expr=vdisk.has_manual_dtl)
         self.assertEqual(first='ok_standalone', second=vdisk.dtl_status)
         self.assertEqual(first=0, second=len(vdisk.domains_dtl_guids))
@@ -200,10 +200,10 @@ class VDiskTest(unittest.TestCase):
         vdisk = vdisks[3]
         with self.assertRaises(Exception):
             VDiskController.set_config_params(vdisk.guid, new_config_params={'dtl_mode': 'a_sync'})
-        logs = [log for log in LogHandler._logs['lib_vdisk'] if 'No possible StorageRouters' in log and vdisk.name in log]
+        logs = [log for log in Logger._logs['lib'] if 'No possible StorageRouters' in log and vdisk.name in log]
         vdisk.discard()
         self.assertEqual(first=1, second=len(logs))
-        self.assertEqual(first='error', second=LogHandler._logs['lib_vdisk'][logs[0]])
+        self.assertEqual(first='ERROR', second=Logger._logs['lib'][logs[0]])
         self.assertFalse(expr=vdisk.has_manual_dtl)
         self.assertEqual(first='disabled', second=vdisk.dtl_status)
         self.assertEqual(first=0, second=len(vdisk.domains_dtl_guids))
@@ -247,10 +247,10 @@ class VDiskTest(unittest.TestCase):
         vdisk = vdisks[1]
         with self.assertRaises(Exception):
             VDiskController.set_config_params(vdisk.guid, new_config_params={'dtl_mode': 'a_sync', 'dtl_target': [domain_1.guid]})
-        logs = [log for log in LogHandler._logs['lib_vdisk'] if 'No possible StorageRouters' in log and vdisk.name in log]
+        logs = [log for log in Logger._logs['lib'] if 'No possible StorageRouters' in log and vdisk.name in log]
         vdisk.discard()
         self.assertEqual(first=1, second=len(logs))
-        self.assertEqual(first='error', second=LogHandler._logs['lib_vdisk'][logs[0]])
+        self.assertEqual(first='ERROR', second=Logger._logs['lib'][logs[0]])
         self.assertFalse(expr=vdisk.has_manual_dtl)
         self.assertEqual(first='ok_standalone', second=vdisk.dtl_status)
         self.assertEqual(first=0, second=len(vdisk.domains_dtl_guids))
@@ -281,10 +281,10 @@ class VDiskTest(unittest.TestCase):
         vdisk = vdisks[3]
         with self.assertRaises(Exception):
             VDiskController.set_config_params(vdisk.guid, new_config_params={'dtl_mode': 'a_sync', 'dtl_target': [domain_1.guid, domain_2.guid]})
-        logs = [log for log in LogHandler._logs['lib_vdisk'] if 'No possible StorageRouters' in log and vdisk.name in log]
+        logs = [log for log in Logger._logs['lib'] if 'No possible StorageRouters' in log and vdisk.name in log]
         vdisk.discard()
         self.assertEqual(first=1, second=len(logs))
-        self.assertEqual(first='error', second=LogHandler._logs['lib_vdisk'][logs[0]])
+        self.assertEqual(first='ERROR', second=Logger._logs['lib'][logs[0]])
         self.assertFalse(expr=vdisk.has_manual_dtl)
         self.assertEqual(first='disabled', second=vdisk.dtl_status)
         self.assertEqual(first=0, second=len(vdisk.domains_dtl_guids))
@@ -385,9 +385,9 @@ class VDiskTest(unittest.TestCase):
         with self.assertRaises(Exception):
             VDiskController.set_config_params(vdisk.guid, new_config_params={'dtl_mode': 'a_sync'})
         vdisk.discard()
-        logs = [log for log in LogHandler._logs['lib_vdisk'] if 'No possible StorageRouters' in log and vdisk.name in log]
+        logs = [log for log in Logger._logs['lib'] if 'No possible StorageRouters' in log and vdisk.name in log]
         self.assertEqual(first=1, second=len(logs))
-        self.assertEqual(first='error', second=LogHandler._logs['lib_vdisk'][logs[0]])
+        self.assertEqual(first='ERROR', second=Logger._logs['lib'][logs[0]])
         self.assertFalse(expr=vdisk.has_manual_dtl)
         self.assertEqual(first='ok_standalone', second=vdisk.dtl_status)
         self.assertEqual(first=0, second=len(vdisk.domains_dtl_guids))

@@ -17,12 +17,11 @@
 """
 Service Factory for the OVS Framework
 """
-import logging
+
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs_extensions.services.servicefactory import ServiceFactory as _ServiceFactory
-
-logger = logging.getLogger(__name__)
 
 
 class ServiceFactory(_ServiceFactory):
@@ -45,3 +44,7 @@ class ServiceFactory(_ServiceFactory):
     @classmethod
     def _get_configuration(cls):
         return Configuration
+
+    @classmethod
+    def _get_logger_instance(cls):
+        return Logger('extensions')

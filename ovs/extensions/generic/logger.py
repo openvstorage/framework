@@ -15,33 +15,24 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Contains the LogHandler module
+Contains the Logger module
 """
 
-import inspect
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
-from ovs_extensions.log.log_handler import LogHandler as _LogHandler
+from ovs_extensions.log.logger import Logger as _Logger
 
 
-class LogHandler(_LogHandler):
+class Logger(_Logger):
     """
-    Log handler.
-
-    WARNING: This log handler might be highly unreliable if not used correctly. It can log to redis, but if Redis is
-    not working as expected, it will result in lost log messages. If you want reliable logging, do not use Redis at all
-    or log to files and have a separate process forward them to Redis (so logs can be re-send if Redis is unavailable)
+    Logger class
     """
-
     LOG_PATH = '/var/log/ovs'
 
-    def __init__(self, source, name, propagate, target_type):
+    def __init__(self, name, forced_target_type=None):
         """
-        Dummy init method
+        Init method
         """
-        _ = self, source, name, propagate, target_type
-        parent_invoker = inspect.stack()[1]
-        if not __file__.startswith(parent_invoker[1]) or parent_invoker[3] != 'get':
-            raise RuntimeError('Cannot invoke instance from outside this class. Please use LogHandler.get(source, name=None) instead')
+        super(Logger, self).__init__(name, forced_target_type)
 
     @classmethod
     def get_logging_info(cls):
@@ -52,5 +43,5 @@ class LogHandler(_LogHandler):
         """
         try:
             return Configuration.get('/ovs/framework/logging')
-        except NotFoundException:
+        except (IOError, NotFoundException):
             return {}

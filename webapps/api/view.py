@@ -33,16 +33,16 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.client import OVSClient
 from ovs_extensions.api.exceptions import HttpMethodNotAllowedException
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.log_handler import LogHandler
 
 
 class MetadataView(View):
     """
     Implements retrieval of generic metadata about the services
     """
-    _logger = LogHandler.get('api', name='metadata')
+    _logger = Logger('api')
 
     @auto_response()
     @limit(amount=60, per=60, timeout=60)
@@ -188,7 +188,7 @@ def relay(*args, **kwargs):
             message = ex.detail
         if hasattr(ex, 'status_code'):
             status_code = ex.status_code
-        logger = LogHandler.get('api', name='metadata')
+        logger = Logger('api')
         logger.exception('Error relaying call: {0}'.format(message))
         return HttpResponse(json.dumps({'error_description': message,
                                         'error': 'relay_error'}),

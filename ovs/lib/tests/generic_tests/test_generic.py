@@ -28,10 +28,10 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
+from ovs_extensions.log.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs_extensions.generic.threadhelpers import Waiter
-from ovs_extensions.log.log_handler import LogHandler
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
@@ -307,7 +307,7 @@ class Generic(unittest.TestCase):
         self.assertIn(member='No scrub locations found',
                       container=raise_info.exception.message)
         self.assertNotIn(member=expected_log,
-                         container=LogHandler._logs['lib_generic tasks'])
+                         container=Logger._logs['lib'])
 
         # Restore SCRUB partition and make sure StorageRouter is unreachable
         storagerouter.disks[0].partitions[0].roles = [DiskPartition.ROLES.SCRUB]
@@ -316,11 +316,11 @@ class Generic(unittest.TestCase):
         SSHClient._raise_exceptions[storagerouter.ip] = {'users': ['root'], 'exception': UnableToConnectException('No route to host')}
         with self.assertRaises(ValueError):
             GenericController.execute_scrub(vdisk_guids=[vdisk.guid])
-        logs = LogHandler._logs['lib_generic tasks']
+        logs = Logger._logs['lib']
         self.assertIn(member=expected_log,
                       container=logs)
         self.assertEqual(first=logs[expected_log],
-                         second='warning')
+                         second='WARNING')
 
         # Now actually attempt to scrub
         SSHClient._raise_exceptions = {}
@@ -467,7 +467,7 @@ class Generic(unittest.TestCase):
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
         self.assertIn(member='Scrubber - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vpool.name, vdisk_t.guid, vdisk_t.name),
-                      container=LogHandler._logs['lib_generic tasks'])
+                      container=Logger._logs['lib'])
 
         ##############
         # Scenario 4 #
@@ -600,14 +600,14 @@ class Generic(unittest.TestCase):
                                  list2=expected_work)
 
         # Scrub all volumes on specific StorageRouter
-        LogHandler._logs = {}
+        Logger._logs = {}
         for vdisk_id, vdisk in vdisks.iteritems():
             LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
         GenericController.execute_scrub(storagerouter_guid=storagerouters[2].guid)
         for vdisk_id, vdisk in vdisks.iteritems():
             self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
                                  list2=[])
-        logs = LogHandler._logs['lib_generic tasks']
+        logs = Logger._logs['lib']
         for log in logs:
             self.assertNotRegexpMatches(text=log,
                                         unexpected_regexp='.*Scrubber - vPool [{0}|{1}] - StorageRouter {2} - .*'.format(vpools[1].name, vpools[2].name, storagerouters[1].name))
@@ -659,13 +659,13 @@ class Generic(unittest.TestCase):
             vdisk = vdisks[vdisk_id]
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
-        LogHandler._logs = {}
+        Logger._logs = {}
         GenericController.execute_scrub()
         # Verify all threads have been 'consumed'
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
         counter = 0
-        for log in LogHandler._logs['lib_generic tasks']:
+        for log in Logger._logs['lib']:
             if 'threads for proxy service' in log:
                 match = re.match('^Scrubber - .*ovs-albaproxy_[1|2]_([1|2])_.*', log)
                 self.assertIsNotNone(match)
@@ -762,13 +762,13 @@ class Generic(unittest.TestCase):
         GenericController.collapse_arakoon()
 
         # Verify all log messages for each type of cluster
-        generic_logs = LogHandler._logs.get('lib_generic tasks', {})
+        generic_logs = Logger._logs.get('lib', {})
         for cluster_name in successful_clusters + failed_clusters + external_clusters:
-            collect_msg = ('debug', 'Collecting info for cluster {0}'.format(cluster_name))
-            unreachable_msg = ('error', 'Could not collapse any cluster on {0} (not reachable)'.format(storagerouter_2.name))
-            end_collapse_msg = ('debug', 'Collapsing cluster {0} on {1} completed'.format(cluster_name, storagerouter_1.ip))
-            start_collapse_msg = ('debug', 'Collapsing cluster {0} on {1}'.format(cluster_name, storagerouter_1.ip))
-            failed_collapse_msg = ('exception', 'Collapsing cluster {0} on {1} failed'.format(cluster_name, storagerouter_1.ip))
+            collect_msg = ('DEBUG', 'Collecting info for cluster {0}'.format(cluster_name))
+            unreachable_msg = ('ERROR', 'Could not collapse any cluster on {0} (not reachable)'.format(storagerouter_2.name))
+            end_collapse_msg = ('DEBUG', 'Collapsing cluster {0} on {1} completed'.format(cluster_name, storagerouter_1.ip))
+            start_collapse_msg = ('DEBUG', 'Collapsing cluster {0} on {1}'.format(cluster_name, storagerouter_1.ip))
+            failed_collapse_msg = ('ERROR', 'Collapsing cluster {0} on {1} failed'.format(cluster_name, storagerouter_1.ip))
             messages_to_validate = []
             if cluster_name in successful_clusters:
                 assert_function = self.assertIn

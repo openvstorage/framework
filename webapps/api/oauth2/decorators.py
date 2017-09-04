@@ -25,9 +25,9 @@ from django.http import HttpResponse
 from functools import wraps
 from rest_framework.request import Request
 from ovs_extensions.api.exceptions import HttpForbiddenException, HttpTooManyRequestsException
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.log_handler import LogHandler
 
 
 def _find_request(args):
@@ -73,7 +73,7 @@ def limit(amount, per, timeout):
     """
     Rate-limits the decorated call
     """
-    logger = LogHandler.get('api', 'oauth2')
+    logger = Logger('oauth2')
 
     def wrap(f):
         """
@@ -125,6 +125,7 @@ def log():
     """
     Task logger
     """
+    logger = Logger('oauth2')
 
     def wrap(f):
         """
@@ -145,8 +146,7 @@ def log():
                 for key in metadata[mtype]:
                     if 'password' in key:
                         metadata[mtype][key] = '**********************'
-            _logger = LogHandler.get('log', name='api')
-            _logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
+            logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
                 f.__module__,
                 f.__name__,
                 getattr(request, 'client').user_guid if hasattr(request, 'client') else None,

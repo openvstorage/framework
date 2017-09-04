@@ -23,16 +23,15 @@ import time
 from distutils.version import LooseVersion
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.log.log_handler import LogHandler
 
 
 class StorageRouter(DataObject):
     """
     A StorageRouter represents the Open vStorage software stack, any (v)machine on which it is installed
     """
-    _logger = LogHandler.get('dal', name='hybrid')
-
+    _logger = Logger('hybrids')
     __properties = [Property('name', str, unique=True, doc='Name of the Storage Router.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Router.'),
                     Property('machine_id', str, unique=True, mandatory=False, indexed=True, doc='The hardware identifier of the Storage Router'),

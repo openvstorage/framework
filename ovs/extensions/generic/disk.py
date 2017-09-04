@@ -17,6 +17,7 @@
 Disk module
 """
 from ovs_extensions.generic.disk import DiskTools as _DiskTools
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.os.osfactory import OSFactory
 
 
@@ -24,6 +25,10 @@ class DiskTools(_DiskTools):
     """
     This class contains various helper methods wrt Disk maintenance
     """
+    logger = Logger('extensions-generic')
+
+    def __init__(self):
+        super(DiskTools, self).__init__()
 
     @classmethod
     def _get_os_manager(cls):

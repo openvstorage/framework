@@ -17,6 +17,7 @@
 """
 Celery entry point module
 """
+
 from __future__ import absolute_import
 
 import sys
@@ -32,6 +33,7 @@ from celery.task.control import inspect
 from kombu import Queue
 from threading import Thread
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
@@ -39,7 +41,6 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.messaging import MessageController
-from ovs.log.log_handler import LogHandler
 
 
 class CeleryMockup(object):
@@ -114,6 +115,7 @@ class InspectMockup(object):
         return lambda: {'unittests': InspectMockup.states[item]}
 
 
+ovs_logger = Logger('celery')
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     inspect = InspectMockup
     celery = CeleryMockup()
@@ -158,14 +160,13 @@ else:
 @task_postrun.connect
 def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs=None, **kwds):
     """
-    Hook for celery postrun event
+    Hook for celery post-run event
     """
     _ = sender, task, args, kwargs, kwds
     try:
         MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
-    except Exception as ex:
-        loghandler = LogHandler.get('celery', name='celery')
-        loghandler.error('Caught error during postrun handler: {0}'.format(ex))
+    except Exception:
+        ovs_logger.exception('Caught error during post-run handler')
 
 
 @worker_process_init.connect
@@ -176,7 +177,6 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
     _ = args, kwargs, kwds
     VolatileFactory.store = None
     PersistentFactory.store = None
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
 
 
 @after_setup_task_logger.connect
@@ -184,12 +184,11 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 def load_ovs_logger(**kwargs):
     """Load a logger."""
     if 'logger' in kwargs:
-        kwargs['logger'] = LogHandler.get('celery', name='celery')
+        kwargs['logger'].handlers = [ovs_logger.handlers[0]]  # Overrule the default celery handlers with OVSes custom handler
 
 
 def _clean_cache():
-    loghandler = LogHandler.get('celery', name='celery')
-    loghandler.info('Executing celery "clear_cache" startup script...')
+    ovs_logger.info('Executing celery "clear_cache" startup script...')
     from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
     active = inspect().active()
     active_tasks = []
@@ -210,17 +209,16 @@ def _clean_cache():
                 if len(new_values) > 0:
                     entry['values'] = new_values
                     cache.set(key, entry)
-                    loghandler.info('Updated key {0}'.format(key))
+                    ovs_logger.info('Updated key {0}'.format(key))
                 else:
                     cache.delete(key)
-                    loghandler.info('Deleted key {0}'.format(key))
+                    ovs_logger.info('Deleted key {0}'.format(key))
         except KeyNotFoundException:
             pass
-    loghandler.info('Executing celery "clear_cache" startup script... done')
+    ovs_logger.info('Executing celery "clear_cache" startup script... done')
 
 
 if __name__ == '__main__':
     import sys
     if len(sys.argv) == 2 and sys.argv[1] == 'clear_cache':
-        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
         _clean_cache()

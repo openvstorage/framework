@@ -27,6 +27,7 @@ from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInst
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex, NoLockAvailableException
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -38,16 +39,13 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.decorators import add_hooks, ovs_task
 from ovs.lib.helpers.toolbox import Toolbox
-from ovs.log.log_handler import LogHandler
 
 
 class UpdateController(object):
     """
     This class contains all logic for updating an environment
     """
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
-    _logger = LogHandler.get('update', name='core')
-    _logger.logger.propagate = False
+    _logger = Logger('lib')
     _update_file = '/etc/ready_for_upgrade'
     _update_ongoing_file = '/etc/update_ongoing'
 

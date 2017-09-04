@@ -26,16 +26,16 @@ import requests
 from subprocess import check_output
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.packages.packagefactory import PackageFactory
-from ovs.log.log_handler import LogHandler
 
 
 class SupportAgent(object):
     """
     Represents the Support client
     """
-    _logger = LogHandler.get('support', name='agent')
+    _logger = Logger('extensions-support')
 
     def __init__(self):
         """
@@ -157,7 +157,7 @@ class SupportAgent(object):
         try:
             response = requests.post(self._url,
                                      data={'data': json.dumps(self.get_heartbeat_data())},
-                                     headers={'Accept': 'application/json; version=1'})
+                                     headers={'Accept': 'application/json; version=6'})
             if response.status_code != 200:
                 raise RuntimeError('Received invalid status code: {0} - {1}'.format(response.status_code, response.text))
             return_data = response.json()
@@ -191,8 +191,7 @@ class SupportAgent(object):
 
 
 if __name__ == '__main__':
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
-    logger = LogHandler.get('support', name='agent')
+    logger = Logger('extensions-support')
     try:
         if Configuration.get('/ovs/framework/support|enabled') is False:
             print 'Support not enabled'

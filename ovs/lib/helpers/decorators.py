@@ -26,10 +26,10 @@ import string
 import inspect
 import threading
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
-from ovs.log.log_handler import LogHandler
 
 ENSURE_SINGLE_KEY = 'ovs_ensure_single'
 
@@ -75,7 +75,7 @@ def log(event_type):
                 metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id']).guid}
             else:
                 metadata = {}
-            _logger = LogHandler.get('log', name=event_type.lower())
+            _logger = Logger(event_type.lower())
             _logger.info('[{0}.{1}] - {2} - {3} - {4}'.format(
                 f.__module__,
                 f.__name__,
@@ -147,7 +147,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
     :return: Pointer to function
     :rtype: func
     """
-    logger = LogHandler.get('lib', name='ensure single')
+    logger = Logger('lib')
 
     def wrap(f):
         """

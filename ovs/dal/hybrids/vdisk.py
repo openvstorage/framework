@@ -27,18 +27,17 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Dynamic, Property, Relation
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient,\
                                                        SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
-from ovs.log.log_handler import LogHandler
 
 
 class VDisk(DataObject):
     """
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     """
-    _logger = LogHandler.get('dal', name='hybrid')
-
+    _logger = Logger('hybrids')
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
                     Property('size', int, doc='Size of the vDisk in Bytes.'),

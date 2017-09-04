@@ -27,12 +27,12 @@ from celery import current_app
 from celery.beat import Scheduler
 from celery.schedules import crontab, timedelta
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonSockNotReadable
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.toolbox import Schedule
-from ovs.log.log_handler import LogHandler
 
 
 class DistributedScheduler(Scheduler):
@@ -46,7 +46,7 @@ class DistributedScheduler(Scheduler):
         Initializes the distributed scheduler
         """
         self._mutex = volatile_mutex('celery_beat', 10)
-        self._logger = LogHandler.get('celery', name='celery beat')
+        self._logger = Logger('celery')
         self._has_lock = False
         self._lock_name = 'ovs_celery_beat_lock'
         self._entry_name = 'ovs_celery_beat_entries'
