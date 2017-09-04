@@ -534,15 +534,12 @@ class NodeInstallationController(object):
                         boxed=True)
             NodeInstallationController._logger.info('Setup complete')
 
-            try:
-                # Try to trigger setups from possibly installed other packages
+            # Try to trigger setups from possibly installed other packages
+            if root_client.run(['which', 'asd-manager'], allow_nonzero=True) != '':
                 sys.path.append('/opt/asd-manager/')
                 from source.asdmanager import setup
                 Toolbox.log(logger=NodeInstallationController._logger, messages='\nA local ASD Manager was detected for which the setup will now be launched.\n')
                 setup()
-            except:
-                pass
-
         except Exception as exception:
             Toolbox.log(logger=NodeInstallationController._logger, messages='\n')
             Toolbox.log(logger=NodeInstallationController._logger, messages=['An unexpected error occurred:', str(exception).lstrip('\n')], boxed=True, loglevel='exception')
@@ -731,7 +728,7 @@ class NodeInstallationController(object):
                     Interactive.ask_continue()
                 external_config = True
 
-        bootstrap_location = Configuration.BOOTSTRAP_CONFIG_LOCATION
+        bootstrap_location = Configuration.CONFIG_STORE_LOCATION
         if not target_client.file_exists(bootstrap_location):
             target_client.file_create(bootstrap_location)
         target_client.file_write(bootstrap_location, json.dumps({'configuration_store': 'arakoon'}, indent=4))
@@ -878,8 +875,8 @@ class NodeInstallationController(object):
         master_client = ip_client_map[master_ip]
         machine_id = System.get_my_machine_id(target_client)
 
-        target_client.file_write(Configuration.BOOTSTRAP_CONFIG_LOCATION,
-                                 master_client.file_read(Configuration.BOOTSTRAP_CONFIG_LOCATION))
+        target_client.file_write(Configuration.CONFIG_STORE_LOCATION,
+                                 master_client.file_read(Configuration.CONFIG_STORE_LOCATION))
         target_client.file_write(Configuration.CACC_LOCATION,
                                  master_client.file_read(Configuration.CACC_LOCATION))
         Configuration.initialize_host(machine_id)
