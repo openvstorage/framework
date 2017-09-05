@@ -131,4 +131,4 @@ class Configuration(_Configuration):
         """
         with open(cls.CONFIG_STORE_LOCATION) as config_file:
             contents = json.load(config_file)
-            return contents['configuration_store']
+            return contents['configuration_store'], None  # For update we need to return a tuple
