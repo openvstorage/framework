@@ -21,11 +21,10 @@ services:
 before_install:
   - env | sort
   - docker --version
-  - repo=`python scripts/travis/repo.py`  # Has to be while still in the cloned repository directory
-  - cd ..  # Move out so the docker build can access the framework directory
+  - repo=`python scripts/travis/repo.py`
 install:
   - docker pull ${distribution}
-  - docker build --cache-from ${distribution} --tag fwk --build-arg repo=${repo} --file framework/scripts/travis/docker/${distribution}/Dockerfile .
+  - docker build --cache-from ${distribution} --tag fwk --build-arg repo=${repo} --file scripts/travis/docker/${distribution}/Dockerfile .
   - docker run -dit --name fwk fwk  # Run it detached, with stdin open and TTY to keep it running
   - docker ps -a
 script:

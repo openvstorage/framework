@@ -24,7 +24,7 @@ RUN rm -rf /opt/OpenvStorage \
     && chmod 777 /run
 
 # Move over the Travis cloned code base
-ADD framework /opt/OpenvStorage
+ADD . /opt/OpenvStorage
 
 # Further tweaks to run our tests
 RUN cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/ \
