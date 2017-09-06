@@ -29,7 +29,8 @@ define([
             'extender': {numeric: {min: 1, max: 65535}}
         },
         'integer': {
-            'inputType': 'text',
+            'inputType': 'widget',
+            'widgetName': 'numberinput',
             'extender': {numeric: {}}
         }
     };
@@ -94,7 +95,8 @@ define([
                 var display = gatheredData.display;
                 var observable = gatheredData.observable;
                 var linkedObservable = gatheredData.linkedObservable;
-                var formItem = generateFormItem(observable, field, group, display, target, inputType, inputItems, linkedObservable);
+                var widgetName = gatheredData.widgetName;
+                var formItem = generateFormItem(observable, field, group, display, target, inputType, inputItems, linkedObservable, formFieldMapping, widgetName);
                 formQuestions.push(formItem);
             }
         }
@@ -122,6 +124,7 @@ define([
         var display = undefined;
         var extender = undefined;
         var inputItems = undefined;
+        var widgetName = undefined;
         // Check if list of known types
         if (type !== undefined && type.startsWith(listPrefix)) {
             arrayType = true;
@@ -135,6 +138,7 @@ define([
             group = typeMapping[type].group || group;
             display = typeMapping[type].displayOn || display;
             extender = typeMapping[type].extender || extender;
+            widgetName = typeMapping[type].widgetName || widgetName;
         }
         // Optionally overrule with provided mapping
         if (field in actionMapping) {
@@ -145,6 +149,7 @@ define([
             group = actionMapping[field].group || group;
             display = actionMapping[field].displayOn || display;
             extender = actionMapping[field].extender || extender;
+            widgetName = actionMapping[field].widgetName || widgetName;
         }
         // Add data-binding
         var observable = ko.observable();
@@ -176,14 +181,14 @@ define([
             'display': display,
             'extender': extender,
             'observable': observable,
-            'linkedObservable': linkedObservable
+            'linkedObservable': linkedObservable,
+            'widgetName': widgetName
         }
     }
 
-    function generateFormItem(observable, field, group, display, target, inputType, inputItems, linkedObservable, fieldMapping) {
+    function generateFormItem(observable, field, group, display, target, inputType, inputItems, linkedObservable, fieldMapping, widgetName) {
         /**
          * Generate a form item
-         * @param fieldMapping: Optional param. This fieldmapping should be filled in
          */
         // Defaults
         group = (typeof group !== 'undefined') ? group : undefined;
@@ -192,6 +197,7 @@ define([
         inputItems = (typeof inputItems !== 'undefined') ? inputItems : undefined;
         linkedObservable = (typeof linkedObservable !== 'undefined') ? linkedObservable : undefined;  // Used with arrays.
         fieldMapping = (typeof fieldMapping !== 'undefined') ? fieldMapping : formFieldMapping;
+        widgetName = (typeof widgetName !== 'undefined') ? widgetName : undefined;
         var id = field;
         var extendable = false;
         // The linkedObservable can be the container for multiple formItems data
@@ -210,7 +216,8 @@ define([
             'mappedField': ko.observable(target),
             'input': ko.observable({
                 'type': inputType,  // If type = dropdown, will be populated with items
-                'items': inputItems
+                'items': inputItems,
+                'widgetName': widgetName  // if type = widget, a name will be filled in here
             }),
             'extendable': ko.observable(extendable)
         });
@@ -300,7 +307,8 @@ define([
                 var observable = gatheredData.observable;
                 var linkedObservable = gatheredData.linkedObservable;
                 var arrayType = gatheredData.arrayType;
-                var formItem = generateFormItem(observable, field, group, display, target, inputType, inputItems, linkedObservable, fieldMapping);
+                var widgetName = gatheredData.widgetType;
+                var formItem = generateFormItem(observable, field, group, display, target, inputType, inputItems, linkedObservable, fieldMapping, widgetName);
                 var insertIndex = getInsertIndex(formItem, questions);
                 if (arrayType === true) {
                     formItem().extendable(true);
