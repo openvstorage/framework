@@ -69,7 +69,7 @@ class SupportAgent(object):
         try:
             # Versions
             manager = PackageFactory.get_manager()
-            data['metadata']['versions'] = manager.get_installed_versions()  # Fallback to check_output
+            data['metadata']['versions'] = dict((pkg_name, str(version)) for pkg_name, version in manager.get_installed_versions())  # Fallback to check_output
         except Exception, ex:
             data['errors'].append(str(ex))
         try:

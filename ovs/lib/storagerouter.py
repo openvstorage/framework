@@ -1320,10 +1320,10 @@ class StorageRouterController(object):
         :return: Version information
         :rtype: dict
         """
-        pacakge_manager = PackageFactory.get_manager()
+        package_manager = PackageFactory.get_manager()
         client = SSHClient(StorageRouter(storagerouter_guid))
         return {'storagerouter_guid': storagerouter_guid,
-                'versions': pacakge_manager.get_installed_versions(client)}
+                'versions': dict((pkg_name, str(version)) for pkg_name, version in package_manager.get_installed_versions(client))}
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_support_info')
