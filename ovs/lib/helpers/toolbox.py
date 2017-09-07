@@ -236,7 +236,7 @@ class Toolbox(object):
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status == 'active' else 'halted')
         else:
             if logger is not None:
-                logger.debug('{0}: {1} service {2}'.format(client.ip, action, name))
+                logger.info('{0}: {1} service {2}'.format(client.ip, action, name))
             print '  [{0}] {1} {2}'.format(client.ip, name, action.lower())
 
     @staticmethod
