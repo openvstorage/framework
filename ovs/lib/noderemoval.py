@@ -256,7 +256,7 @@ class NodeRemovalController(object):
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 client.file_delete(filenames=[Configuration.CACC_LOCATION])
-                client.file_delete(filenames=[Configuration.BOOTSTRAP_CONFIG_LOCATION])
+                client.file_delete(filenames=[Configuration.CONFIG_STORE_LOCATION])
             storage_router_to_remove.delete()
             Toolbox.log(logger=NodeRemovalController._logger, messages='Successfully removed node\n')
         except Exception as exception:

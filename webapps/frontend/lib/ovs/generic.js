@@ -131,7 +131,8 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         var data = {
             title: title,
             text: message,
-            delay: 6000
+            delay: 6000,
+            hide: type !== 'error'
         };
         if (type !== undefined) {
             data.type = type;

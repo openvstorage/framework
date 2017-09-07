@@ -17,7 +17,7 @@
 """
 Generic module for managing configuration somewhere
 """
-import os
+
 import copy
 import json
 import random
@@ -30,9 +30,8 @@ class Configuration(_Configuration):
     """
     Extends the 'default' configuration class
     """
-
-    BOOTSTRAP_CONFIG_LOCATION = '/opt/OpenvStorage/config/framework.json'
     CACC_LOCATION = '/opt/OpenvStorage/config/arakoon_cacc.ini'
+    CONFIG_STORE_LOCATION = '/opt/OpenvStorage/config/framework.json'
 
     base_config = {'cluster_id': None,
                    'external_config': None,
@@ -126,12 +125,10 @@ class Configuration(_Configuration):
     @classmethod
     def get_store_info(cls):
         """
-        Retrieve the configuration store method. This can currently only be 'arakoon'
-        :return: A tuple containing the store and params that can be passed to the configuration implementation instance
-        :rtype: tuple(str, dict)
+        Retrieve the configuration store method. Currently this can only be 'arakoon'
+        :return: The store method
+        :rtype: str
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
-            return 'unittest', None
-        with open(cls.BOOTSTRAP_CONFIG_LOCATION) as config_file:
+        with open(cls.CONFIG_STORE_LOCATION) as config_file:
             contents = json.load(config_file)
-            return contents['configuration_store'], {'cacc_location': cls.CACC_LOCATION}
+            return contents['configuration_store']
