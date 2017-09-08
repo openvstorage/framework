@@ -397,11 +397,11 @@ class UpdateController(object):
         package_manager = PackageFactory.get_manager()
         currently_installed_versions = package_manager.get_installed_versions(client=client, package_names=UpdateController.packages_core_all)
 
-        pkg_names_to_install = []
+        pkg_names_to_install = set()
         for component in components:
             for pkg_name in UpdateController._packages_core.get(component, set()):
                 if pkg_name in package_info:
-                    pkg_names_to_install.append(pkg_name)
+                    pkg_names_to_install.add(pkg_name)
 
         for pkg_name in sorted(pkg_names_to_install):
             try:
