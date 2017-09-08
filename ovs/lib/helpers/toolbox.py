@@ -218,17 +218,17 @@ class Toolbox(object):
         status = service_manager.get_service_status(name, client=client)
         if status != 'active' and state in ['start', 'restart']:
             if logger is not None:
-                logger.debug('{0}: Starting service {1}'.format(client.ip, name))
+                logger.info('{0}: Starting service {1}'.format(client.ip, name))
             service_manager.start_service(name, client=client)
             action = 'Started'
         elif status == 'active' and state == 'stop':
             if logger is not None:
-                logger.debug('{0}: Stopping service {1}'.format(client.ip, name))
+                logger.info('{0}: Stopping service {1}'.format(client.ip, name))
             service_manager.stop_service(name, client=client)
             action = 'Stopped'
         elif status == 'active' and state == 'restart':
             if logger is not None:
-                logger.debug('{0}: Restarting service {1}'.format(client.ip, name))
+                logger.info('{0}: Restarting service {1}'.format(client.ip, name))
             service_manager.restart_service(name, client=client)
             action = 'Restarted'
 
