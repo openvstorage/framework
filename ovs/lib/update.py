@@ -18,6 +18,7 @@
 Module for UpdateController
 """
 
+import os
 import copy
 import time
 import inspect
@@ -33,6 +34,7 @@ from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -41,6 +43,8 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.decorators import add_hooks, ovs_task
 from ovs.lib.helpers.toolbox import Toolbox
+
+os.environ['OVS_LOGTYPE_OVERRIDE'] = 'file'  # Make sure we log to file during update
 
 
 class UpdateController(object):
@@ -647,6 +651,8 @@ class UpdateController(object):
                         extra_ips.append(sr.ip)
                 except UnableToConnectException:
                     raise Exception('Update is only allowed on systems where all nodes are online and fully functional')
+
+            ssh_clients.sort(key=lambda cl: ExtensionsToolbox.advanced_sort(element=cl.ip, separator='.'))
 
             # Create locks
             for client in ssh_clients:
