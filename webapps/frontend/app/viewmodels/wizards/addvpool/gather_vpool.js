@@ -417,6 +417,7 @@ define([
                 var currentConfig = self.data.vPool().configuration();
                 self.data.name(self.data.vPool().name());
                 self.data.scoSize(currentConfig.sco_size);
+                self.data.mdsSafety(currentConfig.mds_config.mds_safety);
                 self.data.dtlEnabled(currentConfig.dtl_enabled);
                 self.data.clusterSize(currentConfig.cluster_size);
                 self.data.dtlMode({name: currentConfig.dtl_mode});

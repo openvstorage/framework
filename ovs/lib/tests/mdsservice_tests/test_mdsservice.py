@@ -153,7 +153,6 @@ class MDSServices(unittest.TestCase):
             * Retrieve and validate preferred storage driver config for vpool2
             * Update capacity for 1 MDS service in vpool1 and validate changes in preferred storage driver config
         """
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              'domains': [1, 2],
@@ -167,6 +166,10 @@ class MDSServices(unittest.TestCase):
         mds_services = structure['mds_services']
         storagerouters = structure['storagerouters']
         vdisks = {}
+
+        for vpool in vpools.itervalues():
+            Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=10, start_id=len(vdisks) + 1, mds_service=mds_service))
         #                                | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | LOAD (in percent) |
@@ -327,8 +330,6 @@ class MDSServices(unittest.TestCase):
             * Sub-Test 11: Increase safety and some more vDisks
             * Sub-Test 12: Decrease safety
         """
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'domains': [1, 2],
@@ -338,15 +339,15 @@ class MDSServices(unittest.TestCase):
              'storagerouter_domains': [(1, 1, 1, False), (2, 1, 2, True), (3, 2, 1, False), (4, 2, 2, True),
                                        (5, 3, 2, False), (6, 3, 1, True), (7, 4, 2, False), (8, 4, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
-        vpools = structure['vpools']
+        vpool = structure['vpools'][1]
         mds_services = structure['mds_services']
         service_type = structure['service_types']['MetadataServer']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
 
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+
         vdisks = {}
-        for sr in storagerouters.values():
-            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
 
@@ -450,7 +451,7 @@ class MDSServices(unittest.TestCase):
         mds_service.service = service
         mds_service.number = 0
         mds_service.capacity = 10
-        mds_service.vpool = vpools[1]
+        mds_service.vpool = vpool
         mds_service.save()
         mds_services[5] = mds_service
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
@@ -525,9 +526,6 @@ class MDSServices(unittest.TestCase):
         self.volatile._clean()
         self.persistent._clean()
 
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'domains': [1, 2, 3],
@@ -538,13 +536,14 @@ class MDSServices(unittest.TestCase):
                                        (5, 3, 1, False), (6, 4, 1, False), (7, 4, 3, True), (8, 5, 2, False),
                                        (9, 5, 3, True), (10, 6, 3, False), (11, 7, 3, False), (12, 7, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
+        vpool = structure['vpools'][1]
         domains = structure['domains']
         mds_services = structure['mds_services']
         storagerouters = structure['storagerouters']
         storagerouter_domains = structure['storagerouter_domains']
 
-        for sr in storagerouters.values():
-            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
@@ -749,7 +748,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 11: Add some more vDisks and increase safety
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 5)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 5)
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
@@ -784,7 +783,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 12: Reduce safety
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
         # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
         # |    1   |       1       |   1   |     1      |      -       |    10    |
         # |    2   |       2       |   1   |     3      |      2       |    10    |
@@ -868,9 +867,6 @@ class MDSServices(unittest.TestCase):
             * Sub-Test 9: Add backup failure domain
             * Sub-Test 10: Remove backup failure domain
         """
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'domains': [1, 2],
@@ -880,14 +876,13 @@ class MDSServices(unittest.TestCase):
              'storagerouter_domains': [(1, 1, 1, False), (2, 1, 2, True), (3, 2, 1, False), (4, 2, 2, True),
                                        (5, 3, 2, False), (6, 3, 1, True), (7, 4, 2, False), (8, 4, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
-        vpools = structure['vpools']
+        vpool = structure['vpools'][1]
         mds_services = structure['mds_services']
         service_type = structure['service_types']['MetadataServer']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
 
-        for sr in storagerouters.values():
-            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 55)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 55)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
@@ -991,7 +986,7 @@ class MDSServices(unittest.TestCase):
         mds_service.service = service
         mds_service.number = 0
         mds_service.capacity = 10
-        mds_service.vpool = vpools[1]
+        mds_service.vpool = vpool
         mds_service.save()
         mds_services[5] = mds_service
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -1061,9 +1056,6 @@ class MDSServices(unittest.TestCase):
         self.volatile._clean()
         self.persistent._clean()
 
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'domains': [1, 2, 3],
@@ -1074,13 +1066,14 @@ class MDSServices(unittest.TestCase):
                                        (5, 3, 1, False), (6, 4, 1, False), (7, 4, 3, True), (8, 5, 2, False),
                                        (9, 5, 3, True), (10, 6, 3, False), (11, 7, 3, False), (12, 7, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
+        vpool = structure['vpools'][1]
         domains = structure['domains']
         mds_services = structure['mds_services']
         storagerouters = structure['storagerouters']
         storagerouter_domains = structure['storagerouter_domains']
 
-        for sr in storagerouters.values():
-            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 35)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 35)
+
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
@@ -1241,22 +1234,19 @@ class MDSServices(unittest.TestCase):
           race conditions in the StorageDriver. It should be left out, and then in a next call be included again.
         * When an ex-master is recycled, it should be explicitly set to the slave role again
         """
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 7)
-
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1, 2, 3],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2), (3, 3)]}  # (<id>, <storagedriver_id>)
         )
+        vpool = structure['vpools'][1]
         mds_services = structure['mds_services']
-        storagerouters = structure['storagerouters']
         storagedrivers = structure['storagedrivers']
 
-        for sr in storagerouters.values():
-            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 10)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 10)
+
         vdisks = DalHelper.create_vdisks_for_mds_service(amount=1, start_id=1, mds_service=mds_services[1])
         vdisk = vdisks[1]
 
@@ -1313,7 +1303,7 @@ class MDSServices(unittest.TestCase):
         self.assertEqual(mds_client._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
         self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
 
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 2)
         MDSServiceController.ensure_safety(vdisk)
 
         configs = [[{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}]]
@@ -1330,18 +1320,17 @@ class MDSServices(unittest.TestCase):
         """
         Validates the MDS checkup logic: Does it add services when required, does it remove services when required
         """
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 70)
-
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
         )
-        mds_service = structure['mds_services'][1]
         vpool = structure['vpools'][1]
+        mds_service = structure['mds_services'][1]
+
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 70)
 
         mds_service.capacity = 10
         mds_service.save()

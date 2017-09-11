@@ -57,6 +57,7 @@ class VDiskController(object):
     _logger = Logger('lib')
     _VOLDRV_EVENT_KEY = 'voldrv_event_vdisk_{0}'
 
+    # noinspection PyCallByClass,PyTypeChecker
     storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'))
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()

@@ -68,6 +68,9 @@ define([
                             write_buffer: self.data.writeBufferVolume(),
                             dtl_transport: self.data.dtlTransportMode().name
                         },
+                        mds_config_params: {
+                            mds_safety: self.data.mdsSafety()
+                        },
                         parallelism: {
                             proxies: self.data.proxyAmount()
                         }

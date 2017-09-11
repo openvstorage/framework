@@ -51,6 +51,7 @@ define([
         data.dtlTransportMode({name: 'tcp'});
         data.host('');
         data.localHost(true);
+        data.mdsSafety(3);
         data.name('');
         data.partitions(undefined);
         data.port(80);
@@ -62,7 +63,7 @@ define([
         data.storageRoutersUsed([]);
         data.writeBufferGlobal(1);
         data.writeBufferVolume(undefined);
-        
+
         // Fragment cache
         data.backendFC(undefined);
         data.cacheQuotaFC(undefined);
@@ -76,7 +77,7 @@ define([
         data.portFC(80);
         data.presetFC(undefined);
         data.useFC(false);
-        
+
         // Block cache
         data.backendBC(undefined);
         data.cacheQuotaBC(undefined);

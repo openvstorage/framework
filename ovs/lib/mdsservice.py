@@ -323,9 +323,10 @@ class MDSServiceController(object):
 
         MDSServiceController._logger.debug('MDS safety: vDisk {0}: Start checkup for virtual disk {1}'.format(vdisk.guid, vdisk.name))
         with volatile_mutex('ensure_mds_safety_{0}'.format(vdisk.guid), wait=60):
-            tlogs = Configuration.get('/ovs/framework/storagedriver|mds_tlogs')
-            safety = Configuration.get('/ovs/framework/storagedriver|mds_safety')
-            max_load = Configuration.get('/ovs/framework/storagedriver|mds_maxload')
+            mds_config = Configuration.get('/ovs/vpools/{0}/mds_config'.format(vdisk.vpool_guid))
+            tlogs = mds_config['mds_tlogs']
+            safety = mds_config['mds_safety']
+            max_load = mds_config['mds_maxload']
 
             ######################
             # GATHER INFORMATION #
@@ -736,7 +737,7 @@ class MDSServiceController(object):
                 mds_per_load[load] = []
             mds_per_load[load].append(storagerouter)
 
-        safety = Configuration.get('/ovs/framework/storagedriver|mds_safety')
+        safety = Configuration.get('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid))
         config_set = {}
         for storagerouter, ip_info in mds_per_storagerouter.iteritems():
             config_set[storagerouter.guid] = [ip_info]
@@ -783,10 +784,10 @@ class MDSServiceController(object):
                 mds_dict[vpool][storagerouter]['services'].append(mds_service)
 
         failures = []
-        max_load = Configuration.get('/ovs/framework/storagedriver|mds_maxload')
         for vpool, storagerouter_info in mds_dict.iteritems():
             # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
             # If not, create an extra MDS for that StorageRouter
+            max_load = Configuration.get('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid))
             for storagerouter in storagerouter_info:
                 client = mds_dict[vpool][storagerouter]['client']
                 mds_services = mds_dict[vpool][storagerouter]['services']
