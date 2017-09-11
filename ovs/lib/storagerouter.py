@@ -69,6 +69,7 @@ class StorageRouterController(object):
     _logger = Logger('lib')
     SUPPORT_AGENT = 'support-agent'
 
+    # noinspection PyCallByClass,PyTypeChecker
     storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'))
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
@@ -899,9 +900,7 @@ class StorageRouterController(object):
 
         DiskController.sync_with_reality(storagerouter.guid)
 
-        MDSServiceController.prepare_mds_service(storagerouter=storagerouter,
-                                                 vpool=vpool,
-                                                 fresh_only=True)
+        MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool)
 
         ##################
         # START SERVICES #
@@ -1213,7 +1212,6 @@ class StorageRouterController(object):
             try:
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Remove MDS service (number {1}) for Storage Router with IP {2}'.format(storage_driver.guid, mds_service.number, storage_router.ip))
                 MDSServiceController.remove_mds_service(mds_service=mds_service,
-                                                        vpool=vpool,
                                                         reconfigure=False,
                                                         allow_offline=not storage_router_online)
             except Exception:
