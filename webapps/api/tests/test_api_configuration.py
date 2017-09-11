@@ -66,7 +66,7 @@ class APIConfiguration(unittest.TestCase):
                         errors.append('{0} - Would not expect a return type on a destroy method'.format(fun_id))
             if return_metadata['returns'][0] is None and return_metadata['returns'][1] is None:
                 if fun.__doc__ is None:
-                    errors.append('{0} - No documentation found'.format(fun_id))
+                    errors.append('{0} - Missing docstring'.format(fun_id))
                     continue
                 if ':return:' not in fun.__doc__ or ':rtype:' not in fun.__doc__:
                     errors.append('{0} - Missing return docstring'.format(fun_id))
@@ -91,7 +91,7 @@ class APIConfiguration(unittest.TestCase):
             parameters = load_metadata['mandatory'] + load_metadata['optional']
             missing_params = []
             if fun.__doc__ is None:
-                errors.append('{0} - No documentation found'.format(fun_id))
+                errors.append('{0} - Missing docstring'.format(fun_id))
                 continue
             for parameter in parameters:
                 if ':param {0}:'.format(parameter) not in fun.__doc__:
