@@ -187,6 +187,7 @@ class StorageRouterController(object):
                                                     'cluster_size': (int, StorageDriverClient.CLUSTER_SIZES),
                                                     'write_buffer': (int, {'min': 128, 'max': 10240}),
                                                     'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys())}),
+                           'mds_config_params': (dict, {'mds_safety': (int, {'min': 1, 'max': 5}, False)}, False),
                            'fragment_cache_on_read': (bool, None),
                            'fragment_cache_on_write': (bool, None),
                            'block_cache_on_read': (bool, None),
@@ -294,6 +295,11 @@ class StorageRouterController(object):
             vpool.status = VPool.STATUSES.INSTALLING
             vpool.metadata_store_bits = 5
             vpool.save()
+            # Configure this asap because certain flows don't check the vPool status yet and thus rely on the availability of this key
+            Configuration.set(key='/ovs/vpools/{0}/mds_config'.format(vpool.guid),
+                              value={'mds_tlogs': 100,
+                                     'mds_safety': parameters.get('mds_config_params', {}).get('mds_safety', 3),
+                                     'mds_maxload': 75})
         else:
             vpool.status = VPool.STATUSES.EXTENDING
             vpool.save()
@@ -402,6 +408,8 @@ class StorageRouterController(object):
             if new_vpool is False:
                 current_vpool_configuration = vpool.configuration
                 for key in sd_config_params.keys():
+                    if key == 'mds_safety':  # MDS safety for a vPool can be overruled when extending
+                        continue
                     current_value = current_vpool_configuration.get(key)
                     specified_value = sd_config_params[key]
                     if specified_value != current_value:
@@ -714,6 +722,14 @@ class StorageRouterController(object):
         ############################
         # CONFIGURATION MANAGEMENT #
         ############################
+        # Update the MDS safety if changed
+        if new_vpool is False:
+            mds_safety = parameters.get('mds_config_params', {}).get('mds_safety')
+            if mds_safety is not None and vpool.configuration['mds_config']['mds_safety'] != mds_safety:
+                Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid),
+                                  value=mds_safety)
+
+        # Configure regular proxies and scrub proxies
         manifest_cache_size = 16 * 1024 * 1024 * 1024
         for proxy_id, alba_proxy in enumerate(storagedriver.alba_proxies):
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
@@ -1792,3 +1808,5 @@ class StorageRouterController(object):
                 storagedriver.delete()
             if len(vpool.storagedrivers) == 0:
                 vpool.delete()
+                if Configuration.dir_exists(key='/ovs/vpools/{0}'.format(vpool.guid)):
+                    Configuration.delete(key='/ovs/vpools/{0}'.format(vpool.guid))

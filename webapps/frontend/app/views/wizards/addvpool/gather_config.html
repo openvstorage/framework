@@ -113,6 +113,22 @@ but WITHOUT ANY WARRANTY of any kind.
         </div>
         <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.mib"></label>
     </div>
+    <div style="margin-bottom: 5px;">
+        <span data-i18n="ovs:wizards.add_vpool.gather_config.mds"></span>
+        <a data-bind="popover: {
+                          title: 'ovs:storagedrivers.general.mds_help_title',
+                          content: 'ovs:storagedrivers.general.mds_help_message'
+                      }"
+           class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
+        </a>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-4 control-label" for="mdsSafety" data-i18n="ovs:wizards.add_vpool.gather_config.mds_safety"></label>
+        <div class="col-lg-2">
+            <input type="text" id="mdsSafety" class="autofocus form-control" style="text-align: center; width: 110px;"
+                   data-bind="value: data.mdsSafety, disable: data.vPool() !== undefined" />
+        </div>
+    </div>
     <div class="alert alert-info">
         <div data-i18n="ovs:wizards.add_vpool.gather_config.information"></div>
         <ul>

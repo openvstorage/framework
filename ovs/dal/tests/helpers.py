@@ -170,6 +170,9 @@ class DalHelper(object):
             else:
                 vpool = vpools[vpool_id]
             srclients[vpool_id] = StorageRouterClient(vpool.guid, None)
+            Configuration.set('/ovs/vpools/{0}/mds_config|mds_tlogs'.format(vpool.guid), 100)
+            Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 2)
+            Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 75)
             Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         for sr_id in structure.get('storagerouters', []):
             if sr_id not in storagerouters:

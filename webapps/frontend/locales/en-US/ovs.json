@@ -496,6 +496,8 @@
                 "tcp": "TCP"
             },
             "fragmentquota": "Fragment quota",
+            "mds_help_message": "OpenvStorage will always run a master MDS in the same Domain as configured for the StorageRouter. In case a Recovery Domain is configured, additional MDS slaves will be configured in that Recovery Domain (safety of 2 and more)",
+            "mds_help_title": "MetaData Server Information",
             "sco_size": "SCO size",
             "quota": "Quota",
             "volume": "Volumes",
@@ -714,6 +716,7 @@
             "generate_configs": "Generate HPRM configuration files",
             "generating_configs": "Generating HPRM configuration files",
             "extend": "Extend",
+            "mds_safety": "Amount of MetaData Servers",
             "refresh": {
                 "failed_msg": "Refreshing configuration on StorageRouter __sr__ for vPool __vpool__ failed: __why__",
                 "started": "Refreshing",
@@ -735,6 +738,7 @@
         "fragment_caching": "Fragment Caching",
         "global_write_buffer_short": "Write Buffer",
         "global_write_buffer": "Global Write Buffer",
+        "mds_safety": "MDS Safety",
         "preset": "Preset",
         "proxies_amount": "# Proxies",
         "sco_size": "SCO Size",
@@ -863,6 +867,25 @@
                 "use_backend_bc": "Use another Backend as Cache",
                 "use_local": "Use local disk"
             },
+            "gather_config": {
+                "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
+                "cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local Cache with current Global Write Buffer size",
+                "cluster_size": "Cluster Size:",
+                "dtl": "Distributed Transaction Log Information",
+                "dtl_mode": "Mode:",
+                "dtl_transport": "Transport Mode:",
+                "global_write_buffer": "Global Write Buffer:",
+                "global_write_buffer_available": "Dedicated global Write Buffer space:",
+                "information": "Information about the available space:",
+                "mds": "MDS Information",
+                "mds_safety": "Safety:",
+                "no_space_left": "No space left",
+                "over_allocation": "Over-allocation detected",
+                "sco_size": "SCO Size:",
+                "title_write_buffer": "StorageDriver Write Buffer",
+                "volume": "Volume Information",
+                "volume_write_buffer": "Volume Write Buffer:"
+            },
             "gather_fragment_cache": {
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",
@@ -896,23 +919,6 @@
                 "re_use_connection_info": "Re-use connection info:",
                 "use_backend_fc": "Use another Backend as Cache",
                 "use_local": "Use local disk"
-            },
-            "gather_config": {
-                "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
-                "cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local Cache with current Global Write Buffer size",
-                "cluster_size": "Cluster Size:",
-                "dtl": "Distributed Transaction Log Information",
-                "dtl_mode": "Mode:",
-                "dtl_transport": "Transport Mode:",
-                "global_write_buffer": "Global Write Buffer:",
-                "global_write_buffer_available": "Dedicated global Write Buffer space:",
-                "information": "Information about the available space:",
-                "no_space_left": "No space left",
-                "over_allocation": "Over-allocation detected",
-                "sco_size": "SCO Size:",
-                "title_write_buffer": "StorageDriver Write Buffer",
-                "volume": "Volume Information",
-                "volume_write_buffer": "Volume Write Buffer:"
             },
             "gather_vpool": {
                 "alba_backend": "Backend:",

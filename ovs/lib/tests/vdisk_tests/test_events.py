@@ -22,7 +22,6 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.tests.helpers import DalHelper
-from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.vdisk import VDiskController
@@ -37,9 +36,6 @@ class VDiskEventsTest(unittest.TestCase):
         (Re)Sets the stores on every test
         """
         DalHelper.setup()
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
 
     def tearDown(self):
         """

@@ -27,7 +27,6 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.tests.helpers import DalHelper
-from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
@@ -43,9 +42,6 @@ class VDiskTest(unittest.TestCase):
         (Re)Sets the stores on every test
         """
         DalHelper.setup(fake_sleep=True)
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
 
     def tearDown(self):
         """

@@ -221,7 +221,8 @@ class MigrationController(object):
 
         ########################################
         # Update metadata_store_bits information
-        for vpool in VPoolList.get_vpools():
+        vpools = VPoolList.get_vpools()
+        for vpool in vpools:
             bits = None
             for storagedriver in vpool.storagedrivers:
                 key = '/ovs/framework/hosts/{0}/services/volumedriver_{1}'.format(storagedriver.storagerouter.machine_id, vpool.name)
@@ -246,4 +247,3 @@ class MigrationController(object):
                 vpool.save()
 
         MigrationController._logger.info('Finished out of band migrations')
-        GenericController.refresh_package_information()

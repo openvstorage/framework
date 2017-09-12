@@ -89,6 +89,7 @@ define(['jquery', 'knockout'], function($, ko){
             dtlTransportMode:        ko.observable({name: 'tcp'}),
             host:                    ko.observable('').extend({regex: hostRegex}),
             localHost:               ko.observable(true),
+            mdsSafety:               ko.observable(3).extend({ numeric: {min: 1, max: 5}}),
             name:                    ko.observable('').extend({regex: nameRegex}),
             partitions:              ko.observable(),
             port:                    ko.observable(80).extend({ numeric: {min: 1, max: 65535}}),
