@@ -246,17 +246,4 @@ class MigrationController(object):
                 vpool.metadata_store_bits = bits
                 vpool.save()
 
-        #######################################
-        # MDS safety granularity on vPool level
-        mds_safety_key = '/ovs/framework/storagedriver'
-        if Configuration.exists(key=mds_safety_key):
-            current_mds_settings = Configuration.get(key=mds_safety_key)
-            for vpool in vpools:
-                vpool_key = '/ovs/vpools/{0}'.format(vpool.guid)
-                if Configuration.dir_exists(key=vpool_key):
-                    Configuration.set(key='{0}/mds_config'.format(vpool_key),
-                                      value=current_mds_settings)
-            Configuration.delete(key=mds_safety_key)
-
         MigrationController._logger.info('Finished out of band migrations')
-        GenericController.refresh_package_information()
