@@ -48,7 +48,6 @@ define([
                 var parameters = {
                     port: self.data.hprmPort(),
                     identifier: self.data.identifier(),
-                    vpool_guid: self.data.vPool().guid(),
                     fragment: {
                         read: self.data.fragmentCacheOnRead(),
                         write: self.data.fragmentCacheOnWrite()
@@ -97,9 +96,8 @@ define([
                     }
                 }
                 generic.alertInfo($.t('ovs:wizards.create_hprm_configs.confirm.started'),
-                                  $.t('ovs:wizards.create_hprm_configs.confirm.started_msg', {vpool: self.data.vPool().name(),
-                                                                                              storagerouter: self.data.storageRouter().name()}));
-                api.get('storagerouters/' + self.data.storageRouter().guid() + '/create_hprm_config_files', {queryparams: {parameters: JSON.stringify(parameters)}})
+                                  $.t('ovs:wizards.create_hprm_configs.confirm.started_msg', {vpool: self.data.vPool().name()}));
+                api.post('vpools/' + self.data.vPool().guid() + '/create_hprm_config_files', {queryparams: {parameters: JSON.stringify(parameters)}})
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
                         window.location.href = 'downloads/' + data;
@@ -107,8 +105,7 @@ define([
                             self.data.completed.resolve(true);
                         }
                         generic.alertSuccess($.t('ovs:wizards.create_hprm_configs.confirm.success'),
-                                             $.t('ovs:wizards.create_hprm_configs.confirm.success_msg', {vpool: self.data.vPool().name(),
-                                                                                                         storagerouter: self.data.storageRouter().name()}));
+                                             $.t('ovs:wizards.create_hprm_configs.confirm.success_msg', {vpool: self.data.vPool().name()}));
                     })
                     .fail(function(error) {
                         if (self.data.completed !== undefined) {
@@ -117,8 +114,7 @@ define([
                         error = generic.extractErrorMessage(error);
                         generic.alertError($.t('ovs:generic.error'),
                                            $.t('ovs:wizards.create_hprm_configs.confirm.failure_msg', {why: error,
-                                                                                                       vpool: self.data.vPool().name(),
-                                                                                                       storagerouter: self.data.storageRouter().name()})
+                                                                                                       vpool: self.data.vPool().name()})
                         );
                     });
                 deferred.resolve();
