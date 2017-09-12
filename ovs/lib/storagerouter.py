@@ -1086,6 +1086,8 @@ class StorageRouterController(object):
         if client is None:
             raise RuntimeError('Could not find any responsive node in the cluster')
 
+        # Sync with reality to have a clear vision of vDisks
+        VDiskController.sync_with_reality(storage_driver.vpool)
         storage_driver.invalidate_dynamics('vdisks_guids')
         if len(storage_driver.vdisks_guids) > 0:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
