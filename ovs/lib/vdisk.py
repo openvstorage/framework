@@ -840,8 +840,7 @@ class VDiskController(object):
         vdisk = VDisk(vdisk_guid)
         vpool = vdisk.vpool
 
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vdisk.storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vpool.guid, vdisk.storagedriver_id)
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
@@ -1503,8 +1502,7 @@ class VDiskController(object):
             return
 
         ratio = vdisk.pagecache_ratio
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vdisk.vpool_guid, storagedriver_id)
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
         # noinspection PyTypeChecker

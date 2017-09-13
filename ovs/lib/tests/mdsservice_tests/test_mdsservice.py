@@ -1429,8 +1429,8 @@ class MDSServices(unittest.TestCase):
         self.assertEqual(MDSServiceController._get_mds_load(mds_service), (80, 90))
         self.assertEqual(MDSServiceController._get_mds_load(mds_service2), (8, 9))
 
-        config = StorageDriverConfiguration('storagedriver', vpool.guid, vpool.storagedrivers[0].storagedriver_id)
-        contents = LocalStorageRouterClient.configurations[config.key]
+        storagedriver_config = StorageDriverConfiguration(vpool.guid, vpool.storagedrivers[0].storagedriver_id)
+        contents = LocalStorageRouterClient.configurations[storagedriver_config._key]
         mds_nodes = contents.get('metadata_server', {}).get('mds_nodes', [])
         mds_nodes.sort(key=lambda i: i['port'])
         self.assertEqual(len(mds_nodes), 2)
@@ -1448,7 +1448,7 @@ class MDSServices(unittest.TestCase):
         MDSServiceController.mds_checkup()  # Migrate disks away
         MDSServiceController.mds_checkup()  # Remove obsolete MDS
 
-        contents = LocalStorageRouterClient.configurations[config.key]
+        contents = LocalStorageRouterClient.configurations[storagedriver_config._key]
         mds_nodes = contents.get('metadata_server', {}).get('mds_nodes', [])
         self.assertEqual(len(mds_nodes), 1)
         self.assertDictEqual(mds_nodes[0], {'host': '10.0.0.1',

@@ -258,7 +258,7 @@ class StorageRouterController(object):
 
         # Check storagerouter connectivity
         ip_client_map = {}
-        offline_nodes_detected = False
+        offline_nodes = []
         for sr in all_storagerouters:
             try:
                 ip_client_map[sr.ip] = {'ovs': SSHClient(sr.ip, username='ovs'),
@@ -266,7 +266,7 @@ class StorageRouterController(object):
             except UnableToConnectException:
                 if sr == storagerouter:
                     raise RuntimeError('Node on which the vpool is being {0} is not reachable'.format('created' if new_vpool is True else 'extended'))
-                offline_nodes_detected = True  # We currently want to allow offline nodes while setting up or extend a vpool
+                offline_nodes.append(sr)  # We currently want to allow offline nodes while setting up or extend a vpool
 
         block_cache_on_read = parameters['block_cache_on_read']
         block_cache_on_write = parameters['block_cache_on_write']
@@ -723,13 +723,6 @@ class StorageRouterController(object):
         ############################
         # CONFIGURATION MANAGEMENT #
         ############################
-        # Update the MDS safety if changed
-        if new_vpool is False:
-            mds_safety = parameters.get('mds_config_params', {}).get('mds_safety')
-            if mds_safety is not None and vpool.configuration['mds_config']['mds_safety'] != mds_safety:
-                Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid),
-                                  value=mds_safety)
-
         # Configure regular proxies and scrub proxies
         manifest_cache_size = 16 * 1024 * 1024 * 1024
         for proxy_id, alba_proxy in enumerate(storagedriver.alba_proxies):
@@ -886,8 +879,7 @@ class StorageRouterController(object):
                           'node_id': node.name} for node in ArakoonClusterConfig(cluster_id=arakoon_cluster_name).nodes]
 
         # DTL path is not used, but a required parameter. The DTL transport should be the same as the one set in the DTL server.
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
         storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
         storagedriver_config.configure_content_addressed_cache(serialize_read_cache=False,
                                                                read_cache_serialization_path=[])
@@ -917,6 +909,13 @@ class StorageRouterController(object):
         DiskController.sync_with_reality(storagerouter.guid)
 
         MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool)
+
+        # Update the MDS safety if changed (vpool.configuration will be available at this point also for the newly added StorageDriver)
+        if new_vpool is False:
+            mds_safety = parameters.get('mds_config_params', {}).get('mds_safety')
+            if mds_safety is not None and vpool.configuration['mds_config']['mds_safety'] != mds_safety:
+                Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid),
+                                  value=mds_safety)
 
         ##################
         # START SERVICES #
@@ -983,15 +982,14 @@ class StorageRouterController(object):
         ###############
         # POST CHECKS #
         ###############
-        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool, check_online=not offline_nodes_detected)
+        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool, offline_nodes=offline_nodes)
         for sr in all_storagerouters:
             if sr.ip not in ip_client_map:
                 continue
             node_client = ip_client_map[sr.ip]['ovs']
             for current_storagedriver in [sd for sd in sr.storagedrivers if sd.vpool_guid == vpool.guid]:
-                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, current_storagedriver.storagedriver_id)
-                storagedriver_config.load()
-                if storagedriver_config.is_new is False:
+                storagedriver_config = StorageDriverConfiguration(vpool.guid, current_storagedriver.storagedriver_id)
+                if storagedriver_config.config_missing is False:
                     storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
                     storagedriver_config.save(node_client)
 
