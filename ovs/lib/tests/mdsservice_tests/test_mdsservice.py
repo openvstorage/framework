@@ -17,13 +17,16 @@
 """
 MDSService test module
 """
+
 import json
 import unittest
 from ovs.dal.hybrids.j_mdsservice import MDSService
+from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.service import Service
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
+from ovs_extensions.log.logger import Logger
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.mdsservice import MDSServiceController
@@ -231,60 +234,140 @@ class MDSServices(unittest.TestCase):
                                              {'host': '10.0.0.3', 'port': 4}]}
         self.assertDictEqual(config, expected, 'Test 2. Got:\n{0}'.format(json.dumps(config, indent=2)))
 
-    def test_syncreality(self):
+    def test_sync_vdisk_with_reality(self):
         """
         Validates whether reality is synced to the model as expected
         MDSServiceController.sync_vdisk_to_reality will sync the actual disk config retrieved from the storagedriver in our model (MDS service vs vDisk junction)
         This test does:
             * Create several storagerouters, storagedrivers, MDS services
-            * Create 5 vDisks which will NOT be linked to any MDS service yet
-            * Store the configuration in storage driver
-            * Run the sync with reality
-            * Verify that the entries in the junction table have been created as expected
+            * Several scenarios are tested, which do in general the following:
+                * Create a vDisk without any MDS services linked to it yet
+                * Store the configuration in the StorageDriver
+                * Run the sync with reality
+                * Verify that the entries in the junction table have been created as expected
         """
-        def _test_scenario(scenario):
-            """
-            Executes a test run for a given scenario
-            """
-            for disk_id, mds_ids in scenario.iteritems():
-                vdisk = vdisks[disk_id]
-                mds_backend_config = DalHelper.generate_mds_metadata_backend_config([mds_services[mds_id] for mds_id in mds_ids])
-                for config in mds_backend_config.node_configs():
-                    MDSClient(config).create_namespace(vdisk.volume_id)
-                vdisk.storagedriver_client.update_metadata_backend_config(vdisk.volume_id, mds_backend_config)
+        def _test_scenario(vdisk_id, scenarios):
+            # Create vDisk without MDS Service junctions on StorageDriver 1
+            vdisk = DalHelper.create_vdisks_for_mds_service(amount=1, start_id=vdisk_id, storagedriver=storagedriver_1)[vdisk_id]
+            self.assertEqual(first=0, second=len(vdisk.mds_services))  # Initially we haven't added any MDS junctions yet
 
-            for vdisk_id in vdisks:
-                MDSServiceController.sync_vdisk_to_reality(vdisks[vdisk_id])
+            _mds_services = []
+            for index, scenario in enumerate(scenarios):
+                # Configure the StorageDriver
+                _mds_services = [mds_services[mds_id] for mds_id in scenario['mds_ids']]
+                _mds_backend_config = DalHelper.generate_mds_metadata_backend_config(_mds_services)
+                for _config in _mds_backend_config.node_configs():
+                    MDSClient(_config).create_namespace(vdisk.volume_id)
+                vdisk.storagedriver_client.update_metadata_backend_config(vdisk.volume_id, _mds_backend_config)
 
-            for disk_id, mds_ids in scenario.iteritems():
-                expected_mds_services = [mds_services[mds_id] for mds_id in mds_ids]
-                disk = vdisks[disk_id]
-                self.assertEqual(len(disk.mds_services), len(expected_mds_services))
-                for junction in disk.mds_services:
-                    self.assertIn(junction.mds_service, expected_mds_services)
+                # Run sync reality
+                MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk)
+
+                # Assert model has been updated
+                _mds_vdisk = [_junction.mds_service for _junction in vdisk.mds_services]
+                _mds_master = [_junction.mds_service for _junction in vdisk.mds_services if _junction.is_master is True]
+                self.assertEqual(first=len(_mds_services), second=len(vdisk.mds_services))
+                self.assertEqual(first=set(_mds_services), second=set(_mds_vdisk))
+                self.assertEqual(first=1, second=len(_mds_master))  # Only 1 junction should be master
+                self.assertEqual(first=_mds_services[0], second=_mds_master[0])  # 1st entry in StorageDriver MDSes should be master
+
+                # Re-run sync reality - nothing should change
+                MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk)
+                self.assertEqual(first=len(_mds_services), second=len(vdisk.mds_services))
+                self.assertEqual(first=set(_mds_services), second=set(_mds_vdisk))
+                self.assertEqual(first=1, second=len(_mds_master))  # Only 1 junction should be master
+                self.assertEqual(first=_mds_services[0], second=_mds_master[0])  # 1st entry in StorageDriver MDSes should be master
+
+            return vdisk, _mds_services
 
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
-             'domains': [1],
              'storagerouters': [1, 2, 3, 4],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <sr_id>)
-             'mds_services': [(1, 1), (2, 1), (3, 2), (4, 3), (5, 4)],  # (<id>, <storagedriver_id>)
-             'storagerouter_domains': [(1, 1, 1, False), (2, 2, 1, False), (3, 3, 1, False), (4, 4, 1, False)]}  # (<id>, <storagerouter_id>, <domain_id>)
+             'mds_services': [(1, 1), (2, 1), (3, 2), (4, 3), (5, 4)]}  # (<id>, <storagedriver_id>)
         )
-        storagedrivers = structure['storagedrivers']
         mds_services = structure['mds_services']
+        storagedriver_1 = structure['storagedrivers'][1]
 
-        vdisks = DalHelper.create_vdisks_for_mds_service(amount=5, start_id=1, storagedriver=storagedrivers[1])
-        _test_scenario({1: [1, 3, 4],
-                        2: [1, 2],
-                        3: [1, 3, 4],
-                        4: [3, 4, 5],
-                        5: [1, 4, 5]})
-        _test_scenario({1: [1, 2],
-                        2: [1, 2, 3, 4, 5],
-                        3: [1, 2],
-                        4: [5],
-                        5: [1, 4, 5]})
+        # StorageDriver adds 1 MDS Service
+        vdisk_1, copy_mds_services = _test_scenario(vdisk_id=1, scenarios=[{'mds_ids': [1]}])
+
+        # Create duplicate MDS junction service
+        junction = MDSServiceVDisk()
+        junction.vdisk = vdisk_1
+        junction.mds_service = copy_mds_services[0]
+        junction.is_master = False
+        junction.save()
+
+        self.assertEqual(first=len(copy_mds_services) + 1, second=len(vdisk_1.mds_services))  # Temporarily have 1 additional junction service
+        Logger._logs['lib'] = {}  # Reset log entries
+        MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_1)  # Re-running sync should remove the duplicate
+        self.assertEqual(first=len(copy_mds_services), second=len(vdisk_1.mds_services))  # Sync vDisk with reality should have updated the model
+        self.assertEqual(first=copy_mds_services[0], second=vdisk_1.mds_services[0].mds_service)
+        self.assertEqual(first=True, second=vdisk_1.mds_services[0].is_master)
+
+        relevant_logs = []  # Verify that the logging shows the reason is 'Duplicate'
+        for log_entry, log_level in Logger._logs['lib'].iteritems():
+            if 'Deleting junction service 10.0.0.1:1 : Duplicate' in log_entry:
+                relevant_logs.append(log_level)
+        self.assertEqual(first=1, second=len(relevant_logs))
+        self.assertEqual(first='WARNING', second=relevant_logs[0])
+
+        # Create MDS junction service unknown to the StorageDriver
+        junction = MDSServiceVDisk()
+        junction.vdisk = vdisk_1
+        junction.mds_service = mds_services[4]
+        junction.is_master = False
+        junction.save()
+
+        self.assertEqual(first=len(copy_mds_services) + 1, second=len(vdisk_1.mds_services))  # Temporarily have 1 additional junction service
+        Logger._logs['lib'] = {}  # Reset log entries
+        MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_1)  # Re-running sync should remove the unknown entry
+        self.assertEqual(first=len(copy_mds_services), second=len(vdisk_1.mds_services))  # Sync vDisk with reality should have updated the model
+        self.assertEqual(first=copy_mds_services[0], second=vdisk_1.mds_services[0].mds_service)
+        self.assertEqual(first=True, second=vdisk_1.mds_services[0].is_master)
+
+        relevant_logs = []  # Verify that the logging shows the reason is 'Unknown'
+        for log_entry, log_level in Logger._logs['lib'].iteritems():
+            if 'Deleting junction service 10.0.0.3:4 : Unknown by StorageDriver' in log_entry:
+                relevant_logs.append(log_level)
+        self.assertEqual(first=1, second=len(relevant_logs))
+        self.assertEqual(first='WARNING', second=relevant_logs[0])
+
+        # StorageDriver adds multiple MDS Services
+        _test_scenario(vdisk_id=2, scenarios=[{'mds_ids': [1, 3, 4]}])
+
+        # StorageDriver adds multiple MDS Services, but 2 MDSes on same host
+        _test_scenario(vdisk_id=3, scenarios=[{'mds_ids': [1, 2, 3]}])
+
+        # StorageDriver adds multiple MDS Services, then updates the MDSes to same host
+        vdisk_4, _ = _test_scenario(vdisk_id=4,
+                                    scenarios=[{'mds_ids': [1, 3, 4]},
+                                               {'mds_ids': [1, 2]}])
+
+        # Remove a junction service from vDisk and the corresponding MDS service to invoke the prepare_mds_service path in sync_vdisk_with_reality
+        copy_mds_services = [mds_services[1], mds_services[3], mds_services[4], mds_services[5]]
+        mds_backend_config = DalHelper.generate_mds_metadata_backend_config(copy_mds_services)
+        for config in mds_backend_config.node_configs():
+            MDSClient(config).create_namespace(vdisk_4.volume_id)
+        vdisk_4.storagedriver_client.update_metadata_backend_config(vdisk_4.volume_id, mds_backend_config)
+
+        mds_services[5].storagedriver_partitions[0].delete()
+        mds_services[5].delete()
+        mds_services[5].service.delete()
+        Logger._logs['lib'] = {}
+        MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_4)
+        mds_master = [junction.mds_service for junction in vdisk_4.mds_services if junction.is_master is True]
+        self.assertEqual(first=len(copy_mds_services), second=len(vdisk_4.mds_services))
+        self.assertEqual(first=1, second=len(mds_master))  # Only 1 junction should be master
+        self.assertEqual(first=copy_mds_services[0], second=mds_master[0])  # 1st entry in StorageDriver MDSes should be master
+
+        relevant_logs = []  # Verify that the logging shows a CRITICAL entry
+        for log_entry, log_level in Logger._logs['lib'].iteritems():
+            if 'Failed to find an MDS Service for 10.0.0.4:5. Creating a new MDS Service' in log_entry:
+                relevant_logs.append(log_level)
+        self.assertEqual(first=1, second=len(relevant_logs))
+        self.assertEqual(first='CRITICAL', second=relevant_logs[0])
 
     def test_ensure_safety_of_3(self):
         """

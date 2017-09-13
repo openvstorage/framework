@@ -1036,6 +1036,7 @@ class StorageRouterController(object):
         if offline_storage_router_guids is None:
             offline_storage_router_guids = []
 
+        #############
         # Validations
         vpool = storage_driver.vpool
         if vpool.status != VPool.STATUSES.RUNNING:
@@ -1092,6 +1093,12 @@ class StorageRouterController(object):
         if len(storage_driver.vdisks_guids) > 0:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
 
+        mds_services_to_remove = [mds_service for mds_service in vpool.mds_services if mds_service.service.storagerouter_guid == storage_router.guid]
+        for mds_service in mds_services_to_remove:
+            if len(mds_service.storagedriver_partitions) == 0 or mds_service.storagedriver_partitions[0].storagedriver is None:
+                raise RuntimeError('Failed to retrieve the linked StorageDriver to this MDS Service {0}'.format(mds_service.service.name))
+
+        ###############
         # Start removal
         if storage_drivers_left is True:
             vpool.status = VPool.STATUSES.SHRINKING
@@ -1115,7 +1122,6 @@ class StorageRouterController(object):
         # Un-configure or reconfigure the MDSes
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring MDSes'.format(storage_driver.guid))
         vdisks = []
-        mds_services_to_remove = [mds_service for mds_service in vpool.mds_services if mds_service.service.storagerouter_guid == storage_router.guid]
         for mds in mds_services_to_remove:
             for junction in mds.vdisks:
                 vdisk = junction.vdisk
