@@ -21,7 +21,7 @@ services:
 before_install:
   - env | sort
   - docker --version
-  - repo=`python scripts/travis/repo.py`
+  - repo=`python scripts/travis/repository_resolver.py`
 install:
   - docker pull ${distribution}
   - docker build --cache-from ${distribution} --tag fwk --build-arg repo=${repo} --file scripts/travis/docker/${distribution}/Dockerfile .

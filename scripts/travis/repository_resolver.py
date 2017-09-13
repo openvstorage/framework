@@ -23,7 +23,7 @@ import os
 from subprocess import Popen, PIPE
 
 
-class RepoMapper(object):
+class RepositoryResolver(object):
     """
     Class responsible for fetching the repository based on the branch that Travis is building
     """
@@ -106,4 +106,4 @@ class RepoMapper(object):
 
 if __name__ == '__main__':
     # Make sure it gets outputted to stdout for the Travis build to capture
-    print RepoMapper.get_repository()
+    print RepositoryResolver.get_repository()
