@@ -264,84 +264,77 @@ class MDSServiceController(object):
                         raise
 
     @staticmethod
-    def _sync_vdisk_to_reality(vdisk):
+    @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'CHAINED'})
+    def mds_checkup():
         """
-        Syncs the MDS junction services for a vDisk to the services configured in the StorageDriver
-        :param vdisk: vDisk to synchronize
-        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
+        Validates the current MDS setup/configuration and takes actions where required
         :return: None
         :rtype: NoneType
         """
-        MDSServiceController._logger.info('vDisk {0} - {1}: Syncing to reality'.format(vdisk.guid, vdisk.name))
+        MDSServiceController._logger.info('MDS checkup - Started')
+        mds_dict = {}
+        for vpool in VPoolList.get_vpools():
+            MDSServiceController._logger.info('MDS checkup - vPool {0}'.format(vpool.name))
+            mds_dict[vpool] = {}
+            for mds_service in vpool.mds_services:
+                storagerouter = mds_service.service.storagerouter
+                if storagerouter not in mds_dict[vpool]:
+                    mds_dict[vpool][storagerouter] = {'client': None,
+                                                      'services': []}
+                    try:
+                        mds_dict[vpool][storagerouter]['client'] = SSHClient(storagerouter, username='root')
+                        MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - ONLINE'.format(vpool.name, storagerouter.name))
+                    except UnableToConnectException:
+                        MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - OFFLINE'.format(vpool.name, storagerouter.name))
+                mds_dict[vpool][storagerouter]['services'].append(mds_service)
 
-        sd_master_ip = None  # IP of the master service according to StorageDriver
-        sd_master_port = None  # Port of the master service according to StorageDriver
-        sd_mds_config = collections.OrderedDict()  # MDS services according to StorageDriver
-        model_mds_config = collections.OrderedDict()  # MDS services according to model
-
-        # with volatile_mutex('sync_vdisk_to_reality_{0}'.format(vdisk.guid), wait=10):
-        vdisk.reload_client('storagedriver')
-        vdisk.invalidate_dynamics(['info', 'storagerouter_guid'])
-
-        # Verify the StorageDriver services
-        MDSServiceController._logger.debug('vDisk {0} - {1}: Current MDS Config: {2}'.format(vdisk.guid, vdisk.name, vdisk.info['metadata_backend_config']))
-        for index, mds_entry in enumerate(vdisk.info['metadata_backend_config']):
-            ip = mds_entry['ip']
-            port = mds_entry['port']
-            if index == 0:  # First entry is the master MDS service
-                sd_master_ip = ip
-                sd_master_port = port
-            if ip not in sd_mds_config:
-                sd_mds_config[ip] = []
-            sd_mds_config[ip].append(port)
-
-        # Verify the model junction services (Relations between the MDS Services and the vDisks)
-        for junction in list(vdisk.mds_services):
-            model_ip = junction.mds_service.service.storagerouter.ip
-            model_port = junction.mds_service.service.ports[0]
-            MDSServiceController._logger.debug('vDisk {0} - {1}: Validating junction service {2}:{3}'.format(vdisk.guid, vdisk.name, model_ip, model_port))
-
-            # Remove duplicate junction services
-            if model_ip in model_mds_config and model_port in model_mds_config[model_ip]:
-                MDSServiceController._logger.warning('vDisk {0} - {1}: Deleting junction service {2}:{3} : Duplicate'.format(vdisk.guid, vdisk.name, model_ip, model_port))
-                junction.delete()
-                continue
-
-            # Remove junction services not known by StorageDriver
-            elif model_ip not in sd_mds_config or model_port not in sd_mds_config[model_ip]:
-                MDSServiceController._logger.warning('vDisk {0} - {1}: Deleting junction service {2}:{3} : Unknown by StorageDriver'.format(vdisk.guid, vdisk.name, model_ip, model_port))
-                junction.delete()
-                continue
-
-            junction.is_master = model_ip == sd_master_ip and model_port == sd_master_port
-            junction.save()
-            if model_ip not in model_mds_config:
-                model_mds_config[model_ip] = []
-            model_mds_config[model_ip].append(model_port)
-
-        MDSServiceController._logger.debug('vDisk {0} - {1}: MDS services according to model: {2}'.format(vdisk.guid, vdisk.name, ', '.join(['{0}:{1}'.format(ip, port) for ip, ports in model_mds_config.iteritems() for port in ports])))
-        MDSServiceController._logger.debug('vDisk {0} - {1}: MDS services according to StorageDriver: {2}'.format(vdisk.guid, vdisk.name, ', '.join(['{0}:{1}'.format(ip, port) for ip, ports in sd_mds_config.iteritems() for port in ports])))
-        for ip, ports in sd_mds_config.iteritems():
-            for port in ports:
-                if ip not in model_mds_config or port not in model_mds_config[ip]:
-                    MDSServiceController._logger.warning('vDisk {0} - {1}: Modeling junction service {2}:{3}'.format(vdisk.guid, vdisk.name, ip, port))
-                    service = ServiceList.get_by_ip_ports(ip, [port])
-                    if service is None and vdisk.storagerouter_guid is not None:
-                        MDSServiceController._logger.critical('vDisk {0} - {1}: Failed to find an MDS Service for {2}:{3}. Creating a new MDS Service'.format(vdisk.guid, vdisk.name, ip, port))
-                        storagerouter = StorageRouter(vdisk.storagerouter_guid)
-                        try:
-                            service = MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vdisk.vpool).service
-                        except Exception:
-                            MDSServiceController._logger.exception('vDisk {0} - {1}: Creating MDS Service failed'.format(vdisk.guid, vdisk.name))
-
-                    if service is not None:
-                        mds_service_vdisk = MDSServiceVDisk()
-                        mds_service_vdisk.vdisk = vdisk
-                        mds_service_vdisk.mds_service = service.mds_service
-                        mds_service_vdisk.is_master = sd_master_ip == service.storagerouter.ip and sd_master_port == service.ports[0]
-                        mds_service_vdisk.save()
-                        MDSServiceController._logger.debug('vDisk {0} - {1}: Modeled junction service {2}:{3}'.format(vdisk.guid, vdisk.name, ip, port))
-        MDSServiceController._logger.info('vDisk {0} - {1}: Synced to reality'.format(vdisk.guid, vdisk.name))
+        failures = []
+        for vpool, storagerouter_info in mds_dict.iteritems():
+            # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
+            # If not, create an extra MDS for that StorageRouter
+            max_load = Configuration.get('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid))
+            for storagerouter in storagerouter_info:
+                client = mds_dict[vpool][storagerouter]['client']
+                mds_services = mds_dict[vpool][storagerouter]['services']
+                has_room = False
+                for mds_service in mds_services[:]:
+                    if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
+                        MDSServiceController._logger.info('MDS checkup - Removing mds_service {0} for vPool {1}'.format(mds_service.number, vpool.name))
+                        MDSServiceController.remove_mds_service(mds_service=mds_service, reconfigure=True, allow_offline=client is None)
+                        mds_services.remove(mds_service)
+                for mds_service in mds_services:
+                    _, load = MDSServiceController._get_mds_load(mds_service)
+                    if load < max_load:
+                        has_room = True
+                        break
+                MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - Capacity available: {2}'.format(vpool.name, storagerouter.name, has_room))
+                if has_room is False and client is not None:
+                    mds_services.append(MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool))
+            mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool, True)
+            for storagerouter in storagerouter_info:
+                client = mds_dict[vpool][storagerouter]['client']
+                if client is None:
+                    MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - Marked as offline, not setting default MDS configuration'.format(vpool.name, storagerouter.name))
+                    continue
+                storagedriver = [sd for sd in storagerouter.storagedrivers if sd.vpool_guid == vpool.guid][0]
+                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+                storagedriver_config.load()
+                if storagedriver_config.is_new is False:
+                    MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - Storing default MDS configuration: {2}'.format(vpool.name, storagerouter.name, mds_config_set[storagerouter.guid]))
+                    storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[storagerouter.guid])
+                    storagedriver_config.save(client)
+            # 2. Per VPool, execute a safety check, making sure the master/slave configuration is optimal.
+            MDSServiceController._logger.info('MDS checkup - vPool {0} - Ensuring safety for all virtual disks'.format(vpool.name))
+            for vdisk in vpool.vdisks:
+                try:
+                    MDSServiceController.ensure_safety(vdisk)
+                except Exception:
+                    message = 'Ensure safety for vDisk {0} with guid {1} failed'.format(vdisk.name, vdisk.guid)
+                    MDSServiceController._logger.exception(message)
+                    failures.append(message)
+        if len(failures) > 0:
+            raise Exception('\n - ' + '\n - '.join(failures))
+        MDSServiceController._logger.info('MDS checkup - Finished')
 
     @staticmethod
     def ensure_safety(vdisk, excluded_storagerouters=None):
@@ -462,7 +455,7 @@ class MDSServiceController(object):
                 elif service.storagerouter in secondary_storagerouters:
                     importance = 'secondary'
 
-                loads = MDSServiceController.get_mds_load(service.mds_service)
+                loads = MDSServiceController._get_mds_load(service.mds_service)
                 if service == master_service or service in slave_services:  # Service is still in use
                     load = loads[0]
                     if importance is not None:
@@ -733,27 +726,10 @@ class MDSServiceController(object):
         mds_service = (None, float('inf'))
         for current_mds_service in vpool.mds_services:
             if current_mds_service.service.storagerouter_guid == storagerouter.guid:
-                load = MDSServiceController.get_mds_load(current_mds_service)[0]
+                load = MDSServiceController._get_mds_load(current_mds_service)[0]
                 if mds_service[0] is None or load < mds_service[1]:
                     mds_service = (current_mds_service, load)
         return mds_service
-
-    @staticmethod
-    def get_mds_load(mds_service):
-        """
-        Gets a 'load' for an MDS service based on its capacity and the amount of assigned vDisks
-        :param mds_service: MDS service the get current load for
-        :type mds_service: ovs.dal.hybrids.j_mdsservice.MDSService
-        :return: Load of the MDS service
-        :rtype: tuple(float, float)
-        """
-        service_capacity = float(mds_service.capacity)
-        if service_capacity < 0:
-            return 50.0, 50.0
-        if service_capacity == 0:
-            return float('inf'), float('inf')
-        usage = len(mds_service.vdisks_guids)
-        return round(usage / service_capacity * 100.0, 5), round((usage + 1) / service_capacity * 100.0, 5)
 
     @staticmethod
     def get_mds_storagedriver_config_set(vpool, check_online=False):
@@ -813,79 +789,6 @@ class MDSServiceController(object):
         return config_set
 
     @staticmethod
-    @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'CHAINED'})
-    def mds_checkup():
-        """
-        Validates the current MDS setup/configuration and takes actions where required
-        :return: None
-        :rtype: NoneType
-        """
-        MDSServiceController._logger.info('MDS checkup - Started')
-        mds_dict = {}
-        for vpool in VPoolList.get_vpools():
-            MDSServiceController._logger.info('MDS checkup - vPool {0}'.format(vpool.name))
-            mds_dict[vpool] = {}
-            for mds_service in vpool.mds_services:
-                storagerouter = mds_service.service.storagerouter
-                if storagerouter not in mds_dict[vpool]:
-                    mds_dict[vpool][storagerouter] = {'client': None,
-                                                      'services': []}
-                    try:
-                        mds_dict[vpool][storagerouter]['client'] = SSHClient(storagerouter, username='root')
-                        MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - ONLINE'.format(vpool.name, storagerouter.name))
-                    except UnableToConnectException:
-                        MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - OFFLINE'.format(vpool.name, storagerouter.name))
-                mds_dict[vpool][storagerouter]['services'].append(mds_service)
-
-        failures = []
-        for vpool, storagerouter_info in mds_dict.iteritems():
-            # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
-            # If not, create an extra MDS for that StorageRouter
-            max_load = Configuration.get('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid))
-            for storagerouter in storagerouter_info:
-                client = mds_dict[vpool][storagerouter]['client']
-                mds_services = mds_dict[vpool][storagerouter]['services']
-                has_room = False
-                for mds_service in mds_services[:]:
-                    if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
-                        MDSServiceController._logger.info('MDS checkup - Removing mds_service {0} for vPool {1}'.format(mds_service.number, vpool.name))
-                        MDSServiceController.remove_mds_service(mds_service=mds_service, reconfigure=True, allow_offline=client is None)
-                        mds_services.remove(mds_service)
-                for mds_service in mds_services:
-                    _, load = MDSServiceController.get_mds_load(mds_service)
-                    if load < max_load:
-                        has_room = True
-                        break
-                MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - Capacity available: {2}'.format(vpool.name, storagerouter.name, has_room))
-                if has_room is False and client is not None:
-                    mds_services.append(MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool))
-            mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool, True)
-            for storagerouter in storagerouter_info:
-                client = mds_dict[vpool][storagerouter]['client']
-                if client is None:
-                    MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - Marked as offline, not setting default MDS configuration'.format(vpool.name, storagerouter.name))
-                    continue
-                storagedriver = [sd for sd in storagerouter.storagedrivers if sd.vpool_guid == vpool.guid][0]
-                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-                storagedriver_config.load()
-                if storagedriver_config.is_new is False:
-                    MDSServiceController._logger.info('MDS checkup - vPool {0} - StorageRouter {1} - Storing default MDS configuration: {2}'.format(vpool.name, storagerouter.name, mds_config_set[storagerouter.guid]))
-                    storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[storagerouter.guid])
-                    storagedriver_config.save(client)
-            # 2. Per VPool, execute a safety check, making sure the master/slave configuration is optimal.
-            MDSServiceController._logger.info('MDS checkup - vPool {0} - Ensuring safety for all virtual disks'.format(vpool.name))
-            for vdisk in vpool.vdisks:
-                try:
-                    MDSServiceController.ensure_safety(vdisk)
-                except Exception:
-                    message = 'Ensure safety for vDisk {0} with guid {1} failed'.format(vdisk.name, vdisk.guid)
-                    MDSServiceController._logger.exception(message)
-                    failures.append(message)
-        if len(failures) > 0:
-            raise Exception('\n - ' + '\n - '.join(failures))
-        MDSServiceController._logger.info('MDS checkup - Finished')
-
-    @staticmethod
     def monitor_mds_layout():
         """
         Prints the current MDS layout
@@ -918,7 +821,7 @@ class MDSServiceController(object):
                                 capacity = mds_service.capacity
                                 if capacity == -1:
                                     capacity = 'infinite'
-                                load, _ = MDSServiceController.get_mds_load(mds_service)
+                                load, _ = MDSServiceController._get_mds_load(mds_service)
                                 if load == float('inf'):
                                     load = 'infinite'
                                 else:
@@ -932,3 +835,100 @@ class MDSServiceController(object):
                 time.sleep(1)
         except KeyboardInterrupt:
             pass
+
+    @staticmethod
+    def _sync_vdisk_to_reality(vdisk):
+        """
+        Syncs the MDS junction services for a vDisk to the services configured in the StorageDriver
+        :param vdisk: vDisk to synchronize
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
+        :return: None
+        :rtype: NoneType
+        """
+        MDSServiceController._logger.info('vDisk {0} - {1}: Syncing to reality'.format(vdisk.guid, vdisk.name))
+
+        sd_master_ip = None  # IP of the master service according to StorageDriver
+        sd_master_port = None  # Port of the master service according to StorageDriver
+        sd_mds_config = collections.OrderedDict()  # MDS services according to StorageDriver
+        model_mds_config = collections.OrderedDict()  # MDS services according to model
+
+        # with volatile_mutex('sync_vdisk_to_reality_{0}'.format(vdisk.guid), wait=10):
+        vdisk.reload_client('storagedriver')
+        vdisk.invalidate_dynamics(['info', 'storagerouter_guid'])
+
+        # Verify the StorageDriver services
+        MDSServiceController._logger.debug('vDisk {0} - {1}: Current MDS Config: {2}'.format(vdisk.guid, vdisk.name, vdisk.info['metadata_backend_config']))
+        for index, mds_entry in enumerate(vdisk.info['metadata_backend_config']):
+            ip = mds_entry['ip']
+            port = mds_entry['port']
+            if index == 0:  # First entry is the master MDS service
+                sd_master_ip = ip
+                sd_master_port = port
+            if ip not in sd_mds_config:
+                sd_mds_config[ip] = []
+            sd_mds_config[ip].append(port)
+
+        # Verify the model junction services (Relations between the MDS Services and the vDisks)
+        for junction in list(vdisk.mds_services):
+            model_ip = junction.mds_service.service.storagerouter.ip
+            model_port = junction.mds_service.service.ports[0]
+            MDSServiceController._logger.debug('vDisk {0} - {1}: Validating junction service {2}:{3}'.format(vdisk.guid, vdisk.name, model_ip, model_port))
+
+            # Remove duplicate junction services
+            if model_ip in model_mds_config and model_port in model_mds_config[model_ip]:
+                MDSServiceController._logger.warning('vDisk {0} - {1}: Deleting junction service {2}:{3} : Duplicate'.format(vdisk.guid, vdisk.name, model_ip, model_port))
+                junction.delete()
+                continue
+
+            # Remove junction services not known by StorageDriver
+            elif model_ip not in sd_mds_config or model_port not in sd_mds_config[model_ip]:
+                MDSServiceController._logger.warning('vDisk {0} - {1}: Deleting junction service {2}:{3} : Unknown by StorageDriver'.format(vdisk.guid, vdisk.name, model_ip, model_port))
+                junction.delete()
+                continue
+
+            junction.is_master = model_ip == sd_master_ip and model_port == sd_master_port
+            junction.save()
+            if model_ip not in model_mds_config:
+                model_mds_config[model_ip] = []
+            model_mds_config[model_ip].append(model_port)
+
+        MDSServiceController._logger.debug('vDisk {0} - {1}: MDS services according to model: {2}'.format(vdisk.guid, vdisk.name, ', '.join(['{0}:{1}'.format(ip, port) for ip, ports in model_mds_config.iteritems() for port in ports])))
+        MDSServiceController._logger.debug('vDisk {0} - {1}: MDS services according to StorageDriver: {2}'.format(vdisk.guid, vdisk.name, ', '.join(['{0}:{1}'.format(ip, port) for ip, ports in sd_mds_config.iteritems() for port in ports])))
+        for ip, ports in sd_mds_config.iteritems():
+            for port in ports:
+                if ip not in model_mds_config or port not in model_mds_config[ip]:
+                    MDSServiceController._logger.warning('vDisk {0} - {1}: Modeling junction service {2}:{3}'.format(vdisk.guid, vdisk.name, ip, port))
+                    service = ServiceList.get_by_ip_ports(ip, [port])
+                    if service is None and vdisk.storagerouter_guid is not None:
+                        MDSServiceController._logger.critical('vDisk {0} - {1}: Failed to find an MDS Service for {2}:{3}. Creating a new MDS Service'.format(vdisk.guid, vdisk.name, ip, port))
+                        storagerouter = StorageRouter(vdisk.storagerouter_guid)
+                        try:
+                            service = MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vdisk.vpool).service
+                        except Exception:
+                            MDSServiceController._logger.exception('vDisk {0} - {1}: Creating MDS Service failed'.format(vdisk.guid, vdisk.name))
+
+                    if service is not None:
+                        mds_service_vdisk = MDSServiceVDisk()
+                        mds_service_vdisk.vdisk = vdisk
+                        mds_service_vdisk.mds_service = service.mds_service
+                        mds_service_vdisk.is_master = sd_master_ip == service.storagerouter.ip and sd_master_port == service.ports[0]
+                        mds_service_vdisk.save()
+                        MDSServiceController._logger.debug('vDisk {0} - {1}: Modeled junction service {2}:{3}'.format(vdisk.guid, vdisk.name, ip, port))
+        MDSServiceController._logger.info('vDisk {0} - {1}: Synced to reality'.format(vdisk.guid, vdisk.name))
+
+    @staticmethod
+    def _get_mds_load(mds_service):
+        """
+        Gets a 'load' for an MDS service based on its capacity and the amount of assigned vDisks
+        :param mds_service: MDS service the get current load for
+        :type mds_service: ovs.dal.hybrids.j_mdsservice.MDSService
+        :return: Load of the MDS service
+        :rtype: tuple(float, float)
+        """
+        service_capacity = float(mds_service.capacity)
+        if service_capacity < 0:
+            return 50.0, 50.0
+        if service_capacity == 0:
+            return float('inf'), float('inf')
+        usage = len(mds_service.vdisks_guids)
+        return round(usage / service_capacity * 100.0, 5), round((usage + 1) / service_capacity * 100.0, 5)
