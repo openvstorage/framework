@@ -22,6 +22,7 @@ before_install:
   - env | sort
   - docker --version
   - repo=`python scripts/travis/repo.py`
+  - echo git show-branch | grep "*" | grep -v "$(git rev-parse --abbrev-ref HEAD)" | head -n1 | sed "s/.*\[\(.*\)\].*/\1/" | sed "s/[\^~].*//"
 install:
   - docker pull ${distribution}
   - docker build --cache-from ${distribution} --tag fwk --build-arg repo=${repo} --file scripts/travis/docker/${distribution}/Dockerfile .
