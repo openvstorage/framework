@@ -110,7 +110,7 @@ class VDiskController(object):
             VDiskController._logger.exception('Error during vDisk checkup (DTL)')
         try:
             VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
-            MDSServiceController.ensure_safety(vdisk)
+            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
         except Exception:
             VDiskController._logger.exception('Error during vDisk checkup')
             if vdisk.objectregistry_client.find(str(vdisk.volume_id)) is None:
@@ -646,7 +646,7 @@ class VDiskController(object):
             raise Exception('Moving vDisk {0} failed'.format(vdisk.name))
 
         try:
-            MDSServiceController.ensure_safety(vdisk=vdisk)
+            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
             VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
         except:
             VDiskController._logger.exception('Executing post-migrate actions failed for vDisk {0}'.format(vdisk.name))

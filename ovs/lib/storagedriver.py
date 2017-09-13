@@ -78,9 +78,9 @@ class StorageDriverController(object):
         :return: None
         """
         if code == VolumeDriverEvents_pb2.MDSFailover:
-            disk = VDiskList.get_vdisk_by_volume_id(volume_id)
-            if disk is not None:
-                MDSServiceController.ensure_safety(disk)
+            vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+            if vdisk is not None:
+                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
 
     @staticmethod
     @ovs_task(name='ovs.storagedriver.cluster_registry_checkup', schedule=Schedule(minute='0', hour='0'), ensure_single_info={'mode': 'CHAINED'})

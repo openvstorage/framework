@@ -468,12 +468,12 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 2, 4, 10, 60.0],
                  ['10.0.0.4', 4, 2, 4, 10, 60.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 2: Validate whether this extra (unnecessary) run doesn't change anything, preventing reconfiguring over and over again
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 3: Validating whether an overloaded node is correctly rebalanced
@@ -497,7 +497,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 2, 5, 10, 70.0],
                  ['10.0.0.4', 4, 2, 5, 10, 70.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 4: Validate whether the overloaded services are still handled
@@ -514,12 +514,12 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 2, 5, 10, 70.0],
                  ['10.0.0.4', 4, 2, 5, 10, 70.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Again, validating whether a subsequent run doesn't give unexpected changes
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 5: An MDS service will be added (next to the overloaded service), this should cause the expected to be rebalanced
@@ -551,14 +551,14 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.4', 4, 2, 4, 10, 60.0],
                  ['10.0.0.2', 5, 0, 5, 10, 50.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
         MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
         MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
@@ -578,7 +578,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.4', 4, 2, 4, 10, 60.0],
                  ['10.0.0.2', 5, 1, 3, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 6: Validate whether a volume migration makes the master follow
@@ -597,12 +597,12 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.4', 4, 2, 5, 10, 70.0],
                  ['10.0.0.2', 5, 1, 3, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Validates if a second run doesn't change anything
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Clean everything from here on out
@@ -682,7 +682,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 4, 10, 50.0],
                  ['10.0.0.7', 9, 1, 3, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 7: Update 2 primary failure domains (Cannot be identical to secondary failure domains)
@@ -719,7 +719,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 3, 10, 40.0],
                  ['10.0.0.7', 9, 1, 3, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 8: Update a secondary failure domain (Cannot be identical to primary failure domain)
@@ -754,7 +754,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 2, 10, 30.0],
                  ['10.0.0.7', 9, 1, 2, 10, 30.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 9: Add a secondary failure domain (Cannot be identical to primary failure domain)
@@ -792,7 +792,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 2, 10, 30.0],
                  ['10.0.0.7', 9, 1, 2, 10, 30.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 10: Remove 2 secondary failure domains
@@ -827,7 +827,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 3, 10, 40.0],
                  ['10.0.0.7', 9, 1, 2, 10, 30.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 11: Add some more vDisks and increase safety
@@ -862,7 +862,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 2, 5, 10, 70.0],
                  ['10.0.0.7', 9, 2, 5, 10, 70.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 12: Reduce safety
@@ -905,7 +905,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 2, 5, 10, 70.0],
                  ['10.0.0.7', 9, 2, 4, 10, 60.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
     def test_ensure_safety_of_2(self):
@@ -1004,12 +1004,12 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 2, 2, 10, 40.0],
                  ['10.0.0.4', 4, 2, 2, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 2: Validate whether this extra (unnecessary) run doesn't change anything, preventing reconfiguring over and over again
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 3: Validating whether an overloaded node is correctly rebalanced
@@ -1033,7 +1033,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 2, 3, 10, 50.0],
                  ['10.0.0.4', 4, 2, 2, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 4: Validate whether the overloaded services are still handled
@@ -1050,12 +1050,12 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 2, 3, 10, 50.0],
                  ['10.0.0.4', 4, 2, 2, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Again, validating whether a subsequent run doesn't give unexpected changes
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 5: An MDS service will be added (next to the overloaded service), this should cause the expected to be rebalanced
@@ -1086,14 +1086,14 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.4', 4, 2, 2, 10, 40.0],
                  ['10.0.0.2', 5, 0, 3, 10, 30.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
         MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
         MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
@@ -1113,7 +1113,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.4', 4, 2, 2, 10, 40.0],
                  ['10.0.0.2', 5, 1, 1, 10, 20.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 6: Validate whether a volume migration makes the master follow
@@ -1132,7 +1132,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.4', 4, 2, 2, 10, 40.0],
                  ['10.0.0.2', 5, 1, 1, 10, 20.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Clean everything from here on out
@@ -1202,7 +1202,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 2, 10, 30.0],
                  ['10.0.0.7', 9, 1, 2, 10, 30.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 7: Update 2 primary failure domains (Cannot be identical to secondary failure domains)
@@ -1229,7 +1229,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 2, 10, 30.0],
                  ['10.0.0.7', 9, 1, 2, 10, 30.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 8: Update a secondary failure domain (Cannot be identical to primary failure domain)
@@ -1254,7 +1254,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 1, 10, 20.0],
                  ['10.0.0.7', 9, 1, 1, 10, 20.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 9: Add a secondary failure domain (Cannot be identical to primary failure domain)
@@ -1282,7 +1282,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 1, 10, 20.0],
                  ['10.0.0.7', 9, 1, 1, 10, 20.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 10: Remove 2 secondary failure domains
@@ -1307,7 +1307,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.6', 8, 1, 1, 10, 20.0],
                  ['10.0.0.7', 9, 1, 1, 10, 20.0]]
         for vdisk_id in sorted(vdisks):
-            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
     def test_role_assignments(self):
@@ -1351,7 +1351,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 0, 1, 10, 10.0]]
 
         StorageRouterClient.mds_recording = []
-        MDSServiceController.ensure_safety(vdisk)
+        MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
         self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.1:1', '10.0.0.2:2', '10.0.0.3:3'],
                                                                  '10.0.0.1:1: Master (I)',
@@ -1366,7 +1366,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 0, 1, 10, 10.0]]
 
         StorageRouterClient.mds_recording = []
-        MDSServiceController.ensure_safety(vdisk)
+        MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
         self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.2:2', '10.0.0.3:3'],
                                                                  '10.0.0.2:2: Master (I)',
@@ -1387,7 +1387,7 @@ class MDSServices(unittest.TestCase):
         self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
 
         Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 2)
-        MDSServiceController.ensure_safety(vdisk)
+        MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
 
         configs = [[{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}]]
         loads = [['10.0.0.1', 1, 0, 1, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load

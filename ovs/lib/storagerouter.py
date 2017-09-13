@@ -1011,7 +1011,7 @@ class StorageRouterController(object):
             pass
         for vdisk in vpool.vdisks:
             try:
-                MDSServiceController.ensure_safety(vdisk=vdisk)
+                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
             except:
                 pass
         StorageRouterController._logger.info('Add vPool {0} ended successfully'.format(vpool_name))
@@ -1130,7 +1130,7 @@ class StorageRouterController(object):
                 if vdisk.storagedriver_id:
                     try:
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety'.format(storage_driver.guid, vdisk.guid, vdisk.name))
-                        MDSServiceController.ensure_safety(vdisk=vdisk,
+                        MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid,
                                                            excluded_storagerouters=[storage_router] + storage_routers_offline)
                     except Exception:
                         StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
