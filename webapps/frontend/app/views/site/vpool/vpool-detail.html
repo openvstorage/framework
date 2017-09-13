@@ -30,6 +30,18 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
             </li>
+            <!-- ko if: $root.storageRouters().length > 0 -->
+            <li class="actions" data-bind="with: $root.storageRouters()[0]">
+                <span data-i18n="ovs:generic.actions"></span>:
+                <button type="button" class="btn btn-mini btn-default hand" id="buttonGenerate"
+                        data-bind="click: $root.generateHPRMConfigFiles,
+                                   tooltip: 'ovs:vpools.detail.generate_configs',
+                                   visible: $root.updatingStorageRouters() === false">
+                    <span class="hand fa" data-bind="visible: $root.generatingConfigs() === false" data-i18n="[html]ovs:icons.download"></span>
+                    <span class="hand fa fa-spin" data-bind="visible: $root.generatingConfigs() === true" data-i18n="[html]ovs:icons.loading"></span>
+                </button>
+            </li>
+            <!-- /ko -->
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="information" style="padding: 15px;">
@@ -348,14 +360,6 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                            attr: { id: 'button_refresh_' + guid()},
                                                                            visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
                                                             <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>
-                                                        </button>
-                                                        <button type="button" class="btn btn-mini btn-default hand" id="buttonGenerate"
-                                                                data-bind="click: $root.generateHPRMConfigFiles,
-                                                                           tooltip: 'ovs:vpools.detail.generate_configs',
-                                                                           attr: { id: 'button_create_configs_' + guid()},
-                                                                           visible: $root.updatingStorageRouters() === false">
-                                                            <span class="hand fa" data-bind="visible: $root.generatingConfigs() === false" data-i18n="[html]ovs:icons.download"></span>
-                                                            <span class="hand fa fa-spin" data-bind="visible: $root.generatingConfigs() === true" data-i18n="[html]ovs:icons.loading"></span>
                                                         </button>
                                                         <button type="button"
                                                                 class="btn btn-mini btn-default hand"

@@ -31,6 +31,7 @@ from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.generic import GenericController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.vpool import VPoolController
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -213,3 +214,25 @@ class VPoolViewSet(viewsets.ViewSet):
             raise HttpNotAcceptableException(error='invalid_data',
                                              error_description='Some of the vDisks specified do not belong to this vPool')
         return GenericController.execute_scrub.delay(vdisk_guids=vdisk_guids or vpool.vdisks_guids)
+
+    @action()
+    @log()
+    @required_roles(['read', 'manage'])
+    @return_task()
+    @load(VPool)
+    def create_hprm_config_files(self, local_storagerouter, vpool, parameters):
+        """
+        Create the required configuration files to be able to make use of HPRM (aka PRACC)
+        These configuration will be zipped and made available for download
+        :param local_storagerouter: StorageRouter this call is executed on
+        :type local_storagerouter: StorageRouter
+        :param vpool: The vpool for which a HPRM manager needs to be deployed
+        :type vpool: ovs.dal.hybrids.vpool.VPool
+        :param parameters: Additional information required for the HPRM configuration files
+        :type parameters: dict
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
+        """
+        return VPoolController.create_hprm_config_files.delay(parameters=parameters,
+                                                              vpool_guid=vpool.guid,
+                                                              local_storagerouter_guid=local_storagerouter.guid)

@@ -34,10 +34,12 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.generic import GenericController
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.update import UpdateController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.vpool import VPoolController
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -174,6 +176,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def create_hprm_config_files(self, local_storagerouter, storagerouter, parameters):
         """
+        DEPRECATED API CALL - USE /vpool/vpool_guid/create_hprm_config_files instead
         Create the required configuration files to be able to make use of HPRM (aka PRACC)
         These configuration will be zipped and made available for download
         :param local_storagerouter: StorageRouter this call is executed on
@@ -185,9 +188,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
-        return StorageRouterController.create_hprm_config_files.delay(parameters=parameters,
-                                                                      storagerouter_guid=storagerouter.guid,
-                                                                      local_storagerouter_guid=local_storagerouter.guid)
+        Toolbox.verify_required_params(actual_params=parameters,
+                                       required_params={'vpool_guid': (str, Toolbox.regex_guid)})
+        return VPoolController.create_hprm_config_files.delay(parameters=parameters,
+                                                              vpool_guid=parameters['vpool_guid'],
+                                                              local_storagerouter_guid=local_storagerouter.guid)
 
     @link()
     @log()

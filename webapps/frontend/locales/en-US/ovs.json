@@ -1053,7 +1053,7 @@
                 "cache_write": "Write:",
                 "cache_quota": "Cache quota:",
                 "client_id": "Client ID:",
-                "failure_msg": "Failed to generate configuration files for vPool __vpool__ on StorageRouter __storagerouter__: __why__",
+                "failure_msg": "Failed to generate configuration files for vPool __vpool__: __why__",
                 "fragment_cache": "Fragment Cache:",
                 "host": "Host:",
                 "identifier": "HPRM identifier",
@@ -1063,9 +1063,9 @@
                 "local_size": "Local Size:",
                 "port": "Port:",
                 "started": "Generating",
-                "started_msg": "Generating HPRM configuration files for vPool __vpool__ on StorageRouter __storagerouter__",
+                "started_msg": "Generating HPRM configuration files for vPool __vpool__",
                 "success": "Generated",
-                "success_msg": "Successfully generated configuration files for vPool __vpool__ on StorageRouter __storagerouter__"
+                "success_msg": "Successfully generated configuration files for vPool __vpool__"
             },
             "gather": {
                 "general_info": "General information",
