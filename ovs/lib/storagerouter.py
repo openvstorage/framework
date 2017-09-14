@@ -512,7 +512,7 @@ class StorageRouterController(object):
                 policies = []
                 for policy_info in preset_info[preset_name]['policies']:
                     policy = json.loads('[{0}]'.format(policy_info.strip('()')))
-                    policies.append([policy[0], policy[1]])
+                    policies.append(policy)
 
                 if key in vpool.metadata:
                     vpool.metadata[key]['backend_info']['policies'] = policies

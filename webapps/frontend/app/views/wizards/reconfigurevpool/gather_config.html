@@ -1,0 +1,152 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <div style="margin-bottom: 5px;">
+        <span data-i18n="ovs:wizards.add_vpool.gather_config.dtl"></span>
+        <a data-bind="popover: {
+                          title: 'ovs:storagedrivers.general.dtl_help_title',
+                          content: 'ovs:storagedrivers.general.dtl_help_message'
+                      }"
+           class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
+        </a>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-4 control-label" for="dtlMode" data-i18n="ovs:wizards.add_vpool.gather_config.dtl_mode"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <span id="dtlMode"
+                  data-bind="dropdown: {
+                                 enabled: data.vPoolAdd,
+                                 items: dtlModes,
+                                 target: dtlMode,
+                                 text: function(item) {
+                                     return $.t('ovs:storagedrivers.general.dtl_modes.' + item.name);
+                                 }
+                             }">
+            </span>
+        </div>
+    </div>
+    <div class="form-group" data-bind="visible: data.dtlEnabled()">
+        <label class="col-lg-4 control-label" for="dtlTransport" data-i18n="ovs:wizards.add_vpool.gather_config.dtl_transport"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <span id="dtlTransport"
+                  data-bind="dropdown: {
+                                 enabled: data.vPoolAdd,
+                                 items: dtlTransportModes,
+                                 target: data.dtlTransportMode,
+                                 text: function(item) {
+                                     return $.t('ovs:storagedrivers.general.dtl_transport_modes.' + item.name);
+                                 }
+                             }">
+            </span>
+        </div>
+    </div>
+    <div style="margin-bottom: 5px;">
+        <span data-i18n="ovs:wizards.add_vpool.gather_config.title_write_buffer"></span>
+    </div>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('writeBufferGlobal') }">
+        <label class="col-lg-4 control-label" for="writeBufferGlobal" data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer"></label>
+        <div class="col-lg-2">
+            <input type="text" id="writeBufferGlobal" class="autofocus form-control" style="text-align: center; width: 110px;"
+                   data-bind="value: data.writeBufferGlobal, valueUpdate: 'afterkeydown'" />
+        </div>
+        <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib"></label>
+    </div>
+    <div style="margin-bottom: 5px;">
+        <span data-i18n="ovs:wizards.add_vpool.gather_config.volume"></span>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-4 control-label" for="scoSize" data-i18n="ovs:wizards.add_vpool.gather_config.sco_size"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <span id="scoSize"
+                  data-bind="dropdown: {
+                                 enabled: data.vPoolAdd,
+                                 items: scoSizes,
+                                 target: data.scoSize,
+                                 text: function(item) {
+                                     if (item === undefined || item === null) {
+                                         return '-';
+                                     }
+                                     return item + ' ' + $.t('ovs:generic.units.mib');
+                                 }
+                             }">
+            </span>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-4 control-label" for="clusterSize" data-i18n="ovs:wizards.add_vpool.gather_config.cluster_size"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <span id="clusterSize"
+                  data-bind="dropdown: {
+                                 enabled: data.vPoolAdd,
+                                 items: clusterSizes,
+                                 target: data.clusterSize,
+                                 text: function(item) {
+                                     if (item === undefined || item === null) {
+                                         return '-';
+                                     }
+                                     return item + ' ' + $.t('ovs:generic.units.kib');
+                                 }
+                             }">
+            </span>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-4 control-label" for="writeBufferVolume" data-i18n="ovs:wizards.add_vpool.gather_config.volume_write_buffer"></label>
+        <div class="col-lg-2">
+            <input type="text" id="writeBufferVolume" class="autofocus form-control" style="text-align: center; width: 110px;"
+                   data-bind="value: data.writeBufferVolume, disable: data.vPool() !== undefined" />
+        </div>
+        <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.mib"></label>
+    </div>
+    <div style="margin-bottom: 5px;">
+        <span data-i18n="ovs:wizards.add_vpool.gather_config.mds"></span>
+        <a data-bind="popover: {
+                          title: 'ovs:storagedrivers.general.mds_help_title',
+                          content: 'ovs:storagedrivers.general.mds_help_message'
+                      }"
+           class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
+        </a>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-4 control-label" for="mdsSafety" data-i18n="ovs:wizards.add_vpool.gather_config.mds_safety"></label>
+        <div class="col-lg-2">
+            <input type="text" id="mdsSafety" class="autofocus form-control" style="text-align: center; width: 110px;"
+                   data-bind="value: data.mdsSafety, disable: data.vPool() !== undefined" />
+        </div>
+    </div>
+    <div class="alert alert-info">
+        <div data-i18n="ovs:wizards.add_vpool.gather_config.information"></div>
+        <ul>
+            <li data-bind="visible: data.writeBufferGlobalMax() !== undefined && Math.floor(data.writeBufferGlobalMax() / 1024 / 1024 / 1024) > 0">
+                <span data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer_available"></span>
+                <span data-bind="text: Math.floor(data.writeBufferGlobalMax() / 1024 / 1024 / 1024)"></span>
+                <span data-i18n="ovs:generic.units.gib"></span>
+            </li>
+            <li data-bind="visible: Math.floor(data.writeBufferGlobalMax() / 1024 / 1024 / 1024) === 0">
+                <span data-i18n="ovs:wizards.add_vpool.gather_config.no_space_left"></span>
+            </li>
+        </ul>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

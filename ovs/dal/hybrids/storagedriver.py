@@ -50,6 +50,7 @@ class StorageDriver(DataObject):
                   Dynamic('statistics', dict, 4),
                   Dynamic('edge_clients', list, 30),
                   Dynamic('vdisks_guids', list, 15),
+                  Dynamic('local_summary', dict, 15),
                   Dynamic('vpool_backend_info', dict, 60),
                   Dynamic('cluster_node_config', dict, 3600)]
 
@@ -212,3 +213,25 @@ class StorageDriver(DataObject):
                                                              self.storage_ip,
                                                              self.ports['edge']),
                 'node_distance_map': distance_map}
+
+    def _local_summary(self):
+        """
+        Returns a summary of the proxies of this storagedriver
+        :return: summary of the proxies
+        :rtype: dict
+        """
+        from ovs.extensions.generic.sshclient import SSHClient
+        from ovs.extensions.services.servicefactory import ServiceFactory
+        service_manager = ServiceFactory.get_manager()
+        client = SSHClient(self.storagerouter)
+        proxy_info = {'red': 0,
+                      'orange': 0,
+                      'green': 0}
+        summary = {'proxies': proxy_info}
+        for alba_proxy in self.alba_proxies:
+            service_status = service_manager.get_service_status(alba_proxy.service.name, client)
+            if service_status == 'active':
+                proxy_info['green'] += 1
+            elif service_status == 'inactive':
+                proxy_info['inactive'] += 1
+        return summary
