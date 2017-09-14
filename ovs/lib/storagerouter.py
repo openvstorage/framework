@@ -51,7 +51,7 @@ from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
+from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, LOG_LEVEL_MAPPING, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import ovs_task
@@ -66,11 +66,11 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
-    _logger = Logger('lib')
     SUPPORT_AGENT = 'support-agent'
-
+    _logger = Logger('lib')
+    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
     # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 

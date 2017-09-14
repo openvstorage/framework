@@ -41,7 +41,7 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient, SRCObjectNotFoundException, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient, SRCObjectNotFoundException, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from volumedriver.storagerouter import storagerouterclient
@@ -52,9 +52,10 @@ class MDSServiceController(object):
     Contains all BLL related to MDSServices
     """
     _logger = Logger('lib')
+    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
 
     # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 

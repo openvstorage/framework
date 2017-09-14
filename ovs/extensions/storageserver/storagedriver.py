@@ -37,7 +37,7 @@ from volumedriver.storagerouter.storagerouterclient import \
     MaxRedirectsExceededException, MDSMetaDataBackendConfig,  MDSNodeConfig, \
     ObjectNotFoundException as SRCObjectNotFoundException, \
     ReadCacheBehaviour, ReadCacheMode, SnapshotNotFoundException, \
-    Role, Statistics, VolumeInfo
+    Role, Severity, Statistics, VolumeInfo
 try:
     from volumedriver.storagerouter.storagerouterclient import VolumeRestartInProgressException
 except ImportError:
@@ -58,6 +58,13 @@ else:
         FileSystemMetaDataClient = None
 
 
+LOG_LEVEL_MAPPING = {0: Severity.debug,
+                     10: Severity.debug,
+                     20: Severity.info,
+                     30: Severity.warning,
+                     40: Severity.error,
+                     50: Severity.fatal}
+
 client_vpool_cache = {}
 oclient_vpool_cache = {}
 crclient_vpool_cache = {}
@@ -77,8 +84,9 @@ class StorageDriverClient(object):
     """
     Client to access storagedriver client
     """
+    _log_level = LOG_LEVEL_MAPPING[OVSLogger('extensions').getEffectiveLevel()]
     # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -196,8 +204,9 @@ class MetadataServerClient(object):
     Builds a MDSClient
     """
     _logger = OVSLogger('extensions')
+    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
     # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -305,8 +314,9 @@ class StorageDriverConfiguration(object):
         """
         Initializes the class
         """
+        _log_level = LOG_LEVEL_MAPPING[OVSLogger('extensions').getEffectiveLevel()]
         # noinspection PyCallByClass,PyTypeChecker
-        storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
+        storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
         # noinspection PyArgumentList
         storagerouterclient.Logger.enableLogging()
 
