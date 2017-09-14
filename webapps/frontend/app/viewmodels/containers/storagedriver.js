@@ -38,6 +38,7 @@ define([
         self.storageRouterGuid        = ko.observable();
         self.vdiskGuids               = ko.observableArray([]);
         self.vpoolBackendInfo         = ko.observable();
+        self.localSummary             = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -49,6 +50,7 @@ define([
             generic.trySet(self.vdiskGuids, data, 'vdisks_guids');
             generic.trySet(self.vpoolBackendInfo, data, 'vpool_backend_info');
             generic.trySet(self.albaProxyGuids, data, 'alba_proxies_guids');
+            generic.trySet(self.localSummary, data, 'local_summary');
             if (data.hasOwnProperty('vpool_backend_info')) {
                 generic.trySet(self.backendInfo, data.vpool_backend_info, 'backend_info');
                 generic.trySet(self.connectionInfo, data.vpool_backend_info, 'connection_info');

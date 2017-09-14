@@ -40,6 +40,7 @@ define([
         self.backendName          = ko.observable();
         self.backendPort          = ko.observable();
         self.backendPreset        = ko.observable();
+        self.backendPolicies      = ko.observableArray([]);
         self.backendRead          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendReadSpeed     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.backendWriteSpeed    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -93,6 +94,7 @@ define([
                     generic.trySet(self.backendGuid, data.metadata.backend.backend_info, 'backend_guid');
                     generic.trySet(self.backendName, data.metadata.backend.backend_info, 'name');
                     generic.trySet(self.backendPreset, data.metadata.backend.backend_info, 'preset');
+                    generic.trySet(self.backendPolicies, data.metadata.backend.backend_info, 'policies');
                 }
                 if (data.metadata.backend.hasOwnProperty('connection_info')) {
                     generic.trySet(self.backendHost, data.metadata.backend.connection_info, 'host');

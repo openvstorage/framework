@@ -21,18 +21,17 @@
             "edit": "Edit backend"
         },
         "new": {
-            "complete": "Backend added",
+            "addfailed": "The backend could not be added: __why__",
             "addsuccess": "The backend was added. Please open the details to configure",
-            "addfailed": "The backend could not be added: __why__"
+            "complete": "Backend added"
         },
         "save": {
-            "success": "The backend was successfully saved",
-            "failure": "Error saving the backend"
+            "failure": "Error saving the backend",
+            "success": "The backend was successfully saved"
         },
         "title": "Backends"
     },
     "dashboard": {
-        "title": "Dashboard",
         "panels": {
             "statistics": {
                 "helpcontent": "This panels lists the average on IOPS, Read and Write Speed and Cache Hits over 5 seconds summarized for all vDisks in the Cluster. The values are updated automatically every 5 seconds.",
@@ -44,32 +43,33 @@
                 "helptitle": "Help - vPools",
                 "title": "vPools"
             }
-        }
+        },
+        "title": "Dashboard"
     },
     "domains": {
-        "title": "Domains",
-        "save": {
-            "complete": "Safe completed",
-            "success": "Domain __what__ updated.",
-            "failed": "Updating __what__ failed: __why__"
+        "delete": {
+            "complete": "Deleted",
+            "delete": "Are you sure you want to delete Domain '__what__'?",
+            "deletefailed": "Could not delete the Domain: __why__",
+            "deletesuccess": "Domain deleted"
         },
         "new": {
-            "complete": "Created",
+            "addfailed": "Domain could not be created: __why__",
             "addsuccess": "Domain created",
-            "addfailed": "Domain could not be created: __why__"
+            "complete": "Created"
         },
-        "delete": {
-            "delete": "Are you sure you want to delete Domain '__what__'?",
-            "complete": "Deleted",
-            "deletesuccess": "Domain deleted",
-            "deletefailed": "Could not delete the Domain: __why__"
-        }
+        "save": {
+            "complete": "Safe completed",
+            "failed": "Updating __what__ failed: __why__",
+            "success": "Domain __what__ updated."
+        },
+        "title": "Domains"
     },
     "generic": {
         "about": "About",
         "accept": "Accept",
-        "access_rights": "Access Rights",
         "access_right_resolution": "Access is implicitly <b>denied</b>. However, if the logged in client has an active <b>manage</b> role, access is implicitly <b>granted</b>. An explicit <b>deny</b> wins over any <b>grant</b>. Users logging in into the GUI always use the Access Rights of the user. A grey tick indicates implicit rights, a dark tick indicates explicit rights.",
+        "access_rights": "Access Rights",
         "actions": "Actions",
         "address": "Address",
         "administration": "Administration",
@@ -130,6 +130,7 @@
         "dtl_port": "DTL Port",
         "dtl_status": "DTL",
         "edge": "Edge",
+        "edge_port": "Edge Port",
         "edge_clients": "Edge Clients",
         "ee_teasers": {
             "no_block_cache": "Block Cache can only be configured in the Enterprise Edition.",
@@ -164,8 +165,8 @@
         "iops": "IOPS",
         "ip": "IP",
         "latency": "Latency",
-        "local": "local",
         "loadingdata": "Loading data...",
+        "local": "local",
         "logout": "Log out",
         "machine": "Machine",
         "machines": "Machines",
@@ -260,6 +261,13 @@
                 "ok_sync": "Healthy (sync)",
                 "unknown": "Unknown"
             },
+            "storagedriver": {
+                "proxies": {
+                    "ok": "Good",
+                    "warning": "Warning",
+                    "error": "Error"
+                }
+            },
             "storagerouter": {
                 "failure": "Failure",
                 "ok": "OK",
@@ -318,8 +326,8 @@
             "tib": "TiB",
             "tibs": "TiB/s"
         },
-        "usedports": "Used Ports",
         "usage": "Usage",
+        "usedports": "Used Ports",
         "user": "User",
         "user_client": "User/Client",
         "username": "Username",
@@ -349,8 +357,8 @@
         "cancel": "&#xf00d;",
         "cancel_circle": "&#xf057;",
         "check": "&#xf00c;",
-        "checked": "&#xf046;",
         "check_circle": "&#xf058;",
+        "checked": "&#xf046;",
         "clone": "&#xf24d;",
         "cog": "&#xf013;",
         "collapse": "&#xf147;",
@@ -409,65 +417,6 @@
         "ovs": "Core",
         "volumedriver": "Storage Driver"
     },
-    "storagerouters": {
-        "detail": {
-            "bad_recovery_domains": "No StorageRouter found for:",
-            "disks": {
-                "title": "Physical disks",
-                "rescan": {
-                    "success": "Rescan finished",
-                    "scanning": "rescanning",
-                    "started": "Rescan started",
-                    "inprogress": "The disks of this Storage Router are being rescanned"
-                }
-            },
-            "hostip": "Host IP",
-            "moveaway": {
-                "warning": "Are you sure you want to move all vDisks away?",
-                "title": "Are you sure",
-                "no": "Cancel",
-                "yes": "Move away",
-                "marked": "Moving away started",
-                "marked_msg": "All vDisks will be moved away from this Storage Router",
-                "done": "Move away complete",
-                "done_msg": "All vDisks have been moved away from __what__",
-                "error_msg": "moving away all vDisks from __what__"
-            },
-            "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
-            "moveawaytitle": "Move all vDisks",
-            "refresh": {
-                "success": "Refresh finished",
-                "refreshing": "refreshing",
-                "started": "Refresh started",
-                "inprogress": "The hardware capabilities of this Storage Router are being refreshed"
-            },
-            "rdma_capable": "RDMA Capable",
-            "save": {
-                "success": "This Storage Router was saved.",
-                "failure": "Error saving this Storage Router."
-            },
-            "scrub_capable": "SCRUB Capable",
-            "storagerouter_vpool_link": "vPools served by this Storage Router",
-            "title": "Storage Router",
-            "updateserving": "Save changes",
-            "edit": "Edit some properties of this Storage Router",
-            "refreshtt": "Refresh the hardware capabilities of this Storage Router",
-            "offline": {
-                "mark": "Mark this node Offline",
-                "warning": "Please make sure the Storage Router is actually down and unavailable before marking the Storage Router as offline. Marking the Storage Router as offline while it is still available might lead to data corruption.",
-                "title": "Warning",
-                "yes": "Yes, it's offline",
-                "no": "No, back to safety",
-                "pending": "Pending",
-                "pendingmsg": "The Storage Router is being marked offline",
-                "done": "Marked offline",
-                "done_msg": "The Storage Router was marked offline",
-                "error_msg": "marking the Storage Router offline: __error__"
-            }
-        },
-        "details": "Storage Router Details",
-        "title": "Storage Routers"
-    },
     "storagedrivers": {
         "general": {
             "blockquota": "Block quota",
@@ -499,8 +448,8 @@
             "fragmentquota": "Fragment quota",
             "mds_help_message": "OpenvStorage will always run a master MDS in the same Domain as configured for the StorageRouter. In case a Recovery Domain is configured, additional MDS slaves will be configured in that Recovery Domain (safety of 2 and more)",
             "mds_help_title": "MetaData Server Information",
-            "sco_size": "SCO size",
             "quota": "Quota",
+            "sco_size": "SCO size",
             "volume": "Volumes",
             "write_buffer": "Maximum write buffer"
         },
@@ -508,6 +457,65 @@
             "cache": "Caching",
             "volume": "Volume"
         }
+    },
+    "storagerouters": {
+        "detail": {
+            "bad_recovery_domains": "No StorageRouter found for:",
+            "disks": {
+                "rescan": {
+                    "inprogress": "The disks of this Storage Router are being rescanned",
+                    "scanning": "rescanning",
+                    "started": "Rescan started",
+                    "success": "Rescan finished"
+                },
+                "title": "Physical disks"
+            },
+            "edit": "Edit some properties of this Storage Router",
+            "hostip": "Host IP",
+            "moveaway": {
+                "done": "Move away complete",
+                "done_msg": "All vDisks have been moved away from __what__",
+                "error_msg": "moving away all vDisks from __what__",
+                "marked": "Moving away started",
+                "marked_msg": "All vDisks will be moved away from this Storage Router",
+                "no": "Cancel",
+                "title": "Are you sure",
+                "warning": "Are you sure you want to move all vDisks away?",
+                "yes": "Move away"
+            },
+            "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
+            "moveawaytitle": "Move all vDisks",
+            "offline": {
+                "done": "Marked offline",
+                "done_msg": "The Storage Router was marked offline",
+                "error_msg": "marking the Storage Router offline: __error__",
+                "mark": "Mark this node Offline",
+                "no": "No, back to safety",
+                "pending": "Pending",
+                "pendingmsg": "The Storage Router is being marked offline",
+                "title": "Warning",
+                "warning": "Please make sure the Storage Router is actually down and unavailable before marking the Storage Router as offline. Marking the Storage Router as offline while it is still available might lead to data corruption.",
+                "yes": "Yes, it's offline"
+            },
+            "rdma_capable": "RDMA Capable",
+            "refresh": {
+                "inprogress": "The hardware capabilities of this Storage Router are being refreshed",
+                "refreshing": "refreshing",
+                "started": "Refresh started",
+                "success": "Refresh finished"
+            },
+            "refreshtt": "Refresh the hardware capabilities of this Storage Router",
+            "save": {
+                "failure": "Error saving this Storage Router.",
+                "success": "This Storage Router was saved."
+            },
+            "scrub_capable": "SCRUB Capable",
+            "storagerouter_vpool_link": "vPools served by this Storage Router",
+            "title": "Storage Router",
+            "updateserving": "Save changes"
+        },
+        "details": "Storage Router Details",
+        "title": "Storage Routers"
     },
     "support": {
         "heart_beat": {
@@ -572,8 +580,8 @@
         "collective_updates_ongoing": "An update is in progress",
         "component_framework": "Framework",
         "component_storagedriver": "StorageDriver",
-        "loading_information": "Loading information",
         "information": "Update information",
+        "loading_information": "Loading information",
         "node_name": "Node",
         "plugin": "Plugin",
         "refresh": {
@@ -685,6 +693,16 @@
             "success": "Save complete",
             "success_msg": "The configuration details for __what__ are saved."
         },
+        "scrub": {
+            "failed_message": "Scrubbing vDisk __vdisk__ failed: __why__",
+            "failed_title": "Failure",
+            "started_message": "Scrubbing vDisk __vdisk__ started",
+            "started_title": "Scrubbing",
+            "success_message": "Scrubbing vDisk __vdisk__ finished",
+            "success_title": "Success",
+            "title": "Scrub vDisk __vdisk__",
+            "title_message": "Are you sure you want to scrub vDisk __vdisk__?"
+        },
         "set_as_template": {
             "failed_msg": "Converting vDisk __what__ into vTemplate failed: __why__",
             "no": "Close",
@@ -696,16 +714,6 @@
             "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer be actively used.",
             "yes": "Convert into vTemplate"
         },
-        "scrub": {
-            "failed_message": "Scrubbing vDisk __vdisk__ failed: __why__",
-            "failed_title": "Failure",
-            "started_message": "Scrubbing vDisk __vdisk__ started",
-            "started_title": "Scrubbing",
-            "success_message": "Scrubbing vDisk __vdisk__ finished",
-            "success_title": "Success",
-            "title": "Scrub vDisk __vdisk__",
-            "title_message": "Are you sure you want to scrub vDisk __vdisk__?"
-        },
         "title": "vDisks"
     },
     "vpools": {
@@ -714,8 +722,8 @@
         "backend_connection": "Connection",
         "backend_login": "Login",
         "backend_preset": "Backend (Preset)",
-        "cache_quota": "Quota",
         "block_caching": "Block Caching",
+        "cache_quota": "Quota",
         "caching_types": {
             "none": "No Caching",
             "read": "Read",
@@ -725,9 +733,9 @@
         "cluster_size": "Cluster Size",
         "configuration": "Configuration",
         "detail": {
+            "extend": "Extend",
             "generate_configs": "Generate HPRM configuration files",
             "generating_configs": "Generating HPRM configuration files",
-            "extend": "Extend",
             "mds_safety": "Amount of MetaData Servers",
             "refresh": {
                 "failed_msg": "Refreshing configuration on StorageRouter __sr__ for vPool __vpool__ failed: __why__",
@@ -738,6 +746,7 @@
                 "warning": "Warning",
                 "warning_msg": "No configuration changes were detected on StorageRouter __sr__ for vPool __vpool__"
             },
+            "reconfigure": "Reconfigure",
             "refresh_config": "Refresh configuration",
             "remove": "Remove",
             "storagerouter_vpool_link": "Storage Routers serving this vPool",
@@ -748,10 +757,12 @@
         "dtl_mode": "DTL Mode",
         "dtl_transport": "DTL Transport",
         "fragment_caching": "Fragment Caching",
-        "global_write_buffer_short": "Write Buffer",
         "global_write_buffer": "Global Write Buffer",
+        "global_write_buffer_short": "Write Buffer",
         "mds_safety": "MDS Safety",
+        "ports": "Ports",
         "preset": "Preset",
+        "proxies": "Proxies",
         "proxies_amount": "# Proxies",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
@@ -767,29 +778,28 @@
             "title": "vDisk Templates"
         }
     },
-    "wizards" : {
+    "wizards": {
         "add_backend": {
-            "title": "Add new Backend",
             "gather": {
                 "backend_type": "Backend type:",
                 "basic_info": "Enter the requested information",
                 "complete": "Completed",
+                "creating": "Creating",
                 "duplicate_name": "This name already exists.",
                 "failed": "The backend could not be created.",
-                "creating": "Creating",
-                "started": "Backend creation started",
                 "invalid_name": "The name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "name": "Name:",
+                "started": "Backend creation started",
                 "success": "Added backend __what__"
-            }
+            },
+            "title": "Add new Backend"
         },
         "add_vdisk": {
-            "title": "Add new vDisk",
             "gather": {
                 "cleaned_name": "Devicename on filesystem: ",
-                "complete":"Adding vDisk complete",
-                "failed":"Adding vDisk failed: __why__",
-                "in_progress":"Adding vDisk in progress",
+                "complete": "Adding vDisk complete",
+                "failed": "Adding vDisk failed: __why__",
+                "in_progress": "Adding vDisk in progress",
                 "invalid_name": "The vDisk name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "invalid_preset": "No preset available for the chosen vPool",
                 "invalid_size": "Maximum size of __amount__ __unit__ exceeded",
@@ -800,11 +810,12 @@
                 "name": "Name:",
                 "name_exists": "The devicename already exists",
                 "size": "Size:",
-                "started":"Adding vDisk",
+                "started": "Adding vDisk",
                 "storagerouter": "Storage Router:",
-                "success":"vDisk added successfully",
+                "success": "vDisk added successfully",
                 "vpool": "vPool:"
-            }
+            },
+            "title": "Add new vDisk"
         },
         "add_vpool": {
             "confirm": {
@@ -812,14 +823,14 @@
                 "alba_preset": "Preset:",
                 "backend": "Backend:",
                 "basic_info": "Validate the basic vPool information.",
-                "cache_quota": "Quota",
                 "block_cache": "Block Cache:",
                 "block_cache_info": {
-                    "true": "Active",
-                    "false": "Inactive"
+                    "false": "Inactive",
+                    "true": "Active"
                 },
                 "block_cache_read": "Cache on read:",
                 "block_cache_write": "Cache on write:",
+                "cache_quota": "Quota",
                 "client_id": "Client ID:",
                 "configuration": "Validate the configuration settings.",
                 "dtl_transport": "DTL Transport Mode:",
@@ -828,8 +839,8 @@
                 "failure_title": "Failure",
                 "fragment_cache": "Fragment Cache:",
                 "fragment_cache_info": {
-                    "true": "Active",
-                    "false": "Inactive"
+                    "false": "Inactive",
+                    "true": "Active"
                 },
                 "fragment_cache_read": "Cache on read:",
                 "fragment_cache_write": "Cache on write:",
@@ -852,6 +863,7 @@
                 "backend_info": "Backend information",
                 "backends_loading": "Backends are being loaded",
                 "basic_info": "Configure additional caching (Block Cache)",
+                "block_cache": "Block Cache:",
                 "cache_quota_info": "Maximum space each vDisk can use for caching purposes",
                 "cache_quota_label": "Quota:",
                 "cache_quota_title": "Caching Quota",
@@ -859,7 +871,6 @@
                 "choose_preset": "Choose one of the available presets",
                 "client_id": "Client ID:",
                 "client_secret": "Client Secret:",
-                "block_cache": "Block Cache:",
                 "host": "Host (FQDN/IP):",
                 "information_extend": "Extending a vPool does not allow to reconfigure the caching policy",
                 "information_extend_quota": "and the caching quota",
@@ -969,8 +980,29 @@
             "title_add": "Add new vPool",
             "title_extend": "Extend vPool"
         },
+        "changepassword": {
+            "confirm": {
+                "enternew": "Enter new password",
+                "introduction": "Enter the new password for user:",
+                "newpassword": "New password",
+                "retype": "Retype",
+                "shouldmatch": "New passwords should match",
+                "title": "Please provide the required information",
+                "updatingpassword": "updating the password"
+            },
+            "title": "Change password"
+        },
         "clone": {
-            "title": "Clone",
+            "confirm": {
+                "clonestarted": "Clone started",
+                "failed": "Failed to clone vDisk __what__ failed.",
+                "inprogress": "vDisk __what__ cloning in progress...",
+                "name": "Name:",
+                "snapshot": "Snapshot:",
+                "storagerouter": "Storage Router:",
+                "success": "Cloned __what__ successfully",
+                "title": "Verify the entered information"
+            },
             "gather": {
                 "basicinfo": "Enter basic information:",
                 "cleaned_name": "Devicename on filesystem: ",
@@ -984,51 +1016,29 @@
                 "snapshots": "Snapshot:",
                 "storagerouters": "Storage Router:"
             },
-            "confirm": {
-                "clonestarted": "Clone started",
-                "failed": "Failed to clone vDisk __what__ failed.",
-                "inprogress": "vDisk __what__ cloning in progress...",
-                "name": "Name:",
-                "snapshot": "Snapshot:",
-                "storagerouter": "Storage Router:",
-                "success": "Cloned __what__ successfully",
-                "title": "Verify the entered information"
-            }
-        },
-        "changepassword": {
-            "title": "Change password",
-            "confirm": {
-                "title": "Please provide the required information",
-                "introduction": "Enter the new password for user:",
-                "newpassword": "New password",
-                "retype": "Retype",
-                "enternew": "Enter new password",
-                "shouldmatch": "New passwords should match",
-                "updatingpassword": "updating the password"
-            }
+            "title": "Clone"
         },
         "configure_partition": {
-            "title": "Configure partitions",
+            "confirm": {
+                "creating": "configuring the partition",
+                "in_progress": "The partition is now being configured.",
+                "started": "Configuration started",
+                "success": "Partition configured"
+            },
             "gather": {
                 "basic_info": "Configure the selected partition or raw disk space. Where required, a partition will be created, adding a filesystem and mounting it.",
                 "device": "Device",
-                "metadata_failure": "Failed to load the information about the current roles",
                 "filesystem": "Filesystem",
+                "metadata_failure": "Failed to load the information about the current roles",
                 "mountpoint": "Mountpoint",
                 "offset": "Offset",
                 "role_info": "Update/select the required roles for the partition. Roles in use cannot be removed. Only 1 DB, DTL and SCRUB role can be assigned to any of the partitions.",
                 "roles": "Roles",
                 "size": "Size"
             },
-            "confirm": {
-                "creating": "configuring the partition",
-                "success": "Partition configured",
-                "started": "Configuration started",
-                "in_progress": "The partition is now being configured."
-            }
+            "title": "Configure partitions"
         },
         "create_ft": {
-            "title": "Create from vTemplate",
             "gather": {
                 "all_failed": "All create actions from vTemplate __what__ failed.",
                 "amount": "# of vDisks:",
@@ -1037,19 +1047,20 @@
                 "complete": "Create completed",
                 "creating": "creating from vTemplate __what__: __error__",
                 "description": "Description:",
-                "storagerouters": "Storage Routers:",
                 "in_progress": "Creating from vTemplate __what__ in progress...",
                 "name": "Name:",
                 "name_exists": "One of the devicenames already exists",
-                "no_object": "No vTemplate found",
                 "no_name": "No name was given",
+                "no_object": "No vTemplate found",
                 "no_storagerouters": "No Storage Routers found.",
                 "no_storagerouters_selected": "Please select at least one Storage Router.",
                 "some_failed": "Create from __what__ finished. However, some could not be created.",
                 "start_nr": "Start nr.:",
                 "started": "Create started",
+                "storagerouters": "Storage Routers:",
                 "success": "Creating from vTemplate __what__ was successful"
-            }
+            },
+            "title": "Create from vTemplate"
         },
         "create_hprm_configs": {
             "confirm": {
@@ -1058,19 +1069,19 @@
                 "basic_info": "Validate the information",
                 "block_cache": "Block Cache:",
                 "cache_info": {
-                    "true": "Active",
-                    "false": "Inactive"
+                    "false": "Inactive",
+                    "true": "Active"
                 },
+                "cache_quota": "Cache quota:",
                 "cache_read": "Read:",
                 "cache_write": "Write:",
-                "cache_quota": "Cache quota:",
                 "client_id": "Client ID:",
                 "failure_msg": "Failed to generate configuration files for vPool __vpool__: __why__",
                 "fragment_cache": "Fragment Cache:",
                 "host": "Host:",
                 "identifier": "HPRM identifier",
-                "instructions": "Instructions",
                 "instruction_steps": "<ul><li><b>Copy</b> the .tgz file to the correct node</li><li><b>Extract</b> the .tgz <code>(tar xzvf &lt;filename&gt; -C /etc/hprm)</code></li><li><b>Enable</b> the HPRM service <code>(systemctl enable hprm@__identifier__.service)</code></li><li><b>Start</b> the HPRM service <code>(systemctl start hprm@__identifier__.service)</code></li></ul>",
+                "instructions": "Instructions",
                 "local_path": "Local Path:",
                 "local_size": "Local Size:",
                 "port": "Port:",
@@ -1107,23 +1118,35 @@
                 "title": "Extend vPool __name__"
             }
         },
+        "reconfigure_vpool": {
+            "gather_vpool": {
+                "backend_name": "Backend",
+                "basic_info": "Basic vPool information",
+                "extended_info": "Extended vPool information",
+                "preset": "Preset",
+                "proxy_amount": "Amount of proxies",
+                "storage_ip": "Storage IP",
+                "storagerouter_name": "Storage Router",
+                "vpool_name": "Name"
+            },
+            "title": "Reconfigure vPool"
+        },
         "rollback": {
-            "title": "Rollback",
             "gather": {
-                "title": "Please provide the required information",
-                "selectsnapshots": "Select the Snapshot to which you want to Rollback:",
-                "novdisk": "No disk loaded",
+                "failed": "Disk __what__ rollback failed.",
+                "inprogress": "Disk __what__ rollback in progress...",
                 "noname": "No name was entered",
                 "nosnapshots": "No Snapshots found",
-                "snapshot": "Snapshots",
+                "novdisk": "No disk loaded",
                 "rollbackstarted": "Rollback started",
-                "inprogress": "Disk __what__ rollback in progress...",
-                "failed": "Disk __what__ rollback failed.",
-                "success": "Disk __what__ rollback successfully."
-            }
+                "selectsnapshots": "Select the Snapshot to which you want to Rollback:",
+                "snapshot": "Snapshots",
+                "success": "Disk __what__ rollback successfully.",
+                "title": "Please provide the required information"
+            },
+            "title": "Rollback"
         },
         "shrink_vpool": {
-            "title": "Remove Storage Driver from vPool",
             "confirm": {
                 "cannot_remove": "The vPool is in use on this Storage Router",
                 "complete": "Remove complete",
@@ -1136,19 +1159,10 @@
                 "started": "Removal started",
                 "success_multi": "The vPool was removed from the selected Storage Router with success",
                 "success_single": "The vPool was successfully removed"
-            }
+            },
+            "title": "Remove Storage Driver from vPool"
         },
         "snapshot": {
-            "title": "Snapshot",
-            "gather": {
-                "title": "Please provide the required information",
-                "name": "Snapshot name",
-                "consistent": "Label as Consistent Snapshot",
-                "sticky": "Label as Sticky Snapshot",
-                "basicinfo": "Enter basic information",
-                "nomachine": "No object loaded",
-                "noname": "No name was entered"
-            },
             "confirm": {
                 "consistent": "Label as Consistent Snapshot",
                 "failed": "Snapshot failed",
@@ -1157,7 +1171,17 @@
                 "snapshotstarted": "Snapshot started",
                 "success": "Successfully created snapshot",
                 "title": "Verify the entered information"
-            }
+            },
+            "gather": {
+                "basicinfo": "Enter basic information",
+                "consistent": "Label as Consistent Snapshot",
+                "name": "Snapshot name",
+                "nomachine": "No object loaded",
+                "noname": "No name was entered",
+                "sticky": "Label as Sticky Snapshot",
+                "title": "Please provide the required information"
+            },
+            "title": "Snapshot"
         },
         "stats_monkey_configure": {
             "basic_info": "Statistics information",
