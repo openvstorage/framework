@@ -18,7 +18,6 @@
 Module for UpdateController
 """
 
-import os
 import copy
 import time
 import inspect
@@ -44,14 +43,12 @@ from ovs.lib.generic import GenericController
 from ovs.lib.helpers.decorators import add_hooks, ovs_task
 from ovs.lib.helpers.toolbox import Toolbox
 
-os.environ['OVS_LOGTYPE_OVERRIDE'] = 'file'  # Make sure we log to file during update
-
 
 class UpdateController(object):
     """
     This class contains all logic for updating an environment
     """
-    _logger = Logger('update')
+    _logger = Logger(name='update', forced_target_type='file')
     _update_file = '/etc/ready_for_upgrade'
     _update_ongoing_file = '/etc/update_ongoing'
 
