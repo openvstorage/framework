@@ -47,6 +47,7 @@ define([
         self.backendWritten       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cachingInfo          = ko.observable();
         self.cacheMisses          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.configuration        = ko.observable();
         self.extensible           = ko.observable(true);
@@ -174,5 +175,68 @@ define([
                 }
             }).promise();
         };
+        self.getCachingData = function(sr_guid) {
+            var cachingData = {};
+            var cacheStructure = {
+                'read': false,
+                'write': false,
+                'isBackend': false,
+                'quota': undefined,
+                'backendInfo': {  // Will be filled in when isBackend is true
+                    // Structure is kept the same as the python api will return
+                    'name': undefined,
+                    'backend_guid': undefined,
+                    'alba_backend_guid': undefined,
+                    'policies': [],
+                    'preset': undefined,
+                    'connectionInfo': {
+                        'client_id': undefined,
+                        'client_secret': undefined,
+                        'host': undefined,
+                        'port': undefined,
+                        'local': undefined
+                    }
+                }
+            };
+            var map = {
+                'fragmentCache': {
+                    'read': 'fragment_cache_on_read',
+                    'write': 'fragment_cache_on_write',
+                    'quota': 'quota_fc',
+                    'backendPrefix': 'backend_aa_{0}'
+                },
+                'blockCache': {
+                    'read': 'block_cache_on_read',
+                    'write': 'block_cache_on_write',
+                    'quota': 'quota_bc',
+                    'backendPrefix': 'backend_bc_{0}'
+                }
+            };
+            var backendMetadata = self.metadata().backend;
+            // Extract the fragment cache and block cache read and write
+            if (backendMetadata.hasOwnProperty('caching_info') && backendMetadata['caching_info'].hasOwnProperty(sr_guid)) {
+                var cachingInfo = backendMetadata['caching_info'][sr_guid];
+                $.each(map, function(cacheType, cacheTypeData) {
+                    var metadataCacheData = $.extend(true, {}, cacheStructure);  // Deepcopy
+                    cachingData[cacheType] = metadataCacheData;
+                    $.each(cacheTypeData, function(structureKey, metadataKey){
+                        if (structureKey === 'backendPrefix') {
+                            // Get possible backend related info
+                            metadataKey = metadataKey.format([sr_guid]);
+                            if (self.metadata().hasOwnProperty(metadataKey)) {
+                                var aaBackendData = self.metadata()[metadataKey];
+                                metadataCacheData.isBackend = true;
+                                $.extend(metadataCacheData.backendInfo, aaBackendData.backend_info);
+                                $.extend(metadataCacheData.backendInfo.connectionInfo, aaBackendData.connection_info);
+                            }
+                        } else {
+                            metadataCacheData[structureKey] = cachingInfo.hasOwnProperty(metadataKey) ? cachingInfo[metadataKey] : false;
+                        }
+                    });
+                });
+            }
+            return cachingData
+
+        }
     };
 });
