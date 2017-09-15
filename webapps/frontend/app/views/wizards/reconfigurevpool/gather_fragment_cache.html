@@ -17,11 +17,12 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <p data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.basic_info"></p>
+    <pre data-bind="text: ko.toJSON(data.fragmentCache, null, 2)"></pre>
+
     <div class="form-group">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.fragment_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
             <span data-bind="dropdown: {
-                                 enabled: data.vPoolAdd,
                                  items: fragmentCacheSettings, target: fragmentCacheSetting,
                                  text: function(item) {
                                      return $.t('ovs:generic.fragmentcaches.' + item);
@@ -30,17 +31,21 @@ but WITHOUT ANY WARRANTY of any kind.
             </span>
         </div>
     </div>
-    <div data-bind="visible: data.fragmentCacheOnRead() || data.fragmentCacheOnWrite()">
+    <div data-bind="visible: useFragmentCache()">
         <div class="form-group">
             <div class="col-lg-3"></div>
             <div class="col-lg-7">
-                <input type="radio" name="fcBackend" id="useAcceleratedAlbaNo" class="autofocus" data-bind="checked: data.useFC, checkedValue: false" />
-                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.use_local" style="font-weight: normal;"></label><br />
-                <input type="radio" name="fcBackend" id="useAcceleratedAlbaYes" class="autofocus" data-bind="checked: data.useFC, checkedValue: true" />
-                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.use_backend_fc" style="font-weight: normal;"></label>
+                <input type="radio" name="fcBackend" id="useAcceleratedAlbaNo" class="autofocus"
+                       data-bind="checked: useFragmentCacheBackend, checkedValue: false" />
+                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.use_local"
+                       style="font-weight: normal;"></label><br />
+                <input type="radio" name="fcBackend" id="useAcceleratedAlbaYes" class="autofocus"
+                       data-bind="checked: useFragmentCacheBackend, checkedValue: true" />
+                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.use_backend_fc"
+                       style="font-weight: normal;"></label>
             </div>
         </div>
-        <div data-bind="visible: data.useFC()">
+        <div data-bind="visible: useFragmentCacheBackend()">
             <p data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.accelerated_info"></p>
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('quota') }">
                 <label class="col-lg-3 control-label" style="padding-top: 8px;">
@@ -184,24 +189,5 @@ but WITHOUT ANY WARRANTY of any kind.
                 <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib" style="margin-left: -20px;"></label>
             </div>
         </div>
-    </div>
-    <div class="alert alert-warning" data-bind="visible: !isPresetAvailable() && canContinue().value" style="margin-top: 20px;">
-        <span data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.alba_preset_unavailable"></span>
-    </div>
-    <div class="alert alert-info" data-bind="visible: !hasCacheQuota() && data.useFC()" style="margin-top: 20px;">
-        <span data-i18n="ovs:generic.ee_teasers.no_cache_quota" data-bind="visible: !hasEE()"></span>
-        <span data-i18n="ovs:generic.version_teasers.no_cache_quota" data-bind="visible: hasEE()"></span>
-    </div>
-    <div class="alert alert-info" data-bind="visible: (data.vPool() !== undefined && !data.vPoolAdd()) || (data.useFC() && loadingBackends()) && canContinue().value" style="margin-top: 20px;">
-        <p data-bind="translate: 'ovs:wizards.add_vpool.gather_fragment_cache.loading_backend_information', visible: (data.useFC() && loadingBackends())"></p>
-        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_fragment_cache.information_extend', visible: data.vPool() !== undefined"></span>
-        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_fragment_cache.information_extend_quota', visible: data.vPool() !== undefined && data.cacheQuotaFCConfigured() && data.useFC()"></span>
-    </div>
-    <div class="alert alert-danger" data-bind="visible: (!data.useFC() || (data.useFC() && !loadingBackends())) && (!canContinue().value || canContinue().showErrors)" style="margin-bottom: -10px;">
-        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
-        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
-        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
-            <li data-bind="text: $data"></li>
-        </ul>
     </div>
 </div>

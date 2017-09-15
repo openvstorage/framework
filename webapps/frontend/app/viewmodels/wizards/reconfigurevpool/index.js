@@ -15,9 +15,9 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'ovs/generic',
+    'jquery', 'knockout', 'ovs/generic',
     '../build', './data', './gather_config', './gather_vpool', './gather_fragment_cache', './gather_block_cache', './confirm'
-], function($, generic, build, data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
+], function($, ko, generic, build, data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -33,12 +33,18 @@ define([
         self.step(0);
         self.activateStep();
 
+        var cachingData = options.vPool.getCachingData(options.storageRouter.guid());
+        // Make cachingData observable for our change monitoring purposes
+        cachingData = ko.observable(cachingData);
+        generic.makeChildrenObservables(cachingData);
         // Cleaning data
         data.vPool(options.vPool);
         data.storageRouter(options.storageRouter);
         data.storageDriver(options.storageDriver);
 
         // Set all configurable data
-        data.proxyAmount(options.storageDriver.albaProxyGuids().length)
+        data.proxyAmount(options.storageDriver.albaProxyGuids().length);
+        data.fragmentCache(cachingData().fragmentCache());
+        data.blockCache(cachingData().blockCache());
     };
 });

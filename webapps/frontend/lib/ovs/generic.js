@@ -508,6 +508,17 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         }
         return true;
     }
+    // Object should already be observable
+    function makeChildrenObservables(object) {
+        if(!ko.isObservable(object)) return;
+        // Loop through its children
+        for (var child in object()) {
+            if (!ko.isObservable(object()[child])) {
+                object()[child] = ko.observable(object()[child]);
+            }
+            makeChildrenObservables(object()[child]);
+        }
+    }
     function _arrayGetItem(array, prop, index){
         var foundItem = undefined;
         if (index > array.length - 1 || index < 0){
@@ -623,6 +634,25 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         return removeElement(this, element);
     };
 
+    String.prototype.format = function (args) {
+			var str = this;
+			return str.replace(String.prototype.format.regex, function(item) {
+				var intVal = parseInt(item.substring(1, item.length - 1));
+				var replace;
+				if (intVal >= 0) {
+					replace = args[intVal];
+				} else if (intVal === -1) {
+					replace = "{";
+				} else if (intVal === -2) {
+					replace = "}";
+				} else {
+					replace = "";
+				}
+				return replace;
+			});
+		};
+    String.prototype.format.regex = new RegExp("{-?[0-9]+}", "g");
+
     return {
         // Vars
         ipRegex: ipRegex,
@@ -655,6 +685,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         keys: keys,
         log: log,
         lower: lower,
+        makeChildrenObservables: makeChildrenObservables,
         merge: merge,
         objectEquals: objectEquals,
         padRight: padRight,
