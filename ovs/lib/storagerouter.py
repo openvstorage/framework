@@ -1018,7 +1018,7 @@ class StorageRouterController(object):
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.remove_storagedriver')
-    def remove_storagedriver(storagedriver_guid, offline_storage_router_guids=None):
+    def remove_storagedriver(storagedriver_guid, offline_storage_router_guids=list()):
         """
         Removes a Storage Driver (if its the last Storage Driver for a vPool, the vPool is removed as well)
         :param storagedriver_guid: Guid of the Storage Driver to remove
@@ -1030,9 +1030,6 @@ class StorageRouterController(object):
         """
         storage_driver = StorageDriver(storagedriver_guid)
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Deleting Storage Driver {1}'.format(storage_driver.guid, storage_driver.name))
-
-        if offline_storage_router_guids is None:
-            offline_storage_router_guids = []
 
         #############
         # Validations
@@ -1046,7 +1043,6 @@ class StorageRouterController(object):
         storage_router = storage_driver.storagerouter
         storage_drivers_left = False
         storage_router_online = True
-        storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
         available_storage_drivers = []
         for sd in vpool.storagedrivers:
             sr = sd.storagerouter
@@ -1054,7 +1050,7 @@ class StorageRouterController(object):
                 storage_drivers_left = True
             try:
                 temp_client = SSHClient(sr, username='root')
-                if sr in storage_routers_offline:
+                if sr.guid in offline_storage_router_guids:
                     raise Exception('Storage Router "{0}" passed as "offline Storage Router" appears to be reachable'.format(sr.name))
                 if sr == storage_router:
                     mtpt_pids = temp_client.run("lsof -t +D '/mnt/{0}' || true".format(vpool.name.replace(r"'", r"'\''")), allow_insecure=True).splitlines()
@@ -1075,7 +1071,7 @@ class StorageRouterController(object):
                 client = temp_client
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is online'.format(storage_driver.guid, sr.name, sr.ip))
             except UnableToConnectException:
-                if sr == storage_router or sr in storage_routers_offline:
+                if sr == storage_router or sr.guid in offline_storage_router_guids:
                     StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is offline'.format(storage_driver.guid, sr.name, sr.ip))
                     if sr == storage_router:
                         storage_router_online = False
@@ -1131,7 +1127,7 @@ class StorageRouterController(object):
                     try:
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety'.format(storage_driver.guid, vdisk.guid, vdisk.name))
                         MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid,
-                                                           excluded_storagerouters=[storage_router] + storage_routers_offline)
+                                                           excluded_storagerouter_guids=[storage_router.guid] + offline_storage_router_guids)
                     except Exception:
                         StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
 
