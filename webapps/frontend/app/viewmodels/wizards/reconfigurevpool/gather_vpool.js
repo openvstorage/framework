@@ -32,6 +32,21 @@ define([
             var reasons = [], fields = [];
             return { value: reasons.length === 0, reasons: reasons, fields: fields };
         });
+        self.enhancedPreset = ko.computed(function() {
+            /**
+             * Compute a preset to look like presetName: (1,1,1,1),(2,1,2,1)
+             */
+            var vpool = self.data.vPool();
+            if (vpool === undefined || (vpool.backendPolicies().length === 0 && vpool.backendPreset === undefined)) {
+               return undefined
+            }
+            var policies = [];
+            $.each(vpool.backendPolicies(), function(index, policy) {
+                policies.push('(' + policy.join(', ') + ')')
+            });
+            return vpool.backendPreset() +': ' + policies.join(', ')
+        });
+
 
     };
 });

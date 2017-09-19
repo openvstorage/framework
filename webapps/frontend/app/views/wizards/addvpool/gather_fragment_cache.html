@@ -168,22 +168,6 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
         </div>
-        <div data-bind="if: options !== undefined && options.customlocal == true &&
-                            !data.useFC() && (data.fragmentCacheOnRead() || data.fragmentCacheOnWrite())">
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('local_path') }">
-                <label class="col-lg-3 control-label" for="localPath" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.local_path"></label>
-                <div class="col-lg-5">
-                    <input type="text" id="localPath" class="autofocus form-control" data-bind="value: data.localPathFC, valueUpdate: 'afterkeydown'" />
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="col-lg-3 control-label" for="localSize" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.local_size"></label>
-                <div class="col-lg-2">
-                    <input type="text" id="localSize" class="autofocus form-control" data-bind="value: data.localSizeFC, valueUpdate: 'afterkeydown'" />
-                </div>
-                <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib" style="margin-left: -20px;"></label>
-            </div>
-        </div>
     </div>
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable() && canContinue().value" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.alba_preset_unavailable"></span>

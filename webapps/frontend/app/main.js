@@ -21,7 +21,8 @@ requirejs.config({
         'plugins'           : '../lib/durandal/js/plugins',
         'transitions'       : '../lib/durandal/js/transitions',
         'knockout'          : '../lib/knockout/knockout-3.3.0',
-        'knockout-mapping'  : '../lib/knockout/knockout-mapping-2.4.1',
+        'knockout-mapping'  : '../lib/knockout/plugins/knockout-mapping-2.4.1',
+        'knockout-reactor'  : '../lib/knockout/plugins/ko-reactor-1.3.8',
         'bootstrap'         : '../lib/bootstrap/js/bootstrap',
         'jquery'            : '../lib/jquery/jquery-1.9.1',
         'jqp'               : '../lib/jquery-plugins/js',
@@ -69,7 +70,8 @@ define([
     'durandal/system', 'durandal/app', 'durandal/viewLocator', 'durandal/binder', 'jquery', 'i18next',
     'ovs/shared',
     'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions', 'ovs/extensions/knockout-extenders',
-    'bootstrap'
+    'bootstrap',
+    'knockout-reactor' // Ko plugins
 ],  function(system, app, viewLocator, binder, $, i18n, shared) {
     "use strict";
     system.debug(true);

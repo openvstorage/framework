@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
-    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk'
-], function($, ko, shared, generic, api, BackendType, VDisk) {
+    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk', 'viewmodels/containers/vpoolcachingdata'
+], function($, ko, shared, generic, api, BackendType, VDisk, CacheData) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -175,7 +175,9 @@ define([
                 }
             }).promise();
         };
-        self.getCachingData = function(sr_guid) {
+        self.getCachingData = function(sr_guid, returnViewModel) {
+            // @todo make this obsolete by returning a proper structure as vpool metadata
+            returnViewModel = returnViewModel || false;
             var cachingData = {};
             var cacheStructure = {
                 'read': false,
@@ -187,7 +189,7 @@ define([
                     'name': undefined,
                     'backend_guid': undefined,
                     'alba_backend_guid': undefined,
-                    'policies': [],
+                    'policies': undefined,
                     'preset': undefined,
                     'connectionInfo': {
                         'client_id': undefined,
@@ -217,7 +219,7 @@ define([
             if (backendMetadata.hasOwnProperty('caching_info') && backendMetadata['caching_info'].hasOwnProperty(sr_guid)) {
                 var cachingInfo = backendMetadata['caching_info'][sr_guid];
                 $.each(map, function(cacheType, cacheTypeData) {
-                    var metadataCacheData = $.extend(true, {}, cacheStructure);  // Deepcopy
+                    var metadataCacheData = $.extend(true, {}, cacheStructure);  // Deepcopy, ignores values = undefined
                     cachingData[cacheType] = metadataCacheData;
                     $.each(cacheTypeData, function(structureKey, metadataKey){
                         if (structureKey === 'backendPrefix') {
@@ -230,13 +232,15 @@ define([
                                 $.extend(metadataCacheData.backendInfo.connectionInfo, aaBackendData.connection_info);
                             }
                         } else {
-                            metadataCacheData[structureKey] = cachingInfo.hasOwnProperty(metadataKey) ? cachingInfo[metadataKey] : false;
+                            metadataCacheData[structureKey] = cachingInfo.hasOwnProperty(metadataKey) ? cachingInfo[metadataKey] : undefined;
                         }
                     });
                 });
             }
+            if (returnViewModel === true) {
+                return new CacheData(cachingData)
+            }
             return cachingData
-
         }
     };
 });
