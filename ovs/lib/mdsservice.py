@@ -471,6 +471,10 @@ class MDSServiceController(object):
         if vdisk.storagerouter_guid is None:
             raise SRCObjectNotFoundException('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any StorageRouter'.format(vdisk.name, vdisk.guid))
 
+        vdisk_storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        if vdisk_storagerouter in excluded_storagerouters:
+            raise RuntimeError('Current host ({0}) of vDisk {1} is in the list of excluded StorageRouters'.format(vdisk_storagerouter.ip, vdisk.guid))
+
         mds_config = Configuration.get('/ovs/vpools/{0}/mds_config'.format(vdisk.vpool_guid))
         tlogs = mds_config['mds_tlogs']
         safety = mds_config['mds_safety']
@@ -484,11 +488,10 @@ class MDSServiceController(object):
         # Default sorting behavior for relations used to be based on order in which relations were added
         # Now sorting is based on guid (DAL speedup changes)
         service_per_key = collections.OrderedDict()  # OrderedDict to keep the ordering in the dict
-        for service in sorted([mds.service for mds in vdisk.vpool.mds_services if mds.service.storagerouter not in excluded_storagerouters], key=lambda k: k.ports):
+        for service in sorted([mds.service for mds in vdisk.vpool.mds_services], key=lambda k: k.ports):
             service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.ports[0])] = service
 
         # Create a pool of StorageRouters being a part of the primary and secondary domains of this StorageRouter
-        vdisk_storagerouter = StorageRouter(vdisk.storagerouter_guid)
         primary_domains = [junction.domain for junction in vdisk_storagerouter.domains if junction.backup is False]
         secondary_domains = [junction.domain for junction in vdisk_storagerouter.domains if junction.backup is True]
         primary_storagerouters = set()
@@ -758,7 +761,9 @@ class MDSServiceController(object):
         new_services.extend(new_primary_services)
         new_services.extend(new_secondary_services)
 
-        if new_services == [master_service] + slave_services:
+        if new_services == [master_service] + slave_services and len(new_services) == len(vdisk.info['metadata_backend_config']):
+            service_string = ', '.join(["{{'ip': '{0}', 'port': {1}}}".format(service.storagerouter.ip, service.ports[0]) for service in new_services])
+            MDSServiceController._logger.debug('vDisk {0} - Current configuration after slave calculation: [{1}]'.format(vdisk.guid, service_string))
             MDSServiceController._logger.info('vDisk {0} - Could not calculate a better MDS layout. Nothing to update'.format(vdisk.guid))
             MDSServiceController._sync_vdisk_to_reality(vdisk)
             return

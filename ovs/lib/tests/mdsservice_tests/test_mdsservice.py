@@ -88,7 +88,7 @@ class MDSServices(unittest.TestCase):
     def test_load_calculation(self):
         """
         Validates whether the load calculation works
-        MDSServiceController._get_mds_load returns the current load and load in case 1 extra disk would be created for this MDS
+        MDSServiceController._get_mds_load returns the current load and load in case 1 extra vDisk would be created for this MDS
             * Current load: Amount of vdisks for this MDS service / Amount of vdisks this MDS service can serve * 100
             * Next load: Amount of vdisks for this MDS service + 1 / Amount of vdisks this MDS service can serve * 100
         This test does:
@@ -237,7 +237,7 @@ class MDSServices(unittest.TestCase):
     def test_sync_vdisk_with_reality(self):
         """
         Validates whether reality is synced to the model as expected
-        MDSServiceController.sync_vdisk_to_reality will sync the actual disk config retrieved from the storagedriver in our model (MDS service vs vDisk junction)
+        MDSServiceController.sync_vdisk_to_reality will sync the actual vDisk config retrieved from the storagedriver in our model (MDS service vs vDisk junction)
         This test does:
             * Create several storagerouters, storagedrivers, MDS services
             * Several scenarios are tested, which do in general the following:
@@ -405,7 +405,7 @@ class MDSServices(unittest.TestCase):
                 * Set tlogs to > threshold and verify nothing changes in config while catch up is ongoing
                 * Set tlogs to < threshold and verify multiple MDS services on same storagerouter are removed
             * Sub-Test 6:
-                * Migrate a disk to another storagerouter and verify master follows
+                * Migrate a vDisk to another storagerouter and verify master follows
             * Sub-Test 7: Update failure domain
             * Sub-Test 8: Update backup failure domain
             * Sub-Test 9: Add backup failure domain
@@ -434,7 +434,7 @@ class MDSServices(unittest.TestCase):
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
 
-        # Sub-Test 1: Validate the start configuration which is simple, each disk has only its default local master
+        # Sub-Test 1: Validate the start configuration which is simple, each vDisk has only its default local master
         # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
         # |    1   |       1       |   1   |     1      |      2       |    10    |
         # |    2   |       2       |   1   |     1      |      2       |    10    |
@@ -454,7 +454,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.4', 4, 2, 0, 10, 20.0]]
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
-        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        # Validate first run. Each vDisk should now have sufficient nodes, since there are plenty of MDS services available
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -631,7 +631,7 @@ class MDSServices(unittest.TestCase):
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
 
-        # Validate the start configuration which is simple, each disk has only its default local master
+        # Validate the start configuration which is simple, each vDisk has only its default local master
         # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
         # |    1   |       1       |   1   |     1      |      2       |    10    |
         # |    2   |       2       |   1   |     1      |      2       |    10    |
@@ -662,7 +662,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.7', 9, 1, 0, 10, 10.0]]
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
-        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        # Validate first run. Each vDisk should now have sufficient nodes, since there are plenty of MDS services available
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.5', 'port': 7}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
@@ -944,7 +944,7 @@ class MDSServices(unittest.TestCase):
                 * Set tlogs to > threshold and verify nothing changes in config while catch up is ongoing
                 * Set tlogs to < threshold and verify multiple MDS services on same storagerouter are removed
             * Sub-Test 6:
-                * Migrate a disk to another storagerouter and verify master follows
+                * Migrate a vDisk to another storagerouter and verify master follows
             * Sub-Test 7: Update failure domain
             * Sub-Test 8: Update backup failure domain
             * Sub-Test 9: Add backup failure domain
@@ -970,7 +970,7 @@ class MDSServices(unittest.TestCase):
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
 
-        # Sub-Test 1: Validate the start configuration which is simple, each disk has only its default local master
+        # Sub-Test 1: Validate the start configuration which is simple, each vDisk has only its default local master
         # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY | LOAD (in percent) |
         # |    1   |       1       |   1   |     1      |      2       |    10    |       20,0        |
         # |    2   |       2       |   1   |     1      |      2       |    10    |       20,0        |
@@ -990,7 +990,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.4', 4, 2, 0, 10, 20.0]]
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
-        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        # Validate first run. Each vDisk should now have sufficient nodes, since there are plenty of MDS services available
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.3', 'port': 3}],
@@ -1161,7 +1161,7 @@ class MDSServices(unittest.TestCase):
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
 
-        # Validate the start configuration which is simple, each disk has only its default local master
+        # Validate the start configuration which is simple, each vDisk has only its default local master
         configs = [[{'ip': '10.0.0.1', 'port': 1}],
                    [{'ip': '10.0.0.2', 'port': 2}],
                    [{'ip': '10.0.0.2', 'port': 3}],
@@ -1182,7 +1182,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.7', 9, 1, 0, 10, 10.0]]
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
-        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        # Validate first run. Each vDisk should now have sufficient nodes, since there are plenty of MDS services available
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.5', 'port': 7}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.5', 'port': 6}],
@@ -1333,7 +1333,7 @@ class MDSServices(unittest.TestCase):
         vdisks = DalHelper.create_vdisks_for_mds_service(amount=1, start_id=1, mds_service=mds_services[1])
         vdisk = vdisks[1]
 
-        # Sub-Test 1: Validate the start configuration which is simple, each disk has only its default local master
+        # Sub-Test 1: Validate the start configuration which is simple, each vDisk has only its default local master
         # | MDS ID | STORAGEROUTER | VPOOL | CAPACITY | LOAD (in percent) |
         # |    1   |       1       |   1   |    10    |       10,0        |
         # |    2   |       2       |   1   |    10    |        0,0        |
@@ -1344,7 +1344,7 @@ class MDSServices(unittest.TestCase):
                  ['10.0.0.3', 3, 0, 0, 10,  0.0]]
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
-        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        # Validate first run. Each vDisk should now have sufficient nodes, since there are plenty of MDS services available
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.3', 'port': 3}]]
         loads = [['10.0.0.1', 1, 1, 0, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
                  ['10.0.0.2', 2, 0, 1, 10, 10.0],
@@ -1455,3 +1455,111 @@ class MDSServices(unittest.TestCase):
                                             'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/scratch',
                                             'port': 10000,
                                             'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/db'})
+
+    def test_ensure_safety_excluded_storagerouters(self):
+        """
+        Validates the ensure safety logic and making sure some StorageRouters cannot be used
+        """
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'domains': [1, 2, 3],
+             'storagerouters': [1, 2, 3, 4, 5, 6, 7],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5), (6, 1, 6), (7, 1, 7)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4), (6, 5), (7, 5), (8, 6), (9, 7)],  # (<id>, <storagedriver_id>)
+             'storagerouter_domains': [(1, 1, 1, False), (2, 1, 2, True), (3, 2, 1, False), (4, 2, 2, True),
+                                       (5, 3, 1, False), (6, 4, 1, False), (7, 4, 3, True), (8, 5, 2, False),
+                                       (9, 5, 3, True), (10, 6, 3, False), (11, 7, 3, False), (12, 7, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>, <backup>)
+        )
+        vpool = structure['vpools'][1]
+        mds_services = structure['mds_services']
+        storagerouters = structure['storagerouters']
+
+        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 35)
+
+        vdisks = {}
+        for mds_service in mds_services.itervalues():
+            vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
+
+        # Validate the start configuration which is simple, each vDisk has only its default local master
+        configs = [[{'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.7', 'port': 9}]]
+        loads = [['10.0.0.1', 1, 1, 0, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 0, 10, 10.0],
+                 ['10.0.0.2', 3, 1, 0, 10, 10.0],
+                 ['10.0.0.3', 4, 1, 0, 10, 10.0],
+                 ['10.0.0.4', 5, 1, 0, 10, 10.0],
+                 ['10.0.0.5', 6, 1, 0, 10, 10.0],
+                 ['10.0.0.5', 7, 1, 0, 10, 10.0],
+                 ['10.0.0.6', 8, 1, 0, 10, 10.0],
+                 ['10.0.0.7', 9, 1, 0, 10, 10.0]]
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+
+        # Validate first run. Each vDisk should now have sufficient nodes, since there are plenty of MDS services available
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}]]
+        loads = [['10.0.0.1', 1, 1, 1, 10, 20.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 1, 10, 20.0],
+                 ['10.0.0.2', 3, 1, 0, 10, 10.0],
+                 ['10.0.0.3', 4, 1, 0, 10, 10.0],
+                 ['10.0.0.4', 5, 1, 0, 10, 10.0],
+                 ['10.0.0.5', 6, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 7, 1, 1, 10, 20.0],
+                 ['10.0.0.6', 8, 1, 2, 10, 30.0],
+                 ['10.0.0.7', 9, 1, 2, 10, 30.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid)
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+
+        # | STORAGEROUTER | MDS ID | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY | LOAD (in percent) |
+        # |       1       |   1    |   1   |     1      |      2       |    10    |       20,0        |
+        # |       2       |   2    |   1   |     1      |      2       |    10    |       20,0        |
+        # |       2       |   3    |   1   |     1      |      2       |    10    |       20,0        |
+        # |       3       |   4    |   1   |     1      |      -       |    10    |       20,0        |
+        # |       4       |   5    |   1   |     1      |      3       |    10    |       20,0        |
+        # |       5       |   6    |   1   |     2      |      3       |    10    |       20,0        |
+        # |       5       |   7    |   1   |     2      |      3       |    10    |       20,0        |
+        # |       6       |   8    |   1   |     3      |      -       |    10    |       20,0        |
+        # |       7       |   9    |   1   |     3      |      1       |    10    |       20,0        |
+        # Exclude certain StorageRouters from ensure safety calculation
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}]]
+        loads = [['10.0.0.1', 1, 1, 1, 10, 20.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 1, 10, 20.0],
+                 ['10.0.0.2', 3, 1, 1, 10, 20.0],
+                 ['10.0.0.3', 4, 1, 1, 10, 20.0],
+                 ['10.0.0.4', 5, 1, 1, 10, 20.0],
+                 ['10.0.0.5', 6, 1, 0, 10, 10.0],
+                 ['10.0.0.5', 7, 1, 0, 10, 10.0],
+                 ['10.0.0.6', 8, 1, 2, 10, 30.0],
+                 ['10.0.0.7', 9, 1, 2, 10, 30.0]]
+        for vdisk_id in sorted(vdisks):
+            if vdisk_id in [6, 7]:
+                # vDisks 6 and 7 are hosted by StorageRouter 5, which gets excluded from calculation --> raises
+                with self.assertRaises(RuntimeError) as raise_info:
+                    MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid, excluded_storagerouter_guids=[storagerouters[5].guid])
+                self.assertEqual(first=raise_info.exception.message,
+                                 second='Current host ({0}) of vDisk {1} is in the list of excluded StorageRouters'.format(storagerouters[5].ip, vdisks[vdisk_id].guid))
+            else:
+                MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid, excluded_storagerouter_guids=[storagerouters[5].guid])
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
