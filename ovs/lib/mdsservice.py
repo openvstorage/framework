@@ -426,6 +426,12 @@ class MDSServiceController(object):
         :type vdisk_guid: str
         :param excluded_storagerouter_guids: GUIDs of StorageRouters to leave out of calculation (Eg: When 1 is down or unavailable)
         :type excluded_storagerouter_guids: list[str]
+        :raises RuntimeError: If host of vDisk is part of the excluded StorageRouters
+                              If host of vDisk is not part of the StorageRouters in the primary domain
+                              If catchup command fails for a slave
+                              If MDS client cannot be created for any of the current or new MDS services
+                              If updateMetadataBackendConfig would fail for whatever reason
+        :raises SRCObjectNotFoundException: If vDisk does not have a StorageRouter GUID
         :return: None
         :rtype: NoneType
         """
@@ -505,15 +511,15 @@ class MDSServiceController(object):
         if len(primary_storagerouters) == 0:
             primary_storagerouters = set(StorageRouterList.get_storagerouters())
 
-        if vdisk_storagerouter not in primary_storagerouters or vdisk_storagerouter in secondary_storagerouters:
-            raise ValueError('StorageRouter {0} for vDisk {1} should be part of the primary domains and NOT be part of the secondary domains'.format(vdisk_storagerouter.name, vdisk.name))
-
         # Remove all excluded StorageRouters from primary StorageRouter
         primary_storagerouters = list(primary_storagerouters.difference(excluded_storagerouters))
 
         # Remove all StorageRouters from secondary which are present in primary and all excluded
         secondary_storagerouters = secondary_storagerouters.difference(primary_storagerouters)
         secondary_storagerouters = list(secondary_storagerouters.difference(excluded_storagerouters))
+
+        if vdisk_storagerouter not in primary_storagerouters:
+            raise RuntimeError('Host of vDisk {0} ({1}) should be part of the primary domains'.format(vdisk.name, vdisk_storagerouter.name))
 
         primary_storagerouters.sort(key=lambda sr: ExtensionsToolbox.advanced_sort(element=sr.ip, separator='.'))
         secondary_storagerouters.sort(key=lambda sr: ExtensionsToolbox.advanced_sort(element=sr.ip, separator='.'))
@@ -723,7 +729,7 @@ class MDSServiceController(object):
                     new_services.append(re_used_local_slave_service)
 
         service_string = ', '.join(["{{'ip': '{0}', 'port': {1}}}".format(service.storagerouter.ip, service.ports[0]) for service in new_services])
-        MDSServiceController._logger.debug('vDisk {0} - Current configuration after master calculation: [{1}]'.format(vdisk.guid, service_string))
+        MDSServiceController._logger.debug('vDisk {0} - Configuration after MASTER calculation: [{1}]'.format(vdisk.guid, service_string))
 
         # At this point we can have:
         #     Local master which is OK
@@ -761,9 +767,9 @@ class MDSServiceController(object):
         new_services.extend(new_primary_services)
         new_services.extend(new_secondary_services)
 
+        service_string = ', '.join(["{{'ip': '{0}', 'port': {1}}}".format(service.storagerouter.ip, service.ports[0]) for service in new_services])
+        MDSServiceController._logger.debug('vDisk {0} - Configuration after SLAVE calculation: [{1}]'.format(vdisk.guid, service_string))
         if new_services == [master_service] + slave_services and len(new_services) == len(vdisk.info['metadata_backend_config']):
-            service_string = ', '.join(["{{'ip': '{0}', 'port': {1}}}".format(service.storagerouter.ip, service.ports[0]) for service in new_services])
-            MDSServiceController._logger.debug('vDisk {0} - Current configuration after slave calculation: [{1}]'.format(vdisk.guid, service_string))
             MDSServiceController._logger.info('vDisk {0} - Could not calculate a better MDS layout. Nothing to update'.format(vdisk.guid))
             MDSServiceController._sync_vdisk_to_reality(vdisk)
             return
@@ -771,12 +777,12 @@ class MDSServiceController(object):
         #################################################
         # EVERYTHING'S CALCULATED, NOTIFY STORAGEDRIVER #
         #################################################
-        service_string = ', '.join(["{{'ip': '{0}', 'port': {1}}}".format(service.storagerouter.ip, service.ports[0]) for service in new_services])
-        MDSServiceController._logger.info('vDisk {0} - New MDS configuration: [{1}]'.format(vdisk.guid, service_string))
-
         # Verify an MDSClient can be created for all relevant services
         mds_client_cache = {}
-        for service in new_services + list(all_info_dict['primary']['used']) + list(all_info_dict['secondary']['used']):
+        services_to_check = new_services + slave_services
+        if master_service is not None:
+            services_to_check.append(master_service)
+        for service in services_to_check:
             if service not in mds_client_cache:
                 client = MetadataServerClient.load(service)
                 if client is None:
@@ -825,7 +831,7 @@ class MDSServiceController(object):
                     pass  # If somehow the namespace would not exist, we don't care.
             raise
 
-        for service in list(all_info_dict['primary']['used']) + list(all_info_dict['secondary']['used']):
+        for service in services_to_check:
             if service not in new_services:
                 MDSServiceController._logger.debug('vDisk {0} - Deleting namespace for vDisk on service {1}:{2}'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
                 client = mds_client_cache[service]
@@ -1029,7 +1035,7 @@ class MDSServiceController(object):
         for ip, ports in sd_mds_config.iteritems():
             for port in ports:
                 if ip not in model_mds_config or port not in model_mds_config[ip]:
-                    MDSServiceController._logger.warning('vDisk {0} - {1}: Modeling junction service {2}:{3}'.format(vdisk.guid, vdisk.name, ip, port))
+                    MDSServiceController._logger.debug('vDisk {0} - {1}: Modeling junction service {2}:{3}'.format(vdisk.guid, vdisk.name, ip, port))
                     service = ServiceList.get_by_ip_ports(ip, [port])
                     if service is None and vdisk.storagerouter_guid is not None:
                         MDSServiceController._logger.critical('vDisk {0} - {1}: Failed to find an MDS Service for {2}:{3}. Creating a new MDS Service'.format(vdisk.guid, vdisk.name, ip, port))
