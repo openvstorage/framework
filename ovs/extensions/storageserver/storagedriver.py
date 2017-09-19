@@ -232,10 +232,9 @@ class MetadataServerClient(object):
         if key not in mdsclient_service_cache:
             try:
                 # noinspection PyArgumentList
-                client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
-                mdsclient_service_cache[key] = client
-            except RuntimeError as ex:
-                MetadataServerClient._logger.error('Error loading MDSClient on {0}: {1}'.format(service.storagerouter.ip, ex))
+                mdsclient_service_cache[key] = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
+            except RuntimeError:
+                MetadataServerClient._logger.exception('Error loading MDSClient on {0}'.format(service.storagerouter.ip))
                 return None
         return mdsclient_service_cache[key]
 

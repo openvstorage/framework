@@ -551,6 +551,14 @@ class MDSClient(object):
             MDSClient._roles[self.key] = {}
         MDSClient._roles[self.key][volume_id] = None
 
+    def list_namespaces(self):
+        """
+        Dummy list namespaces method
+        """
+        if self.key not in MDSClient._catchup:
+            return []
+        return MDSClient._catchup[self.key].keys()
+
     def remove_namespace(self, volume_id):
         """
         Dummy remove namespace method
