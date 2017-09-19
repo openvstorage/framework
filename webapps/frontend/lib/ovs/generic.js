@@ -508,16 +508,58 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         }
         return true;
     }
-    // Object should already be observable
-    function makeChildrenObservables(object) {
-        if(!ko.isObservable(object)) return;
-        // Loop through its children
-        for (var child in object()) {
-            if (!ko.isObservable(object()[child])) {
-                object()[child] = ko.observable(object()[child]);
+
+    function sortObject(object, func) {
+        /**
+         * Sorts on objects keys.
+         * By convention, most browsers will retain the order of keys in an object in the order that they were added.
+         * But don't expect it to always work
+         * @param object: object to sort
+         * @param func: sorting function
+         * @returns {{}}
+         */
+        var sorted = {},
+            key, array = [];
+
+        for (key in object) {
+            if (object.hasOwnProperty(key)) {
+                array.push(key);
             }
-            makeChildrenObservables(object()[child]);
         }
+        array.sort(func);
+        for (key = 0; key < array.length; key++) {
+            sorted[array[key]] = object[array[key]];
+        }
+        return sorted;
+    }
+    // Object should already be observable
+    function makeChildrenObservables(observable) {
+        if(!ko.isObservable(observable)) return;
+        // Loop through its children
+        $.each(observable(), function(key, child) {
+            if (!ko.isObservable(child)) {
+                child = ko.observable(child);
+                observable()[key] = child;  // By reference does not work as the data was unwrapped from the observable
+                if (typeof child() === "object") {
+                    makeChildrenObservables(child);
+                }
+            }
+        });
+    }
+    function recursiveSubscribe(observable, func) {
+        /**
+         * Registers a subscribe to all children observables of an object
+         * @param observable: Observable to subscribe to
+         * @param func: Function to fire on change
+         * @return {[]}
+         */
+        var array = [];
+        if(!ko.isObservable(observable)) return array;
+        $.each(observable(), function(key, child) {
+            if (ko.isObservable(child)) {
+                array.push(child.subscribe(func))
+            }
+        });
     }
     function _arrayGetItem(array, prop, index){
         var foundItem = undefined;
@@ -689,12 +731,14 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         merge: merge,
         objectEquals: objectEquals,
         padRight: padRight,
+        recursiveSubscribe: recursiveSubscribe,
         removeCookie: removeCookie,
         removeElement: removeElement,
         round: round,
         setCookie: setCookie,
         setDecimals: setDecimals,
         smooth: smooth,
+        sortObject: sortObject,
         tryGet: tryGet,
         trySet: trySet,
         validate: validate,

@@ -16,14 +16,15 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <p data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.basic_info"></p>
-    <pre data-bind="text: ko.toJSON(data.fragmentCache, null, 2)"></pre>
-
+    <p data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.basic_info"></p>
+    <pre data-bind="text: ko.toJSON(data.cachingData.fragmentCache, null, 2)"></pre>
+    <!-- ko with: data.cachingData.fragmentCache -->
+    <!-- Root is the wizard, as is the parent-->
     <div class="form-group">
-        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.fragment_cache" style="padding-top: 8px;"></label>
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.fragment_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
             <span data-bind="dropdown: {
-                                 items: fragmentCacheSettings, target: fragmentCacheSetting,
+                                 items: cacheSettings, target: cacheSetting,
                                  text: function(item) {
                                      return $.t('ovs:generic.fragmentcaches.' + item);
                                  }
@@ -31,108 +32,89 @@ but WITHOUT ANY WARRANTY of any kind.
             </span>
         </div>
     </div>
-    <div data-bind="visible: useFragmentCache()">
+    <div data-bind="visible: isUsed()">
         <div class="form-group">
             <div class="col-lg-3"></div>
             <div class="col-lg-7">
                 <input type="radio" name="fcBackend" id="useAcceleratedAlbaNo" class="autofocus"
-                       data-bind="checked: useFragmentCacheBackend, checkedValue: false" />
-                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.use_local"
+                       data-bind="checked: isBackend, checkedValue: false" />
+                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.use_local_disk"
                        style="font-weight: normal;"></label><br />
                 <input type="radio" name="fcBackend" id="useAcceleratedAlbaYes" class="autofocus"
-                       data-bind="checked: useFragmentCacheBackend, checkedValue: true" />
-                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.use_backend_fc"
+                       data-bind="checked: isBackend, checkedValue: true" />
+                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.use_backend_fc"
                        style="font-weight: normal;"></label>
             </div>
         </div>
-        <div data-bind="visible: useFragmentCacheBackend()">
-            <p data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.accelerated_info"></p>
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('quota') }">
+        <div data-bind="visible: isBackend()">
+            <p data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.accelerated_info"></p>
+            <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('quota') }">
                 <label class="col-lg-3 control-label" style="padding-top: 8px;">
                     <a data-bind="popover: {
-                                      title: 'ovs:wizards.add_vpool.gather_fragment_cache.cache_quota_title',
-                                      content: 'ovs:wizards.add_vpool.gather_fragment_cache.cache_quota_info'
+                                      title: 'ovs:wizards.reconfigure_vpool.gather_fragment_cache.cache_quota_title',
+                                      content: 'ovs:wizards.reconfigure_vpool.gather_fragment_cache.cache_quota_info'
                                  }"
                        class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
                     </a>
-                    <span data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.cache_quota_label"></span>
+                    <span data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.cache_quota_label"></span>
                 </label>
                 <div class="col-lg-2">
                     <input class="form-control" type="text" style="text-align: center;"
-                           data-bind="value: data.cacheQuotaFC, valueUpdate: 'input', disable: data.cacheQuotaFCConfigured() || !hasCacheQuota()">
+                           data-bind="value: quota, valueUpdate: 'input', disable: !$root.data.hasCacheQuota()">
                 </div>
                 <label class="col-lg-1" data-i18n="ovs:generic.units.gib" style="padding-top: 7px; padding-left: 0"></label>
             </div>
-            <p data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.backend_info"></p>
-            <div data-bind="visible: localBackendsAvailable()">
+            <!-- ko with: backendInfo.connectionInfo -->
+            <p data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.backend_info"></p>
+            <div data-bind="visible: $root.localBackendsAvailable()">
                 <div class="form-group">
                     <div class="col-lg-3"></div>
                     <div class="col-lg-7">
-                        <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: data.localHostFC" />
-                        <label for="inputBackendLocalHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.local_host" style="font-weight: normal;"></label>
+                        <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: local" />
+                        <label for="inputBackendLocalHost" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.local_backend" style="font-weight: normal;"></label>
                     </div>
                 </div>
             </div>
-            <div data-bind="visible: !data.localHostFC() && reUseableStorageRouters().length > 1">
-                <div class="form-group">
-                    <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.re_use_connection_info"></label>
-                    <div class="col-lg-7">
-                        <span data-bind="dropdown: {
-                                             key: 'guid',
-                                             keyisfunction: true,
-                                             items: reUseableStorageRouters,
-                                             target: reUsedStorageRouter,
-                                             text: function(item) {
-                                                 if (item !== undefined) {
-                                                     return item.name();
-                                                 } else {
-                                                     return '-';
-                                                 }
-                                             }
-                                         }">
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div data-bind="visible: !data.localHostFC()">
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
-                    <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.host"></label>
+            <div data-bind="visible: !local()">
+                <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('host') }">
+                    <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.host"></label>
                     <div class="col-lg-3">
-                        <input type="text" id="inputBackendHost" class="autofocus form-control" data-bind="value: data.hostFC, valueUpdate: 'input'" />
+                        <input type="text" id="inputBackendHost" class="autofocus form-control" data-bind="value: host, valueUpdate: 'input'" />
                     </div>
-                    <label class="col-lg-1 control-label" for="inputBackendPort" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.port"></label>
+                    <label class="col-lg-1 control-label" for="inputBackendPort" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.port"></label>
                     <div class="col-lg-2">
-                        <input type="text" id="inputBackendPort" class="autofocus form-control" data-bind="value: data.portFC, valueUpdate: 'input'" />
+                        <input type="text" id="inputBackendPort" class="autofocus form-control" data-bind="value: port, valueUpdate: 'input'" />
                     </div>
                 </div>
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
-                    <label class="col-lg-3 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.client_id"></label>
+                <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('clientid') }">
+                    <label class="col-lg-3 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.client_id"></label>
                     <div class="col-lg-7">
-                        <input type="text" id="inputBackendClientId" class="autofocus form-control" data-bind="value: data.clientIDFC, valueUpdate: 'input'" />
+                        <input type="text" id="inputBackendClientId" class="autofocus form-control" data-bind="value: client_id, valueUpdate: 'input'" />
                     </div>
                 </div>
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientsecret') }">
-                    <label class="col-lg-3 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.client_secret"></label>
+                <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('clientsecret') }">
+                    <label class="col-lg-3 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.client_secret"></label>
                     <div class="col-lg-7">
-                        <input type="password" id="inputBackendClientSecret" class="autofocus form-control" data-bind="value: data.clientSecretFC, valueUpdate: 'input'" />
+                        <input type="password" id="inputBackendClientSecret" class="autofocus form-control" data-bind="value: client_secret, valueUpdate: 'input'" />
                     </div>
                 </div>
             </div>
+            <!-- /ko -->
             <div class="form-group">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.alba_backend"></label>
-                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }">
-                    <!-- ko if: loadingBackends() === true -->
+                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.alba_backend"></label>
+                <div class="col-lg-7" data-bind="css: { 'has-error': $root.canContinue().fields.contains('backend') }">
+                    <!-- ko if: $root.data.loadingBackends() === true -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
                     <!-- /ko -->
-                    <!-- ko if: loadingBackends() === false && (backendsFC() === undefined || backendsFC().length === 0) -->
-                        <i data-i18n="[html]ovs:wizards.add_vpool.gather_fragment_cache.no_backends"
+                    <!-- ko if: $root.data.loadingBackends() === false && ($root.data.filteredBackends() === undefined || $root.data.filteredBackends().length === 0) -->
+                        <i data-i18n="[html]ovs:wizards.reconfigure_vpool.gather_fragment_cache.no_backends"
                            style="display: inline-block; margin-top: 7px;"></i>
                     <!-- /ko -->
-                    <!-- ko if: loadingBackends() === false && (backendsFC() !== undefined && backendsFC().length > 0) -->
-                        <span data-bind="visible: (data.vPool() === undefined || data.backendFC() !== undefined),
+                    <!-- ko if: $root.data.loadingBackends() === false && ($root.data.filteredBackends() !== undefined && $root.data.filteredBackends().length > 0) -->
+                        <span data-bind="visible: ($root.data.vPool() === undefined || $root.fragmentCacheBackend() !== undefined),
                                          dropdown: {
                                              key: 'guid', keyisfunction: false,
-                                             items: backendsFC, target: data.backendFC,
+                                             items: $root.data.filteredBackends, target: $root.fragmentCacheBackend,
                                              text: function(item) {
                                                  if (item !== undefined) {
                                                      return item.name;
@@ -142,23 +124,24 @@ but WITHOUT ANY WARRANTY of any kind.
                         </span>
                     <!-- /ko -->
                     <button type ='button' class="btn btn-default"  style="margin-left: 10px;"
-                            data-bind="click: loadBackends,
-                                       style: {'margin-top': (backendsFC() !== undefined && backendsFC().length > 0 ? '-26px' : '')},
-                                       enable: !loadingBackends(),
-                                       visible: !data.localHostFC()">
-                        <span class="fa fa-" data-bind="css: { 'fa-spin': loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
+                            data-bind="click: $root.loadBackends,
+                                       style: {'margin-top': ($root.data.filteredBackends() !== undefined && $root.data.filteredBackends().length > 0 ? '-26px' : '')},
+                                       enable: !$root.data.loadingBackends(),
+                                       visible: !backendInfo.connectionInfo.local()">
+                        <span class="fa fa-" data-bind="css: { 'fa-spin': $root.data.loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
                         <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
                     </button>
                 </div>
             </div>
-            <div class="form-group" data-bind="visible: data.backendFC() !== undefined">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.alba_preset"></label>
-                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('preset') }">
-                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && data.presetFC() === undefined)"></span>
-                    <span data-bind="visible: (data.vPool() === undefined || data.presetFC() !== undefined),
+            <div class="form-group" data-bind="visible: $root.fragmentCacheBackend() !== undefined">
+                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.alba_preset"></label>
+                <div class="col-lg-7" data-bind="css: { 'has-error': $root.canContinue().fields.contains('preset') }">
+                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: ($root.data.vPool() !== undefined && $root.preset() === undefined)"></span>
+                    <span data-bind="visible: ($root.data.vPool() === undefined || $root.preset() !== undefined),
                                      dropdown: {
-                                         key: 'name', keyisfunction: false,
-                                         items: data.enhancedPresetsFC, target: data.presetFC,
+                                         key: 'name',
+                                         keyisfunction: false,
+                                         items: $root.enhancedPresets, target: $root.preset,
                                          emptyisloading: false,
                                          text: function(item) {
                                              var policies = [];
@@ -173,21 +156,6 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
         </div>
-        <div data-bind="if: options !== undefined && options.customlocal == true &&
-                            !data.useFC() && (data.fragmentCacheOnRead() || data.fragmentCacheOnWrite())">
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('local_path') }">
-                <label class="col-lg-3 control-label" for="localPath" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.local_path"></label>
-                <div class="col-lg-5">
-                    <input type="text" id="localPath" class="autofocus form-control" data-bind="value: data.localPathFC, valueUpdate: 'afterkeydown'" />
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="col-lg-3 control-label" for="localSize" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.local_size"></label>
-                <div class="col-lg-2">
-                    <input type="text" id="localSize" class="autofocus form-control" data-bind="value: data.localSizeFC, valueUpdate: 'afterkeydown'" />
-                </div>
-                <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib" style="margin-left: -20px;"></label>
-            </div>
-        </div>
     </div>
+    <!-- /ko -->
 </div>

@@ -20,6 +20,18 @@ define([
 ], function($, ko, generic, build, data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
     "use strict";
     return function(options) {
+        // Inject all data first before building all steps to avoid computing
+        var cachingData = options.vPool.getCachingData(options.storageRouter.guid(), true);
+        // Make cachingData observable for our change monitoring purposes
+        // Cleaning data
+        data.vPool(options.vPool);
+        data.storageRouter(options.storageRouter);
+        data.storageDriver(options.storageDriver);
+
+        // Set all configurable data
+        data.cachingData = cachingData;
+        data.proxyAmount(options.storageDriver.albaProxyGuids().length);
+
         var self = this;
         build(self);
 
@@ -32,19 +44,5 @@ define([
         data.completed = options.completed;
         self.step(0);
         self.activateStep();
-
-        var cachingData = options.vPool.getCachingData(options.storageRouter.guid());
-        // Make cachingData observable for our change monitoring purposes
-        cachingData = ko.observable(cachingData);
-        generic.makeChildrenObservables(cachingData);
-        // Cleaning data
-        data.vPool(options.vPool);
-        data.storageRouter(options.storageRouter);
-        data.storageDriver(options.storageDriver);
-
-        // Set all configurable data
-        data.proxyAmount(options.storageDriver.albaProxyGuids().length);
-        data.fragmentCache(cachingData().fragmentCache());
-        data.blockCache(cachingData().blockCache());
     };
 });
