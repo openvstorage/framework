@@ -17,7 +17,6 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <p data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.basic_info"></p>
-    <pre data-bind="text: ko.toJSON(data.cachingData.fragmentCache, null, 2)"></pre>
     <!-- ko with: data.cachingData.fragmentCache -->
     <!-- Root is the wizard, as is the parent-->
     <div class="form-group">
@@ -70,12 +69,12 @@ but WITHOUT ANY WARRANTY of any kind.
                 <div class="form-group">
                     <div class="col-lg-3"></div>
                     <div class="col-lg-7">
-                        <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: local" />
+                        <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: isLocalBackend" />
                         <label for="inputBackendLocalHost" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.local_backend" style="font-weight: normal;"></label>
                     </div>
                 </div>
             </div>
-            <div data-bind="visible: !local()">
+            <div data-bind="visible: !isLocalBackend()">
                 <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('host') }">
                     <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.host"></label>
                     <div class="col-lg-3">
@@ -99,22 +98,22 @@ but WITHOUT ANY WARRANTY of any kind.
                     </div>
                 </div>
             </div>
-            <!-- /ko -->
             <div class="form-group">
+                <pre data-bind="text: $root.canContinue().fields.contains('backend')"></pre>
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.alba_backend"></label>
                 <div class="col-lg-7" data-bind="css: { 'has-error': $root.canContinue().fields.contains('backend') }">
                     <!-- ko if: $root.data.loadingBackends() === true -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
                     <!-- /ko -->
-                    <!-- ko if: $root.data.loadingBackends() === false && ($root.data.filteredBackends() === undefined || $root.data.filteredBackends().length === 0) -->
+                    <!-- ko if: $root.data.loadingBackends() === false && ($root.fragmentCacheBackends() === undefined || $root.fragmentCacheBackends().length === 0) -->
                         <i data-i18n="[html]ovs:wizards.reconfigure_vpool.gather_fragment_cache.no_backends"
                            style="display: inline-block; margin-top: 7px;"></i>
                     <!-- /ko -->
-                    <!-- ko if: $root.data.loadingBackends() === false && ($root.data.filteredBackends() !== undefined && $root.data.filteredBackends().length > 0) -->
+                    <!-- ko if: $root.data.loadingBackends() === false && ($root.fragmentCacheBackends() !== undefined && $root.fragmentCacheBackends().length > 0) -->
                         <span data-bind="visible: ($root.data.vPool() === undefined || $root.fragmentCacheBackend() !== undefined),
                                          dropdown: {
                                              key: 'guid', keyisfunction: false,
-                                             items: $root.data.filteredBackends, target: $root.fragmentCacheBackend,
+                                             items: $root.fragmentCacheBackends, target: $root.fragmentCacheBackend,
                                              text: function(item) {
                                                  if (item !== undefined) {
                                                      return item.name;
@@ -125,19 +124,20 @@ but WITHOUT ANY WARRANTY of any kind.
                     <!-- /ko -->
                     <button type ='button' class="btn btn-default"  style="margin-left: 10px;"
                             data-bind="click: $root.loadBackends,
-                                       style: {'margin-top': ($root.data.filteredBackends() !== undefined && $root.data.filteredBackends().length > 0 ? '-26px' : '')},
-                                       enable: !$root.data.loadingBackends(),
-                                       visible: !backendInfo.connectionInfo.local()">
+                                       style: {'margin-top': ($root.fragmentCacheBackends() !== undefined && $root.fragmentCacheBackends().length > 0 ? '-26px' : '')},
+                                       enable: !$root.data.loadingBackends() && hasRemoteInfo(),
+                                       visible: !isLocalBackend()">
                         <span class="fa fa-" data-bind="css: { 'fa-spin': $root.data.loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
                         <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
                     </button>
                 </div>
             </div>
+
             <div class="form-group" data-bind="visible: $root.fragmentCacheBackend() !== undefined">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_fragment_cache.alba_preset"></label>
                 <div class="col-lg-7" data-bind="css: { 'has-error': $root.canContinue().fields.contains('preset') }">
-                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: ($root.data.vPool() !== undefined && $root.preset() === undefined)"></span>
-                    <span data-bind="visible: ($root.data.vPool() === undefined || $root.preset() !== undefined),
+                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: ($root.preset() === undefined)"></span>
+                    <span data-bind="visible: ($root.preset() !== undefined),
                                      dropdown: {
                                          key: 'name',
                                          keyisfunction: false,
@@ -155,7 +155,15 @@ but WITHOUT ANY WARRANTY of any kind.
                                      }"></span>
                 </div>
             </div>
+            <!-- /ko -->
         </div>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: (isUsed() && !$root.data.loadingBackends()) && (!$root.canContinue().value || $root.canContinue().showErrors)" style="margin-bottom: -10px;">
+        <p data-bind="visible: $root.canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: $root.canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: $root.canContinue().reasons.length > 0, foreach: $root.canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
     </div>
     <!-- /ko -->
 </div>

@@ -98,7 +98,7 @@
             "alba": "Open vStorage Backend"
         },
         "bandwidth": "Bandwidth",
-        "blockcaches": {
+        "blockCaches": {
             "none": "No Block caching",
             "read": "On Read",
             "rw": "On Read & Write",
@@ -1105,6 +1105,38 @@
             }
         },
         "reconfigure_vpool": {
+            "gather_block_cache": {
+                "alba_backend": "Backend:",
+                "alba_preset": "Preset:",
+                "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
+                "backend_info": "Backend information",
+                "backends_loading": "Backends are being loaded",
+                "basic_info": "Configure additional caching (Block Cache)",
+                "cache_quota_info": "Maximum space each vDisk can use for caching purposes",
+                "cache_quota_label": "Quota:",
+                "cache_quota_title": "Caching Quota",
+                "choose_backend": "Choose one of the available backends",
+                "choose_preset": "Choose one of the available presets",
+                "client_id": "Client ID:",
+                "client_secret": "Client Secret:",
+                "block_cache": "Block Cache:",
+                "host": "Host (FQDN/IP):",
+                "information_extend": "Extending a vPool does not allow to reconfigure the caching policy",
+                "information_extend_quota": "and the caching quota",
+                "invalid_alba_info": "The entered connection info and credentials are invalid",
+                "invalid_host": "Invalid host (should be a FQDN or IP address)",
+                "invalid_local_path": "The given local path is invalid",
+                "invalid_local_size": "The given size is invalid",
+                "invalid_quota_nan": "Quota should be a number",
+                "loading_backend_information": "Backend information is being loaded",
+                "local_backend": "Use local Open vStorage backend",
+                "no_backends": "No backends found",
+                "no_credentials": "No credentials were entered",
+                "port": "Port:",
+                "re_use_connection_info": "Re-use connection info:",
+                "use_backend_fc": "Use another Backend as Cache",
+                "use_local_disk": "Use local disk"
+            },
             "gather_fragment_cache": {
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",

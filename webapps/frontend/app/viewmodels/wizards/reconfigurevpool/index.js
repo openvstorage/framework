@@ -24,10 +24,15 @@ define([
         var cachingData = options.vPool.getCachingData(options.storageRouter.guid(), true);
         // Make cachingData observable for our change monitoring purposes
         // Cleaning data
+        data.loadBackendsHandle = undefined;
+        data.loadingBackends();
+        data.invalidBackendInfo();
+        data.backends([]);
+        data.albaPresetMap({});
+        // Set current data
         data.vPool(options.vPool);
         data.storageRouter(options.storageRouter);
         data.storageDriver(options.storageDriver);
-
         // Set all configurable data
         data.cachingData = cachingData;
         data.proxyAmount(options.storageDriver.albaProxyGuids().length);

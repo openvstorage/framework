@@ -24,316 +24,138 @@ define([
         var self = this;
 
         // Variables
-        self.data    = options !== undefined && options.data !== undefined ? options.data : data;
-        self.shared  = shared;
+        self.actived = false;
+        self.data = options !== undefined && options.data !== undefined ? options.data : data;
+        self.shared = shared;
         self.options = options;
 
-        // Handles
-        self.fetchAlbaVPoolHandle = undefined;
-
         // Observables
-        self.albaPresetMap          = ko.observable({});
-        self.backendsBC             = ko.observableArray([]);
-        self.blockCacheSettings     = ko.observableArray(['write', 'read', 'rw', 'none']);
-        self.invalidAlbaInfo        = ko.observable(false);
-        self.loadingBackends        = ko.observable(false);
-        self.localBackendsAvailable = ko.observable(true);
-        self.reUsedStorageRouter    = ko.observable();  // Connection info for this storagerouter will be used for accelerated ALBA
+        self.blockCacheSettings      = ko.observableArray(['write', 'read', 'rw', 'none']);
+        self.preset                     = ko.observable();
 
         // Computed
-        // self.isPresetAvailable = ko.computed(function() {
-        //     var presetAvailable = true;
-        //     if (self.data.backendBC() !== undefined && self.data.presetBC() !== undefined && self.data.useBC() === true) {
-        //         var guid = self.data.backendBC().guid,
-        //             name = self.data.presetBC().name;
-        //         if (self.albaPresetMap().hasOwnProperty(guid) && self.albaPresetMap()[guid].hasOwnProperty(name)) {
-        //             presetAvailable = self.albaPresetMap()[guid][name];
-        //         }
-        //     }
-        //     return presetAvailable;
-        // });
-        // self.reUseableStorageRouters = ko.computed(function() {
-        //     var temp = [];
-        //     if (self.data.vPool() === undefined) {
-        //         return temp;
-        //     }
-        //     $.each(self.data.storageRoutersUsed(), function(index, sr) {
-        //         if (self.data.vPool().metadata().hasOwnProperty('backend_bc_' + sr.guid())) {
-        //             temp.push(sr);
-        //         }
-        //     });
-        //     temp.unshift(undefined);  // Insert undefined as element 0
-        //     return temp;
-        // });
-        // self.hasBlockCache = ko.computed(function() {
-        //     return self.data.storageRouter() !== undefined &&
-        //         self.data.storageRouter().features() !== undefined &&
-        //         self.data.storageRouter().features().alba.features.contains('block-cache');
-        // });
-        // self.hasCacheQuota = ko.computed(function() {
-        //     return self.data.storageRouter() !== undefined &&
-        //         self.data.storageRouter().features() !== undefined &&
-        //         self.data.storageRouter().features().alba.features.contains('cache-quota');
-        // });
-        // self.hasEE = ko.computed(function() {
-        //     return self.data.storageRouter() !== undefined &&
-        //         self.data.storageRouter().features() !== undefined &&
-        //         self.data.storageRouter().features().alba.edition === 'enterprise';
-        // });
-        // self.canConfigureBCRW = ko.computed(function() {
-        //     return self.data.vPoolAdd() && self.hasBlockCache();
-        // });
-        // self.canContinue = ko.computed(function() {
-        //     var showErrors = false, reasons = [], fields = [];
-        //     if (self.data.useBC()) {
-        //         if (self.loadingBackends() === true) {
-        //             reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.backends_loading'));
-        //         } else {
-        //             if (self.data.backendBC() === undefined && self.invalidAlbaInfo() === false) {
-        //                 reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.choose_backend'));
-        //                 fields.push('backend');
-        //             } else if (self.data.presetBC() === undefined && self.invalidAlbaInfo() === false) {
-        //                 reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.choose_preset'));
-        //                 fields.push('preset');
-        //             }
-        //             if (!self.data.localHostBC()) {
-        //                 if (!self.data.hostBC.valid()) {
-        //                     fields.push('host');
-        //                     reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_host'));
-        //                 }
-        //                 if (self.data.clientIDBC() === '' || self.data.clientSecretBC() === '') {
-        //                     fields.push('clientid');
-        //                     fields.push('clientsecret');
-        //                     reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.no_credentials'));
-        //                 }
-        //                 if (self.invalidAlbaInfo()) {
-        //                     reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_alba_info'));
-        //                     fields.push('clientid');
-        //                     fields.push('clientsecret');
-        //                     fields.push('host');
-        //                 }
-        //             }
-        //             var quota = self.data.cacheQuotaBC();
-        //             if (quota !== undefined && quota !== '') {
-        //                 if (isNaN(parseFloat(quota))) {
-        //                     fields.push('quota');
-        //                     reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_quota_nan'));
-        //                 }
-        //             }
-        //         }
-        //     } else if (self.options !== undefined && self.options.customlocal === true && (self.data.blockCacheOnRead() || self.data.blockCacheOnWrite())) {
-        //         var path = self.data.localPathBC();
-        //         if (path === '' || path.endsWith('/.') || path.includes('..') || path.includes('/./')) {
-        //             fields.push('local_path');
-        //             reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_local_path'));
-        //         }
-        //         var localSize = self.data.localSizeBC();
-        //         if (localSize !== undefined && localSize !== '') {
-        //             if (isNaN(parseFloat(localSize))) {
-        //                 fields.push('localsize');
-        //                 reasons.push($.t('ovs:wizards.add_vpool.gather_block_cache.invalid_local_size'));
-        //             }
-        //         }
-        //     }
-        //     return { value: reasons.length === 0, showErrors: showErrors, reasons: reasons, fields: fields };
-        // });
-        // self.blockCacheSetting = ko.computed({
-        //     read: function() {
-        //         if (self.data.blockCacheOnRead() && self.data.blockCacheOnWrite()) {
-        //             return 'rw';
-        //         }
-        //         if (self.data.blockCacheOnRead() || self.data.blockCacheOnWrite()) {
-        //             return self.data.blockCacheOnRead() ? 'read' : 'write';
-        //         }
-        //         return 'none';
-        //     },
-        //     write: function(cache) {
-        //         self.data.blockCacheOnRead(['rw', 'read'].contains(cache));
-        //         self.data.blockCacheOnWrite(['rw', 'write'].contains(cache));
-        //         if (cache === 'none') {
-        //             self.data.useBC(false);
-        //         }
-        //     }
-        // });
-        //
-        // // Functions
-        // self.resetBackendsBC = function() {
-        //     self.backendsBC([]);
-        //     self.data.backendBC(undefined);
-        //     self.data.presetBC(undefined);
-        // };
-        // self.shouldSkip = function() {
-        //     return $.Deferred(function(deferred) {
-        //         if (self.data.vPool() !== undefined && !self.data.blockCacheOnRead() && !self.data.blockCacheOnWrite()) {
-        //             self.data.supportsBC(false);
-        //             deferred.resolve(true);
-        //         } else {
-        //             deferred.resolve(false);
-        //         }
-        //     }).promise();
-        // };
-        // self.loadBackends = function() {
-        //     return $.Deferred(function(albaDeferred) {
-        //         generic.xhrAbort(self.fetchAlbaVPoolHandle);
-        //         var relay = '', remoteInfo = {},
-        //             getData = {
-        //                 contents: 'available'
-        //             };
-        //         if (!self.data.localHostBC()) {
-        //             relay = 'relay/';
-        //             remoteInfo.ip = self.data.hostBC();
-        //             remoteInfo.port = self.data.portBC();
-        //             remoteInfo.client_id = self.data.clientIDBC().replace(/\s+/, "");
-        //             remoteInfo.client_secret = self.data.clientSecretBC().replace(/\s+/, "");
-        //         }
-        //         $.extend(getData, remoteInfo);
-        //         self.loadingBackends(true);
-        //         self.invalidAlbaInfo(false);
-        //         self.fetchAlbaVPoolHandle = api.get(relay + 'alba/backends', { queryparams: getData })
-        //             .done(function(data) {
-        //                 var available_backends = [], calls = [];
-        //                 $.each(data.data, function (index, item) {
-        //                     if (item.available === true) {
-        //                         getData.contents = 'name,ns_statistics,presets,usages';
-        //                         calls.push(
-        //                             api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
-        //                                 .then(function(data) {
-        //                                     if (self.data.backend() === undefined || data.guid !== self.data.backend().guid) {
-        //                                         var backendSize = data.usages.size;
-        //                                         if ((backendSize !== undefined && backendSize > 0)) {
-        //                                             available_backends.push(data);
-        //                                             self.albaPresetMap()[data.guid] = {};
-        //                                             $.each(data.presets, function (_, preset) {
-        //                                                 self.albaPresetMap()[data.guid][preset.name] = preset.is_available;
-        //                                             });
-        //                                         }
-        //                                     }
-        //                                 })
-        //                         );
-        //                     }
-        //                 });
-        //                 $.when.apply($, calls)
-        //                     .then(function() {
-        //                         if (available_backends.length > 0) {
-        //                             available_backends.sort(function(backend1, backend2) {
-        //                                 return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
-        //                             });
-        //                             self.backendsBC(available_backends);
-        //                             if (self.data.backendBC() === undefined) {
-        //                                 self.data.backendBC(available_backends[0]);
-        //                                 self.data.presetBC(self.data.enhancedPresetsBC()[0]);
-        //                             }
-        //                         } else {
-        //                             self.backendsBC([]);
-        //                             self.data.backendBC(undefined);
-        //                             self.data.presetBC(undefined);
-        //                         }
-        //                         self.loadingBackends(false);
-        //                     })
-        //                     .done(albaDeferred.resolve)
-        //                     .fail(function() {
-        //                         self.backendsBC([]);
-        //                         self.data.backendBC(undefined);
-        //                         self.data.presetBC(undefined);
-        //                         self.loadingBackends(false);
-        //                         self.invalidAlbaInfo(true);
-        //                         albaDeferred.reject();
-        //                     });
-        //             })
-        //             .fail(function() {
-        //                 self.backendsBC([]);
-        //                 self.data.backendBC(undefined);
-        //                 self.data.presetBC(undefined);
-        //                 self.loadingBackends(false);
-        //                 self.invalidAlbaInfo(true);
-        //                 albaDeferred.reject();
-        //             });
-        //     }).promise();
-        // };
-        //
-        // // Durandal
-        // self.activate = function() {
-        //     // Subscriptions
-        //     self.useBCSubscription = self.data.useBC.subscribe(function(accelerated) {
-        //         if (accelerated === true && self.backendsBC().length === 0) {
-        //             self.loadBackends();
-        //         }
-        //     });
-        //     self.reUsedStorageRouterSubscription = self.reUsedStorageRouter.subscribe(function(sr) {
-        //         if (sr === undefined && !self.data.localHostBC() && self.data.storageRoutersUsed().length > 0) {
-        //             self.data.hostBC('');
-        //             self.data.portBC(80);
-        //             self.data.clientIDBC('');
-        //             self.data.clientSecretBC('');
-        //         }
-        //         if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_bc_' + sr.guid())) {
-        //             var md = self.data.vPool().metadata()['backend_bc_' + sr.guid()];
-        //             if (md.hasOwnProperty('connection_info')) {
-        //                 self.data.hostBC(md.connection_info.host);
-        //                 self.data.portBC(md.connection_info.port);
-        //                 self.data.clientIDBC(md.connection_info.client_id);
-        //                 self.data.clientSecretBC(md.connection_info.client_secret);
-        //             }
-        //         }
-        //     });
-        //     self.hostBCSubscription = self.data.hostBC.subscribe(self.resetBackendsBC);
-        //     self.portBCSubscription = self.data.portBC.subscribe(self.resetBackendsBC);
-        //     self.clientIDBCSubscription = self.data.clientIDBC.subscribe(self.resetBackendsBC);
-        //     self.clientSecretBCSubscription = self.data.clientSecretBC.subscribe(self.resetBackendsBC);
-        //     self.localHostBCSubscription = self.data.localHostBC.subscribe(function(local) {
-        //         self.data.hostBC('');
-        //         self.data.portBC(80);
-        //         self.data.clientIDBC('');
-        //         self.data.clientSecretBC('');
-        //         self.reUsedStorageRouter(undefined);
-        //         if (local === true && self.data.useBC() === true && self.backendsBC().length === 0) {
-        //             self.loadBackends();
-        //         }
-        //     });
-        //
-        //     if (options === undefined || options.allowlocalbackend !== true) {
-        //         var localBackendsRequiredAmount = self.data.localHost() === true ? 2 : 1;
-        //         if (self.data.backends().length >= localBackendsRequiredAmount) {
-        //             self.data.localHostBC(true);
-        //             self.localBackendsAvailable(true);
-        //         } else {
-        //             self.data.localHostBC(false);
-        //             self.localBackendsAvailable(false);
-        //         }
-        //     }
-        //
-        //     if (self.data.backend() !== undefined && self.data.backendBC() !== undefined && self.data.backend().guid === self.data.backendBC().guid) {
-        //         self.backendsBC([]);
-        //         $.each(self.data.backends(), function (_, backend) {
-        //             if (backend !== self.data.backend() && !self.backendsBC().contains(backend)) {
-        //                 self.backendsBC().push(backend);
-        //             }
-        //         });
-        //         if (self.backendsBC().length === 0) {
-        //             self.data.backendBC(undefined);
-        //             self.data.presetBC(undefined);
-        //         } else {
-        //             self.data.backendBC(self.backendsBC()[0]);
-        //             self.data.presetBC(self.data.enhancedPresetsBC()[0]);
-        //         }
-        //     }
-        //     self.loadBackends();
-        //     if (!self.hasBlockCache()) {
-        //         self.data.blockCacheOnRead(false);
-        //         self.data.blockCacheOnWrite(false);
-        //         self.data.supportsBC(false);
-        //     } else {
-        //         self.data.supportsBC(true);
-        //     }
-        // };
-        // self.deactivate = function() {
-        //     self.useBCSubscription.dispose();
-        //     self.hostBCSubscription.dispose();
-        //     self.portBCSubscription.dispose();
-        //     self.clientIDBCSubscription.dispose();
-        //     self.localHostBCSubscription.dispose();
-        //     self.clientSecretBCSubscription.dispose();
-        //     self.reUsedStorageRouterSubscription.dispose();
-        // }
-    };
+        self.blockCacheBackend = ko.computed({
+            deferEvaluation: true,  // Wait with computing for an actual subscription
+            read: function() {
+                var backendInfo = self.data.cachingData.blockCache.backendInfo;
+                var backend = self.data.getBackend(backendInfo.backend_guid());
+                if (backend === undefined) {
+                    // Return the first of the list
+                    var backends = self.getblockCacheBackends();
+                    if (backends !== undefined && backends.length > 0) {
+                        backend = backends[0];
+                        self.blockCacheBackend(backend)
+                    }
+                }
+                return backend;
+            },
+            write: function(backend) {
+                // Mutate the backend info
+                var backendInfo = self.data.cachingData.blockCache.backendInfo;
+                backendInfo.name(backend.name);
+                backendInfo.backend_guid(backend.backend_guid);
+                backendInfo.alba_backend_guid(backend.guid);
+            }
+        });
+        self.blockCacheBackends = ko.computed({
+            deferEvaluation: true,  // Wait with computing for an actual subscription
+            read: function () {
+                var backends = self.getblockCacheBackends();
+                if (backends.length === 0) {
+                    // Update our Model
+                    self.resetBackend();
+                }
+                return backends;
+            }
+        });
+        self.localBackendsAvailable = ko.pureComputed(function() {
+            var connectionInfo = self.data.cachingData.blockCache.backendInfo.connectionInfo;
+            var useLocalBackend = !!ko.utils.unwrapObservable(connectionInfo.isLocalBackend);
+            var localBackendsRequiredAmount = useLocalBackend === true ? 2 : 1;
+            return self.data.filterBackendsByLocationKey('local').length >= localBackendsRequiredAmount;
+        });
+        self.enhancedPresets = ko.pureComputed(function() {
+            return self.data.parsePresets(self.blockCacheBackend())
+        });
+        self.preset = ko.computed({
+            deferEvaluation: true,  // Wait with computing for an actual subscription
+            read: function() {
+                var parsedPreset = undefined;
+                if (self.blockCacheBackend() === undefined) {
+                    return parsedPreset
+                }
+                var backendInfo = self.data.cachingData.blockCache.backendInfo;
+                var preset = self.data.getPreset(backendInfo.alba_backend_guid(), backendInfo.preset());
+                if (preset === undefined) {
+                    // No preset could be found for our current setting. Attempt to reconfigure it
+                    var enhancedPresets = self.enhancedPresets();
+                    if (enhancedPresets.length > 0) {
+                        parsedPreset = enhancedPresets[0];
+                        self.preset(parsedPreset);  // This will trigger this compute to trigger again but also correct the mistake
+                    }
+                    return parsedPreset
+                }
+                return self.data.parsePreset(preset);
+            },
+            write: function(preset) {
+                var backendInfo = self.data.cachingData.blockCache.backendInfo;
+                backendInfo.preset(preset.name);
+            }
+        });
+        self.canContinue = ko.pureComputed(function() {
+            var reasons = [], fields = [];
+            var blockCache = self.data.cachingData.blockCache;
+            if (blockCache.isUsed() === true){
+                if (self.data.loadingBackends() === true) {
+                    reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.backends_loading'));
+                } else {
+                    if (blockCache.isBackend() === true ){
+                        if (self.blockCacheBackend() === undefined) {
+                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.choose_backend'));
+                            fields.push('backend');
+                        }
+                        else if (self.preset() === undefined) {
+                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.choose_preset'));
+                            fields.push('preset');
+                        }
+                    }
+                }
+            }
+            return { value: reasons.length === 0, reasons: reasons, fields: fields };
+        });
+
+        // Functions
+        self.loadBackends = function() {
+            var connectionInfo = self.data.cachingData.blockCache.backendInfo.connectionInfo;
+            return self.data.loadBackends(connectionInfo)
+        };
+        self.resetBackend = function() {
+            // Will force to recompute everything
+            self.blockCacheBackend({'name': undefined, 'backend_guid':undefined, 'alba_backend_guid': undefined});
+            self.resetPreset();
+        };
+        self.resetPreset = function() {
+            self.preset({'name': undefined});
+        };
+        self.getblockCacheBackends = function() {
+            // Wrapped function for the computable
+            // Issue was when the computed would update the Model when no backends were found, the computed would not
+            // return its value and the backend computed would fetch the old values, causing a mismatch
+            var backendInfo = self.data.cachingData.blockCache.backendInfo;
+            var connectionInfo = backendInfo.connectionInfo;
+            return self.data.filterBackendsByLocationKey(self.data.buildLocationKey(connectionInfo));
+        };
+
+        // Durandal
+        self.activate = function() {
+            if (self.actived === false) {
+                self.data.loadBackends();
+                var connectionInfo = self.data.cachingData.blockCache.backendInfo.connectionInfo;
+                if (!!ko.utils.unwrapObservable(connectionInfo.isLocalBackend) === false && !['', undefined, null].contains(connectionInfo.host())) {
+                    self.data.loadBackends(connectionInfo);
+                }
+                self.actived = true;
+            }
+        };
+    }
 });

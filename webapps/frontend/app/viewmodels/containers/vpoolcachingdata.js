@@ -121,6 +121,30 @@ define([
         self.port           = ko.observable();
         self.local          = ko.observable();
 
+        self.isLocalBackend = ko.pureComputed({
+           read: function() {
+               if (self.local() === undefined) {
+                   // Default to True for reading purposes
+                   return true;
+            }
+            return self.local();
+           },
+           write: function(value) {
+               self.local(value)
+           }
+        });
+        self.hasRemoteInfo = ko.pureComputed(function (){
+            var requiredProps = [self.client_id, self.client_secret, self.host, self.port];
+            var hasRemoteInfo = true;
+            $.each(requiredProps, function(index, prop) {
+                if (ko.utils.unwrapObservable(prop) === undefined){
+                    hasRemoteInfo = false;
+                    return false  // Break
+                }
+            });
+            return hasRemoteInfo;
+        });
+
         ko.mapping.fromJS(data, connectionInfoMapping, self)
     };
     return cacheViewModel;
