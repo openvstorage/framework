@@ -18,6 +18,7 @@
 MDSService module
 """
 
+import sys
 import math
 import time
 import random
@@ -329,10 +330,10 @@ class MDSServiceController(object):
             # Remove all MDS Services which have been manually marked for removal (by setting its capacity to 0)
             max_load = Configuration.get('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid))
             for storagerouter in sorted(storagerouter_info, key=lambda k: k.ip):
+                total_load = 0.0
                 root_client = mds_dict[vpool][storagerouter]['client']
                 mds_services = mds_dict[vpool][storagerouter]['services']
 
-                has_room = False
                 for mds_service in list(sorted(mds_services, key=lambda k: k.number)):
                     port = mds_service.service.ports[0]
                     number = mds_service.number
@@ -346,19 +347,29 @@ class MDSServiceController(object):
                             MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Failed to remove'.format(vpool.name, storagerouter.name, number, port))
                         mds_services.remove(mds_service)
                     else:
-                        _, load = MDSServiceController._get_mds_load(mds_service=mds_service)
-                        if load < max_load:
-                            MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Capacity available'.format(vpool.name, storagerouter.name, number, port))
-                            has_room = True
+                        _, next_load = MDSServiceController._get_mds_load(mds_service=mds_service)
+                        if next_load == float('inf'):
+                            total_load = sys.maxint * -1  # Cast to lowest possible value if any MDS service capacity is set to infinity
                         else:
-                            MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: No capacity available'.format(vpool.name, storagerouter.name, number, port))
+                            total_load += next_load
 
-                if has_room is False:
-                    MDSServiceController._logger.info('vPool {0} - StorageRouter {1} - Adding new MDS Service'.format(vpool.name, storagerouter.name))
-                    try:
-                        mds_services.append(MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool))
-                    except Exception:
-                        MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - Failed to create new MDS Service'.format(vpool.name, storagerouter.name))
+                        if next_load < max_load:
+                            MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Capacity available - Load at {4}%'.format(vpool.name, storagerouter.name, number, port, next_load))
+                        else:
+                            MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: No capacity available - Load at {4}%'.format(vpool.name, storagerouter.name, number, port, next_load))
+
+                if total_load >= max_load * len(mds_services):
+                    mds_services_to_add = int(math.ceil((total_load - max_load * len(mds_services)) / max_load))
+                    MDSServiceController._logger.info('vPool {0} - StorageRouter {1} - Average load per service {2:.2f}% - Max load per service {3:.2f}% - {4} MDS service{5} will be added'.format(
+                        vpool.name, storagerouter.name, total_load / len(mds_services), max_load, mds_services_to_add, '' if mds_services_to_add == 1 else 's'
+                    ))
+
+                    for _ in range(mds_services_to_add):
+                        MDSServiceController._logger.info('vPool {0} - StorageRouter {1} - Adding new MDS Service'.format(vpool.name, storagerouter.name))
+                        try:
+                            mds_services.append(MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool))
+                        except Exception:
+                            MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - Failed to create new MDS Service'.format(vpool.name, storagerouter.name))
 
             # After potentially having added new MDSes, retrieve the optimal configuration
             mds_config_set = {}
