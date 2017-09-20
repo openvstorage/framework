@@ -90,12 +90,30 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
             }
             return undefined;
         };
-        /**
-         * Loads in all backends for the current supplied data
-         * All data is loaded in the backends variable. The key for remote connection is composed of ip:port
-         * @returns undefined
-         */
+        wizardData.getDistinctBackends = function(backends) {
+            /**
+             * Filter out backend duplicates
+             * @param backends: array of backends
+             * @type backends: {Array}
+             * @return {Array}
+             */
+            var seen = [];
+            return ko.utils.arrayFilter(backends, function(backend) {
+                // Add up the two keys
+                var uniqueKey = backend.backend_guid;
+                if (backend.locationKey) {
+                    uniqueKey += backend.locationKey
+                }
+                return !seen.contains(uniqueKey) && seen.push(uniqueKey);
+            });
+        };
         wizardData.loadBackends = function(connectionInfo) {
+            /**
+             * Loads in all backends for the current supplied data
+             * All data is loaded in the backends variable. The key for remote connection is composed of ip:port
+             * @param connectionInfo: Object with connection information (optional)
+             * @returns $.Deferred
+            */
             return $.Deferred(function(albaDeferred) {
                 generic.xhrAbort(wizardData.loadBackendsHandle);
                 var relay = '';
@@ -104,6 +122,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                 };
                 var remoteInfo = {};
                 var backendType = 'local';
+                var availableBackends = wizardData.backends();
                 if (connectionInfo !== undefined && connectionInfo.local() === false) {
                     backendType = 'remote';
                     relay = 'relay/';
@@ -117,7 +136,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                 wizardData.invalidBackendInfo(false);
                 wizardData.loadBackendsHandle = api.get(relay + 'alba/backends', { queryparams: getData })
                     .done(function(data) {
-                        var available_backends = [], calls = [];
+                        var calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
                                 getData.contents = 'name,ns_statistics,presets,usages,backend';
@@ -128,7 +147,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                                             if ((backendSize !== undefined && backendSize > 0)) {
                                                 // Add some metadata about the location
                                                 data.locationKey = wizardData.buildLocationKey(connectionInfo);
-                                                available_backends.push(data);
+                                                availableBackends.push(data);
                                                 wizardData.albaPresetMap()[data.guid] = {};
                                                 $.each(data.presets, function (_, preset) {
                                                     wizardData.albaPresetMap()[data.guid][preset.name] = preset;
@@ -138,27 +157,28 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                                 );
                             }
                         });
+                        availableBackends = wizardData.getDistinctBackends(availableBackends);
                         $.when.apply($, calls)
                             .then(function() {
-                                if (available_backends.length > 0) {
+                                if (availableBackends.length > 0) {
                                     var sortFunction = function(backend1, backend2) {
                                         return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
                                     };
-                                    available_backends = available_backends.sort(sortFunction);
-                                    wizardData.backends(available_backends);
+                                    availableBackends = availableBackends.sort(sortFunction);
+                                    wizardData.backends(availableBackends);
                                 }
                                 wizardData.loadingBackends(false);
                             })
                             .done(albaDeferred.resolve)
                             .fail(function() {
-                                wizardData.backends(available_backends);
+                                wizardData.backends(availableBackends);
                                 wizardData.loadingBackends(false);
                                 wizardData.invalidBackendInfo(true);
                                 albaDeferred.reject();
                             });
                     })
                     .fail(function() {
-                        wizardData.backends(available_backends);
+                        wizardData.backends(availableBackends);
                         wizardData.loadingBackends(false);
                         wizardData.invalidBackendInfo(true);
                         albaDeferred.reject();
