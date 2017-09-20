@@ -1412,7 +1412,6 @@ class MDSServices(unittest.TestCase):
         vpool = structure['vpools'][1]
         mds_service = structure['mds_services'][1]
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
         Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 70)
 
         mds_service.capacity = 10
@@ -1455,6 +1454,53 @@ class MDSServices(unittest.TestCase):
                                             'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/scratch',
                                             'port': 10000,
                                             'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/db'})
+
+        # Verify if MDSes are heavily overloaded, multiple MDSes get created
+        mds_service2.capacity = 10
+        mds_service2.save()
+        DalHelper.create_vdisks_for_mds_service(amount=12, start_id=9, mds_service=mds_service2)  # Total of 20 vDisks, capacity is 10 and max_load is 70% --> 2 additional MDS services should be created
+
+        # 2 Additional MDS services will be created, ensure safety will be executed for all vDisks (The additional MDS services have a default capacity of 100)
+        # The vDisks on the overloaded MDS service will now be assigned an additional slave, thus increasing the MDS load again
+        MDSServiceController.mds_checkup()
+        sorted_services = sorted(vpool.mds_services, key=lambda _mds: _mds.service.ports[0])
+        self.assertEqual(first=3, second=len(vpool.mds_services))
+        self.assertEqual(first=(200, 210), second=MDSServiceController._get_mds_load(sorted_services[0]))  # 20 masters - All vDisk's master services are still on this service
+        self.assertEqual(first=(10, 11), second=MDSServiceController._get_mds_load(sorted_services[1]))  # 10 slaves - All vDisks have now a slave on either 1 of the newly created slaves --> thus increasing the MDS load again
+        self.assertEqual(first=(10, 11), second=MDSServiceController._get_mds_load(sorted_services[2]))  # 10 slaves
+
+        # Running the MDS checkup again should result in:
+        #    - A new MDS service, because the total load is now 210% + 11% + 11% = 232%, which is larger than the amount of MDS services multiplied by max_load (3 * 70%)
+        #    - The slaves for each vDisk should have caught up now, reducing the load on the 1st MDS service
+        MDSServiceController.mds_checkup()
+        sorted_services = sorted(vpool.mds_services, key=lambda _mds: _mds.service.ports[0])
+        self.assertEqual(first=4, second=len(vpool.mds_services))
+        self.assertEqual(first=(70, 80), second=MDSServiceController._get_mds_load(sorted_services[0]))  # 7 masters - Only the maximum amount of vDisks remain with this service as master
+        self.assertEqual(first=(7, 8), second=MDSServiceController._get_mds_load(sorted_services[1]))  # 7 masters - Another 7 vDisks have their master here (which was a catching up slave in previous iteration)
+        self.assertEqual(first=(6, 7), second=MDSServiceController._get_mds_load(sorted_services[2]))  # 6 masters - Another 6 vDisks have their master here (which was a catching up slave in previous iteration)
+        self.assertEqual(first=(0, 1), second=MDSServiceController._get_mds_load(sorted_services[3]))  # Newly created service which does not have any load so far
+
+        # Verify the MDS configuration
+        contents = LocalStorageRouterClient.configurations[storagedriver_config._key]
+        mds_nodes = contents.get('metadata_server', {}).get('mds_nodes', [])
+        mds_nodes.sort(key=lambda i: i['port'])
+        self.assertEqual(len(mds_nodes), 4)
+        self.assertDictEqual(mds_nodes[0], {'host': '10.0.0.1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/scratch',
+                                            'port': 10000,
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/db'})
+        self.assertDictEqual(mds_nodes[1], {'host': '10.0.0.1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_3/scratch',
+                                            'port': 10001,
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_3/db'})
+        self.assertDictEqual(mds_nodes[2], {'host': '10.0.0.1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_4/scratch',
+                                            'port': 10002,
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_4/db'})
+        self.assertDictEqual(mds_nodes[3], {'host': '10.0.0.1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_5/scratch',
+                                            'port': 10003,
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_5/db'})
 
     def test_ensure_safety_excluded_storagerouters(self):
         """
