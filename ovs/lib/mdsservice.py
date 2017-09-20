@@ -265,7 +265,7 @@ class MDSServiceController(object):
                         raise
 
     @staticmethod
-    @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'DEFAULT'})
+    @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'CHAINED'})
     def mds_checkup():
         """
         Validates the current MDS setup/configuration and takes actions where required
@@ -361,6 +361,7 @@ class MDSServiceController(object):
                         MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - Failed to create new MDS Service'.format(vpool.name, storagerouter.name))
 
             # After potentially having added new MDSes, retrieve the optimal configuration
+            mds_config_set = {}
             try:
                 mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool, offline_nodes=offline_nodes)
                 MDSServiceController._logger.debug('vPool {0} - Optimal configuration {1}'.format(vpool.name, mds_config_set))
@@ -532,6 +533,8 @@ class MDSServiceController(object):
             MDSServiceController._logger.debug('vDisk {0} - Primary StorageRouter {1} with IP {2}'.format(vdisk.guid, primary_storagerouter.name, primary_storagerouter.ip))
         for secondary_storagerouter in secondary_storagerouters:
             MDSServiceController._logger.debug('vDisk {0} - Secondary StorageRouter {1} with IP {2}'.format(vdisk.guid, secondary_storagerouter.name, secondary_storagerouter.ip))
+        for excluded_storagerouter in excluded_storagerouters:
+            MDSServiceController._logger.debug('vDisk {0} - Excluded StorageRouter {1} with IP {2}'.format(vdisk.guid, excluded_storagerouter.name, excluded_storagerouter.ip))
 
         ###################################
         # VERIFY RECONFIGURATION REQUIRED #
@@ -719,6 +722,7 @@ class MDSServiceController(object):
                         MDSServiceController._logger.debug('vDisk {0} - Catchup took {1}s'.format(vdisk.guid, round(time.time() - start, 2)))
                     except Exception:
                         MDSServiceController._logger.exception('vDisk {0} - Catching up failed'.format(vdisk.guid))
+                        raise  # Catchup failed, so we don't know whether the new slave can be promoted to master yet
 
                     # It's up to date, so add it as a new master
                     new_services.append(re_used_local_slave_service)
@@ -811,6 +815,7 @@ class MDSServiceController(object):
         start = time.time()
         timeout = 300
         timed_out = False
+        update_failure = False
         try:
             MDSServiceController._logger.debug('vDisk {0} - Updating MDS configuration'.format(vdisk.guid))
             if len(configs_without_replaced_master) != len(configs_all):  # First update without previous master to avoid race conditions (required by voldrv)
@@ -822,6 +827,10 @@ class MDSServiceController(object):
             vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
                                                                       metadata_backend_config=MDSMetaDataBackendConfig(configs_all),
                                                                       req_timeout_secs=timeout)
+            # Verify the configuration - chosen by the framework - passed to the StorageDriver is effectively the correct configuration
+            vdisk.invalidate_dynamics('info')
+            MDSServiceController._logger.debug('vDisk {0} - Configuration after update: {1}'.format(vdisk.guid, vdisk.info['metadata_backend_config']))
+
             duration = time.time() - start
             if duration > 5:
                 MDSServiceController._logger.critical('vDisk {0} - Updating MDS configuration took {1}s'.format(vdisk.guid, duration))
@@ -840,17 +849,23 @@ class MDSServiceController(object):
                     )
                 MDSServiceController._logger.critical('vDisk {0} - Sync vDisk to reality action required'.format(vdisk.guid))
             else:
+                MDSServiceController._logger.exception('vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
+                update_failure = True  # No need to clean new namespaces if time out would have occurred
                 raise
         except Exception:
             MDSServiceController._logger.exception('vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
-            # Remove newly created namespaces when updating would go wrong to avoid storage leaks
-            for new_namespace_service in new_namespace_services:
-                client = mds_client_cache[new_namespace_service]
-                try:
-                    client.remove_namespace(str(vdisk.volume_id))
-                except RuntimeError:
-                    pass  # If somehow the namespace would not exist, we don't care.
+            update_failure = True
             raise
+        finally:
+            if update_failure is True:
+                # Remove newly created namespaces when updating would go wrong to avoid storage leaks
+                for new_namespace_service in new_namespace_services:
+                    client = mds_client_cache[new_namespace_service]
+                    try:
+                        MDSServiceController._logger.warning('vDisk {0}: Deleting newly created namespace {1} for service {2}:{3}'.format(vdisk.guid, vdisk.volume_id, new_namespace_service.storagerouter.ip, new_namespace_service.ports[0]))
+                        client.remove_namespace(str(vdisk.volume_id))
+                    except RuntimeError:
+                        pass  # If somehow the namespace would not exist, we don't care.
 
         if timed_out is False:
             for service in services_to_check:
