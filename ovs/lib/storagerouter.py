@@ -910,8 +910,9 @@ class StorageRouterController(object):
 
         MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool)
 
-        # Update the MDS safety if changed (vpool.configuration will be available at this point also for the newly added StorageDriver)
+        # Update the MDS safety if changed via API (vpool.configuration will be available at this point also for the newly added StorageDriver)
         if new_vpool is False:
+            vpool.invalidate_dynamics('configuration')
             mds_safety = parameters.get('mds_config_params', {}).get('mds_safety')
             if mds_safety is not None and vpool.configuration['mds_config']['mds_safety'] != mds_safety:
                 Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid),
@@ -990,6 +991,8 @@ class StorageRouterController(object):
             for current_storagedriver in [sd for sd in sr.storagedrivers if sd.vpool_guid == vpool.guid]:
                 storagedriver_config = StorageDriverConfiguration(vpool.guid, current_storagedriver.storagedriver_id)
                 if storagedriver_config.config_missing is False:
+                    # Filesystem section in StorageDriver configuration are all parameters used for vDisks created directly on the filesystem
+                    # So when a vDisk gets created on the filesystem, these MDSes will be assigned to them
                     storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
                     storagedriver_config.save(node_client)
 

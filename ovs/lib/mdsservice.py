@@ -386,6 +386,8 @@ class MDSServiceController(object):
                 if storagedriver_config.config_missing is False:
                     optimal_mds_config = mds_config_set[storagerouter.guid]
                     MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - Storing optimal MDS configuration: {2}'.format(vpool.name, storagerouter.name, optimal_mds_config))
+                    # Filesystem section in StorageDriver configuration are all parameters used for vDisks created directly on the filesystem
+                    # So when a vDisk gets created on the filesystem, these MDSes will be assigned to them
                     storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=optimal_mds_config)
                     storagedriver_config.save(root_client)
 
@@ -540,7 +542,8 @@ class MDSServiceController(object):
             config_key = '{0}:{1}'.format(config['ip'], config['port'])
             service = service_per_key.get(config_key)
             if service is None:
-                MDSServiceController._logger.critical('vDisk {0} - Storage leak detected. Namespace for service {1} will never be deleted automatically because service does no longer exist in model'.format(vdisk.guid, config_key))
+                MDSServiceController._logger.critical('vDisk {0} - Storage leak detected. Namespace {1} for service {2} will never be deleted automatically because service does no longer exist in model'.format(
+                    vdisk.guid, vdisk.volume_id, config_key))
                 reconfigure_reasons.add('{0} {1} cannot be used anymore'.format('Master' if index == 0 else 'Slave', config_key))
             else:
                 if service.storagerouter.ip in current_service_ips:
@@ -790,12 +793,12 @@ class MDSServiceController(object):
                 mds_client_cache[service] = client
 
         configs_all = []
-        new_namespaces = []
+        new_namespace_services = []
         configs_without_replaced_master = []
         for service in new_services:
             client = mds_client_cache[service]
             if str(vdisk.volume_id) not in client.list_namespaces():
-                new_namespaces.append(service)
+                new_namespace_services.append(service)
                 client.create_namespace(str(vdisk.volume_id))  # StorageDriver does not throw error if already existing or does not create a duplicate namespace
             # noinspection PyArgumentList
             config = MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0])
@@ -803,52 +806,69 @@ class MDSServiceController(object):
                 configs_without_replaced_master.append(config)
             configs_all.append(config)
 
+        start = time.time()
+        timeout = 300
+        timed_out = False
         try:
-            start = time.time()
             MDSServiceController._logger.debug('vDisk {0} - Updating MDS configuration'.format(vdisk.guid))
             if len(configs_without_replaced_master) != len(configs_all):  # First update without previous master to avoid race conditions (required by voldrv)
                 MDSServiceController._logger.debug('vDisk {0} - Without previous master: {1}:{2}'.format(vdisk.guid, previous_master.storagerouter.ip, previous_master.ports[0]))
                 vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
                                                                           metadata_backend_config=MDSMetaDataBackendConfig(configs_without_replaced_master),
-                                                                          req_timeout_secs=300)
+                                                                          req_timeout_secs=timeout)
                 MDSServiceController._logger.debug('vDisk {0} - Updating MDS configuration without previous master took {1}s'.format(vdisk.guid, time.time() - start))
             vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
                                                                       metadata_backend_config=MDSMetaDataBackendConfig(configs_all),
-                                                                      req_timeout_secs=300)
+                                                                      req_timeout_secs=timeout)
             duration = time.time() - start
             if duration > 5:
                 MDSServiceController._logger.critical('vDisk {0} - Updating MDS configuration took {1}s'.format(vdisk.guid, duration))
+        except RuntimeError:
+            # @TODO: Timeout throws RuntimeError for now. Replace this once https://github.com/openvstorage/volumedriver/issues/349 is fixed
+            if time.time() - start >= timeout:  # Timeout reached, clean up must be done manually once server side finished
+                timed_out = True
+                MDSServiceController._logger.critical('vDisk {0} - Updating MDS configuration timed out'.format(vdisk.guid))
+                for service in [svc for svc in services_to_check if svc not in new_services]:
+                    MDSServiceController._logger.critical('vDisk {0} - Manual remove namespace action required for MDS {1}:{2} and namespace {3}'.format(
+                        vdisk.guid, service.storagerouter.ip, service.ports[0], vdisk.volume_id)
+                    )
+                for service in new_services[1:]:
+                    MDSServiceController._logger.critical('vDisk {0} - Manual set SLAVE role action required for MDS {1}:{2} and namespace {3}'.format(
+                        vdisk.guid, service.storagerouter.ip, service.ports[0], vdisk.volume_id)
+                    )
+                MDSServiceController._logger.critical('vDisk {0} - Sync vDisk to reality action required'.format(vdisk.guid))
             else:
-                MDSServiceController._logger.debug('vDisk {0} - Updating MDS configuration took {1}s'.format(vdisk.guid, duration))
+                raise
         except Exception:
             MDSServiceController._logger.exception('vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
             # Remove newly created namespaces when updating would go wrong to avoid storage leaks
-            for new_namespace in new_namespaces:
-                client = mds_client_cache[new_namespace]
+            for new_namespace_service in new_namespace_services:
+                client = mds_client_cache[new_namespace_service]
                 try:
                     client.remove_namespace(str(vdisk.volume_id))
                 except RuntimeError:
                     pass  # If somehow the namespace would not exist, we don't care.
             raise
 
-        for service in services_to_check:
-            if service not in new_services:
-                MDSServiceController._logger.debug('vDisk {0} - Deleting namespace for vDisk on service {1}:{2}'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
+        if timed_out is False:
+            for service in services_to_check:
+                if service not in new_services:
+                    MDSServiceController._logger.debug('vDisk {0} - Deleting namespace for vDisk on service {1}:{2}'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
+                    client = mds_client_cache[service]
+                    try:
+                        client.remove_namespace(str(vdisk.volume_id))
+                    except RuntimeError:
+                        pass  # If somehow the namespace would not exist, we don't care.
+
+            for service in new_services[1:]:
                 client = mds_client_cache[service]
                 try:
-                    client.remove_namespace(str(vdisk.volume_id))
-                except RuntimeError:
-                    pass  # If somehow the namespace would not exist, we don't care.
+                    MDSServiceController._logger.debug('vDisk {0} - Demoting service {1}:{2} to slave'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
+                    client.set_role(str(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+                except Exception:
+                    MDSServiceController._logger.critical('vDisk {0} - Failed to demote service {1}:{2} to SLAVE'.format(service.storagerouter.ip, service.ports[0]))
 
-        for service in new_services[1:]:
-            client = mds_client_cache[service]
-            try:
-                MDSServiceController._logger.debug('vDisk {0} - Demoting service {1}:{2} to slave'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
-                client.set_role(str(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
-            except Exception:
-                MDSServiceController._logger.critical('vDisk {0} - Failed to demote service {1}:{2} to SLAVE'.format(service.storagerouter.ip, service.ports[0]))
-
-        MDSServiceController._sync_vdisk_to_reality(vdisk)
+            MDSServiceController._sync_vdisk_to_reality(vdisk)
         MDSServiceController._logger.info('vDisk {0}: Completed'.format(vdisk.guid))
 
     @staticmethod
