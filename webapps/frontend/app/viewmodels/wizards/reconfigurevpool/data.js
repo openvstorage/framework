@@ -32,40 +32,32 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
             loadingBackends:         ko.observable(),
             invalidBackendInfo:      ko.observable(),
             backends:                ko.observableArray([]),
-            backendsFilter:          ko.observable(),  // LocationKey string
             albaPresetMap:           ko.observable({})
 
         };
         // Computed
-        wizardData.hasCacheQuota = ko.computed(function() {
+        wizardData.hasCacheQuota = ko.pureComputed(function() {
             return wizardData.storageRouter() !== undefined &&
                 wizardData.storageRouter().features() !== undefined &&
                 wizardData.storageRouter().features().alba.features.contains('cache-quota');
         });
-        wizardData.hasEE = ko.computed(function() {
+        wizardData.hasEE = ko.pureComputed(function() {
             return wizardData.storageRouter() !== undefined &&
                 wizardData.storageRouter().features() !== undefined &&
                 wizardData.storageRouter().features().alba.edition === 'enterprise';
         });
-        wizardData.filteredBackends = ko.computed(function() {
-            var filter = wizardData.backendsFilter();
-            if (filter === undefined) {
-                return wizardData.backends()
-            }
-            filter = filter.toLowerCase();
-            return ko.utils.arrayFilter(wizardData.backends(), function(backend) {
-                return backend.locationKey.toLowerCase().startsWith(filter);
-            });
-        });
 
         // Functions
         wizardData.filterBackendsByLocationKey = function(locationKey) {
+            if (locationKey === undefined) {
+                return wizardData.backends();
+            }
             return ko.utils.arrayFilter(wizardData.backends(), function(backend) {
                 return backend.locationKey.toLowerCase().startsWith(locationKey);
             });
         };
         wizardData.buildLocationKey = function(connectionInfo) {
-            if (connectionInfo === undefined || connectionInfo.local() === true) {
+            if (connectionInfo === undefined || connectionInfo.isLocalBackend() === true) {
                 return 'local';
             }
             return '{0}:{1}'.format([ko.utils.unwrapObservable(connectionInfo.host), ko.utils.unwrapObservable(connectionInfo.port)])
@@ -121,10 +113,8 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                     contents: 'available'
                 };
                 var remoteInfo = {};
-                var backendType = 'local';
-                var availableBackends = wizardData.backends();
-                if (connectionInfo !== undefined && connectionInfo.local() === false) {
-                    backendType = 'remote';
+
+                if (connectionInfo !== undefined && connectionInfo.isLocalBackend() === false) {
                     relay = 'relay/';
                     remoteInfo.ip = connectionInfo.host();
                     remoteInfo.port = connectionInfo.port();
@@ -137,6 +127,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                 wizardData.loadBackendsHandle = api.get(relay + 'alba/backends', { queryparams: getData })
                     .done(function(data) {
                         var calls = [];
+                        var availableBackends = wizardData.backends();
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
                                 getData.contents = 'name,ns_statistics,presets,usages,backend';
@@ -157,9 +148,9 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                                 );
                             }
                         });
-                        availableBackends = wizardData.getDistinctBackends(availableBackends);
                         $.when.apply($, calls)
                             .then(function() {
+                                availableBackends = wizardData.getDistinctBackends(availableBackends);
                                 if (availableBackends.length > 0) {
                                     var sortFunction = function(backend1, backend2) {
                                         return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
@@ -171,6 +162,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                             })
                             .done(albaDeferred.resolve)
                             .fail(function() {
+                                availableBackends = wizardData.getDistinctBackends(availableBackends);
                                 wizardData.backends(availableBackends);
                                 wizardData.loadingBackends(false);
                                 wizardData.invalidBackendInfo(true);
@@ -178,7 +170,6 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
                             });
                     })
                     .fail(function() {
-                        wizardData.backends(availableBackends);
                         wizardData.loadingBackends(false);
                         wizardData.invalidBackendInfo(true);
                         albaDeferred.reject();

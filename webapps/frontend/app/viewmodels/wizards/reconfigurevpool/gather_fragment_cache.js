@@ -29,48 +29,22 @@ define([
         self.shared = shared;
         self.options = options;
 
-        // Subscriptions
-        self.subscriptions = [];
         // Observables
         self.fragmentCacheSettings      = ko.observableArray(['write', 'read', 'rw', 'none']);
         self.preset                     = ko.observable();
 
-        // Functions
-        self.loadBackends = function() {
-            var connectionInfo = self.data.cachingData.fragmentCache.backendInfo.connectionInfo;
-            return self.data.loadBackends(connectionInfo)
-        };
-        self.resetBackend = function() {
-            // Will force to recompute everything
-            var backendInfo = self.data.cachingData.fragmentCache.backendInfo;
-            backendInfo.name(undefined);
-            backendInfo.backend_guid(undefined);
-            backendInfo.alba_backend_guid(undefined);
-            self.resetPreset()
-        };
-        self.resetPreset = function() {
-            var backendInfo = self.data.cachingData.fragmentCache.backendInfo;
-            backendInfo.preset(undefined);
-            backendInfo.policies([]);
-        };
-
         // Computed
-        self.canContinue = ko.computed(function() {
-            var reasons = [], fields = [];
-            return { value: reasons.length === 0, reasons: reasons, fields: fields };
-        });
         self.fragmentCacheBackend = ko.computed({
+            deferEvaluation: true,  // Wait with computing for an actual subscription
             read: function() {
                 var backendInfo = self.data.cachingData.fragmentCache.backendInfo;
                 var backend = self.data.getBackend(backendInfo.backend_guid());
                 if (backend === undefined) {
                     // Return the first of the list
-                    var backends = ko.utils.unwrapObservable(self.fragmentCacheBackends);
+                    var backends = self.getFragmentCacheBackends();
                     if (backends !== undefined && backends.length > 0) {
                         backend = backends[0];
                         self.fragmentCacheBackend(backend)
-                    } else {
-                        self.resetBackend()  // No backend to be set, update our model
                     }
                 }
                 return backend;
@@ -83,29 +57,28 @@ define([
                 backendInfo.alba_backend_guid(backend.guid);
             }
         });
-        self.fragmentCacheBackends = ko.computed(function() {
-            var backendInfo = self.data.cachingData.fragmentCache.backendInfo;
-            var connectionInfo = backendInfo.connectionInfo;
-            var locationKey = self.data.buildLocationKey(connectionInfo);
-            self.data.backendsFilter(locationKey);
-            var backends = self.data.filteredBackends();
-            if (backends.length === 0) {
-                // Reset our backend
-                self.resetBackend()
+        self.fragmentCacheBackends = ko.computed({
+            deferEvaluation: true,  // Wait with computing for an actual subscription
+            read: function () {
+                var backends = self.getFragmentCacheBackends();
+                if (backends.length === 0) {
+                    // Update our Model
+                    self.resetBackend();
+                }
+                return backends;
             }
-            return backends;
         });
-        self.localBackendsAvailable = ko.computed(function() {
+        self.localBackendsAvailable = ko.pureComputed(function() {
             var connectionInfo = self.data.cachingData.fragmentCache.backendInfo.connectionInfo;
-            var useLocalBackend = !!ko.utils.unwrapObservable(connectionInfo.local);
+            var useLocalBackend = !!ko.utils.unwrapObservable(connectionInfo.isLocalBackend);
             var localBackendsRequiredAmount = useLocalBackend === true ? 2 : 1;
-            var backends = self.data.filterBackendsByLocationKey('local');
             return self.data.filterBackendsByLocationKey('local').length >= localBackendsRequiredAmount;
         });
-        self.enhancedPresets = ko.computed(function() {
+        self.enhancedPresets = ko.pureComputed(function() {
             return self.data.parsePresets(self.fragmentCacheBackend())
         });
         self.preset = ko.computed({
+            deferEvaluation: true,  // Wait with computing for an actual subscription
             read: function() {
                 var parsedPreset = undefined;
                 if (self.fragmentCacheBackend() === undefined) {
@@ -125,27 +98,64 @@ define([
                 return self.data.parsePreset(preset);
             },
             write: function(preset) {
-                console.log(preset);
                 var backendInfo = self.data.cachingData.fragmentCache.backendInfo;
                 backendInfo.preset(preset.name);
             }
         });
+        self.canContinue = ko.pureComputed(function() {
+            var reasons = [], fields = [];
+            var fragmentCache = self.data.cachingData.fragmentCache;
+            if (fragmentCache.isUsed() === true){
+                if (self.data.loadingBackends() === true) {
+                    reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.backends_loading'));
+                } else {
+                    if (fragmentCache.isBackend() === true ){
+                        if (self.fragmentCacheBackend() === undefined) {
+                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.choose_backend'));
+                            fields.push('backend');
+                        }
+                        else if (self.preset() === undefined) {
+                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.choose_preset'));
+                            fields.push('preset');
+                        }
+                    }
+                }
+            }
+            return { value: reasons.length === 0, reasons: reasons, fields: fields };
+        });
+
+        // Functions
+        self.loadBackends = function() {
+            var connectionInfo = self.data.cachingData.fragmentCache.backendInfo.connectionInfo;
+            return self.data.loadBackends(connectionInfo)
+        };
+        self.resetBackend = function() {
+            // Will force to recompute everything
+            self.fragmentCacheBackend({'name': undefined, 'backend_guid':undefined, 'alba_backend_guid': undefined});
+            self.resetPreset();
+        };
+        self.resetPreset = function() {
+            self.preset({'name': undefined});
+        };
+        self.getFragmentCacheBackends = function() {
+            // Wrapped function for the computable
+            // Issue was when the computed would update the Model when no backends were found, the computed would not
+            // return its value and the backend computed would fetch the old values, causing a mismatch
+            var backendInfo = self.data.cachingData.fragmentCache.backendInfo;
+            var connectionInfo = backendInfo.connectionInfo;
+            return self.data.filterBackendsByLocationKey(self.data.buildLocationKey(connectionInfo));
+        };
 
         // Durandal
         self.activate = function() {
             if (self.actived === false) {
                 self.data.loadBackends();
                 var connectionInfo = self.data.cachingData.fragmentCache.backendInfo.connectionInfo;
-                if (!!ko.utils.unwrapObservable(connectionInfo.local) === false && !['', undefined, null].contains(connectionInfo.host())) {
+                if (!!ko.utils.unwrapObservable(connectionInfo.isLocalBackend) === false && !['', undefined, null].contains(connectionInfo.host())) {
                     self.data.loadBackends(connectionInfo);
                 }
                 self.actived = true;
             }
         };
-        self.deactivate = function() {
-            $.each(self.subscriptions, function(index, subscription) {
-               subscription.dispose();
-            });
-        }
     }
 });
