@@ -42,8 +42,8 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
-                                                       StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, \
+                                                       MDSNodeConfig, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
@@ -54,11 +54,12 @@ class VDiskController(object):
     """
     Contains all BLL regarding VDisks
     """
-    _logger = Logger('lib')
     _VOLDRV_EVENT_KEY = 'voldrv_event_vdisk_{0}'
+    _logger = Logger('lib')
+    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
 
     # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -110,7 +111,7 @@ class VDiskController(object):
             VDiskController._logger.exception('Error during vDisk checkup (DTL)')
         try:
             VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
-            MDSServiceController.ensure_safety(vdisk)
+            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
         except Exception:
             VDiskController._logger.exception('Error during vDisk checkup')
             if vdisk.objectregistry_client.find(str(vdisk.volume_id)) is None:
@@ -646,7 +647,7 @@ class VDiskController(object):
             raise Exception('Moving vDisk {0} failed'.format(vdisk.name))
 
         try:
-            MDSServiceController.ensure_safety(vdisk=vdisk)
+            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
             VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
         except:
             VDiskController._logger.exception('Executing post-migrate actions failed for vDisk {0}'.format(vdisk.name))
@@ -840,8 +841,7 @@ class VDiskController(object):
         vdisk = VDisk(vdisk_guid)
         vpool = vdisk.vpool
 
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vdisk.storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vpool.guid, vdisk.storagedriver_id)
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
@@ -1503,8 +1503,7 @@ class VDiskController(object):
             return
 
         ratio = vdisk.pagecache_ratio
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vdisk.vpool_guid, storagedriver_id)
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
         # noinspection PyTypeChecker

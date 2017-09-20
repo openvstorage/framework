@@ -17,6 +17,7 @@
 """
 VPool module
 """
+
 import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
@@ -110,8 +111,7 @@ class VPool(DataObject):
         if not self.storagedrivers or not self.storagedrivers[0].storagerouter:
             return {}
 
-        storagedriver_config = StorageDriverConfiguration('storagedriver', self.guid, self.storagedrivers[0].storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(self.guid, self.storagedrivers[0].storagedriver_id)
         for expected_key in ['distributed_transaction_log', 'filesystem', 'volume_router', 'volume_manager']:
             if expected_key not in storagedriver_config.configuration:
                 return {}
