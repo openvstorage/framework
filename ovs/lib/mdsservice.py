@@ -475,13 +475,16 @@ class MDSServiceController(object):
         excluded_storagerouters = [StorageRouter(sr_guid) for sr_guid in excluded_storagerouter_guids]
         MDSServiceController._logger.info('vDisk {0} - Start checkup for vDisk {1}'.format(vdisk.guid, vdisk.name))
 
-        vdisk.invalidate_dynamics('storagerouter_guid')
+        vdisk.invalidate_dynamics(['info', 'storagerouter_guid'])
         if vdisk.storagerouter_guid is None:
             raise SRCObjectNotFoundException('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any StorageRouter'.format(vdisk.name, vdisk.guid))
 
         vdisk_storagerouter = StorageRouter(vdisk.storagerouter_guid)
         if vdisk_storagerouter in excluded_storagerouters:
             raise RuntimeError('Current host ({0}) of vDisk {1} is in the list of excluded StorageRouters'.format(vdisk_storagerouter.ip, vdisk.guid))
+
+        if vdisk.info['live_status'] != VDisk.STATUSES.RUNNING:
+            raise RuntimeError('vDisk {0} is not {1}, cannot update MDS configuration'.format(vdisk.guid, VDisk.STATUSES.RUNNING))
 
         mds_config = Configuration.get('/ovs/vpools/{0}/mds_config'.format(vdisk.vpool_guid))
         tlogs = mds_config['mds_tlogs']
@@ -533,7 +536,6 @@ class MDSServiceController(object):
         ###################################
         # VERIFY RECONFIGURATION REQUIRED #
         ###################################
-        vdisk.invalidate_dynamics('info')
         master_service = None
         slave_services = []
         current_service_ips = []
