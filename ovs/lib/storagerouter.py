@@ -1145,6 +1145,9 @@ class StorageRouterController(object):
                 vdisks.append(vdisk)
                 StorageRouterController._logger.critical('StorageDriver {0} - vDisk {1} {2} - MDS Services have not been migrated away'.format(storage_driver.guid, vdisk.guid, vdisk.name))
         if len(vdisks) > 0:
+            # Put back in RUNNING, so it can be used again. Errors keep on displaying in GUI now anyway
+            vpool.status = VPool.STATUSES.RUNNING
+            vpool.save()
             raise RuntimeError('Not all MDS Services have been successfully migrated away')
 
         # Disable and stop DTL, voldrv and albaproxy services
