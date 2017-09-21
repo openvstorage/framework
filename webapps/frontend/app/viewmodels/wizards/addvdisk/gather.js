@@ -17,7 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic', 'ovs/refresher', 'ovs/shared',
-    './data', '../../containers/vpool', '../../containers/storagerouter'
+    './data',
+    'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagerouter/storagerouter'
 ], function($, ko,
             api, generic, Refresher, shared,
             data, VPool, StorageRouter) {

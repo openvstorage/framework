@@ -17,8 +17,8 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../../containers/vdisk', '../../containers/vpool', '../../containers/storagerouter',
-    '../../wizards/addvdisk/index'
+    'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagerouter/storagerouter',
+    'viewmodels/wizards/addvdisk/index'
 ], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VPool, StorageRouter, AddVDiskWizard) {
     "use strict";
     return function() {

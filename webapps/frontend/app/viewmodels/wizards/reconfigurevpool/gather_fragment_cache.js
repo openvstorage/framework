@@ -114,12 +114,11 @@ define([
                         if (self.fragmentCacheBackend() === undefined) {
                             reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.choose_backend'));
                             fields.push('backend');
-                        }
-                        else if (self.preset() === undefined) {
+                        } else if (self.preset() === undefined) {
                             reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.choose_preset'));
                             fields.push('preset');
                         }
-                        if (connectionInfo.isLocalBackend() === false && connectionInfo.hasRemoteInfo() === false) {
+                        if (connectionInfo.isLocalBackend() === false && connectionInfo.hasRemoteInfo() === false || self.data.invalidBackendInfo() === true) {
                             reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.invalid_alba_info'));
                             fields.push('invalid_alba_info');
                         }

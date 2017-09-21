@@ -532,6 +532,43 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         }
         return sorted;
     }
+    function cleanObject(obj, depth, ignoredProps) {
+        // Reset all properties to undefined (props can also be observables)
+        var currentDepth = 0;
+        depth = 0 || depth;
+        ignoredProps = (Object.prototype.toString.call( ignoredProps ) === '[object Array]') ? ignoredProps : [];  // Only accept arrays
+        var props = [];
+        do {
+            var fetchedProps = Object.getOwnPropertyNames(obj)
+                .sort()
+                .filter(function(prop, index, arr) {
+                    return !prop.startsWith('__') &&                        // ignore requirejs props
+                        !ignoredProps.contains(prop) &&                     // Not in ignored props
+                        typeof obj[prop] !== 'function' ||                  // Only the observables / non-function
+                        (ko.isObservable(obj[prop]) && !ko.isComputed(obj[prop])) &&
+                        prop !== 'constructor' &&                           // Not the constructor
+                        (index === 0 || prop !== arr[index - 1]) &&         // Not overriding in this prototype
+                        !props.contains(prop)                               // Not overridden in a child
+                });
+            props = props.concat(fetchedProps);
+            currentDepth += 1;  // Might go deeper after here
+        }
+        while (
+            depth >= currentDepth &&
+            (obj = Object.getPrototypeOf(obj))  // Walk-up the prototype chain
+        );
+        $.each(props, function(index, prop) {
+            if (ko.isObservable(obj[prop])) {
+                if (!(obj[prop].destroyAll === undefined)) {  // ObservableArray
+                    obj[prop]([]);
+                } else {
+                    obj[prop](undefined);
+                }
+            } else {
+                obj[prop] = undefined;
+            }
+        })
+    }
     // Object should already be observable
     function makeChildrenObservables(observable) {
         if(!ko.isObservable(observable)) return;
@@ -710,6 +747,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         arrayHasElementWithProperty: arrayHasElementWithProperty,
         ceil: ceil,
         cleanDeviceName: cleanDeviceName,
+        cleanObject: cleanObject,
         crossFiller: crossFiller,
         deg2rad: deg2rad,
         extract: extract,

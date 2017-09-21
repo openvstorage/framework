@@ -19,21 +19,21 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
     var singleton;
     singleton = function() {
         var wizardData = {
-            storageRouter:           ko.observable(),
             storageDriver:           ko.observable(),
+            storageRouter:           ko.observable(),
             vPool:                   ko.observable(),
             // Changes
+            cachingData:             undefined,  // Changes related to fragment cache and block cache (not observable as it is viewmodel)
+            configParams:            undefined,  // Changes related to general configs (sco size, dtl ...)
             proxyAmount:             ko.observable(),
-            cachingData:             undefined,
             // Shared across the pages
             // Handles
             loadBackendsHandle:      undefined,
             // Data
-            loadingBackends:         ko.observable(),
-            invalidBackendInfo:      ko.observable(),
+            albaPresetMap:           ko.observable({}),
             backends:                ko.observableArray([]),
-            albaPresetMap:           ko.observable({})
-
+            invalidBackendInfo:      ko.observable(),
+            loadingBackends:         ko.observable()
         };
         // Computed
         wizardData.hasCacheQuota = ko.pureComputed(function() {
