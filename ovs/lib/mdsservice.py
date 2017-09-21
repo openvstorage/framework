@@ -848,7 +848,6 @@ class MDSServiceController(object):
             configs_all.append(config)
 
         start = time.time()
-        timed_out = False
         update_failure = False
         try:
             MDSServiceController._logger.debug('vDisk {0} - Updating MDS configuration'.format(vdisk.guid))
@@ -871,7 +870,6 @@ class MDSServiceController(object):
         except RuntimeError:
             # @TODO: Timeout throws RuntimeError for now. Replace this once https://github.com/openvstorage/volumedriver/issues/349 is fixed
             if time.time() - start >= sr_client_timeout:  # Timeout reached, clean up must be done manually once server side finished
-                timed_out = True
                 MDSServiceController._logger.critical('vDisk {0} - Updating MDS configuration timed out'.format(vdisk.guid))
                 for service in [svc for svc in services_to_check if svc not in new_services]:
                     MDSServiceController._logger.critical('vDisk {0} - Manual remove namespace action required for MDS {1}:{2} and namespace {3}'.format(
@@ -885,7 +883,10 @@ class MDSServiceController(object):
             else:
                 MDSServiceController._logger.exception('vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
                 update_failure = True  # No need to clean new namespaces if time out would have occurred
-                raise
+            # Always raise
+            #     * In case of a timeout, the manual actions are logged and user knows the ensure_safety has failed
+            #     * In any other case, the newly created namespaces are deleted
+            raise
         except Exception:
             MDSServiceController._logger.exception('vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
             update_failure = True
@@ -901,26 +902,29 @@ class MDSServiceController(object):
                     except RuntimeError:
                         pass  # If somehow the namespace would not exist, we don't care.
 
-        if timed_out is False:
-            MDSServiceController._sync_vdisk_to_reality(vdisk)
-            for service in services_to_check:
-                if service not in new_services:
-                    MDSServiceController._logger.debug('vDisk {0} - Deleting namespace for vDisk on service {1}:{2}'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
-                    client = mds_client_cache[service]
-                    try:
-                        client.remove_namespace(str(vdisk.volume_id))
-                    except RuntimeError:
-                        pass  # If somehow the namespace would not exist, we don't care.
-
-            for service in new_services[1:]:
+        MDSServiceController._sync_vdisk_to_reality(vdisk)
+        for service in services_to_check:
+            if service not in new_services:
+                MDSServiceController._logger.debug('vDisk {0} - Deleting namespace for vDisk on service {1}:{2}'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
                 client = mds_client_cache[service]
                 try:
-                    if client.get_role(nspace=str(vdisk.volume_id)) != MetadataServerClient.MDS_ROLE.SLAVE:
-                        MDSServiceController._logger.debug('vDisk {0} - Demoting service {1}:{2} to SLAVE'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
-                        client.set_role(nspace=str(vdisk.volume_id), role=MetadataServerClient.MDS_ROLE.SLAVE)
-                except Exception:
-                    MDSServiceController._logger.critical('vDisk {0} - Failed to demote service {1}:{2} to SLAVE'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
-                    raise
+                    client.remove_namespace(str(vdisk.volume_id))
+                except RuntimeError:
+                    pass  # If somehow the namespace would not exist, we don't care.
+
+        for service in new_services[1:]:
+            client = mds_client_cache[service]
+            try:
+                if client.get_role(nspace=str(vdisk.volume_id)) != MetadataServerClient.MDS_ROLE.SLAVE:
+                    MDSServiceController._logger.debug('vDisk {0} - Demoting service {1}:{2} to SLAVE'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
+                    start = time.time()
+                    client.set_role(nspace=str(vdisk.volume_id), role=MetadataServerClient.MDS_ROLE.SLAVE)
+                    duration = time.time() - start
+                    if duration > 5:
+                        MDSServiceController._logger.critical('vDisk {0} - Demoting service {1}:{2} to SLAVE took {3}s'.format(vdisk.guid, service.storagerouter.ip, service.ports[0], duration))
+            except Exception:
+                MDSServiceController._logger.critical('vDisk {0} - Failed to demote service {1}:{2} to SLAVE'.format(vdisk.guid, service.storagerouter.ip, service.ports[0]))
+                raise
         MDSServiceController._logger.info('vDisk {0}: Completed'.format(vdisk.guid))
 
     @staticmethod
