@@ -21,26 +21,26 @@ define([
     // Caching data viewModel which is parsed from JS
     // Return a constructor for a nested viewModel
     var cacheMapping = {
-       'fragmentCache': {
+       'fragment_cache': {
             create: function (options) {
                 if (options.data !== null) return new cacheTypeViewModel(options.data);
             }
         },
-        'blockCache': {
+        'block_cache': {
            create: function (options) {
                 if (options.data !== null) return new cacheTypeViewModel(options.data);
             }
         }
     };
     var cacheTypeMapping = {
-        'backendInfo': {
+        'backend_info': {
             create: function (options) {
                 if (options.data !== null) return new backendInfoViewModel(options.data);
             }
         }
     };
     var backendInfoMapping = {
-        'connectionInfo': {
+        'connection_info': {
             create: function (options) {
                 if (options.data !== null) return new connectionInfoViewModel(options.data);
             }
@@ -56,7 +56,7 @@ define([
         // Observables (This will ensure that these observables are present even if the data is missing them)
         self.read               = ko.observable();
         self.write              = ko.observable();
-        self.isBackend          = ko.observable();
+        self.is_backend          = ko.observable();
         self.quota              = ko.observable();
         self.cacheSettings      = ko.observableArray(['write', 'read', 'rw', 'none']);
 

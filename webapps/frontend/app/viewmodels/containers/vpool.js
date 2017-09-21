@@ -182,16 +182,16 @@ define([
             var cacheStructure = {
                 'read': false,
                 'write': false,
-                'isBackend': false,
+                'is_backend': false,
                 'quota': undefined,
-                'backendInfo': {  // Will be filled in when isBackend is true
+                'backend_info': {  // Will be filled in when isBackend is true
                     // Structure is kept the same as the python api will return
                     'name': undefined,
                     'backend_guid': undefined,
                     'alba_backend_guid': undefined,
                     'policies': undefined,
                     'preset': undefined,
-                    'connectionInfo': {
+                    'connection_info': {
                         'client_id': undefined,
                         'client_secret': undefined,
                         'host': undefined,
@@ -201,13 +201,13 @@ define([
                 }
             };
             var map = {
-                'fragmentCache': {
+                'fragment_cache': {
                     'read': 'fragment_cache_on_read',
                     'write': 'fragment_cache_on_write',
                     'quota': 'quota_fc',
                     'backendPrefix': 'backend_aa_{0}'
                 },
-                'blockCache': {
+                'block_cache': {
                     'read': 'block_cache_on_read',
                     'write': 'block_cache_on_write',
                     'quota': 'quota_bc',
@@ -227,9 +227,9 @@ define([
                             metadataKey = metadataKey.format([sr_guid]);
                             if (self.metadata().hasOwnProperty(metadataKey)) {
                                 var aaBackendData = self.metadata()[metadataKey];
-                                metadataCacheData.isBackend = true;
-                                $.extend(metadataCacheData.backendInfo, aaBackendData.backend_info);
-                                $.extend(metadataCacheData.backendInfo.connectionInfo, aaBackendData.connection_info);
+                                metadataCacheData.is_backend = true;
+                                $.extend(metadataCacheData.backend_info, aaBackendData.backend_info);
+                                $.extend(metadataCacheData.backend_info.connection_info, aaBackendData.connection_info);
                             }
                         } else {
                             metadataCacheData[structureKey] = cachingInfo.hasOwnProperty(metadataKey) ? cachingInfo[metadataKey] : undefined;

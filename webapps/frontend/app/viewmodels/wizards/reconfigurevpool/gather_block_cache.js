@@ -37,7 +37,7 @@ define([
         self.blockCacheBackend = ko.computed({
             deferEvaluation: true,  // Wait with computing for an actual subscription
             read: function() {
-                var backendInfo = self.data.cachingData.blockCache.backendInfo;
+                var backendInfo = self.data.cachingData.block_cache.backend_info;
                 var backend = self.data.getBackend(backendInfo.backend_guid());
                 if (backend === undefined) {
                     // Return the first of the list
@@ -51,7 +51,7 @@ define([
             },
             write: function(backend) {
                 // Mutate the backend info
-                var backendInfo = self.data.cachingData.blockCache.backendInfo;
+                var backendInfo = self.data.cachingData.block_cache.backend_info;
                 backendInfo.name(backend.name);
                 backendInfo.backend_guid(backend.backend_guid);
                 backendInfo.alba_backend_guid(backend.guid);
@@ -69,7 +69,7 @@ define([
             }
         });
         self.localBackendsAvailable = ko.pureComputed(function() {
-            var connectionInfo = self.data.cachingData.blockCache.backendInfo.connectionInfo;
+            var connectionInfo = self.data.cachingData.block_cache.backend_info.connection_info;
             var useLocalBackend = !!ko.utils.unwrapObservable(connectionInfo.isLocalBackend);
             var localBackendsRequiredAmount = useLocalBackend === true ? 2 : 1;
             return self.data.filterBackendsByLocationKey('local').length >= localBackendsRequiredAmount;
@@ -84,7 +84,7 @@ define([
                 if (self.blockCacheBackend() === undefined) {
                     return parsedPreset
                 }
-                var backendInfo = self.data.cachingData.blockCache.backendInfo;
+                var backendInfo = self.data.cachingData.block_cache.backend_info;
                 var preset = self.data.getPreset(backendInfo.alba_backend_guid(), backendInfo.preset());
                 if (preset === undefined) {
                     // No preset could be found for our current setting. Attempt to reconfigure it
@@ -98,25 +98,30 @@ define([
                 return self.data.parsePreset(preset);
             },
             write: function(preset) {
-                var backendInfo = self.data.cachingData.blockCache.backendInfo;
+                var backendInfo = self.data.cachingData.block_cache.backend_info;
                 backendInfo.preset(preset.name);
             }
         });
         self.canContinue = ko.pureComputed(function() {
             var reasons = [], fields = [];
-            var blockCache = self.data.cachingData.blockCache;
+            var blockCache = self.data.cachingData.block_cache;
             if (blockCache.isUsed() === true){
                 if (self.data.loadingBackends() === true) {
-                    reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.backends_loading'));
+                    reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_block_cache.backends_loading'));
                 } else {
-                    if (blockCache.isBackend() === true ){
+                    var connectionInfo = blockCache.backend_info.connection_info;
+                    if (blockCache.is_backend() === true ){
                         if (self.blockCacheBackend() === undefined) {
-                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.choose_backend'));
+                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_block_cache.choose_backend'));
                             fields.push('backend');
                         }
                         else if (self.preset() === undefined) {
-                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_fragment_cache.choose_preset'));
+                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_block_cache.choose_preset'));
                             fields.push('preset');
+                        }
+                        if (connectionInfo.isLocalBackend() === false && connectionInfo.hasRemoteInfo() === false) {
+                            reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_block_cache.invalid_alba_info'));
+                            fields.push('invalid_alba_info');
                         }
                     }
                 }
@@ -126,7 +131,7 @@ define([
 
         // Functions
         self.loadBackends = function() {
-            var connectionInfo = self.data.cachingData.blockCache.backendInfo.connectionInfo;
+            var connectionInfo = self.data.cachingData.block_cache.backend_info.connection_info;
             return self.data.loadBackends(connectionInfo)
         };
         self.resetBackend = function() {
@@ -141,8 +146,8 @@ define([
             // Wrapped function for the computable
             // Issue was when the computed would update the Model when no backends were found, the computed would not
             // return its value and the backend computed would fetch the old values, causing a mismatch
-            var backendInfo = self.data.cachingData.blockCache.backendInfo;
-            var connectionInfo = backendInfo.connectionInfo;
+            var backendInfo = self.data.cachingData.block_cache.backend_info;
+            var connectionInfo = backendInfo.connection_info;
             return self.data.filterBackendsByLocationKey(self.data.buildLocationKey(connectionInfo));
         };
 
@@ -150,7 +155,7 @@ define([
         self.activate = function() {
             if (self.actived === false) {
                 self.data.loadBackends();
-                var connectionInfo = self.data.cachingData.blockCache.backendInfo.connectionInfo;
+                var connectionInfo = self.data.cachingData.block_cache.backend_info.connection_info;
                 if (!!ko.utils.unwrapObservable(connectionInfo.isLocalBackend) === false && !['', undefined, null].contains(connectionInfo.host())) {
                     self.data.loadBackends(connectionInfo);
                 }
