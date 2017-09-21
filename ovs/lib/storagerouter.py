@@ -1040,10 +1040,21 @@ class StorageRouterController(object):
         if vpool.status != VPool.STATUSES.RUNNING:
             raise ValueError('VPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
 
+        # Sync with reality to have a clear vision of vDisks
+        VDiskController.sync_with_reality(storage_driver.vpool_guid)
+        storage_driver.invalidate_dynamics('vdisks_guids')
+        if len(storage_driver.vdisks_guids) > 0:
+            raise RuntimeError('There are still vDisks served from the given StorageDriver')
+
+        storage_router = storage_driver.storagerouter
+        mds_services_to_remove = [mds_service for mds_service in vpool.mds_services if mds_service.service.storagerouter_guid == storage_router.guid]
+        for mds_service in mds_services_to_remove:
+            if len(mds_service.storagedriver_partitions) == 0 or mds_service.storagedriver_partitions[0].storagedriver is None:
+                raise RuntimeError('Failed to retrieve the linked StorageDriver to this MDS Service {0}'.format(mds_service.service.name))
+
         StorageRouterController._logger.info('StorageDriver {0} - Checking availability of related StorageRouters'.format(storage_driver.guid, storage_driver.name))
         client = None
         errors_found = False
-        storage_router = storage_driver.storagerouter
         storage_drivers_left = False
         storage_router_online = True
         available_storage_drivers = []
@@ -1084,17 +1095,6 @@ class StorageRouterController(object):
         if client is None:
             raise RuntimeError('Could not find any responsive node in the cluster')
 
-        # Sync with reality to have a clear vision of vDisks
-        VDiskController.sync_with_reality(storage_driver.vpool_guid)
-        storage_driver.invalidate_dynamics('vdisks_guids')
-        if len(storage_driver.vdisks_guids) > 0:
-            raise RuntimeError('There are still vDisks served from the given StorageDriver')
-
-        mds_services_to_remove = [mds_service for mds_service in vpool.mds_services if mds_service.service.storagerouter_guid == storage_router.guid]
-        for mds_service in mds_services_to_remove:
-            if len(mds_service.storagedriver_partitions) == 0 or mds_service.storagedriver_partitions[0].storagedriver is None:
-                raise RuntimeError('Failed to retrieve the linked StorageDriver to this MDS Service {0}'.format(mds_service.service.name))
-
         ###############
         # Start removal
         if storage_drivers_left is True:
@@ -1134,8 +1134,24 @@ class StorageRouterController(object):
                     except Exception:
                         StorageRouterController._logger.exception('StorageDriver {0} - vDisk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
 
-        service_manager = ServiceFactory.get_manager()
+        # Validate that all MDSes on current StorageRouter have been moved away
+        # Ensure safety does not always throw an error, that's why we perform this check here instead of in the Exception clause of above code
+        vdisks = []
+        for mds in mds_services_to_remove:
+            for junction in mds.vdisks:
+                vdisk = junction.vdisk
+                if vdisk in vdisks:
+                    continue
+                vdisks.append(vdisk)
+                StorageRouterController._logger.critical('StorageDriver {0} - vDisk {1} {2} - MDS Services have not been migrated away'.format(storage_driver.guid, vdisk.guid, vdisk.name))
+        if len(vdisks) > 0:
+            # Put back in RUNNING, so it can be used again. Errors keep on displaying in GUI now anyway
+            vpool.status = VPool.STATUSES.RUNNING
+            vpool.save()
+            raise RuntimeError('Not all MDS Services have been successfully migrated away')
+
         # Disable and stop DTL, voldrv and albaproxy services
+        service_manager = ServiceFactory.get_manager()
         if storage_router_online is True:
             dtl_service = 'dtl_{0}'.format(vpool.name)
             voldrv_service = 'volumedriver_{0}'.format(vpool.name)
