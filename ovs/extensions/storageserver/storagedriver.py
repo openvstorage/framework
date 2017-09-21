@@ -220,23 +220,31 @@ class MetadataServerClient(object):
         pass
 
     @staticmethod
-    def load(service):
+    def load(service, timeout=20):
         """
         Loads a MDSClient
         :param service: Service for which the MDSClient needs to be loaded
+        :type service: ovs.dal.hybrids.service.Service
+        :param timeout: All calls performed by this MDSClient instance will time out after this period (in seconds)
+        :type timeout: int
+        :return: An MDSClient instance for the specified Service
+        :rtype: MDSClient
         """
         if service.storagerouter is None:
-            raise ValueError('MDS service {0} does not have a Storage Router linked to it'.format(service.name))
+            raise ValueError('Service {0} does not have a StorageRouter linked to it'.format(service.name))
 
         key = service.guid
-        if key not in mdsclient_service_cache:
+        # Create MDSClient instance if no instance has been cached yet or if another timeout has been specified
+        if key not in mdsclient_service_cache or timeout != mdsclient_service_cache[key]['timeout']:
             try:
                 # noinspection PyArgumentList
-                mdsclient_service_cache[key] = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
+                mdsclient_service_cache[key] = {'client': MDSClient(timeout_secs=timeout,
+                                                                    mds_node_config=MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0])),
+                                                'timeout': timeout}
             except RuntimeError:
                 MetadataServerClient._logger.exception('Error loading MDSClient on {0}'.format(service.storagerouter.ip))
                 return None
-        return mdsclient_service_cache[key]
+        return mdsclient_service_cache[key]['client']
 
 
 class ClusterRegistryClient(object):
