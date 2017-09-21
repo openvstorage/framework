@@ -119,7 +119,7 @@ define([
                             reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_block_cache.choose_preset'));
                             fields.push('preset');
                         }
-                        if (connectionInfo.isLocalBackend() === false && connectionInfo.hasRemoteInfo() === false) {
+                        if (connectionInfo.isLocalBackend() === false && connectionInfo.hasRemoteInfo() === false || self.data.invalidBackendInfo() === true) {
                             reasons.push($.t('ovs:wizards.reconfigure_vpool.gather_block_cache.invalid_alba_info'));
                             fields.push('invalid_alba_info');
                         }

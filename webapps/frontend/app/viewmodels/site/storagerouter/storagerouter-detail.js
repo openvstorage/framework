@@ -17,9 +17,9 @@
 define([
     'jquery', 'durandal/app', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../../containers/storagerouter', '../../containers/vpool', '../../containers/storagedriver',
-    '../../containers/domain', '../../containers/vdisk',
-    '../../wizards/configurepartition/index'
+    'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
+    'viewmodels/containers/domain/domain', 'viewmodels/containers/vdisk/vdisk',
+    'viewmodels/wizards/configurepartition/index'
 ], function(
     $, app, ko, dialog, shared, generic, Refresher, api,
     StorageRouter, VPool, StorageDriver, Domain, VDisk,

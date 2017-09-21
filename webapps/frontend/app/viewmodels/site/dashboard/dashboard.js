@@ -17,7 +17,7 @@
 define([
     'knockout', 'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api', 'ovs/refresher',
-    '../../containers/vpool', '../../containers/storagerouter'
+    'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagerouter/storagerouter'
 ], function(ko, $, shared, generic, api, Refresher, VPool, StorageRouter) {
     "use strict";
     return function() {

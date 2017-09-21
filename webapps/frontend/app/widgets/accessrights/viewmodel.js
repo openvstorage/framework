@@ -16,7 +16,7 @@
 /*global define */
 define([
     'jquery', 'knockout', 'ovs/generic', 'ovs/shared', 'ovs/api',
-    '../../viewmodels/containers/user', '../../viewmodels/containers/client'
+    'viewmodels/containers/user/user', 'viewmodels/containers/user/client'
 ], function($, ko, generic, shared, api, User, Client) {
     "use strict";
     return function() {

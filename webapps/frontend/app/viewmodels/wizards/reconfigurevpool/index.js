@@ -21,21 +21,6 @@ define([
     "use strict";
     return function(options) {
         // Inject all data first before building all steps to avoid computing
-        var cachingData = options.vPool.getCachingData(options.storageRouter.guid(), true);
-        // Make cachingData observable for our change monitoring purposes
-        // Cleaning data
-        data.loadBackendsHandle = undefined;
-        data.loadingBackends();
-        data.invalidBackendInfo();
-        data.backends([]);
-        data.albaPresetMap({});
-        // Set current data
-        data.vPool(options.vPool);
-        data.storageRouter(options.storageRouter);
-        data.storageDriver(options.storageDriver);
-        // Set all configurable data
-        data.cachingData = cachingData;
-        data.proxyAmount(options.storageDriver.albaProxyGuids().length);
 
         var self = this;
         build(self);
@@ -46,8 +31,21 @@ define([
         self.title(generic.tryGet(options, 'title', defaultTitle));
 
         self.steps([new GatherVPool(), new GatherFragmentCache(), new GatherBlockCache(), new GatherConfig(), new Confirm()]);
-        data.completed = options.completed;
+        var cachingData = options.vPool.getCachingData(options.storageRouter.guid(), true);
+
         self.step(0);
         self.activateStep();
+
+        // Cleaning data
+        generic.cleanObject(data);
+        data.albaPresetMap({});  // set this to an empty object as cleanObject will set it to undefined
+        // Set current data
+        data.vPool(options.vPool);
+        data.storageRouter(options.storageRouter);
+        data.storageDriver(options.storageDriver);
+        // Set all configurable data
+        data.cachingData = cachingData;
+        data.proxyAmount(options.storageDriver.albaProxyGuids().length);
+        data.completed = options.completed;
     };
 });

@@ -17,14 +17,21 @@
 define([
     'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
-    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk', 'viewmodels/containers/vpoolcachingdata'
-], function($, ko, shared, generic, api, BackendType, VDisk, CacheData) {
+    'viewmodels/containers/backend/backendtype', 'viewmodels/containers/vdisk/vdisk',
+    'viewmodels/containers/vpool/cache', 'viewmodels/containers/vpool/configuration'
+], function($, ko, shared, generic, api, BackendType, VDisk, CacheData, Configuration) {
     "use strict";
     return function(guid) {
         var self = this;
 
         // Variables
         self.shared = shared;
+
+        // Constants
+        self.clusterSizes      = [4, 8, 16, 32, 64];
+        self.dtlModes          = ['no_sync', 'a_sync', 'sync'];
+        self.dtlTransportModes = ['tcp', 'rdma'];
+        self.scoSizes          = [4, 8, 16, 32, 64, 128];
 
         // Handles
         self.loadHandle          = undefined;
@@ -241,6 +248,14 @@ define([
                 return new CacheData(cachingData)
             }
             return cachingData
-        }
+        };
+        self.getConfiguration = function(returnViewModel) {
+            returnViewModel = returnViewModel || false;
+            var configuration = self.configuration();
+            if (returnViewModel === true) {
+                return new Configuration(configuration)
+            }
+            return configuration;
+        };
     };
 });

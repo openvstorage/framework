@@ -17,7 +17,7 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api',
-    'viewmodels/containers/diskpartition'
+    'viewmodels/containers/disk/diskpartition'
 ], function($, ko, generic, api, Partition) {
     "use strict";
     return function(guid) {
