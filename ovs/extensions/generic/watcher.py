@@ -24,8 +24,8 @@ import sys
 import time
 import uuid
 import logging
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.log.log_handler import LogHandler
 
 
 class Watcher(object):
@@ -39,7 +39,7 @@ class Watcher(object):
         """
         Dummy init method
         """
-        self._logger = LogHandler.get('extensions', name='watcher')
+        self._logger = Logger('extensions-generic')
 
     def log_message(self, log_target, entry, level):
         """
@@ -199,7 +199,6 @@ class Watcher(object):
             return False
 
 if __name__ == '__main__':
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
     given_target = sys.argv[1]
     mode = sys.argv[2]
     watcher = Watcher()

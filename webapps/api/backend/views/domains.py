@@ -21,11 +21,11 @@ Module for domains
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import load, log, required_roles, return_list, return_object, return_simple
-from api.backend.exceptions import HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.domainlist import DomainList
+from ovs_extensions.api.exceptions import HttpNotAcceptableException
 
 
 class DomainViewSet(viewsets.ViewSet):
@@ -89,8 +89,8 @@ class DomainViewSet(viewsets.ViewSet):
         domain = serializer.deserialize()
         current_domains = DomainList.get_by_name(domain.name)
         if len(current_domains) > 0:
-            raise HttpNotAcceptableException(error_description='A Domain with the given name already exists',
-                                             error='duplicate')
+            raise HttpNotAcceptableException(error='duplicate',
+                                             error_description='A Domain with the given name already exists')
         domain.save()
         return domain
 
@@ -107,8 +107,8 @@ class DomainViewSet(viewsets.ViewSet):
         :rtype: None
         """
         if len(domain.storagerouters) > 0 or len(domain.backends) > 0 or len(domain.vdisks_dtl) > 0:
-            raise HttpNotAcceptableException(error_description='The given Domain is still in use',
-                                             error='in_use')
+            raise HttpNotAcceptableException(error='in_use',
+                                             error_description='The given Domain is still in use')
         domain.delete()
 
     @log()

@@ -25,24 +25,24 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.conf import settings
 from api.backend.decorators import required_roles, load
-from api.backend.exceptions import HttpBadRequestException
 from api.middleware import OVSMiddleware
 from api.oauth2.decorators import auto_response, limit, authenticated
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.client import OVSClient
+from ovs_extensions.api.exceptions import HttpMethodNotAllowedException
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.log_handler import LogHandler
 
 
 class MetadataView(View):
     """
     Implements retrieval of generic metadata about the services
     """
-    _logger = LogHandler.get('api', name='metadata')
+    _logger = Logger('api')
 
     @auto_response()
     @limit(amount=60, per=60, timeout=60)
@@ -67,7 +67,7 @@ class MetadataView(View):
             try:
                 data['release']['name'] = System.get_release_name()
             except:
-                MetadataView._logger.exception('Could not load releasename')
+                MetadataView._logger.exception('Could not load release name')
 
             # Gather plugin metadata
             plugins = {}
@@ -160,8 +160,8 @@ def relay(*args, **kwargs):
                            raw_response=True,
                            cache_store=VolatileFactory.get_client())
         if not hasattr(client, method):
-            raise HttpBadRequestException(error='unavailable_call',
-                                          error_description='Method not available in relay')
+            raise HttpMethodNotAllowedException(error='unavailable_call',
+                                                error_description='Method not available in relay')
         client_kwargs = {'params': request.GET}
         if method != 'get':
             client_kwargs['data'] = request.POST
@@ -178,6 +178,7 @@ def relay(*args, **kwargs):
         return _relay(*args, **kwargs)
     except Exception as ex:
         if OVSMiddleware.is_own_httpexception(ex):
+            # noinspection PyUnresolvedReferences
             return HttpResponse(ex.data,
                                 status=ex.status_code,
                                 content_type='application/json')
@@ -187,7 +188,7 @@ def relay(*args, **kwargs):
             message = ex.detail
         if hasattr(ex, 'status_code'):
             status_code = ex.status_code
-        logger = LogHandler.get('api', name='metadata')
+        logger = Logger('api')
         logger.exception('Error relaying call: {0}'.format(message))
         return HttpResponse(json.dumps({'error_description': message,
                                         'error': 'relay_error'}),

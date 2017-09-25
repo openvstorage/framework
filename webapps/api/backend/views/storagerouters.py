@@ -23,21 +23,23 @@ from rest_framework import viewsets
 from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
-from api.backend.exceptions import HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.generic import GenericController
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.update import UpdateController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.vpool import VPoolController
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -174,6 +176,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def create_hprm_config_files(self, local_storagerouter, storagerouter, parameters):
         """
+        DEPRECATED API CALL - USE /vpool/vpool_guid/create_hprm_config_files instead
         Create the required configuration files to be able to make use of HPRM (aka PRACC)
         These configuration will be zipped and made available for download
         :param local_storagerouter: StorageRouter this call is executed on
@@ -185,9 +188,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
-        return StorageRouterController.create_hprm_config_files.delay(parameters=parameters,
-                                                                      storagerouter_guid=storagerouter.guid,
-                                                                      local_storagerouter_guid=local_storagerouter.guid)
+        Toolbox.verify_required_params(actual_params=parameters,
+                                       required_params={'vpool_guid': (str, Toolbox.regex_guid)})
+        return VPoolController.create_hprm_config_files.delay(parameters=parameters,
+                                                              vpool_guid=parameters['vpool_guid'],
+                                                              local_storagerouter_guid=local_storagerouter.guid)
 
     @link()
     @log()
@@ -240,32 +245,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read'])
     @return_task()
-    @load(StorageRouter, max_version=5)
-    def check_s3(self, host, port, accesskey, secretkey):
-        """
-        Validates whether connection to a given S3 backend can be made
-        :param host: The host of an S3 endpoint
-        :type host: str
-        :param port: The port of an S3 endpoint
-        :type port: int
-        :param accesskey: The accesskey to be used when validating the S3 endpoint
-        :type accesskey: str
-        :param secretkey: The secretkey to be used when validating the S3 endpoint
-        :type secretkey: str
-        """
-        parameters = {'host': host,
-                      'port': port,
-                      'accesskey': accesskey,
-                      'secretkey': secretkey}
-        for field in parameters:
-            if not isinstance(parameters[field], int):
-                parameters[field] = str(parameters[field])
-        return StorageRouterController.check_s3.delay(**parameters)
-
-    @action()
-    @log()
-    @required_roles(['read'])
-    @return_task()
     @load(StorageRouter)
     def check_mtpt(self, storagerouter, name):
         """
@@ -282,82 +261,25 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def add_vpool(self, storagerouter, call_parameters, version, local_storagerouter, request):
+    def add_vpool(self, call_parameters, local_storagerouter, request):
         """
         Adds a vPool to a given Storage Router
-        :param storagerouter: StorageRouter to add the vPool to
-        :type storagerouter: StorageRouter
         :param call_parameters: A complex (JSON encoded) dictionary containing all various parameters to create the vPool
         :type call_parameters: dict
-        :param version: Client version
-        :type version: int
         :param local_storagerouter: StorageRouter on which the call is executed
         :type local_storagerouter: StorageRouter
         :param request: The raw request
         :type request: Request
         """
-        def _validate_required_keys(section):
-            for required_key in ['host', 'backend']:
-                if required_key not in call_parameters[section]:
-                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" misses information about {1}'.format(section, required_key),
-                                                     error='invalid_data')
-            for sub_required_key in ['backend', 'metadata']:
-                if sub_required_key not in call_parameters[section]['backend']:
-                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" missing information about {1}'.format(section, sub_required_key),
-                                                     error='invalid_data')
-
         # API backwards compatibility
-        if version <= 2:
-            call_parameters['storagerouter_ip'] = storagerouter.ip
-            call_parameters['fragment_cache_on_read'] = True
-            call_parameters['fragment_cache_on_write'] = False
-            call_parameters['backend_connection_info'] = {'host': call_parameters.pop('connection_host'),
-                                                          'port': call_parameters.pop('connection_port'),
-                                                          'username': call_parameters.pop('connection_username'),
-                                                          'password': call_parameters.pop('connection_password')}
-            if 'connection_backend' in call_parameters:
-                connection_backend = call_parameters.pop('connection_backend')
-                call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
-                                                                         'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
-        if version < 6:
-            if 'backend_connection_info' not in call_parameters:
-                raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" should be passed',
-                                                 error='invalid_data')
-            _validate_required_keys(section='backend_connection_info')
-            if 'backend_info' not in call_parameters:
-                call_parameters['backend_info'] = {}
-            if 'connection_info' not in call_parameters:
-                call_parameters['connection_info'] = {}
-            call_parameters['backend_info']['preset'] = call_parameters['backend_connection_info']['backend']['metadata']
-            call_parameters['backend_info']['alba_backend_guid'] = call_parameters['backend_connection_info']['backend']['backend']
-            call_parameters['connection_info']['host'] = call_parameters['backend_connection_info']['host']
-            call_parameters['connection_info']['port'] = call_parameters['backend_connection_info'].get('port', '')
-            call_parameters['connection_info']['client_id'] = call_parameters['backend_connection_info'].get('username', '')
-            call_parameters['connection_info']['client_secret'] = call_parameters['backend_connection_info'].get('password', '')
-            del call_parameters['backend_connection_info']
-
-            if 'backend_connection_info_aa' in call_parameters:
-                if 'backend_info_fc' not in call_parameters:
-                    call_parameters['backend_info_fc'] = {}
-                if 'connection_info_fc' not in call_parameters:
-                    call_parameters['connection_info_fc'] = {}
-                _validate_required_keys(section='backend_connection_info_aa')
-                call_parameters['backend_info_fc']['preset'] = call_parameters['backend_connection_info_aa']['backend']['metadata']
-                call_parameters['backend_info_fc']['alba_backend_guid'] = call_parameters['backend_connection_info_aa']['backend']['backend']
-                call_parameters['connection_info_fc']['host'] = call_parameters['backend_connection_info_aa']['host']
-                call_parameters['connection_info_fc']['port'] = call_parameters['backend_connection_info_aa'].get('port', '')
-                call_parameters['connection_info_fc']['client_id'] = call_parameters['backend_connection_info_aa'].get('username', '')
-                call_parameters['connection_info_fc']['client_secret'] = call_parameters['backend_connection_info_aa'].get('password', '')
-                del call_parameters['backend_connection_info_aa']
-
-        if version >= 6 and 'backend_connection_info' in call_parameters:
-            raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" is deprecated',
-                                             error='invalid_data')
+        if 'backend_connection_info' in call_parameters:
+            raise HttpNotAcceptableException(error='invalid_data',
+                                             error_description='Invalid data passed: "backend_connection_info" is deprecated')
 
         # API client translation (cover "local backend" selection in GUI)
         if 'backend_info' not in call_parameters or 'connection_info' not in call_parameters or 'config_params' not in call_parameters:
-            raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
-                                             error='invalid_data')
+            raise HttpNotAcceptableException(error='invalid_data',
+                                             error_description='Invalid call_parameters passed')
         connection_info = call_parameters['connection_info']
         if 'backend_info_aa' in call_parameters:
             # Backwards compatibility
@@ -376,8 +298,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 if _client.ovs_type == 'INTERNAL' and _client.grant_type == 'CLIENT_CREDENTIALS':
                     client = _client
             if client is None:
-                raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
-                                                 error='invalid_data')
+                raise HttpNotAcceptableException(error='invalid_data',
+                                                 error_description='Invalid call_parameters passed')
             if connection_info['host'] == '':
                 connection_info['client_id'] = client.client_id
                 connection_info['client_secret'] = client.client_secret
@@ -418,6 +340,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def get_update_status(self, storagerouter):
         """
         Return available updates for framework, volumedriver, ...
+        DEPRECATED API call
         :param storagerouter: StorageRouter to get the update information from
         :type storagerouter: StorageRouter
         """
@@ -480,6 +403,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def update_framework(self, storagerouter):
         """
         Initiate a task on the given StorageRouter to update the framework on ALL StorageRouters
+        DEPRECATED API call - use update_components in the future
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
         """
@@ -494,6 +418,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def update_volumedriver(self, storagerouter):
         """
         Initiate a task on the given StorageRouter to update the volumedriver on ALL StorageRouters
+        DEPRECATED API call - use update_components in the future
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
         """

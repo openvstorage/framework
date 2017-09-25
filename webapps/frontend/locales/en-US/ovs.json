@@ -81,10 +81,11 @@
             "internal_server": "Unknown server exception",
             "invalid_data": "Invalid data entered",
             "invalid_roles": "Insufficient rights",
-            "object_not_found": "The object could not be located",
+            "missing_credentials": "Authentication credentials were not provided",
             "no_ownership": "No access to this object",
             "not_authenticated": "Not authenticated",
             "not_found": "API not found",
+            "object_not_found": "The object could not be located",
             "rate_limit_reached": "Reached API rate-limit",
             "rate_limit_timeout": "Waiting for API rate-limit lock to be released",
             "relay_error": "Error while relaying the call",
@@ -495,6 +496,8 @@
                 "tcp": "TCP"
             },
             "fragmentquota": "Fragment quota",
+            "mds_help_message": "OpenvStorage will always run a master MDS in the same Domain as configured for the StorageRouter. In case a Recovery Domain is configured, additional MDS slaves will be configured in that Recovery Domain (safety of 2 and more)",
+            "mds_help_title": "MetaData Server Information",
             "sco_size": "SCO size",
             "quota": "Quota",
             "volume": "Volumes",
@@ -713,6 +716,7 @@
             "generate_configs": "Generate HPRM configuration files",
             "generating_configs": "Generating HPRM configuration files",
             "extend": "Extend",
+            "mds_safety": "Amount of MetaData Servers",
             "refresh": {
                 "failed_msg": "Refreshing configuration on StorageRouter __sr__ for vPool __vpool__ failed: __why__",
                 "started": "Refreshing",
@@ -734,6 +738,7 @@
         "fragment_caching": "Fragment Caching",
         "global_write_buffer_short": "Write Buffer",
         "global_write_buffer": "Global Write Buffer",
+        "mds_safety": "MDS Safety",
         "preset": "Preset",
         "proxies_amount": "# Proxies",
         "sco_size": "SCO Size",
@@ -862,6 +867,25 @@
                 "use_backend_bc": "Use another Backend as Cache",
                 "use_local": "Use local disk"
             },
+            "gather_config": {
+                "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
+                "cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local Cache with current Global Write Buffer size",
+                "cluster_size": "Cluster Size:",
+                "dtl": "Distributed Transaction Log Information",
+                "dtl_mode": "Mode:",
+                "dtl_transport": "Transport Mode:",
+                "global_write_buffer": "Global Write Buffer:",
+                "global_write_buffer_available": "Dedicated global Write Buffer space:",
+                "information": "Information about the available space:",
+                "mds": "MDS Information",
+                "mds_safety": "Safety:",
+                "no_space_left": "No space left",
+                "over_allocation": "Over-allocation detected",
+                "sco_size": "SCO Size:",
+                "title_write_buffer": "StorageDriver Write Buffer",
+                "volume": "Volume Information",
+                "volume_write_buffer": "Volume Write Buffer:"
+            },
             "gather_fragment_cache": {
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",
@@ -895,23 +919,6 @@
                 "re_use_connection_info": "Re-use connection info:",
                 "use_backend_fc": "Use another Backend as Cache",
                 "use_local": "Use local disk"
-            },
-            "gather_config": {
-                "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
-                "cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local Cache with current Global Write Buffer size",
-                "cluster_size": "Cluster Size:",
-                "dtl": "Distributed Transaction Log Information",
-                "dtl_mode": "Mode:",
-                "dtl_transport": "Transport Mode:",
-                "global_write_buffer": "Global Write Buffer:",
-                "global_write_buffer_available": "Dedicated global Write Buffer space:",
-                "information": "Information about the available space:",
-                "no_space_left": "No space left",
-                "over_allocation": "Over-allocation detected",
-                "sco_size": "SCO Size:",
-                "title_write_buffer": "StorageDriver Write Buffer",
-                "volume": "Volume Information",
-                "volume_write_buffer": "Volume Write Buffer:"
             },
             "gather_vpool": {
                 "alba_backend": "Backend:",
@@ -1046,7 +1053,7 @@
                 "cache_write": "Write:",
                 "cache_quota": "Cache quota:",
                 "client_id": "Client ID:",
-                "failure_msg": "Failed to generate configuration files for vPool __vpool__ on StorageRouter __storagerouter__: __why__",
+                "failure_msg": "Failed to generate configuration files for vPool __vpool__: __why__",
                 "fragment_cache": "Fragment Cache:",
                 "host": "Host:",
                 "identifier": "HPRM identifier",
@@ -1056,9 +1063,9 @@
                 "local_size": "Local Size:",
                 "port": "Port:",
                 "started": "Generating",
-                "started_msg": "Generating HPRM configuration files for vPool __vpool__ on StorageRouter __storagerouter__",
+                "started_msg": "Generating HPRM configuration files for vPool __vpool__",
                 "success": "Generated",
-                "success_msg": "Successfully generated configuration files for vPool __vpool__ on StorageRouter __storagerouter__"
+                "success_msg": "Successfully generated configuration files for vPool __vpool__"
             },
             "gather": {
                 "general_info": "General information",

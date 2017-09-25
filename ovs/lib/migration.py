@@ -19,9 +19,9 @@ MigrationController module
 """
 import copy
 import json
+from ovs.extensions.generic.logger import Logger
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
-from ovs.log.log_handler import LogHandler
 
 
 class MigrationController(object):
@@ -29,7 +29,7 @@ class MigrationController(object):
     This controller contains (part of the) migration code. It runs out-of-band with the updater so we reduce the risk of
     failures during the update
     """
-    _logger = LogHandler.get('lib', name='migrations')
+    _logger = Logger('lib')
 
     @staticmethod
     @ovs_task(name='ovs.migration.migrate', schedule=Schedule(minute='0', hour='6'), ensure_single_info={'mode': 'DEFAULT'})
@@ -52,7 +52,6 @@ class MigrationController(object):
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-        from ovs.lib.generic import GenericController
 
         MigrationController._logger.info('Start out of band migrations...')
         service_manager = ServiceFactory.get_manager()
@@ -165,8 +164,7 @@ class MigrationController(object):
 
             # Update 'backend_connection_manager' section
             changes = False
-            storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-            storagedriver_config.load()
+            storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
             if 'backend_connection_manager' not in storagedriver_config.configuration:
                 continue
 
@@ -216,12 +214,13 @@ class MigrationController(object):
                 ExtensionsToolbox.edit_version_file(client=root_client,
                                                     package_name='volumedriver',
                                                     old_service_name='volumedriver_{0}'.format(vpool.name))
-                if service_manager.ImplementationClass == Systemd:
+                if service_manager.__class__ == Systemd:
                     root_client.run(['systemctl', 'daemon-reload'])
 
         ########################################
         # Update metadata_store_bits information
-        for vpool in VPoolList.get_vpools():
+        vpools = VPoolList.get_vpools()
+        for vpool in vpools:
             bits = None
             for storagedriver in vpool.storagedrivers:
                 key = '/ovs/framework/hosts/{0}/services/volumedriver_{1}'.format(storagedriver.storagerouter.machine_id, vpool.name)
@@ -246,4 +245,3 @@ class MigrationController(object):
                 vpool.save()
 
         MigrationController._logger.info('Finished out of band migrations')
-        GenericController.refresh_package_information()

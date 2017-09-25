@@ -100,7 +100,7 @@ define(['jquery', 'knockout'], function($, ko){
             localHostFC:             ko.observable(true),
             localPathFC:             ko.observable(''),
             localSizeFC:             ko.observable().extend({ numeric: {min: 1, max: 10 * 1024}}),
-            portFC:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
+            portFC:                  ko.observable(80).extend({numeric: {min: 1, max: 65535}}),
             presetFC:                ko.observable(),
             useFC:                   ko.observable(false),
             // Block cache
@@ -115,7 +115,7 @@ define(['jquery', 'knockout'], function($, ko){
             localHostBC:             ko.observable(true),
             localPathBC:             ko.observable(''),
             localSizeBC:             ko.observable().extend({ numeric: {min: 1, max: 10 * 1024}}),
-            portBC:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
+            portBC:                  ko.observable(80).extend({numeric: {min: 1, max: 65535}}),
             presetBC:                ko.observable(),
             supportsBC:              ko.observable(true),
             useBC:                   ko.observable(false)

@@ -26,6 +26,7 @@ import time
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -34,15 +35,13 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.toolbox import Toolbox
-from ovs.log.log_handler import LogHandler
 
 
 class NodeTypeController(object):
     """
     This class contains all logic for promoting and demoting nodes in the cluster
     """
-    _logger = LogHandler.get('lib', name='node-type')
-    _logger.logger.propagate = False
+    _logger = Logger('lib')
 
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
@@ -229,9 +228,7 @@ class NodeTypeController(object):
             arakoon_installer = ArakoonInstaller(cluster_name='config')
             arakoon_installer.load(ip=master_ip)
             arakoon_installer.extend_cluster(new_ip=cluster_ip,
-                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                             log_sinks=LogHandler.get_sink_path('arakoon-server_config'),
-                                             crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_config'))
+                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
             arakoon_installer.restart_cluster_after_extending(new_ip=cluster_ip)
             service_manager.register_service(node_name=machine_id,
                                              service_metadata=arakoon_installer.service_metadata[cluster_ip])
@@ -252,9 +249,7 @@ class NodeTypeController(object):
             arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cluster_name)
             arakoon_installer.load()
             arakoon_installer.extend_cluster(new_ip=cluster_ip,
-                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                             log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(arakoon_cluster_name)),
-                                             crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(arakoon_cluster_name)))
+                                             base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
             arakoon_installer.restart_cluster_after_extending(new_ip=cluster_ip)
             arakoon_ports = arakoon_installer.ports[cluster_ip]
 
@@ -521,7 +516,7 @@ class NodeTypeController(object):
         :param clients: Clients on which to restart these services
         :type clients: dict
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :param offline_node_ips: IP addresses of offline nodes in the cluster
         :type offline_node_ips: list
         :return: None
@@ -558,7 +553,7 @@ class NodeTypeController(object):
         :param client: Client on which to configure Memcached
         :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         Toolbox.log(logger=logger, messages='Setting up Memcached')
@@ -574,7 +569,7 @@ class NodeTypeController(object):
         :param client: Client on which to configure RabbitMQ
         :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         Toolbox.log(logger=logger, messages='Setting up RabbitMQ')
@@ -638,7 +633,7 @@ class NodeTypeController(object):
         :param client: Client on which to check RabbitMQ
         :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         service_manager = ServiceFactory.get_manager()
@@ -658,7 +653,7 @@ class NodeTypeController(object):
         :param client: Client on which to check for Avahi
         :type client: ovs_extensions.generic.sshclient.SSHClient
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: True if Avahi is installed, False otherwise
         :rtype: bool
         """
@@ -702,7 +697,7 @@ class NodeTypeController(object):
         :param node_type: Type of the node ('master' or 'extra')
         :type node_type: str
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         valid_avahi = NodeTypeController.validate_avahi_cluster_name(ip=client.ip,
@@ -733,7 +728,7 @@ class NodeTypeController(object):
         :param node_type: Type of node ('master' or 'extra')
         :type node_type: str
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         Toolbox.log(logger=logger, messages='Adding services')
@@ -799,8 +794,7 @@ class NodeTypeController(object):
         if Configuration.dir_exists('/ovs/vpools'):
             for vpool_guid in Configuration.list('/ovs/vpools'):
                 for storagedriver_id in Configuration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
-                    storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_guid, storagedriver_id)
-                    storagedriver_config.load()
+                    storagedriver_config = StorageDriverConfiguration(vpool_guid, storagedriver_id)
                     storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                                    events_amqp_uris=uris)
                     storagedriver_config.save()

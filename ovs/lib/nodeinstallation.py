@@ -26,25 +26,24 @@ import signal
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
+from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.nodetype import NodeTypeController
 from ovs.lib.noderemoval import NodeRemovalController
-from ovs.log.log_handler import LogHandler
 
 
 class NodeInstallationController(object):
     """
     This class contains all logic for setting up an environment, installed with system-native packages
     """
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
-    _logger = LogHandler.get('lib', name='node-installation')
-    _logger.logger.propagate = False
+    _logger = Logger('lib')
 
     nodes = {}
     host_ips = set()
@@ -128,9 +127,6 @@ class NodeInstallationController(object):
                 if execute_rollback is False:  # Only overrule cmdline if setting was not passed
                     execute_rollback = config.get('rollback', False)
 
-            if logging_target is not None:
-                LogHandler.defaults['logging_target'] = logging_target
-
             # Support resume setup - store entered parameters so when retrying, we have the values
             resume_config = {}
             resume_config_file = '/opt/OpenvStorage/config/openvstorage_resumeconfig.json'
@@ -144,8 +140,7 @@ class NodeInstallationController(object):
             root_client = SSHClient(endpoint='127.0.0.1', username='root')
             unique_id = System.get_my_machine_id(root_client)
 
-            ipaddresses = root_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", allow_insecure=True).strip().splitlines()
-            NodeInstallationController.host_ips = set([found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1'])
+            NodeInstallationController.host_ips = set(OSFactory.get_manager().get_ip_addresses(client=root_client))
 
             setup_completed = False
             promote_completed = False
@@ -539,15 +534,12 @@ class NodeInstallationController(object):
                         boxed=True)
             NodeInstallationController._logger.info('Setup complete')
 
-            try:
-                # Try to trigger setups from possibly installed other packages
+            # Try to trigger setups from possibly installed other packages
+            if root_client.run(['which', 'asd-manager'], allow_nonzero=True) != '':
                 sys.path.append('/opt/asd-manager/')
                 from source.asdmanager import setup
                 Toolbox.log(logger=NodeInstallationController._logger, messages='\nA local ASD Manager was detected for which the setup will now be launched.\n')
                 setup()
-            except:
-                pass
-
         except Exception as exception:
             Toolbox.log(logger=NodeInstallationController._logger, messages='\n')
             Toolbox.log(logger=NodeInstallationController._logger, messages=['An unexpected error occurred:', str(exception).lstrip('\n')], boxed=True, loglevel='exception')
@@ -736,7 +728,7 @@ class NodeInstallationController(object):
                     Interactive.ask_continue()
                 external_config = True
 
-        bootstrap_location = Configuration.BOOTSTRAP_CONFIG_LOCATION
+        bootstrap_location = Configuration.CONFIG_STORE_LOCATION
         if not target_client.file_exists(bootstrap_location):
             target_client.file_create(bootstrap_location)
         target_client.file_write(bootstrap_location, json.dumps({'configuration_store': 'arakoon'}, indent=4))
@@ -749,9 +741,7 @@ class NodeInstallationController(object):
             arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
                                              ip=cluster_ip,
                                              base_dir='/opt/OpenvStorage/db',
-                                             locked=False,
-                                             log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(arakoon_config_cluster)),
-                                             crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(arakoon_config_cluster)))
+                                             locked=False)
             arakoon_installer.start_cluster()
             contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
             target_client.file_write(Configuration.CACC_LOCATION, contents)
@@ -788,9 +778,7 @@ class NodeInstallationController(object):
             arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
                                              ip=cluster_ip,
                                              base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                             locked=False,
-                                             log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(arakoon_ovsdb_cluster)),
-                                             crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(arakoon_ovsdb_cluster)))
+                                             locked=False)
             arakoon_installer.start_cluster()
             metadata = arakoon_installer.metadata
             arakoon_ports = arakoon_installer.ports[cluster_ip]
@@ -887,8 +875,8 @@ class NodeInstallationController(object):
         master_client = ip_client_map[master_ip]
         machine_id = System.get_my_machine_id(target_client)
 
-        target_client.file_write(Configuration.BOOTSTRAP_CONFIG_LOCATION,
-                                 master_client.file_read(Configuration.BOOTSTRAP_CONFIG_LOCATION))
+        target_client.file_write(Configuration.CONFIG_STORE_LOCATION,
+                                 master_client.file_read(Configuration.CONFIG_STORE_LOCATION))
         target_client.file_write(Configuration.CACC_LOCATION,
                                  master_client.file_read(Configuration.CACC_LOCATION))
         Configuration.initialize_host(machine_id)

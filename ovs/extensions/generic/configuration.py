@@ -17,22 +17,21 @@
 """
 Generic module for managing configuration somewhere
 """
-import os
+
 import copy
 import json
 import random
 import string
 # noinspection PyUnresolvedReferences
-from ovs_extensions.generic.configuration import NotFoundException, ConnectionException, Configuration as _Configuration
+from ovs_extensions.generic.configuration import Configuration as _Configuration, ConnectionException, NotFoundException
 
 
 class Configuration(_Configuration):
     """
     Extends the 'default' configuration class
     """
-
-    BOOTSTRAP_CONFIG_LOCATION = '/opt/OpenvStorage/config/framework.json'
     CACC_LOCATION = '/opt/OpenvStorage/config/arakoon_cacc.ini'
+    CONFIG_STORE_LOCATION = '/opt/OpenvStorage/config/framework.json'
 
     base_config = {'cluster_id': None,
                    'external_config': None,
@@ -43,9 +42,6 @@ class Configuration(_Configuration):
                    'support': {'enablesupport': False,
                                'enabled': True,
                                'interval': 60},
-                   'storagedriver': {'mds_safety': 3,
-                                     'mds_tlogs': 100,
-                                     'mds_maxload': 75},
                    'webapps': {'html_endpoint': '/',
                                'oauth2': {'mode': 'local'}}}
 
@@ -107,7 +103,7 @@ class Configuration(_Configuration):
                          'arakoon_clusters': {},
                          'stores': {'persistent': 'pyrakoon',
                                     'volatile': 'memcache'},
-                         'logging': {'type': 'console'}})
+                         'logging': {'type': 'console', 'level': 'INFO'}})
         if logging_target is not None:
             base_cfg['logging'] = logging_target
         if cls.exists('/ovs/framework/memcache') is False:
@@ -126,12 +122,10 @@ class Configuration(_Configuration):
     @classmethod
     def get_store_info(cls):
         """
-        Retrieve the configuration store method. This can currently only be 'arakoon'
-        :return: A tuple containing the store and params that can be passed to the configuration implementation instance
-        :rtype: tuple(str, dict)
+        Retrieve the configuration store method. Currently this can only be 'arakoon'
+        :return: The store method
+        :rtype: str
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
-            return 'unittest', None
-        with open(cls.BOOTSTRAP_CONFIG_LOCATION) as config_file:
+        with open(cls.CONFIG_STORE_LOCATION) as config_file:
             contents = json.load(config_file)
-            return contents['configuration_store'], {'cacc_location': cls.CACC_LOCATION}
+            return contents['configuration_store']

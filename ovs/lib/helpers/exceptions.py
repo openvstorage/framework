@@ -14,6 +14,10 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
+"""
+Custom exception module
+"""
+
 
 class EnsureSingleTimeoutReached(Exception):
     """

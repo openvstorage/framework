@@ -24,7 +24,6 @@ import hashlib
 import unittest
 from django.http import HttpResponse
 from api.middleware import OVSMiddleware
-from api.oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
 from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.group import Group
@@ -35,6 +34,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.user import User
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.tests.helpers import DalHelper
+from ovs_extensions.api.exceptions import HttpBadRequestException, HttpTooManyRequestsException, HttpUnauthorizedException
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 

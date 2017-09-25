@@ -26,13 +26,13 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from api.oauth2.decorators import auto_response, limit, log
-from api.oauth2.exceptions import HttpBadRequestException
 from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
-from ovs.log.log_handler import LogHandler
+from ovs_extensions.api.exceptions import HttpBadRequestException
+from ovs.extensions.generic.logger import Logger
 
 
 class OAuth2TokenView(View):
@@ -47,7 +47,7 @@ class OAuth2TokenView(View):
         """
         Handles token post
         """
-        logger = LogHandler.get('api', 'oauth2')
+        logger = Logger('api')
         _ = args, kwargs
         if 'grant_type' not in request.POST:
             raise HttpBadRequestException(error='invalid_request',

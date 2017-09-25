@@ -15,7 +15,7 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global requirejs, define, window */
 requirejs.config({
-    paths: {
+    paths: {  // paths for module names not found under baseUrl (http://requirejs.org/docs/api.html#config-paths)
         'text'       : '../lib/require/text',
         'durandal'   : '../lib/durandal/js',
         'plugins'    : '../lib/durandal/js/plugins',
@@ -91,7 +91,7 @@ define([
             }
         });
         app.start().then(function() {
-            viewLocator.useConvention();
+            viewLocator.useConvention();  // Map view <-> viewmodel
             binder.binding = function(obj, view) {
                 $(view).i18n();
             };

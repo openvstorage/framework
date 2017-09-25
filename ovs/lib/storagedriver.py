@@ -30,6 +30,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -37,7 +38,6 @@ from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalS
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import VolumeDriverEvents_pb2
 
 
@@ -45,7 +45,7 @@ class StorageDriverController(object):
     """
     Contains all BLL related to Storage Drivers
     """
-    _logger = LogHandler.get('lib', name='storagedriver')
+    _logger = Logger('lib')
 
     ################
     # CELERY TASKS #
@@ -78,9 +78,9 @@ class StorageDriverController(object):
         :return: None
         """
         if code == VolumeDriverEvents_pb2.MDSFailover:
-            disk = VDiskList.get_vdisk_by_volume_id(volume_id)
-            if disk is not None:
-                MDSServiceController.ensure_safety(disk)
+            vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+            if vdisk is not None:
+                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
 
     @staticmethod
     @ovs_task(name='ovs.storagedriver.cluster_registry_checkup', schedule=Schedule(minute='0', hour='0'), ensure_single_info={'mode': 'CHAINED'})
@@ -196,10 +196,7 @@ class StorageDriverController(object):
         except UnableToConnectException:
             raise Exception('StorageRouter with IP {0} is not reachable. Cannot refresh the configuration'.format(storagedriver.storagerouter.ip))
 
-        storagedriver_config = StorageDriverConfiguration(config_type='storagedriver',
-                                                          vpool_guid=storagedriver.vpool_guid,
-                                                          storagedriver_id=storagedriver.storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vpool_guid=storagedriver.vpool_guid, storagedriver_id=storagedriver.storagedriver_id)
         return len(storagedriver_config.save(client=client, force_reload=True))
 
     #########
@@ -346,9 +343,7 @@ class StorageDriverController(object):
                 arakoon_installer = ArakoonInstaller(cluster_name=arakoon_voldrv_cluster)
                 arakoon_installer.create_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
                                                  ip=storagerouter.ip,
-                                                 base_dir=partition.folder,
-                                                 log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(arakoon_voldrv_cluster)),
-                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(arakoon_voldrv_cluster)))
+                                                 base_dir=partition.folder)
                 arakoon_installer.start_cluster()
                 ports = arakoon_installer.ports[storagerouter.ip]
                 metadata = arakoon_installer.metadata
@@ -376,9 +371,7 @@ class StorageDriverController(object):
                 arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
                 arakoon_installer.load()
                 arakoon_installer.extend_cluster(new_ip=storagerouter.ip,
-                                                 base_dir=partition.folder,
-                                                 log_sinks=LogHandler.get_sink_path('arakoon-server_{0}'.format(cluster_name)),
-                                                 crash_log_sinks=LogHandler.get_sink_path('arakoon-server-crash_{0}'.format(cluster_name)))
+                                                 base_dir=partition.folder)
                 _add_service(service_storagerouter=storagerouter,
                              arakoon_ports=arakoon_installer.ports[storagerouter.ip],
                              service_name=ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
@@ -398,8 +391,7 @@ class StorageDriverController(object):
         if Configuration.dir_exists('/ovs/vpools'):
             for vpool_guid in Configuration.list('/ovs/vpools'):
                 for storagedriver_id in Configuration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
-                    storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_guid, storagedriver_id)
-                    storagedriver_config.load()
+                    storagedriver_config = StorageDriverConfiguration(vpool_guid, storagedriver_id)
                     storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=cluster_name,
                                                                    vregistry_arakoon_cluster_nodes=arakoon_nodes)
                     storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
@@ -421,7 +413,7 @@ class StorageDriverController(object):
             return {'backoff': 2 * 1024 ** 3,
                     'trigger': 1 * 1024 ** 3}
         gap_configuration = {}
-        # Below "settings" = [factor of smallest parition size, maximum size in GiB, minimum size in bytes]
+        # Below "settings" = [factor of smallest partition size, maximum size in GiB, minimum size in bytes]
         for gap, gap_settings in {'backoff': [0.1, 50, 2],
                                   'trigger': [0.08, 40, 1]}.iteritems():
             current_config = int(cache_size * gap_settings[0])

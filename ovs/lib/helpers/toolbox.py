@@ -30,9 +30,9 @@ from celery.schedules import crontab
 from ovs.dal.helpers import DalToolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.interactive import Interactive
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.log.log_handler import LogHandler
 
 
 class Toolbox(object):
@@ -90,7 +90,7 @@ class Toolbox(object):
         :param sub_component: Name of the sub-component, eg: pre-install, post-install
         :type sub_component: str
         :param logger: Logger object to use for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :param kwargs: Additional named arguments
         :return: Amount of functions executed
         """
@@ -189,7 +189,7 @@ class Toolbox(object):
         :param command: Command to retry
         :param max_count: Maximum retries
         :param time_sleep: Seconds of sleep in between tries
-        :param logger: LogHandler Object
+        :param logger: Logger Object
         """
         cpe = None
         retry = 0
@@ -211,24 +211,24 @@ class Toolbox(object):
         :param client: SSHClient on which to connect and change service state
         :param name: Name of the service
         :param state: State to put the service in
-        :param logger: LogHandler Object
+        :param logger: Logger Object
         """
         service_manager = ServiceFactory.get_manager()
         action = None
         status = service_manager.get_service_status(name, client=client)
         if status != 'active' and state in ['start', 'restart']:
             if logger is not None:
-                logger.debug('{0}: Starting service {1}'.format(client.ip, name))
+                logger.info('{0}: Starting service {1}'.format(client.ip, name))
             service_manager.start_service(name, client=client)
             action = 'Started'
         elif status == 'active' and state == 'stop':
             if logger is not None:
-                logger.debug('{0}: Stopping service {1}'.format(client.ip, name))
+                logger.info('{0}: Stopping service {1}'.format(client.ip, name))
             service_manager.stop_service(name, client=client)
             action = 'Stopped'
         elif status == 'active' and state == 'restart':
             if logger is not None:
-                logger.debug('{0}: Restarting service {1}'.format(client.ip, name))
+                logger.info('{0}: Restarting service {1}'.format(client.ip, name))
             service_manager.restart_service(name, client=client)
             action = 'Restarted'
 
@@ -236,7 +236,7 @@ class Toolbox(object):
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status == 'active' else 'halted')
         else:
             if logger is not None:
-                logger.debug('{0}: {1} service {2}'.format(client.ip, action, name))
+                logger.info('{0}: {1} service {2}'.format(client.ip, action, name))
             print '  [{0}] {1} {2}'.format(client.ip, name, action.lower())
 
     @staticmethod
@@ -249,8 +249,8 @@ class Toolbox(object):
         :type name: str
         :param status: 'active' if running, 'inactive' if halted
         :type status: str
-        :param logger: Logging object
-        :type logger: ovs.log.log_handler.LogHandler
+        :param logger: Logger object
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         :rtype: NoneType
         """
@@ -271,7 +271,7 @@ class Toolbox(object):
         """
         Print a message on stdout and log to file
         :param logger: Logger object to use for the logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :param messages: Messages to print and log
         :type messages: str or list
         :param title: If True some extra chars will be pre- and appended
@@ -341,7 +341,7 @@ class Toolbox(object):
         :param ip: IP of the node on which we want to validate / ask the password
         :type ip: str
         :param logger: Logger object to use for the logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :param username: Username to login with
         :type username: str
         :param previous: Previously used password for another node in the cluster
@@ -414,22 +414,32 @@ class Schedule(object):
     """
     This decorator adds a schedule to a function. All arguments are these from celery's "crontab" class
     """
-    _logger = LogHandler.get('lib', name='scheduler')
+    _logger = Logger('lib')
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
     def generate_schedule(self, name):
         """
-        Generate a schedule
-        :param name: Name to generate
+        Generate a schedule for a Celery task
+        :param name: Name of the Celery task to generate a schedule for
+        :type name: str
         :return: Crontab and additional information about scheduling
+        :rtype: tuple
         """
+        Schedule._logger.debug('Generating schedule for {0}'.format(name))
+        schedule_key = '/ovs/framework/scheduling/celery'
         try:
-            schedules = Configuration.get('/ovs/framework/scheduling/celery', default={})
-        except Exception as ex:
-            Schedule._logger.error('Error loading celery scheduling configuration for {0}: {1}'.format(name, ex))
+            schedules = Configuration.get(key=schedule_key, default={})
+        except Exception:
+            Schedule._logger.exception('Error loading celery scheduling configuration for {0}'.format(name))
             schedules = {}
+
+        if schedules in ['', None]:  # Can occur when key has once been set and afterwards been emptied
+            schedules = {}
+        if not isinstance(schedules, dict):
+            raise ValueError('Value for key "{0}" should be a dictionary'.format(schedule_key))
+
         if name in schedules:
             schedule = schedules[name]
             if schedule is None:
@@ -438,8 +448,11 @@ class Schedule(object):
         else:
             schedule = self.kwargs
             source = 'scheduled from code'
+
+        schedule_msg = ', '.join(['{0}="{1}"'.format(key, value) for key, value in schedule.iteritems()])
+        Schedule._logger.debug('Generated schedule for {0}: {1}'.format(name, schedule_msg))
         try:
-            return crontab(**schedule), '{0}: {1}'.format(source, ', '.join(['{0}="{1}"'.format(key, value) for key, value in schedule.iteritems()]))
-        except Exception as ex:
-            Schedule._logger.error('Could not generate crontab for {0} with data {1} {2}: {3}'.format(name, schedule, source, ex))
-            return None, 'error in configuration'
+            return crontab(**schedule), '{0}: {1}'.format(source, schedule_msg)
+        except TypeError:
+            Schedule._logger.error('Invalid crontab schedule specified for task name {0}. Schedule: {1}'.format(name, schedule_msg))
+            raise

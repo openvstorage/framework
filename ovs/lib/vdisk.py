@@ -37,15 +37,16 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
+from ovs_extensions.generic.volatilemutex import NoLockAvailableException
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
-                                                       StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, \
+                                                       MDSNodeConfig, StorageDriverClient, StorageDriverConfiguration, VolumeRestartInProgressException
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
 
 
@@ -53,10 +54,12 @@ class VDiskController(object):
     """
     Contains all BLL regarding VDisks
     """
-    _logger = LogHandler.get('lib', name='vdisk')
     _VOLDRV_EVENT_KEY = 'voldrv_event_vdisk_{0}'
+    _logger = Logger('lib')
+    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
 
-    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    # noinspection PyCallByClass,PyTypeChecker
+    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -108,7 +111,7 @@ class VDiskController(object):
             VDiskController._logger.exception('Error during vDisk checkup (DTL)')
         try:
             VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
-            MDSServiceController.ensure_safety(vdisk)
+            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
         except Exception:
             VDiskController._logger.exception('Error during vDisk checkup')
             if vdisk.objectregistry_client.find(str(vdisk.volume_id)) is None:
@@ -341,7 +344,7 @@ class VDiskController(object):
                     if devicename.startswith(old_path):
                         vdisk.devicename = '{0}{1}'.format(new_path, ExtensionsToolbox.remove_prefix(devicename, old_path))
                         vdisk.save()
-                        VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
+                        VDiskController._logger.info('Renamed device name from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
                         VDiskController._logger.info('Running "after_volume_rename" hooks for vDisk {0}'.format(vdisk.guid))
                         for _function in _hooked_functions:
                             try:
@@ -362,7 +365,7 @@ class VDiskController(object):
         :type snapshot_id: str
         :param storagerouter_guid: Guid of the StorageRouter
         :type storagerouter_guid: str
-        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :param pagecache_ratio: Ratio of the page cache size (compared to a 100% cache)
         :type pagecache_ratio: float
         :param cache_quota: Max disk space the new clone can consume for caching (both fragment as block) purposes (in Bytes)
         :type cache_quota: dict
@@ -456,6 +459,22 @@ class VDiskController(object):
                 'backingdevice': devicename}
 
     @staticmethod
+    def list_snapshot_ids(vdisk):
+        """
+        Retrieve the snapshot IDs for a given vDisk
+        :param vdisk: vDisk to retrieve the snapshot IDs for
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
+        :return: The snapshot IDs for the given vDisk
+        :rtype: list
+        """
+        volume_id = str(vdisk.volume_id)
+        try:
+            return vdisk.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=10)
+        except VolumeRestartInProgressException:
+            time.sleep(0.5)
+            return vdisk.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=10)
+
+    @staticmethod
     @ovs_task(name='ovs.vdisk.create_snapshot')
     def create_snapshot(vdisk_guid, metadata):
         """
@@ -495,13 +514,14 @@ class VDiskController(object):
         for guid in vdisk_guids:
             try:
                 vdisk = VDisk(guid)
-                VDiskController._logger.info('Create {0} snapshot for vDisk {1}'.format('consistent' if consistent is True else 'inconsistent', vdisk.name))
-                snapshot_id = str(uuid.uuid4())
-                vdisk.invalidate_dynamics(['snapshot_ids'])
-                if len(vdisk.snapshot_ids) > 0:
-                    if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=vdisk.snapshot_ids[-1]) is False:  # Most recent last in list
+                snapshot_ids = VDiskController.list_snapshot_ids(vdisk=vdisk)
+                if len(snapshot_ids) > 0:
+                    if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=snapshot_ids[-1]) is False:  # Most recent last in list
                         results[guid] = [False, 'Previously created snapshot did not make it to the backend yet']
                         continue
+
+                VDiskController._logger.info('Create {0} snapshot for vDisk {1}'.format('consistent' if consistent is True else 'inconsistent', vdisk.name))
+                snapshot_id = str(uuid.uuid4())
                 vdisk.storagedriver_client.create_snapshot(volume_id=str(vdisk.volume_id),
                                                            snapshot_id=str(snapshot_id),
                                                            metadata=metadata,
@@ -558,10 +578,9 @@ class VDiskController(object):
                     results[vdisk_guid] = [False, ex.message]
                 continue
 
-            for snapshot_id in snapshot_ids:
+            for snapshot_id in set(snapshot_ids):
                 try:
-                    vdisk.invalidate_dynamics(['snapshot_ids'])
-                    if snapshot_id not in vdisk.snapshot_ids:
+                    if snapshot_id not in VDiskController.list_snapshot_ids(vdisk=vdisk):
                         raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
 
                     nr_clones = len(VDiskList.get_by_parentsnapshot(snapshot_id))
@@ -619,7 +638,7 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
         :type target_storagerouter_guid: str
-        :param force: Indicates whether to force the migration or not (forcing can lead to dataloss)
+        :param force: Indicates whether to force the migration or not (forcing can lead to data loss)
         :type force: bool
         :return: None
         """
@@ -644,7 +663,7 @@ class VDiskController(object):
             raise Exception('Moving vDisk {0} failed'.format(vdisk.name))
 
         try:
-            MDSServiceController.ensure_safety(vdisk=vdisk)
+            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
             VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
         except:
             VDiskController._logger.exception('Executing post-migrate actions failed for vDisk {0}'.format(vdisk.name))
@@ -682,7 +701,7 @@ class VDiskController(object):
         :type name: str
         :param storagerouter_guid: Guid of the Storage Router on which the vDisk should be started
         :type storagerouter_guid: str
-        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :param pagecache_ratio: Ratio of the page cache size (compared to a 100% cache)
         :type pagecache_ratio: float
         :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
         :type cache_quota: dict
@@ -764,7 +783,7 @@ class VDiskController(object):
         :type volume_size: int
         :param storagedriver_guid: Guid of the Storagedriver
         :type storagedriver_guid: str
-        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :param pagecache_ratio: Ratio of the page cache size (compared to a 100% cache)
         :type pagecache_ratio: float
         :param cache_quota: Max disk space the new volume can consume for caching purposes (in Bytes)
         :type cache_quota: dict
@@ -838,8 +857,7 @@ class VDiskController(object):
         vdisk = VDisk(vdisk_guid)
         vpool = vdisk.vpool
 
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vdisk.storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vpool.guid, vdisk.storagedriver_id)
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
@@ -1427,7 +1445,7 @@ class VDiskController(object):
                                 devicename = fsmetadata_client.lookup(volume_id)
                                 name = VDiskController.extract_volumename(devicename)
                             except FeatureNotAvailableException:
-                                VDiskController._logger.exception('Could not load devicename from StorageDriver')
+                                VDiskController._logger.exception('Could not load device name from StorageDriver')
                                 devicename = '/{0}.raw'.format(volume_id)
                                 name = volume_id
                             new_vdisk.name = name
@@ -1501,8 +1519,7 @@ class VDiskController(object):
             return
 
         ratio = vdisk.pagecache_ratio
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vdisk.vpool_guid, storagedriver_id)
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
         # noinspection PyTypeChecker
@@ -1520,7 +1537,7 @@ class VDiskController(object):
         Clean a name into a usable filename
         :param name: Name of the device
         :type name: str
-        :return: A cleaned devicename
+        :return: A cleaned device name
         :rtype: str
         """
         name = name.strip('/').replace(' ', '_')
@@ -1535,10 +1552,10 @@ class VDiskController(object):
     @staticmethod
     def extract_volumename(devicename):
         """
-        Extracts a reasonable volume name out of a given devicename
-        :param devicename: A raw devicename of a volume (e.g. /foo/bar.raw)
+        Extracts a reasonable volume name out of a given device name
+        :param devicename: A raw device name of a volume (e.g. /foo/bar.raw)
         :type devicename: str
-        :return: A cleaned up volumename (e.g. bar)
+        :return: A cleaned up volume name (e.g. bar)
         """
         return devicename.rsplit('/', 1)[-1].rsplit('.', 1)[0]
 

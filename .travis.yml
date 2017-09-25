@@ -1,27 +1,33 @@
-language: python
 sudo: required
 dist: trusty
+
+language: python
+python:
+  - "2.7"
+
+env:
+  - distribution: ubuntu:16.04
+#  - distribution: ubuntu:14.04
+
 notifications:
   email: false
   slack:
     rooms:
       secure: Ze8lCMV8b38bfesOMfmAYchAde0c23BMkz4PVc1g1p4sdGBSvrfGx15l8Mp4hfoOme51+wctGa38z42HiESCe0hjM2mEkh2OljxNs39Ug/ZpCBveEi63tt/tIfqBjm16Fvi73Y9LvjTOSKB7isaPaUMgh4QDEZJ0SgN7aIhP/9DOnKVPwX0AcYDO4Bk4Gu9wM9jMoe8wAE1lalZa7iTtTG5L+EtTbok3NhiRKxKRuNOSAtP/8aHsp46lZL64Fix3i6RKXE+DjU5hzXchMwF3Qp0hr63S9G+KnK6H3JRQEsUUdjYQ7nKDMZRI9VQUlncGCjTgz1xLcknhMZ/eAagm82youMkzPgE/HDpfirwWF+G0Vu8DIbKiAuXcfVElhw+d4aoE8HWQkTFxaP057br28NPI2QgPTMDldq3ZakoEgI3PvGyZx4mxYRUWqKKzgl8PQu9cMEfp2x3y+tvEqCxByDvfjZOYn627O1MvxsrLpKEP+6TNRY15q+bKbMXuAJmqD+Ez0KVMbxKVlHot+FXGbEjLQsZqfrD4nQqdweaeMa5Na3NUHXhzOQFk5TrD1PSmjaG7t47qn3T5aDkgBwsbgY8WR2eFkQhGSAHYE96QoSpxibe4eYYf+zXX0gcgHUMWh7T5tW5kvaq/vAcFT99hgsL07UWQ5DGOZCOpIctE2Ik=
+
+services:
+  - docker
+
 before_install:
-- env | sort
-- sudo echo "deb http://apt.openvstorage.org `python scripts/travis/repo.py` main" | sudo tee -a /etc/apt/sources.list
-- sudo rm -rf /var/lib/apt/lists/*
-- sudo apt-get -qq update
-- sudo apt-get install -y --force-yes openvstorage openvstorage-extensions
-before_script:
-- sudo rm -rf /opt/OpenvStorage
-- sudo chmod 777 /opt
-- sudo chmod -R 777 /var/log/ovs
-- sudo chmod 777 /run
-- mv ../framework /opt/OpenvStorage
-- sudo cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/
-- sudo chmod 777 /usr/bin/ovs
-- export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/dist-packages
-- cd /opt/OpenvStorage/webapps/api; export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput
-- echo '{"configuration_store":"arakoon"}' > /opt/OpenvStorage/config/framework.json
+  - env | sort
+  - docker --version
+  - repo=`python scripts/travis/repository_resolver.py`
+install:
+  - docker pull ${distribution}
+  - docker build --cache-from ${distribution} --tag fwk --build-arg repo=${repo} --file scripts/travis/docker/${distribution}/Dockerfile .
+  - docker run -dit --name fwk fwk  # Run it detached, with stdin open and TTY to keep it running
+  - docker ps -a
 script:
-- ovs unittest
+  - docker exec -it fwk bash -c "ovs unittest"
+after_failure:
+  - docker logs fwk

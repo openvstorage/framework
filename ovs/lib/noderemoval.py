@@ -22,6 +22,7 @@ import os
 import re
 import sys
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, TimeOutException, UnableToConnectException
@@ -29,16 +30,13 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.nodetype import NodeTypeController
-from ovs.log.log_handler import LogHandler
 
 
 class NodeRemovalController(object):
     """
     This class contains all logic for removing a node from the cluster
     """
-    LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
-    _logger = LogHandler.get('lib', name='node-removal')
-    _logger.logger.propagate = False
+    _logger = Logger('lib')
 
     @staticmethod
     def remove_node(node_ip, silent=None):
@@ -50,7 +48,6 @@ class NodeRemovalController(object):
         :type silent: str
         :return: None
         """
-        LogHandler.get('extensions', name='ovs_extensions')  # Initiate extensions logger
         from ovs.lib.storagedriver import StorageDriverController
         from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -259,7 +256,7 @@ class NodeRemovalController(object):
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 client.file_delete(filenames=[Configuration.CACC_LOCATION])
-                client.file_delete(filenames=[Configuration.BOOTSTRAP_CONFIG_LOCATION])
+                client.file_delete(filenames=[Configuration.CONFIG_STORE_LOCATION])
             storage_router_to_remove.delete()
             Toolbox.log(logger=NodeRemovalController._logger, messages='Successfully removed node\n')
         except Exception as exception:
@@ -289,7 +286,7 @@ class NodeRemovalController(object):
         :param node_type: Type of node, can be 'master' or 'extra'
         :type node_type: str
         :param logger: Logger object used for logging
-        :type logger: ovs.log.log_handler.LogHandler
+        :type logger: ovs.extensions.generic.logger.Logger
         :return: None
         """
         Toolbox.log(logger=logger, messages='Removing services')

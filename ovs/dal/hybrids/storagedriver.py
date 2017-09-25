@@ -24,8 +24,8 @@ from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.log.log_handler import LogHandler
 
 
 class StorageDriver(DataObject):
@@ -35,8 +35,7 @@ class StorageDriver(DataObject):
     """
     DISTANCES = DataObject.enumerator('Distance', {'NEAR': 0, 'FAR': 10000, 'INFINITE': 20000})
 
-    _logger = LogHandler.get('dal', name='hybrid')
-
+    _logger = Logger('hybrids')
     __properties = [Property('name', str, doc='Name of the Storage Driver.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Driver.'),
                     Property('ports', dict, doc='Ports on which the Storage Driver is listening (management, xmlrpc, dtl, edge).'),

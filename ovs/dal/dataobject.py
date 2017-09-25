@@ -30,11 +30,12 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 from ovs.dal.helpers import Descriptor, DalToolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
-from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
+from ovs.extensions.generic.logger import Logger
+from ovs_extensions.generic.volatilemutex import NoLockAvailableException
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.log_handler import LogHandler
 
 
 class MetaClass(type):
@@ -48,15 +49,16 @@ class MetaClass(type):
         Overrides instance creation of all DataObject instances
         """
         if name != 'DataObject':
+            # Property instantiation
             for internal in ['_properties', '_relations', '_dynamics']:
                 data = set()
-                for base in bases:
-                    if hasattr(base, internal):
+                for base in bases:  # Extend properties for deeper inheritance
+                    if hasattr(base, internal):  # if the base already ran the metaclass: append to current class
                         data.update(getattr(base, internal))
-                if '_{0}_{1}'.format(name, internal) in dct:
+                if '_{0}_{1}'.format(name, internal) in dct:  # instance._Testobject__properties. __properties cannot get overruled by inheritance
                     data.update(dct.pop('_{0}_{1}'.format(name, internal)))
                 dct[internal] = list(data)
-
+            # Doc generation - properties
             for prop in dct['_properties']:
                 docstring = prop.docstring
                 if isinstance(prop.property_type, type):
@@ -68,6 +70,7 @@ class MetaClass(type):
                 dct[prop.name] = property(
                     doc='[persistent] {0} {1}\n@type: {2}'.format(docstring, extra_info, itemtype)
                 )
+            # Doc generation - relations
             for relation in dct['_relations']:
                 itemtype = relation.foreign_type.__name__ if relation.foreign_type is not None else name
                 dct[relation.name] = property(
@@ -78,6 +81,7 @@ class MetaClass(type):
                         itemtype
                     )
                 )
+            # Doc generation - dynamics
             for dynamic in dct['_dynamics']:
                 if bases[0].__name__ == 'DataObject':
                     if '_{0}'.format(dynamic.name) not in dct:
@@ -87,7 +91,7 @@ class MetaClass(type):
                     methods = [getattr(base, '_{0}'.format(dynamic.name)) for base in bases if hasattr(base, '_{0}'.format(dynamic.name))]
                     if len(methods) == 0:
                         raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(dynamic.name, name))
-                    method = [0]
+                    method = methods[0]
                 docstring = method.__doc__.strip()
                 if isinstance(dynamic.return_type, type):
                     itemtype = dynamic.return_type.__name__
@@ -143,9 +147,9 @@ class DataObject(object):
     _properties = []  # Blueprint data of the object type
     _dynamics = []    # Timeout of readonly object properties cache
     _relations = []   # Blueprint for relations
-    _logger = LogHandler.get('dal', name='dataobject')
+    _logger = Logger('dal')
 
-    NAMESPACE = 'ovs_data'
+    NAMESPACE = 'ovs_data'  # Arakoon namespace
 
     ###############
     # Constructor #
@@ -153,22 +157,21 @@ class DataObject(object):
 
     def __new__(cls, *args, **kwargs):
         """
-        Initializes the class
+        Control the initialization of the class
         """
         hybrid_structure = HybridRunner.get_hybrids()
         identifier = Descriptor(cls).descriptor['identifier']
         if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
-            new_class = Descriptor().load(hybrid_structure[identifier]).get_object()
+            new_class = Descriptor().load(hybrid_structure[identifier]).get_object()  # Load the possible extended hybrid
             # noinspection PyArgumentList
             return super(cls, new_class).__new__(new_class, *args)
         return super(DataObject, cls).__new__(cls)
 
     def __init__(self, guid=None, data=None, datastore_wins=False, volatile=False, _hook=None):
         """
-        Loads an object with a given guid. If no guid is given, a new object
-        is generated with a new guid.
+        Loads an object with a given guid. If no guid is given, a new object is generated with a new guid.
         * guid: The guid indicating which object should be loaded
-        * datastoreWins: Optional boolean indicating save conflict resolve management.
+        * datastore_wins: Optional boolean indicating save conflict resolve management.
         ** True: when saving, external modified fields will not be saved
         ** False: when saving, all changed data will be saved, regardless of external updates
         ** None: in case changed field were also changed externally, an error will be raised
@@ -178,7 +181,7 @@ class DataObject(object):
         super(DataObject, self).__init__()
 
         # Initialize internal fields
-        self._frozen = False
+        self._frozen = False  # Prevent property setting on the object
         self._datastore_wins = datastore_wins
         self._guid = None    # Guid identifier of the object
         self._original = {}  # Original data copy
@@ -197,11 +200,11 @@ class DataObject(object):
         # Rebuild _relation types
         hybrid_structure = HybridRunner.get_hybrids()
         for relation in self._relations:
-            if relation.foreign_type is not None:
+            if relation.foreign_type is not None:  # If none -> points to itself
                 identifier = Descriptor(relation.foreign_type).descriptor['identifier']
                 if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
+                    # Point to relations of the original object when object got extended
                     relation.foreign_type = Descriptor().load(hybrid_structure[identifier]).get_object()
-
         # Init guid
         self._new = False
         if guid is None:
@@ -220,9 +223,7 @@ class DataObject(object):
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._metadata['cache'] = None
-        if self._new:
-            self._data = {}
-        else:
+        if not self._new:
             if data is not None:
                 self._data = copy.deepcopy(data)
                 self._metadata['cache'] = None
@@ -260,7 +261,7 @@ class DataObject(object):
             self._add_dynamic_property(dynamic)
 
         # Load foreign keys
-        relations = RelationMapper.load_foreign_relations(self.__class__)
+        relations = RelationMapper.load_foreign_relations(self.__class__)  # To many side of things
         if relations is not None:
             for key, info in relations.iteritems():
                 self._objects[key] = {'info': info,
@@ -270,7 +271,7 @@ class DataObject(object):
         if _hook is not None and 'before_cache' in _hook:
             _hook['before_cache']()
 
-        if not self._new:
+        if not self._new:  # A new object is useless as it has no practical properties
             # Re-cache the object, if required
             if self._metadata['cache'] is False:
                 # The data wasn't loaded from the cache, so caching is required now
@@ -383,7 +384,7 @@ class DataObject(object):
         """
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
-        remote_key = info['key']
+        remote_key = info['key']  # Foreign = remote
         datalist = DataList.get_relation_set(remote_class, remote_key, self.__class__, attribute, self.guid)
         if self._objects[attribute]['data'] is None:
             self._objects[attribute]['data'] = datalist
@@ -578,9 +579,9 @@ class DataObject(object):
                             # In case we didn't set a policy, we raise the conflicts
                             data_conflicts.append(attribute)
                         elif self._datastore_wins is False:
-                            # If the datastore should not win, we just overwrite the data
+                            # If the data-store should not win, we just overwrite the data
                             data[attribute] = self._data[attribute]
-                        # If the datastore should win, we discard/ignore our change
+                        # If the data-store should win, we discard/ignore our change
                     else:
                         # Normal scenario, saving data
                         data[attribute] = self._data[attribute]
@@ -965,7 +966,7 @@ class DataObject(object):
 
     def updated_on_datastore(self):
         """
-        Checks whether this object has been modified on the datastore
+        Checks whether this object has been modified on the data-store
         """
         if self.volatile is True:
             return False
@@ -1034,6 +1035,7 @@ class DataObject(object):
                         raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
                             caller_name, str(allowed_types), given_type
                         ))
+                    # Set the result of the function into a dict to avoid None retrieved from the cache when key is not found
                     cached_data = {'data': dynamic_data}
                     if dynamic.timeout > 0:
                         self._volatile.set(cache_key, cached_data, dynamic.timeout)
@@ -1051,6 +1053,7 @@ class DataObject(object):
         """
         The string representation of a DataObject is the serialized value
         """
+        # cls= acts as a fallback
         return json.dumps(self.serialize(), indent=4, cls=DataObjectAttributeEncoder)
 
     def __hash__(self):
@@ -1072,6 +1075,14 @@ class DataObject(object):
         return not self.__eq__(other)
 
     def _benchmark(self, iterations=100, dynamics=None):
+        """
+        Benchmark the dynamics
+        CAUTION: when a dynamic calls another dynamic in its implementations, the timings might be off
+        as the implementing dynamic might be cached
+        :param iterations:  amount of iterations
+        :param dynamics: dynamics to benchmark
+        :return:
+        """
         import time
         begin = time.time()
         stats = {}

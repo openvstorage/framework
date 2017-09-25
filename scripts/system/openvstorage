@@ -1,0 +1,26 @@
+get_ovs_config_keys()
+{
+    echo $(ovs config list-recursive)
+}
+
+_generate_config_options()
+{
+    local cur prev                                                # Local variable declaration
+    COMPREPLY=()                                                  # Initiate empty reply array
+    cur="${COMP_WORDS[COMP_CWORD]}"                               # Current word is last entry on cmdline,
+                                                                  #     eg: "ovs config get ovs/alba" --> cur = "ovs/alba"
+                                                                  #     eg: "ovs config get ovs/ " --> cur = "" because of space at end
+
+    if [ -z "$_all_ovs_keys" ]; then                              # Initiate '_all_ovs_keys' if non-existing
+        _all_ovs_keys=$(get_ovs_config_keys)
+    fi
+
+    if [[ ${cur} == * ]] ;                                        # Check if 'cur' matches a wildcard, which is always True
+    then
+        COMPREPLY=( $(compgen -W "${_all_ovs_keys}" -- ${cur}) )  # Generate possible answers provided by -W and what is in 'cur' variable
+        return 0
+    fi
+}
+complete -F _generate_config_options ovs config get
+complete -F _generate_config_options ovs config edit
+complete -F _generate_config_options ovs config list

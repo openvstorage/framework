@@ -30,6 +30,18 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
             </li>
+            <!-- ko if: $root.storageRouters().length > 0 -->
+            <li class="actions" data-bind="with: $root.storageRouters()[0]">
+                <span data-i18n="ovs:generic.actions"></span>:
+                <button type="button" class="btn btn-mini btn-default hand" id="buttonGenerate"
+                        data-bind="click: $root.generateHPRMConfigFiles,
+                                   tooltip: 'ovs:vpools.detail.generate_configs',
+                                   visible: $root.updatingStorageRouters() === false">
+                    <span class="hand fa" data-bind="visible: $root.generatingConfigs() === false" data-i18n="[html]ovs:icons.download"></span>
+                    <span class="hand fa fa-spin" data-bind="visible: $root.generatingConfigs() === true" data-i18n="[html]ovs:icons.loading"></span>
+                </button>
+            </li>
+            <!-- /ko -->
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="information" style="padding: 15px;">
@@ -121,6 +133,25 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td data-i18n="ovs:vpools.backend_connection"></td>
                             <td data-bind="text: backendConnection() ? backendConnection() : '-'"></td>
                             <td>
+                                <span data-i18n="ovs:vpools.mds_safety"></span>
+                                <a data-bind="tooltip: 'ovs:vpools.detail.mds_safety'"
+                                           class="hand fa noline"
+                                           data-i18n="[html]ovs:icons.help"
+                                           style="margin-left: 5px; color: blue;">
+                                </a>
+                            </td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="text: item().mds_config.mds_safety"></span>
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>  <!-- row 5 -->
+                            <td data-i18n="ovs:generic.write_speed"></td>
+                            <td data-bind="text: writeSpeed"></td>
+                            <td data-i18n="ovs:generic.read_speed"></td>
+                            <td data-bind="text: backendReadSpeed"></td>
+                            <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
                                         <span data-bind="translate: 'ovs:vpools.' + (item().dtl_enabled === true ? 'dtl_mode' : 'dtl')"></span>
@@ -138,11 +169,11 @@ but WITHOUT ANY WARRANTY of any kind.
                                 </span>
                             </td>
                         </tr>
-                        <tr>  <!-- row 5 -->
+                        <tr>  <!-- row 6 -->
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td data-bind="text: vDisks().length"></td>
                             <td data-i18n="ovs:generic.write_speed"></td>
-                            <td data-bind="text: writeSpeed"></td>
-                            <td data-i18n="ovs:generic.read_speed"></td>
-                            <td data-bind="text: backendReadSpeed"></td>
+                            <td data-bind="text: backendWriteSpeed"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
@@ -157,13 +188,6 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      translate: 'ovs:storagedrivers.general.dtl_transport_modes.' + item().dtl_transport"></span>
                                 </span>
                             </td>
-                        </tr>
-                        <tr>  <!-- row 6 -->
-                            <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td data-bind="text: vDisks().length"></td>
-                            <td data-i18n="ovs:generic.write_speed"></td>
-                            <td data-bind="text: backendWriteSpeed"></td>
-                            <td colspan="2" >&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>
@@ -336,14 +360,6 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                            attr: { id: 'button_refresh_' + guid()},
                                                                            visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
                                                             <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>
-                                                        </button>
-                                                        <button type="button" class="btn btn-mini btn-default hand" id="buttonGenerate"
-                                                                data-bind="click: $root.generateHPRMConfigFiles,
-                                                                           tooltip: 'ovs:vpools.detail.generate_configs',
-                                                                           attr: { id: 'button_create_configs_' + guid()},
-                                                                           visible: $root.updatingStorageRouters() === false">
-                                                            <span class="hand fa" data-bind="visible: $root.generatingConfigs() === false" data-i18n="[html]ovs:icons.download"></span>
-                                                            <span class="hand fa fa-spin" data-bind="visible: $root.generatingConfigs() === true" data-i18n="[html]ovs:icons.loading"></span>
                                                         </button>
                                                         <button type="button"
                                                                 class="btn btn-mini btn-default hand"

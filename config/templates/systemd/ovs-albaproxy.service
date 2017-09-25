@@ -8,6 +8,8 @@ Type=simple
 User=root
 Group=root
 Environment=LD_LIBRARY_PATH=/usr/lib/alba
+# Garbage collection for ALBA
+Environment=OCAMLRUNPARAM='b,a=1,s=4096k,O=50'
 ExecStartPre=/bin/bash -c "if [ ! -d /opt/OpenvStorage/run ]; then mkdir /opt/OpenvStorage/run; chown ovs:ovs /opt/OpenvStorage/run; fi; echo alba=`alba version --terse` > /opt/OpenvStorage/run/<SERVICE_NAME>.version"
 ExecStart=/usr/bin/alba proxy-start --config <CONFIG_PATH> --log-sink <LOG_SINK>
 ExecReload=/bin/bash -c "kill -s SIGUSR1 $MAINPID"

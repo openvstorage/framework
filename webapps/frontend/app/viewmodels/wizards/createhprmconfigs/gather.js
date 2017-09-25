@@ -54,7 +54,6 @@ define([
                     self.loadProxyConfigHandle = api.get('storagerouters/' + self.data.storageRouter().guid() + '/get_proxy_config', {queryparams: {vpool_guid: self.data.vPool().guid()}})
                         .then(self.shared.tasks.wait)
                         .done(function(data) {
-                            self.data.hprmPort(data.port);
                             self.data.useFC(data.fragment_cache[0] === 'alba');
                             if (data.fragment_cache[0] !== 'none') {
                                 self.data.fragmentCacheOnRead(data.fragment_cache[1].cache_on_read);

@@ -30,11 +30,11 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.tests.helpers import DalHelper
+from ovs_extensions.log.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, DTLMode
 from ovs.lib.vdisk import VDiskController
-from ovs.log.log_handler import LogHandler
 
 
 class DTLCheckup(unittest.TestCase):
@@ -533,13 +533,13 @@ class DTLCheckup(unittest.TestCase):
                                                         {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
         # Delete the vDiskDomain on which the DTL resides, 1 other vDiskDomain remains, no changes should be made, but OVS_WARNING should be logged
         vdomain1.delete()
-        LogHandler._logs = {}
+        Logger._logs = {}
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
         warning_logs = []
-        for log in LogHandler._logs['lib_vdisk']:
+        for log in Logger._logs['lib']:
             if 'OVS_WARNING' in log and 'manual DTL configuration is no longer' in log and vdisk.guid in log:
                 warning_logs.append(log)
         self.assertEqual(first=1, second=len(warning_logs))

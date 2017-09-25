@@ -29,16 +29,17 @@ from django.core.handlers.wsgi import WSGIRequest
 from functools import wraps
 from rest_framework import status
 from rest_framework.request import Request
-from api.backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
 from api.backend.toolbox import ApiToolbox
 from api.helpers import OVSResponse
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException,\
+    HttpTooManyRequestsException, HttpUnauthorizedException, HttpUpgradeNeededException
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.log_handler import LogHandler
 
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from api.backend.serializers.mockups import FullSerializer
@@ -73,15 +74,15 @@ def required_roles(roles):
             start = time.time()
             request = _find_request(args)
             if not hasattr(request, 'user') or not hasattr(request, 'client'):
-                raise HttpUnauthorizedException(error_description='Not authenticated',
-                                                error='not_authenticated')
+                raise HttpUnauthorizedException(error='not_authenticated',
+                                                error_description='Not authenticated')
             user = UserList.get_user_by_username(request.user.username)
             if user is None:
-                raise HttpUnauthorizedException(error_description='Not authenticated',
-                                                error='not_authenticated')
+                raise HttpUnauthorizedException(error='not_authenticated',
+                                                error_description='Not authenticated')
             if not ApiToolbox.is_token_in_roles(request.token, roles):
-                raise HttpForbiddenException(error_description='This call requires roles: {0}'.format(', '.join(roles)),
-                                             error='invalid_roles')
+                raise HttpForbiddenException(error='invalid_roles',
+                                             error_description='This call requires roles: {0}'.format(', '.join(roles)))
             duration = time.time() - start
             result = f(*args, **kw)
             if isinstance(result, OVSResponse):
@@ -96,6 +97,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
     """
     Parameter discovery decorator
     """
+    logger = Logger('api')
     regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
     def wrap(f):
@@ -152,7 +154,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             else:
                 validation_mandatory_vars = []
                 validation_optional_vars = []
-            # Check versioning
+            # Check version
             version_match = regex.match(request.META['HTTP_ACCEPT'])
             if version_match is not None:
                 version = version_match.groupdict()['version']
@@ -164,16 +166,17 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 version = versions[1]
             version = int(version)
             if version < versions[0] or version > versions[1]:
-                raise HttpNotAcceptableException(error_description='API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version),
-                                                 error='invalid_version')
+                logger.warning('API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version))
+                raise HttpUpgradeNeededException(error='invalid_version',
+                                                 error_description='API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version))
             # Load some information
             instance = None
             if 'pk' in kwargs and object_type is not None:
                 try:
                     instance = object_type(kwargs['pk'])
                 except ObjectNotFoundException:
-                    raise HttpNotFoundException(error_description='The requested object could not be found',
-                                                error='object_not_found')
+                    raise HttpNotFoundException(error='object_not_found',
+                                                error_description='The requested object could not be found')
             # Build new kwargs
             for _mandatory_vars, _optional_vars, _new_kwargs in [(f.ovs_metadata['load']['mandatory'][:], f.ovs_metadata['load']['optional'][:], new_kwargs),
                                                                  (validation_mandatory_vars, validation_optional_vars, validation_new_kwargs)]:
@@ -204,8 +207,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                     else:
                         if name not in post_data:
                             if name not in get_data:
-                                raise HttpNotAcceptableException(error_description='Invalid data passed: {0} is missing'.format(name),
-                                                                 error='invalid_data')
+                                raise HttpNotAcceptableException(error='invalid_data',
+                                                                 error_description='Invalid data passed: {0} is missing'.format(name))
                             _new_kwargs[name] = _try_parse(get_data[name])
                         else:
                             _new_kwargs[name] = _try_parse(post_data[name])
@@ -495,7 +498,7 @@ def limit(amount, per, timeout):
     """
     Rate-limits the decorated call
     """
-    logger = LogHandler.get('api')
+    logger = Logger('api')
 
     def wrap(f):
         """
@@ -546,7 +549,7 @@ def log(log_slow=True):
     Task logger
     :param log_slow: Indicates whether a slow call should be logged
     """
-    logger = LogHandler.get('api')
+    logger = Logger('api')
 
     def wrap(f):
         """
@@ -573,8 +576,7 @@ def log(log_slow=True):
                 for key in metadata[mtype]:
                     if 'password' in key:
                         metadata[mtype][key] = '**********************'
-            _logger = LogHandler.get('log', name='api')
-            _logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
+            logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
                 f.__module__,
                 f.__name__,
                 getattr(request, 'client').user_guid if hasattr(request, 'client') else None,

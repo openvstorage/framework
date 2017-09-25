@@ -17,8 +17,8 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter',
-    '../wizards/update/index'
+    '../../containers/storagerouter',
+    '../../wizards/update/index'
 ], function($, dialog, ko, shared, generic, Refresher, api, StorageRouter, UpdateWizard) {
     "use strict";
     return function() {

@@ -213,13 +213,11 @@ define([
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
                                 getData.contents = 'name,usages,presets';
-                                if (item.scaling === 'LOCAL') {
-                                    getData.contents += ',asd_statistics';
-                                }
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.guid + '/', {queryparams: getData})
                                         .then(function (data) {
-                                            if ((data.asd_statistics !== undefined && Object.keys(data.asd_statistics).length > 0) || data.scaling === 'GLOBAL') {
+                                            var backendSize = data.usages.size;
+                                                if ((backendSize !== undefined && backendSize > 0)) {
                                                 available_backends.push(data);
                                                 self.albaPresetMap()[data.guid] = {};
                                                 $.each(data.presets, function (_, preset) {
@@ -419,6 +417,7 @@ define([
                 var currentConfig = self.data.vPool().configuration();
                 self.data.name(self.data.vPool().name());
                 self.data.scoSize(currentConfig.sco_size);
+                self.data.mdsSafety(currentConfig.mds_config.mds_safety);
                 self.data.dtlEnabled(currentConfig.dtl_enabled);
                 self.data.clusterSize(currentConfig.cluster_size);
                 self.data.dtlMode({name: currentConfig.dtl_mode});

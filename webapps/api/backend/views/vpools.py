@@ -23,14 +23,15 @@ from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, load, return_list, return_object, return_task, return_simple, log
-from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.generic import GenericController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.vpool import VPoolController
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -92,8 +93,8 @@ class VPoolViewSet(viewsets.ViewSet):
         sr = StorageRouter(storagerouter_guid)
         intersection = set(vpool.storagedrivers_guids).intersection(set(sr.storagedrivers_guids))
         if not intersection:
-            raise HttpNotAcceptableException(error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name),
-                                             error='impossible_request')
+            raise HttpNotAcceptableException(error='impossible_request',
+                                             error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name))
         return StorageRouterController.remove_storagedriver.delay(list(intersection)[0])
 
     @link()
@@ -121,8 +122,8 @@ class VPoolViewSet(viewsets.ViewSet):
         if names is not None and not isinstance(names, list):
             error_message = 'The names parameter must be a list of strings'
         if error_message is not None:
-            raise HttpNotAcceptableException(error_description=error_message,
-                                             error='impossible_request')
+            raise HttpNotAcceptableException(error='impossible_request',
+                                             error_description=error_message)
 
         if name is not None:
             devicename = VDiskController.clean_devicename(name)
@@ -210,6 +211,28 @@ class VPoolViewSet(viewsets.ViewSet):
         if vdisk_guids is None:
             vdisk_guids = []
         if set(vdisk_guids).difference(set(vpool.vdisks_guids)):
-            raise HttpNotAcceptableException(error_description='Some of the vDisks specified do not belong to this vPool',
-                                             error='invalid_data')
+            raise HttpNotAcceptableException(error='invalid_data',
+                                             error_description='Some of the vDisks specified do not belong to this vPool')
         return GenericController.execute_scrub.delay(vdisk_guids=vdisk_guids or vpool.vdisks_guids)
+
+    @action()
+    @log()
+    @required_roles(['read', 'manage'])
+    @return_task()
+    @load(VPool)
+    def create_hprm_config_files(self, local_storagerouter, vpool, parameters):
+        """
+        Create the required configuration files to be able to make use of HPRM (aka PRACC)
+        These configuration will be zipped and made available for download
+        :param local_storagerouter: StorageRouter this call is executed on
+        :type local_storagerouter: StorageRouter
+        :param vpool: The vpool for which a HPRM manager needs to be deployed
+        :type vpool: ovs.dal.hybrids.vpool.VPool
+        :param parameters: Additional information required for the HPRM configuration files
+        :type parameters: dict
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
+        """
+        return VPoolController.create_hprm_config_files.delay(parameters=parameters,
+                                                              vpool_guid=vpool.guid,
+                                                              local_storagerouter_guid=local_storagerouter.guid)

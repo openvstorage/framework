@@ -40,6 +40,7 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs_extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
@@ -51,7 +52,6 @@ from ovs.extensions.storageserver.tests.mockups import LocalStorageRouterClient,
 from ovs.lib.helpers.decorators import Decorators
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.storagedriver import StorageDriverController
-from ovs.log.log_handler import LogHandler
 
 
 class DalHelper(object):
@@ -105,7 +105,7 @@ class DalHelper(object):
         # noinspection PyProtectedMember
         StorageRouterClient._clean()
 
-        LogHandler._logs = {}
+        Logger._logs = {}
         DataList._test_hooks = {}
         Toolbox._function_pointers = {}
         Configuration._unittest_data = {}
@@ -170,6 +170,9 @@ class DalHelper(object):
             else:
                 vpool = vpools[vpool_id]
             srclients[vpool_id] = StorageRouterClient(vpool.guid, None)
+            Configuration.set('/ovs/vpools/{0}/mds_config|mds_tlogs'.format(vpool.guid), 100)
+            Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 2)
+            Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 75)
             Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         for sr_id in structure.get('storagerouters', []):
             if sr_id not in storagerouters:

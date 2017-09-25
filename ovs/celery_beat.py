@@ -26,32 +26,32 @@ import inspect
 from celery import current_app
 from celery.beat import Scheduler
 from celery.schedules import crontab, timedelta
+from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonSockNotReadable
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.toolbox import Schedule
-from ovs.log.log_handler import LogHandler
 
 
 class DistributedScheduler(Scheduler):
-
     """
     Distributed scheduler that can run on multiple nodes at the same time.
     """
-
     TIMEOUT = 60 * 30
 
     def __init__(self, *args, **kwargs):
         """
         Initializes the distributed scheduler
         """
-        self._logger = LogHandler.get('celery', name='celery beat')
-        self._persistent = PersistentFactory.get_client()
-        self._namespace = 'ovs_celery_beat'
         self._mutex = volatile_mutex('celery_beat', 10)
-        self._schedule_info = {}
+        self._logger = Logger('celery')
         self._has_lock = False
+        self._lock_name = 'ovs_celery_beat_lock'
+        self._entry_name = 'ovs_celery_beat_entries'
+        self._persistent = PersistentFactory.get_client()
+        self._schedule_info = {}
         super(DistributedScheduler, self).__init__(*args, **kwargs)
         self._logger.debug('DS init')
 
@@ -104,7 +104,7 @@ class DistributedScheduler(Scheduler):
             self._logger.debug('DS loading schedule entries')
             self._mutex.acquire(wait=10)
             try:
-                self.schedule = cPickle.loads(str(self._persistent.get('{0}_entries'.format(self._namespace))))
+                self.schedule = cPickle.loads(str(self._persistent.get(self._entry_name)))
             except:
                 # In case an exception occurs during loading the schedule, it is ignored and the default schedule
                 # will be used/restored.
@@ -117,8 +117,10 @@ class DistributedScheduler(Scheduler):
             try:
                 self._logger.debug('DS syncing schedule entries')
                 self._mutex.acquire(wait=10)
-                self._persistent.set('{0}_entries'.format(
-                    self._namespace), cPickle.dumps(self.schedule))
+                self._persistent.set(key=self._entry_name,
+                                     value=cPickle.dumps(self.schedule))
+            except ArakoonSockNotReadable:
+                self._logger.exception('Syncing the schedule failed this iteration')
             finally:
                 self._mutex.release()
         else:
@@ -137,7 +139,7 @@ class DistributedScheduler(Scheduler):
                 node_timestamp = time.mktime(node_now.timetuple())
                 node_name = System.get_my_machine_id()
                 try:
-                    lock = self._persistent.get('{0}_lock'.format(self._namespace))
+                    lock = self._persistent.get(self._lock_name)
                 except KeyNotFoundException:
                     lock = None
                 if lock is None:
@@ -161,7 +163,7 @@ class DistributedScheduler(Scheduler):
                     lock = {'name': node_name,
                             'timestamp': node_timestamp}
                     self._logger.debug('DS refreshing lock')
-                    self._persistent.set('{0}_lock'.format(self._namespace), lock)
+                    self._persistent.set(self._lock_name, lock)
 
             if self._has_lock is True:
                 self._logger.debug('DS executing tick workload')

@@ -31,8 +31,8 @@ from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
-from ovs.log.log_handler import LogHandler
 
 
 # noinspection PyProtectedMember
@@ -40,7 +40,7 @@ class OpenAPIView(View):
     """
     Implements retrieval of generic metadata about the services
     """
-    _logger = LogHandler.get('api', name='openapi')
+    _logger = Logger('api')
 
     @auto_response(beautify=True)
     @load()
@@ -59,13 +59,13 @@ class OpenAPIView(View):
                 'produces': ['application/json; version={0}'.format(version)],
                 'paths': {'/': {'get': {'summary': 'Retrieve API metadata',
                                         'operationId': 'api',
-                                        'responses': {'200': {'descirption': 'API metadata',
+                                        'responses': {'200': {'description': 'API metadata',
                                                               'schema': {'type': 'object',
                                                                          'title': 'APIMetadata',
                                                                          'properties': {'authenticated': {'type': 'boolean',
                                                                                                           'description': 'Indicates whether the client is authenticated.'},
                                                                                         'authentication_state': {'type': 'string',
-                                                                                                                 'description': 'Povides more information on the "authenticated" state of a client.',
+                                                                                                                 'description': 'Provides more information on the "authenticated" state of a client.',
                                                                                                                  'enum': ['unauthenticated',
                                                                                                                           'invalid_authorization_type',
                                                                                                                           'invalid_token',
@@ -79,7 +79,7 @@ class OpenAPIView(View):
                                                                                                                     'properties': {'ip': {'type': 'string',
                                                                                                                                           'description': 'The IP address of the current node.'},
                                                                                                                                    'mode': {'type': 'string',
-                                                                                                                                            'description': 'Indicates wheter the "local" or a "remote" authentication endpoint should be used.',
+                                                                                                                                            'description': 'Indicates whether the "local" or a "remote" authentication endpoint should be used.',
                                                                                                                                             'enum': ['local',
                                                                                                                                                      'remote']},
                                                                                                                                    'authorize_uri': {'type': 'string',
