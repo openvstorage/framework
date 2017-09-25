@@ -178,13 +178,9 @@ class VDisk(DataObject):
         if not self.volume_id or not self.vpool:
             return []
 
-        volume_id = str(self.volume_id)
+        from ovs.lib.vdisk import VDiskController
         try:
-            try:
-                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
-            except VolumeRestartInProgressException:
-                time.sleep(0.5)
-                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+            return VDiskController.list_snapshot_ids(vdisk=self)
         except:
             return []
 
@@ -193,7 +189,8 @@ class VDisk(DataObject):
         Fetches the information of all snapshots for this vDisk
         """
         snapshots = []
-        for snap_id in self._snapshot_ids():
+        self.invalidate_dynamics('snapshot_ids')
+        for snap_id in self.snapshot_ids:
             try:
                 snapshot = self.storagedriver_client.info_snapshot(str(self.volume_id), snap_id, req_timeout_secs=2)
             except SnapshotNotFoundException:
