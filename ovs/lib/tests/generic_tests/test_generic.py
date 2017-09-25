@@ -72,8 +72,8 @@ class Generic(unittest.TestCase):
         success, fail = GenericController.snapshot_all_vdisks()
         self.assertEqual(first=len(fail), second=0, msg='Expected 0 failed snapshots')
         self.assertEqual(first=len(success), second=2, msg='Expected 2 successful snapshots')
-        self.assertEqual(first=len(vdisk_1.snapshot_ids), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_1.name))
-        self.assertEqual(first=len(vdisk_2.snapshot_ids), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_2.name))
+        self.assertEqual(first=len(vdisk_1.snapshot_ids[1]), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_1.name))
+        self.assertEqual(first=len(vdisk_2.snapshot_ids[1]), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_2.name))
         self.assertEqual(first=len(vdisk_1.snapshots), second=1, msg='Expected 1 snapshot for vDisk {0}'.format(vdisk_1.name))
         self.assertEqual(first=len(vdisk_2.snapshots), second=1, msg='Expected 1 snapshot for vDisk {0}'.format(vdisk_2.name))
 
@@ -84,8 +84,8 @@ class Generic(unittest.TestCase):
         self.assertEqual(first=fail[0], second=vdisk_1.guid, msg='Expected vDisk {0} to have failed'.format(vdisk_1.name))
         self.assertEqual(first=len(success), second=1, msg='Expected 1 successful snapshot')
         self.assertEqual(first=success[0], second=vdisk_2.guid, msg='Expected vDisk {0} to have succeeded'.format(vdisk_2.name))
-        self.assertEqual(first=len(vdisk_1.snapshot_ids), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_1.name))
-        self.assertEqual(first=len(vdisk_2.snapshot_ids), second=2, msg='Expected 2 snapshot IDs for vDisk {0}'.format(vdisk_2.name))
+        self.assertEqual(first=len(vdisk_1.snapshot_ids[1]), second=1, msg='Expected 1 snapshot ID for vDisk {0}'.format(vdisk_1.name))
+        self.assertEqual(first=len(vdisk_2.snapshot_ids[1]), second=2, msg='Expected 2 snapshot IDs for vDisk {0}'.format(vdisk_2.name))
         self.assertEqual(first=len(vdisk_1.snapshots), second=1, msg='Expected 1 snapshot for vDisk {0}'.format(vdisk_1.name))
         self.assertEqual(first=len(vdisk_2.snapshots), second=2, msg='Expected 2 snapshots for vDisk {0}'.format(vdisk_2.name))
 
@@ -119,7 +119,7 @@ class Generic(unittest.TestCase):
         structure = DalHelper.build_dal_structure(structure={'vdisks': [(2, 1, 1, 1)]},
                                                   previous_structure=structure)
         clone_vdisk = structure['vdisks'][2]
-        base_snapshot_guid = vdisk_1.snapshot_ids[0]  # Oldest
+        base_snapshot_guid = vdisk_1.snapshot_ids[1][0]  # Oldest
         clone_vdisk.parentsnapshot = base_snapshot_guid
         clone_vdisk.save()
 
@@ -133,7 +133,7 @@ class Generic(unittest.TestCase):
                                                           'timestamp': str(timestamp)})
             base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * 2)
             GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
-        self.assertIn(base_snapshot_guid, vdisk_1.snapshot_ids, 'Snapshot was deleted while there are still clones of it')
+        self.assertIn(base_snapshot_guid, vdisk_1.snapshot_ids[1], 'Snapshot was deleted while there are still clones of it')
 
     def test_different_snapshot_flags(self):
         """

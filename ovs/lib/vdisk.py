@@ -499,12 +499,16 @@ class VDiskController(object):
             try:
                 vdisk = VDisk(guid)
                 VDiskController._logger.info('Create {0} snapshot for vDisk {1}'.format('consistent' if consistent is True else 'inconsistent', vdisk.name))
-                snapshot_id = str(uuid.uuid4())
-                vdisk.invalidate_dynamics(['snapshot_ids'])
-                if len(vdisk.snapshot_ids) > 0:
-                    if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=vdisk.snapshot_ids[-1]) is False:  # Most recent last in list
+                vdisk.invalidate_dynamics('snapshot_ids')
+                if vdisk.snapshot_ids[0] is False:
+                    results[guid] = [False, 'Cannot check if latest snapshot made it to backend']
+                    continue
+                snapshot_ids = vdisk.snapshot_ids[1]
+                if len(snapshot_ids) > 0:
+                    if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=snapshot_ids[-1]) is False:  # Most recent last in list
                         results[guid] = [False, 'Previously created snapshot did not make it to the backend yet']
                         continue
+                snapshot_id = str(uuid.uuid4())
                 vdisk.storagedriver_client.create_snapshot(volume_id=str(vdisk.volume_id),
                                                            snapshot_id=str(snapshot_id),
                                                            metadata=metadata,
@@ -561,10 +565,12 @@ class VDiskController(object):
                     results[vdisk_guid] = [False, ex.message]
                 continue
 
-            for snapshot_id in snapshot_ids:
+            for snapshot_id in set(snapshot_ids):
                 try:
-                    vdisk.invalidate_dynamics(['snapshot_ids'])
-                    if snapshot_id not in vdisk.snapshot_ids:
+                    vdisk.invalidate_dynamics('snapshot_ids')
+                    if vdisk.snapshot_ids[0] is False:
+                        raise RuntimeError('Failed to retrieve the snapshot IDs for vDisk {0}'.format(vdisk.name))
+                    if snapshot_id not in vdisk.snapshot_ids[1]:
                         raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
 
                     nr_clones = len(VDiskList.get_by_parentsnapshot(snapshot_id))

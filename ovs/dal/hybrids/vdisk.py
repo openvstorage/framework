@@ -55,7 +55,7 @@ class VDisk(DataObject):
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),
                   Dynamic('snapshots', list, 30),
-                  Dynamic('snapshot_ids', list, 30),
+                  Dynamic('snapshot_ids', tuple, 30),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
@@ -176,24 +176,25 @@ class VDisk(DataObject):
         Fetches the snapshot IDs for this vDisk
         """
         if not self.volume_id or not self.vpool:
-            return []
+            return False, []
 
         volume_id = str(self.volume_id)
         try:
             try:
-                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+                return True, self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=10)
             except VolumeRestartInProgressException:
                 time.sleep(0.5)
-                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+                return True, self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=10)
         except:
-            return []
+            return False, []
 
     def _snapshots(self):
         """
         Fetches the information of all snapshots for this vDisk
         """
         snapshots = []
-        for snap_id in self._snapshot_ids():
+        self.invalidate_dynamics('snapshot_ids')
+        for snap_id in self.snapshot_ids[1]:
             try:
                 snapshot = self.storagedriver_client.info_snapshot(str(self.volume_id), snap_id, req_timeout_secs=2)
             except SnapshotNotFoundException:
