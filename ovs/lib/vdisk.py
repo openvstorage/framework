@@ -43,7 +43,7 @@ from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, \
-                                                       MDSNodeConfig, StorageDriverClient, StorageDriverConfiguration
+                                                       MDSNodeConfig, StorageDriverClient, StorageDriverConfiguration, VolumeRestartInProgressException
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
@@ -459,6 +459,22 @@ class VDiskController(object):
                 'backingdevice': devicename}
 
     @staticmethod
+    def list_snapshot_ids(vdisk):
+        """
+        Retrieve the snapshot IDs for a given vDisk
+        :param vdisk: vDisk to retrieve the snapshot IDs for
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
+        :return: The snapshot IDs for the given vDisk
+        :rtype: list
+        """
+        volume_id = str(vdisk.volume_id)
+        try:
+            return vdisk.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=10)
+        except VolumeRestartInProgressException:
+            time.sleep(0.5)
+            return vdisk.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=10)
+
+    @staticmethod
     @ovs_task(name='ovs.vdisk.create_snapshot')
     def create_snapshot(vdisk_guid, metadata):
         """
@@ -498,16 +514,13 @@ class VDiskController(object):
         for guid in vdisk_guids:
             try:
                 vdisk = VDisk(guid)
-                VDiskController._logger.info('Create {0} snapshot for vDisk {1}'.format('consistent' if consistent is True else 'inconsistent', vdisk.name))
-                vdisk.invalidate_dynamics('snapshot_ids')
-                if vdisk.snapshot_ids[0] is False:
-                    results[guid] = [False, 'Cannot check if latest snapshot made it to backend']
-                    continue
-                snapshot_ids = vdisk.snapshot_ids[1]
+                snapshot_ids = VDiskController.list_snapshot_ids(vdisk=vdisk)
                 if len(snapshot_ids) > 0:
                     if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=snapshot_ids[-1]) is False:  # Most recent last in list
                         results[guid] = [False, 'Previously created snapshot did not make it to the backend yet']
                         continue
+
+                VDiskController._logger.info('Create {0} snapshot for vDisk {1}'.format('consistent' if consistent is True else 'inconsistent', vdisk.name))
                 snapshot_id = str(uuid.uuid4())
                 vdisk.storagedriver_client.create_snapshot(volume_id=str(vdisk.volume_id),
                                                            snapshot_id=str(snapshot_id),
@@ -567,10 +580,7 @@ class VDiskController(object):
 
             for snapshot_id in set(snapshot_ids):
                 try:
-                    vdisk.invalidate_dynamics('snapshot_ids')
-                    if vdisk.snapshot_ids[0] is False:
-                        raise RuntimeError('Failed to retrieve the snapshot IDs for vDisk {0}'.format(vdisk.name))
-                    if snapshot_id not in vdisk.snapshot_ids[1]:
+                    if snapshot_id not in VDiskController.list_snapshot_ids(vdisk=vdisk):
                         raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
 
                     nr_clones = len(VDiskList.get_by_parentsnapshot(snapshot_id))

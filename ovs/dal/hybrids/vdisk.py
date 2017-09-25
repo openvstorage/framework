@@ -55,7 +55,7 @@ class VDisk(DataObject):
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),
                   Dynamic('snapshots', list, 30),
-                  Dynamic('snapshot_ids', tuple, 30),
+                  Dynamic('snapshot_ids', list, 30),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
@@ -176,17 +176,13 @@ class VDisk(DataObject):
         Fetches the snapshot IDs for this vDisk
         """
         if not self.volume_id or not self.vpool:
-            return False, []
+            return []
 
-        volume_id = str(self.volume_id)
+        from ovs.lib.vdisk import VDiskController
         try:
-            try:
-                return True, self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=10)
-            except VolumeRestartInProgressException:
-                time.sleep(0.5)
-                return True, self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=10)
+            return VDiskController.list_snapshot_ids(vdisk=self)
         except:
-            return False, []
+            return []
 
     def _snapshots(self):
         """
@@ -194,7 +190,7 @@ class VDisk(DataObject):
         """
         snapshots = []
         self.invalidate_dynamics('snapshot_ids')
-        for snap_id in self.snapshot_ids[1]:
+        for snap_id in self.snapshot_ids:
             try:
                 snapshot = self.storagedriver_client.info_snapshot(str(self.volume_id), snap_id, req_timeout_secs=2)
             except SnapshotNotFoundException:
