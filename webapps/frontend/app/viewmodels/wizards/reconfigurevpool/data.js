@@ -14,26 +14,35 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic, api){
+define(['jquery', 'knockout',
+    'ovs/generic', 'ovs/api', 'ovs/shared',
+    'viewmodels/containers/storagerouter/storagerouter'],
+    function($, ko, generic, api, shared, StorageRouter){
     "use strict";
     var singleton;
     singleton = function() {
         var wizardData = {
-            storageDriver:           ko.observable(),
-            storageRouter:           ko.observable(),
-            vPool:                   ko.observable(),
+            storageDriver:                      ko.observable(),
+            storageRouter:                      ko.observable(),
+            vPool:                              ko.observable(),
             // Changes
-            cachingData:             undefined,  // Changes related to fragment cache and block cache (not observable as it is viewmodel)
-            configParams:            undefined,  // Changes related to general configs (sco size, dtl ...)
-            proxyAmount:             ko.observable(),
+            // General vPool changes
+            configParams:                       undefined,  // Changes related to general configs (sco size, dtl ...)
+            // Storagedriver changes
+            cachingData:                        undefined,  // Changes related to fragment cache and block cache
+            globalWriteBuffer:                  ko.observable(),
+            proxyAmount:                        ko.observable(),
             // Shared across the pages
             // Handles
-            loadBackendsHandle:      undefined,
+            loadBackendsHandle:                  undefined,
+            loadAvailableStorageRoutersHandle:   undefined,
             // Data
-            albaPresetMap:           ko.observable({}),
-            backends:                ko.observableArray([]),
-            invalidBackendInfo:      ko.observable(),
-            loadingBackends:         ko.observable()
+            albaPresetMap:                      ko.observable({}),
+            backends:                           ko.observableArray([]),
+            invalidBackendInfo:                 ko.observable(),
+            loadingBackends:                    ko.observable(),
+            globalWriteBufferMax:               ko.observable(),  // Used to detect over allocation
+            srPartitions:                       ko.observableArray()
         };
         // Computed
         wizardData.hasCacheQuota = ko.pureComputed(function() {
@@ -48,6 +57,50 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
         });
 
         // Functions
+        wizardData.fillData = function() {
+            var requiredObservables = [wizardData.storageRouter, wizardData.storageDriver, wizardData.vPool];
+            var missingObservables = [];
+            $.each(requiredObservables, function(index, obs) {
+                if (ko.utils.unwrapObservable(obs) === undefined) {
+                    missingObservables.push(obs);
+                }
+            });
+            if (missingObservables.length > 0) {
+                throw new Error('The wizard does not have the necessary data to continue.')
+            }
+            // Fire up some asynchronous calls
+            wizardData.loadBackends();
+            wizardData.loadStorageRouterMetadata(wizardData.storageRouter().guid())
+                .done(function(data) {
+                    wizardData.srPartitions(data.srData.partitions);
+                    var sdGlobalWriteBuffer =  wizardData.storageDriver().vpoolBackendInfo().global_write_buffer;
+                    var totalBuffer = data.writeCacheSize + sdGlobalWriteBuffer;
+                    wizardData.globalWriteBuffer(sdGlobalWriteBuffer / Math.pow(1024, 3));
+                    wizardData.globalWriteBufferMax(totalBuffer / Math.pow(1024, 3));
+                });
+            // Set all configurable data
+            wizardData.cachingData = wizardData.vPool().getCachingData(wizardData.storageRouter().guid(), true);
+            wizardData.configParams = wizardData.vPool().getConfiguration(true);
+            wizardData.proxyAmount(wizardData.storageDriver().albaProxyGuids().length);
+
+        };
+        wizardData.loadStorageRouterMetadata = function(storageRouterGuid) {
+            if (ko.utils.unwrapObservable(storageRouterGuid) === undefined) {
+                throw new Error('Cannot load metadata of an undefined storage router guid')
+            }
+            return api.post('storagerouters/' + storageRouterGuid + '/get_metadata')
+                .then(shared.tasks.wait)
+                .then(function (srData) {
+                    // Fill in the max global write buffer
+                    var writeCacheSize = 0;
+                    $.each(srData.partitions.WRITE, function(index, info) {
+                        if (info['usable'] === true) {
+                            writeCacheSize += info['available'];
+                        }
+                    });
+                    return {srData: srData, writeCacheSize: writeCacheSize}
+                });
+        };
         wizardData.filterBackendsByLocationKey = function(locationKey) {
             if (locationKey === undefined) {
                 return wizardData.backends();
@@ -104,7 +157,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/api'], function($, ko, generic
              * Loads in all backends for the current supplied data
              * All data is loaded in the backends variable. The key for remote connection is composed of ip:port
              * @param connectionInfo: Object with connection information (optional)
-             * @returns $.Deferred
+             * @returns {Promise}
             */
             return $.Deferred(function(albaDeferred) {
                 generic.xhrAbort(wizardData.loadBackendsHandle);

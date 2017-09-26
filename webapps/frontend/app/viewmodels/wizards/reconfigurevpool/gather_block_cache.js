@@ -154,7 +154,6 @@ define([
         // Durandal
         self.activate = function() {
             if (self.actived === false) {
-                self.data.loadBackends();
                 var connectionInfo = self.data.cachingData.block_cache.backend_info.connection_info;
                 if (!!ko.utils.unwrapObservable(connectionInfo.isLocalBackend) === false && !['', undefined, null].contains(connectionInfo.host())) {
                     self.data.loadBackends(connectionInfo);

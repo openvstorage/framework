@@ -121,13 +121,18 @@ define([
 
         // Durandal
         self.activate = function(settings) {
-            if (!settings.hasOwnProperty('items')) {
-                throw 'Items should be specified';
+            if (!settings.hasOwnProperty('items') || !(ko.utils.unwrapObservable(settings.items) instanceof Array)) {
+                throw 'Items should be a specified array';
             }
             if (!settings.hasOwnProperty('target')) {
                 throw 'Target should be specified';
             }
-            self.items = settings.items;
+            // Items can be dynamic if it is an observable array but this is not required
+            if (settings.items.isObservableArray) {
+                self.items = settings.items;
+            } else {
+                self.items(settings.items)
+            }
             self.target = settings.target;
             self.enabled = generic.tryGet(settings, 'enabled', ko.observable(true));
             self.key(generic.tryGet(settings, 'key', undefined));
