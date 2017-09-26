@@ -27,12 +27,6 @@ define([
         // Variables
         self.shared = shared;
 
-        // Constants
-        self.clusterSizes      = [4, 8, 16, 32, 64];
-        self.dtlModes          = ['no_sync', 'a_sync', 'sync'];
-        self.dtlTransportModes = ['tcp', 'rdma'];
-        self.scoSizes          = [4, 8, 16, 32, 64, 128];
-
         // Handles
         self.loadHandle          = undefined;
         self.diskHandle          = undefined;
@@ -174,11 +168,13 @@ define([
                     self.storageRouterHandle = api.get('vpools/' + self.guid() + '/storagerouters')
                         .done(function(data) {
                             self.storageRouterGuids(data.data);
-                            deferred.resolve();
+                            deferred.resolve(self.storageRouterGuids());
                         })
-                        .fail(deferred.reject);
+                        .fail(function(error) {
+                            deferred.reject(error)
+                        });
                 } else {
-                    deferred.resolve();
+                    deferred.resolve(self.storageRouterGuids());
                 }
             }).promise();
         };

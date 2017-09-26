@@ -16,6 +16,9 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
+    <!-- ko with: data.configParams -->
+    <pre data-bind="text: ko.toJSON(ko.mapping.fromJS($data), null, 2)"></pre>
+    <!-- Root is the wizard, as is the parent-->
     <div style="margin-bottom: 5px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_config.dtl"></span>
         <a data-bind="popover: {
@@ -30,9 +33,8 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-lg-7" style="margin-bottom: -5px;">
             <span id="dtlMode"
                   data-bind="dropdown: {
-                                 enabled: data.vPoolAdd,
-                                 items: dtlModes,
-                                 target: dtlMode,
+                                 items: $root.dtlModes,
+                                 target: dtl_mode,
                                  text: function(item) {
                                      return $.t('ovs:storagedrivers.general.dtl_modes.' + item.name);
                                  }
@@ -40,14 +42,13 @@ but WITHOUT ANY WARRANTY of any kind.
             </span>
         </div>
     </div>
-    <div class="form-group" data-bind="visible: data.dtlEnabled()">
+    <div class="form-group" data-bind="visible: dtl_enabled()">
         <label class="col-lg-4 control-label" for="dtlTransport" data-i18n="ovs:wizards.add_vpool.gather_config.dtl_transport"></label>
         <div class="col-lg-7" style="margin-bottom: -5px;">
             <span id="dtlTransport"
                   data-bind="dropdown: {
-                                 enabled: data.vPoolAdd,
-                                 items: dtlTransportModes,
-                                 target: data.dtlTransportMode,
+                                 items: $root.dtlTransportModes,
+                                 target: dtl_transport,
                                  text: function(item) {
                                      return $.t('ovs:storagedrivers.general.dtl_transport_modes.' + item.name);
                                  }
@@ -58,11 +59,11 @@ but WITHOUT ANY WARRANTY of any kind.
     <div style="margin-bottom: 5px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_config.title_write_buffer"></span>
     </div>
-    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('writeBufferGlobal') }">
+    <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('writeBufferGlobal') }">
         <label class="col-lg-4 control-label" for="writeBufferGlobal" data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer"></label>
         <div class="col-lg-2">
             <input type="text" id="writeBufferGlobal" class="autofocus form-control" style="text-align: center; width: 110px;"
-                   data-bind="value: data.writeBufferGlobal, valueUpdate: 'afterkeydown'" />
+                   data-bind="value: $root.data.globalWriteBuffer, valueUpdate: 'afterkeydown'" />
         </div>
         <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib"></label>
     </div>
@@ -74,9 +75,8 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-lg-7" style="margin-bottom: -5px;">
             <span id="scoSize"
                   data-bind="dropdown: {
-                                 enabled: data.vPoolAdd,
                                  items: scoSizes,
-                                 target: data.scoSize,
+                                 target: sco_size,
                                  text: function(item) {
                                      if (item === undefined || item === null) {
                                          return '-';
@@ -92,9 +92,8 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-lg-7" style="margin-bottom: -5px;">
             <span id="clusterSize"
                   data-bind="dropdown: {
-                                 enabled: data.vPoolAdd,
                                  items: clusterSizes,
-                                 target: data.clusterSize,
+                                 target: cluster_size,
                                  text: function(item) {
                                      if (item === undefined || item === null) {
                                          return '-';
@@ -109,7 +108,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <label class="col-lg-4 control-label" for="writeBufferVolume" data-i18n="ovs:wizards.add_vpool.gather_config.volume_write_buffer"></label>
         <div class="col-lg-2">
             <input type="text" id="writeBufferVolume" class="autofocus form-control" style="text-align: center; width: 110px;"
-                   data-bind="value: data.writeBufferVolume, disable: data.vPool() !== undefined" />
+                   data-bind="value: write_buffer" />
         </div>
         <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.mib"></label>
     </div>
@@ -122,31 +121,34 @@ but WITHOUT ANY WARRANTY of any kind.
            class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
         </a>
     </div>
+    <!-- ko with: mds_config -->
     <div class="form-group">
         <label class="col-lg-4 control-label" for="mdsSafety" data-i18n="ovs:wizards.add_vpool.gather_config.mds_safety"></label>
         <div class="col-lg-2">
             <input type="text" id="mdsSafety" class="autofocus form-control" style="text-align: center; width: 110px;"
-                   data-bind="value: data.mdsSafety, disable: data.vPool() !== undefined" />
+                   data-bind="value: mds_safety" />
         </div>
     </div>
+    <!-- /ko -->
     <div class="alert alert-info">
         <div data-i18n="ovs:wizards.add_vpool.gather_config.information"></div>
         <ul>
-            <li data-bind="visible: data.writeBufferGlobalMax() !== undefined && Math.floor(data.writeBufferGlobalMax() / 1024 / 1024 / 1024) > 0">
+            <li data-bind="visible: $root.data.globalWriteBufferMax() !== undefined && Math.floor($root.data.globalWriteBufferMax()) > 0">
                 <span data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer_available"></span>
-                <span data-bind="text: Math.floor(data.writeBufferGlobalMax() / 1024 / 1024 / 1024)"></span>
+                <span data-bind="text: Math.floor($root.data.globalWriteBufferMax())"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
-            <li data-bind="visible: Math.floor(data.writeBufferGlobalMax() / 1024 / 1024 / 1024) === 0">
+            <li data-bind="visible: Math.floor($root.data.globalWriteBufferMax()) === 0">
                 <span data-i18n="ovs:wizards.add_vpool.gather_config.no_space_left"></span>
             </li>
         </ul>
     </div>
-    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
-        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
-        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
-        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+    <div class="alert alert-danger" data-bind="visible: !$root.canContinue().value || $root.canContinue().showErrors" style="margin-bottom: -10px;">
+        <p data-bind="visible: $root.canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: $root.canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: $root.canContinue().reasons.length > 0, foreach: $root.canContinue().reasons">
             <li data-bind="text: $data"></li>
         </ul>
     </div>
+    <!-- /ko -->
 </div>

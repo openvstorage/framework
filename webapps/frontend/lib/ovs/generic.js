@@ -559,7 +559,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         );
         $.each(props, function(index, prop) {
             if (ko.isObservable(obj[prop])) {
-                if (!(obj[prop].destroyAll === undefined)) {  // ObservableArray
+                if (obj[prop].isObservableArray) {  // ObservableArray
                     obj[prop]([]);
                 } else {
                     obj[prop](undefined);

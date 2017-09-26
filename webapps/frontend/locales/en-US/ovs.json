@@ -144,7 +144,7 @@
         "finished": "Finished",
         "followingerrorsfound": "Following errors were found:",
         "for": "for",
-        "fragmentcaches": {
+        "fragmentCaches": {
             "none": "No Fragment caching",
             "read": "On Read",
             "rw": "On Read & Write",

@@ -31,7 +31,6 @@ define([
         self.title(generic.tryGet(options, 'title', defaultTitle));
 
         self.steps([new GatherVPool(), new GatherFragmentCache(), new GatherBlockCache(), new GatherConfig(), new Confirm()]);
-        var cachingData = options.vPool.getCachingData(options.storageRouter.guid(), true);
 
         self.step(0);
         self.activateStep();
@@ -43,9 +42,8 @@ define([
         data.vPool(options.vPool);
         data.storageRouter(options.storageRouter);
         data.storageDriver(options.storageDriver);
-        // Set all configurable data
-        data.cachingData = cachingData;
-        data.proxyAmount(options.storageDriver.albaProxyGuids().length);
         data.completed = options.completed;
+        // Fill in all wizard data which is derived from the options above
+        data.fillData()
     };
 });
