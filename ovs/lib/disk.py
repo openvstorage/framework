@@ -109,7 +109,7 @@ class DiskController(object):
             link = client.file_read_link('/sys/block/{0}'.format(name))
             device_state = None
             friendly_path = '/dev/{0}'.format(name)
-            if not os.path.exists(friendly_path):
+            if not client.path_exists(friendly_path):
                 DiskController._logger.warning('Skipping {0} as path {1} does not exist'.format(name, friendly_path))
                 continue
             system_aliases = name_alias_mapping.get(friendly_path, [friendly_path])
