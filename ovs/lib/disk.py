@@ -17,7 +17,6 @@
 """
 DiskController module
 """
-import os
 import re
 import time
 from ovs.dal.hybrids.disk import Disk
