@@ -17,6 +17,7 @@
 """
 DiskController module
 """
+import os
 import re
 import time
 from ovs.dal.hybrids.disk import Disk
@@ -108,6 +109,9 @@ class DiskController(object):
             link = client.file_read_link('/sys/block/{0}'.format(name))
             device_state = None
             friendly_path = '/dev/{0}'.format(name)
+            if not os.path.exists(friendly_path):
+                DiskController._logger.warning('Skipping {0} as path {1} does not exist'.format(name, friendly_path))
+                continue
             system_aliases = name_alias_mapping.get(friendly_path, [friendly_path])
             device_is_also_partition = False
             if link is not None:  # If this returns, it means its a device and not a partition
