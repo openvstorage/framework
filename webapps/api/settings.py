@@ -34,7 +34,7 @@ APP_NAME = 'api'
 BASE_WWW_DIR = os.path.dirname(__file__)
 
 BASE_FOLDER = '/opt/OpenvStorage/webapps/{0}'.format(APP_NAME)
-VERSION = (6, 7, 8, 9)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
+VERSION = (6, 7, 8, 9, 10)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
 # WARNING: When removing oldest version(s)
 #     All occurrences of OVSClient need to be checked whether POST data changes are required
 #     Bump the version to newest lowest version for each OVSClient
@@ -46,10 +46,12 @@ VERSION = (6, 7, 8, 9)  # This tuple should contain all supported API versions. 
 # 2016-11-07: * Introduced version 6
 # 2016-11-28: * Introduced version 7
 # 2017-01-13: * Introduced version 8
-#             * vdisks.get_children: Deprecated (max_version 7)
+    #             * vdisks.get_children: Deprecated (max_version 7)
 # 2017-07-18: * Introduced version 9
-#             * A lot of new API calls for alba/*, deprecating the old ones (max_version 8)
+#                 * A lot of new API calls for alba/*, deprecating the old ones (max_version 8)
 # 2017-07-28: * Removed version 2, 3, 4 and 5
+# 2017-09-26: * Introduced version 10
+#                 * Parameter 'amount' obsoleted for call ALBA Backend 'expand_nsm_clusters'
 
 BASE_LOG_DIR = '/var/log/ovs'
 LOG_FILENAME = '/django.log'
