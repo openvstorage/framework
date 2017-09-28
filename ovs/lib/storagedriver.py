@@ -17,13 +17,15 @@
 """
 StorageDriver module
 """
-
+import copy
+import json
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -421,3 +423,121 @@ class StorageDriverController(object):
             current_config = max(current_config, gap_settings[2])
             gap_configuration[gap] = current_config
         return gap_configuration
+
+    @staticmethod
+    def calculate_update_impact(storagedriver_guid, requested_config):
+        """
+        Calculate the impact of the update for a storagedriver with a given config
+        :param storagedriver_guid: Guid of the storage driver
+        :param requested_config: requested configuration
+        :return: dict indicating what will be needed to be done
+        :rtype: dict
+        """
+        storagedriver = StorageDriver(storagedriver_guid)
+        # Get a difference between the current config and the requested one
+
+        return {}
+
+    @staticmethod
+    def configure_proxies_configs(vpool_guid, storagedriver_guid, read_preferences):
+        vpool = VPool(vpool_guid)
+        storagedriver = StorageDriver(storagedriver_guid)
+        storagerouter = storagedriver.storagerouter
+
+        block_cache_setting = vpool.metadata['caching_info']['block_cache']
+        fragment_cache_setting = vpool.metadata['caching_info']['fragment_cache']
+
+        # Validate features
+        storagerouter.invalidate_dynamics(['features'])
+        features = storagerouter.features
+        if features is None:
+            raise RuntimeError('Could not load available features')
+        supports_block_cache = 'block-cache' in features['alba']['features']
+        if supports_block_cache is False and (block_cache_setting['read'] is True or block_cache_setting['write'] is True):
+            raise RuntimeError('Block cache is not a supported feature')
+
+        use_block_cache_backend = block_cache_setting['is_backend']
+        use_fragment_cache_backend = fragment_cache_setting['is_backend']
+        # Configure regular proxies and scrub proxies
+        manifest_cache_size = 16 * 1024 * 1024 * 1024
+        for proxy_id, alba_proxy in enumerate(storagedriver.alba_proxies):
+            config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
+            metadata_keys = {'backend': 'abm'}
+            if fragment_cache_setting['is_backend'] is True:
+                metadata_keys['backend_aa_{0}'.format(storagerouter.guid)] = 'abm_aa'
+            if block_cache_setting['is_backend'] is True:
+                metadata_keys['backend_bc_{0}'.format(storagerouter.guid)] = 'abm_bc'
+            for metadata_key in metadata_keys:
+                arakoon_config = vpool.metadata[metadata_key]['arakoon_config']
+                arakoon_config = ArakoonClusterConfig.convert_config_to(config=arakoon_config, return_type='INI')
+                Configuration.set(config_tree.format(metadata_keys[metadata_key]), arakoon_config, raw=True)
+
+            fragment_cache_scrub_info = ['none']
+            if fragment_cache_setting['read'] is False and fragment_cache_setting['write'] is False:
+                fragment_cache_info = ['none']
+            elif fragment_cache_setting['is_backend'] is True:
+                fragment_cache_info = ['alba', {
+                    'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
+                    'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
+                                                   'preset':
+                                                       vpool.metadata['backend_aa_{0}'.format(storagerouter.guid)][
+                                                           'backend_info']['preset']}],
+                    'manifest_cache_size': manifest_cache_size,
+                    'cache_on_read': fragment_cache_setting['read'],
+                    'cache_on_write': fragment_cache_setting['write']}]
+                if fragment_cache_setting['write'] is True:
+                    # The scrubbers want only cache-on-write.
+                    fragment_cache_scrub_info = copy.deepcopy(fragment_cache_info)
+                    fragment_cache_scrub_info[1]['cache_on_read'] = False
+            else:
+                fragment_cache_info = ['local', {'path': '{0}/fc'.format(sdp_frags[proxy_id].path),
+                                                 'max_size': frag_size / local_amount_of_proxies,
+                                                 'cache_on_read': fragment_cache_setting['read'],
+                                                 'cache_on_write': fragment_cache_setting['write']}]
+
+            block_cache_scrub_info = ['none']
+            if block_cache_setting['read'] is False and block_cache_setting['write'] is False:
+                block_cache_info = ['none']
+            elif block_cache_setting['is_backend'] is True:
+                block_cache_info = ['alba', {
+                    'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_bc')),
+                    'bucket_strategy': ['1-to-1', {'prefix': '{0}_bc'.format(vpool.guid),
+                                                   'preset':
+                                                       vpool.metadata['backend_bc_{0}'.format(storagerouter.guid)][
+                                                           'backend_info']['preset']}],
+                    'manifest_cache_size': manifest_cache_size,
+                    'cache_on_read': block_cache_setting['read'],
+                    'cache_on_write': block_cache_setting['write']}]
+                if block_cache_setting['write'] is True:
+                    # The scrubbers want only cache-on-write.
+                    block_cache_scrub_info = copy.deepcopy(block_cache_info)
+                    block_cache_scrub_info[1]['cache_on_read'] = False
+            else:
+                block_cache_info = ['local', {'path': '{0}/bc'.format(sdp_frags[proxy_id].path),
+                                              'max_size': frag_size / local_amount_of_proxies,
+                                              'cache_on_read': block_cache_setting['read'],
+                                              'cache_on_write': block_cache_setting['write']}]
+
+            main_proxy_config = {'log_level': 'info',
+                                 'port': alba_proxy.service.ports[0],
+                                 'ips': [storagedriver.storage_ip],
+                                 'manifest_cache_size': manifest_cache_size,
+                                 'fragment_cache': fragment_cache_info,
+                                 'transport': 'tcp',
+                                 'read_preference': read_preferences,
+                                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
+            if supports_block_cache is True:
+                main_proxy_config['block_cache'] = block_cache_info
+            Configuration.set(config_tree.format('main'), json.dumps(main_proxy_config, indent=4), raw=True)
+            scrub_proxy_config = {'log_level': 'info',
+                                  'port': 0,  # Will be overruled by the scrubber scheduled task
+                                  'ips': ['127.0.0.1'],
+                                  'manifest_cache_size': manifest_cache_size,
+                                  'fragment_cache': fragment_cache_scrub_info,
+                                  'transport': 'tcp',
+                                  'read_preference': read_preferences,
+                                  'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
+            if supports_block_cache is True:
+                scrub_proxy_config['block_cache'] = block_cache_scrub_info
+            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4), raw=True)
+

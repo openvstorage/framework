@@ -92,6 +92,9 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         return computed;
     };
     ko.extenders.removeWhiteSpaces = function(target) {
+        if (target() === undefined) {
+            return target
+        }
         var computed = ko.computed({
             read: target,
             write: function(newValue) {

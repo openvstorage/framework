@@ -59,6 +59,7 @@ from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.vpool import VPoolController
 from volumedriver.storagerouter import storagerouterclient
 
 
@@ -476,68 +477,43 @@ class StorageRouterController(object):
             # Renew vPool metadata
             StorageRouterController._logger.info('Add vPool {0} started'.format(vpool_name))
             if new_vpool is True:
-                metadata_map = {'backend': {'backend_info': backend_info,
-                                            'connection_info': connection_info}}
+                new_backend_info = backend_info
+                new_backend_info['connection_info'] = connection_info
+                updated_metadata = {'backend': {'backend_info': new_backend_info},
+                                    'caching_info': {}}
             else:
-                metadata_map = copy.deepcopy(vpool.metadata)
+                updated_metadata = copy.deepcopy(vpool.metadata)
 
+            caching_info = {'block_cache': {'is_backend': False},
+                            'fragment_cache': {'is_backend': False}}
             if use_fragment_cache_backend is True:
-                metadata_map['backend_aa_{0}'.format(storagerouter.guid)] = {'backend_info': backend_info_fc,
-                                                                             'connection_info': connection_info_fc}
+                fragment_cache_backend_info = backend_info_fc
+                fragment_cache_backend_info['connection_info'] = connection_info_fc
+                caching_info['fragment_cache'] = {'backend_info': fragment_cache_backend_info,
+                                                  'is_backend': True}
             if use_block_cache_backend is True:
-                metadata_map['backend_bc_{0}'.format(storagerouter.guid)] = {'backend_info': backend_info_bc,
-                                                                             'connection_info': connection_info_bc}
+                block_cache_backend_info = backend_info_bc
+                block_cache_backend_info['connection_info'] = connection_info_bc
+                caching_info['block_cache'] = {'backend_info': block_cache_backend_info,
+                                               'is_backend': True}
+            updated_metadata['caching_info'][storagerouter.guid] = caching_info
 
-            read_preferences = []
-            for key, metadata in metadata_map.iteritems():
-                ovs_client = OVSClient(ip=metadata['connection_info']['host'],
-                                       port=metadata['connection_info']['port'],
-                                       credentials=(metadata['connection_info']['client_id'], metadata['connection_info']['client_secret']),
-                                       version=6,
-                                       cache_store=VolatileFactory.get_client())
-                preset_name = metadata['backend_info']['preset']
-                alba_backend_guid = metadata['backend_info']['alba_backend_guid']
-                arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
-                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
-                preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
-                if preset_name not in preset_info:
-                    raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_dict['name']))
-
-                # Calculate ALBA local read preference
-                if backend_dict['scaling'] == 'GLOBAL' and metadata['connection_info']['local'] is True:
-                    for node_id, value in backend_dict['remote_stack'].iteritems():
-                        if value.get('domain') is not None and value['domain']['guid'] in storagerouter.regular_domains:
-                            read_preferences.append(node_id)
-
-                policies = []
-                for policy_info in preset_info[preset_name]['policies']:
-                    policy = json.loads('[{0}]'.format(policy_info.strip('()')))
-                    policies.append(policy)
-
-                if key in vpool.metadata:
-                    vpool.metadata[key]['backend_info']['policies'] = policies
-                    vpool.metadata[key]['arakoon_config'] = arakoon_config
-                else:
-                    vpool.metadata[key] = {'backend_info': {'name': backend_dict['name'],
-                                                            'preset': preset_name,
-                                                            'policies': policies,
-                                                            'sco_size': sco_size * 1024.0 ** 2 if new_vpool is True else vpool.configuration['sco_size'] * 1024.0 ** 2,
-                                                            'frag_size': float(preset_info[preset_name]['fragment_size']),
-                                                            'total_size': float(backend_dict['usages']['size']),
-                                                            'backend_guid': backend_dict['backend_guid'],
-                                                            'alba_backend_guid': alba_backend_guid},
-                                           'connection_info': metadata['connection_info'],
-                                           'arakoon_config': arakoon_config}
-            if 'caching_info' not in vpool.metadata['backend']:
-                vpool.metadata['backend']['caching_info'] = {}
-            vpool.metadata['backend']['caching_info'][storagerouter.guid] = {'fragment_cache_on_read': fragment_cache_on_read,
-                                                                             'fragment_cache_on_write': fragment_cache_on_write,
-                                                                             'block_cache_on_read': block_cache_on_read,
-                                                                             'block_cache_on_write': block_cache_on_write}
-            if 'cache_quota_fc' in parameters:
-                vpool.metadata['backend']['caching_info'][storagerouter.guid]['quota_fc'] = parameters['cache_quota_fc']
-            if 'cache_quota_bc' in parameters:
-                vpool.metadata['backend']['caching_info'][storagerouter.guid]['quota_bc'] = parameters['cache_quota_bc']
+            StorageRouterController._logger.info('Refreshing metadata for {0} has started'.format(vpool.name))
+            # import sys
+            # sys.path.append('/opt/OpenvStorage/pycharm-debug.egg')
+            # import pydevd
+            # pydevd.settrace('192.168.11.70', port=21000, stdoutToServer=True, stderrToServer=True)
+            read_preferences = VPoolController.calculate_read_preferences(vpool.guid, storagerouter.guid, updated_metadata)
+            # Load backend properties for metadata
+            renewed_metadata = VPoolController.get_renewed_backend_metadata(vpool.guid, {'sco_size': sco_size}, updated_metadata, new_vpool)
+            # Set caching
+            renewed_metadata['caching_info'][storagerouter.guid]['fragment_cache']['read'] = fragment_cache_on_read
+            renewed_metadata['caching_info'][storagerouter.guid]['fragment_cache']['write'] = fragment_cache_on_write
+            renewed_metadata['caching_info'][storagerouter.guid]['fragment_cache']['quota'] = parameters.get('cache_quota_fc')
+            renewed_metadata['caching_info'][storagerouter.guid]['block_cache']['read'] = block_cache_on_read
+            renewed_metadata['caching_info'][storagerouter.guid]['block_cache']['write'] = block_cache_on_write
+            renewed_metadata['caching_info'][storagerouter.guid]['block_cache']['quota'] = parameters.get('cache_quota_bc')
+            vpool.metadata = renewed_metadata
             vpool.save()
 
             # StorageDriver

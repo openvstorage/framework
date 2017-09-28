@@ -15,8 +15,9 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout'
-], function($, ko) {
+    'jquery', 'knockout',
+    'ovs/generic'
+], function($, ko, generic) {
     "use strict";
     // Caching data viewModel which is parsed from JS
     // Return a constructor for a nested viewModel
@@ -63,8 +64,8 @@ define([
         ko.mapping.fromJS(data, cacheTypeMapping, self);
 
         // Computed
-        self.isUsed = ko.computed(function() {
-           return self.cacheSetting !== 'None';
+        self.isUsed = ko.pureComputed(function() {
+           return self.cacheSetting() !== 'none';
 
         });
         self.cacheSetting = ko.computed({
@@ -115,10 +116,10 @@ define([
     var connectionInfoViewModel = function(data) {
         var self = this;
         // Observables (This will ensure that these observables are present even if the data is missing them)
-        self.client_id      = ko.observable();
-        self.client_secret  = ko.observable();
-        self.host           = ko.observable();
-        self.port           = ko.observable();
+        self.client_id      = ko.observable().extend({removeWhiteSpaces: null});
+        self.client_secret  = ko.observable().extend({removeWhiteSpaces: null});
+        self.host           = ko.observable().extend({regex: generic.hostRegex});
+        self.port           = ko.observable().extend({ numeric: {min: 1, max: 65535}});
         self.local          = ko.observable();
 
         self.isLocalBackend = ko.pureComputed({

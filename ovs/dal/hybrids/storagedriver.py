@@ -131,47 +131,30 @@ class StorageDriver(DataObject):
             if partition.role == DiskPartition.ROLES.WRITE and partition.sub_role == StorageDriverPartition.SUBROLE.SCO:
                 global_write_buffer += partition.size
 
-        cache_read = None
-        cache_write = None
-        cache_quota_fc = None
-        cache_quota_bc = None
-        backend_info = None
-        connection_info = None
-        block_cache_read = None
-        block_cache_write = None
-        block_cache_backend_info = None
-        block_cache_connection_info = None
-        metadata_key = 'backend_aa_{0}'.format(self.storagerouter_guid)
-        if metadata_key in self.vpool.metadata:
-            metadata = self.vpool.metadata[metadata_key]
-            backend_info = metadata['backend_info']
-            connection_info = metadata['connection_info']
-        metadata_key = 'backend_bc_{0}'.format(self.storagerouter_guid)
-        if metadata_key in self.vpool.metadata:
-            metadata = self.vpool.metadata[metadata_key]
-            block_cache_backend_info = metadata['backend_info']
-            block_cache_connection_info = metadata['connection_info']
-
-        if self.storagerouter_guid in self.vpool.metadata['backend']['caching_info']:
-            caching_info = self.vpool.metadata['backend']['caching_info'][self.storagerouter_guid]
-            cache_read = caching_info['fragment_cache_on_read']
-            cache_write = caching_info['fragment_cache_on_write']
-            cache_quota_fc = caching_info.get('quota_fc')
-            cache_quota_bc = caching_info.get('quota_bc')
-            block_cache_read = caching_info.get('block_cache_on_read')
-            block_cache_write = caching_info.get('block_cache_on_write')
-
-        return {'cache_read': cache_read,
-                'cache_write': cache_write,
-                'cache_quota_fc': cache_quota_fc,
-                'cache_quota_bc': cache_quota_bc,
-                'backend_info': backend_info,
-                'connection_info': connection_info,
-                'block_cache_read': block_cache_read,
-                'block_cache_write': block_cache_write,
-                'block_cache_backend_info': block_cache_backend_info,
-                'block_cache_connection_info': block_cache_connection_info,
-                'global_write_buffer': global_write_buffer}
+        vpool_backend_info = {'fragment_cache': {'read': False,
+                                                 'write': False,
+                                                 'quota': None,
+                                                 'backend_info': None},  # Will contain connection info if it wouldn't be None
+                              'block_cache': {'read': False,
+                                              'write': False,
+                                              'quota': None,
+                                              'backend_info': None}}
+        if 'caching_info' not in self.vpool.metadata:
+            self._logger.critical('Metadata structure has not been updated yet')
+            return vpool_backend_info
+        if self.storagerouter_guid not in self.vpool.metadata['caching_info']:
+            # No caching configured
+            return vpool_backend_info
+        for cache_type, cache_data in vpool_backend_info.iteritems():
+            caching_info = self.vpool.metadata['caching_info'][self.storagerouter_guid][cache_type]
+            # Update the cache data matching the keys currently specified in cache_data
+            cache_data.update((k, caching_info[k]) for k in cache_data.viewkeys() & caching_info.viewkeys())
+            # Possible set backend_info to None to match this view
+            if caching_info.is_backend is False:
+                cache_data.backend_info = None
+        # Add global write buffer
+        vpool_backend_info['global_write_buffer'] = global_write_buffer
+        return vpool_backend_info
 
     def _cluster_node_config(self):
         """

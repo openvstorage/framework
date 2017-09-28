@@ -17,7 +17,7 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <!-- ko with: data.configParams -->
-    <pre data-bind="text: ko.toJSON(ko.mapping.fromJS($data), null, 2)"></pre>
+    <pre data-bind="text: ko.toJSON(ko.mapping.toJS($root.data.configParams), null, 2)"></pre>
     <!-- Root is the wizard, as is the parent-->
     <div style="margin-bottom: 5px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_config.dtl"></span>
@@ -35,9 +35,6 @@ but WITHOUT ANY WARRANTY of any kind.
                   data-bind="dropdown: {
                                  items: $root.dtlModes,
                                  target: dtl_mode,
-                                 text: function(item) {
-                                     return $.t('ovs:storagedrivers.general.dtl_modes.' + item.name);
-                                 }
                              }">
             </span>
         </div>
@@ -49,9 +46,6 @@ but WITHOUT ANY WARRANTY of any kind.
                   data-bind="dropdown: {
                                  items: $root.dtlTransportModes,
                                  target: dtl_transport,
-                                 text: function(item) {
-                                     return $.t('ovs:storagedrivers.general.dtl_transport_modes.' + item.name);
-                                 }
                              }">
             </span>
         </div>

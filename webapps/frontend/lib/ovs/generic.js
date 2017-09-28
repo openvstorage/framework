@@ -536,7 +536,14 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         // Reset all properties to undefined (props can also be observables)
         var currentDepth = 0;
         depth = 0 || depth;
-        ignoredProps = (Object.prototype.toString.call( ignoredProps ) === '[object Array]') ? ignoredProps : [];  // Only accept arrays
+        // Argument validation
+        if (typeof ignoredProps !== undefined) {
+            if (Object.prototype.toString.call( ignoredProps ) !== '[object Array]') {
+                throw new Error('Ignored props should be an Array')
+            }
+        } else {
+            ignoredProps = []
+        }
         var props = [];
         do {
             var fetchedProps = Object.getOwnPropertyNames(obj)
@@ -544,8 +551,8 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
                 .filter(function(prop, index, arr) {
                     return !prop.startsWith('__') &&                        // ignore requirejs props
                         !ignoredProps.contains(prop) &&                     // Not in ignored props
-                        typeof obj[prop] !== 'function' ||                  // Only the observables / non-function
-                        (ko.isObservable(obj[prop]) && !ko.isComputed(obj[prop])) &&
+                        (typeof obj[prop] !== 'function' ||                 // Only the observables / non-function
+                        (ko.isObservable(obj[prop]) && !ko.isComputed(obj[prop]))) &&
                         prop !== 'constructor' &&                           // Not the constructor
                         (index === 0 || prop !== arr[index - 1]) &&         // Not overriding in this prototype
                         !props.contains(prop)                               // Not overridden in a child
