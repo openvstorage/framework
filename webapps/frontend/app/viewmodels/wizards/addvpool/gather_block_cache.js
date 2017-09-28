@@ -194,14 +194,30 @@ define([
                         var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
-                                getData.contents = 'name,ns_statistics,presets,usages';
+                                getData.contents = 'local_summary,name,ns_statistics,presets,usages';
                                 calls.push(
-                                    api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
+                                    api.get(relay + 'alba/backends/' + item.guid + '/', {queryparams: getData})
                                         .then(function(data) {
                                             if (self.data.backend() === undefined || data.guid !== self.data.backend().guid) {
-                                                var backendSize = data.usages.size;
-                                                if ((backendSize !== undefined && backendSize > 0)) {
-                                                    available_backends.push(data);
+                                                // Not using data.usages.size for GLOBAL backends because of issue: https://github.com/openvstorage/framework/issues/1802
+                                                // data.usages.size as of 2.10.0 does work for GLOBAL backends because of list-osds i/o asd-multistatistics
+                                                var available_backend = false;
+                                                if (data.scaling === 'LOCAL') {
+                                                    var backendSize = data.usages.size;
+                                                    if ((backendSize !== undefined && backendSize > 0)) {
+                                                        available_backends.push(data);
+                                                        available_backend = true;
+                                                    }
+                                                } else if (data.scaling === 'GLOBAL') {
+                                                    $.each(data.local_summary.devices, function(color, amount) {
+                                                        if (color !== 'gray' && amount > 0) {
+                                                            available_backends.push(data);
+                                                            available_backend = true;
+                                                            return false;
+                                                        }
+                                                    })
+                                                }
+                                                if (available_backend === true) {
                                                     self.albaPresetMap()[data.guid] = {};
                                                     $.each(data.presets, function (_, preset) {
                                                         self.albaPresetMap()[data.guid][preset.name] = preset.is_available;
