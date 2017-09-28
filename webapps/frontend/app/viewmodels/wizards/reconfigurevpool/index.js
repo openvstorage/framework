@@ -36,7 +36,7 @@ define([
         self.activateStep();
 
         // Cleaning data
-        generic.cleanObject(data);
+        generic.cleanObject(data, 0, ['albaPresetMap']);
         data.albaPresetMap({});  // set this to an empty object as cleanObject will set it to undefined
         // Set current data
         data.vPool(options.vPool);

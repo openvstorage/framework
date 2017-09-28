@@ -31,6 +31,7 @@ from rest_framework import status
 from rest_framework.request import Request
 from api.backend.toolbox import ApiToolbox
 from api.helpers import OVSResponse
+from ovs.dal.dataobject import DataObject
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -373,14 +374,13 @@ def return_list(object_type, default_sort=None):
 
 def return_object(object_type, mode=None):
     """
-    Object decorator
+    Object decorator to return a serialized Hybrid
     """
 
     def wrap(f):
         """
         Wrapper function
         """
-
         return_status = status.HTTP_200_OK
         if mode == 'accepted':
             return_status = status.HTTP_202_ACCEPTED
@@ -406,6 +406,10 @@ def return_object(object_type, mode=None):
 
             start = time.time()
             obj = f(*args, **kwargs)
+            if not isinstance(obj, DataObject):
+                raise TypeError('Returned object is not a hybrid')
+            if not isinstance(obj, object_type):
+                raise TypeError('Returned Hybrid is not of type {0}'.format(str(object_type)))
             timings['fetch'] = [time.time() - start, 'Fetching data']
 
             obj.reset_timings()

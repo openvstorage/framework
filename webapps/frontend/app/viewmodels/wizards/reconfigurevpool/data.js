@@ -28,10 +28,10 @@ define(['jquery', 'knockout',
             // Changes
             // General vPool changes
             configParams:                       undefined,  // Changes related to general configs (sco size, dtl ...)
-            // Storagedriver changes
+            // Storage driver changes
             cachingData:                        undefined,  // Changes related to fragment cache and block cache
-            globalWriteBuffer:                  ko.observable(),
-            proxyAmount:                        ko.observable(),
+            globalWriteBuffer:                  ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}}),
+            proxyAmount:                        ko.observable().extend({numeric: {min: 1, max: 16}}),
             // Shared across the pages
             // Handles
             loadBackendsHandle:                  undefined,
@@ -42,7 +42,7 @@ define(['jquery', 'knockout',
             invalidBackendInfo:                 ko.observable(),
             loadingBackends:                    ko.observable(),
             globalWriteBufferMax:               ko.observable(),  // Used to detect over allocation
-            srPartitions:                       ko.observableArray()
+            srPartitions:                       ko.observable()
         };
         // Computed
         wizardData.hasCacheQuota = ko.pureComputed(function() {

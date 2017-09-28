@@ -18,24 +18,27 @@
 VPool module
 """
 
+import copy
 import json
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs_extensions.api.client import OVSClient
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import log
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox
-from ovs.lib.storagerouter import StorageRouterController
-from ovs_extensions.api.client import OVSClient
 
 
 class VPoolController(object):
     """
     Contains all BLL related to VPools
     """
+    _logger = Logger('lib')
 
     @staticmethod
     @ovs_task(name='ovs.vpool.up_and_running')
@@ -67,6 +70,8 @@ class VPoolController(object):
         :return: Name of the zipfile containing the configuration files
         :rtype: str
         """
+        from ovs.lib.storagerouter import StorageRouterController  # Avoid circular import
+
         # Validations
         required_params = {'port': (int, {'min': 1, 'max': 65535}),
                            'identifier': (str, Toolbox.regex_vpool)}
@@ -185,3 +190,109 @@ class VPoolController(object):
                                   'config/{0}'.format(identifier)])
         local_client.dir_delete(directories='/opt/OpenvStorage/config/{0}'.format(identifier))
         return tgz_name
+
+    @staticmethod
+    def get_renewed_backend_metadata(vpool_guid, additional_params=None, metadata=None, new_vpool=False):
+        """
+        Renews and fills in the metadata from a given vpool
+        :param vpool_guid: Guid of the vPool to renew the metadata for
+        :param metadata: vPool metadata that could have been modified (Optional, will use vpools metadata when not provided)
+        :param new_vpool: Indicates whether the supplied vpool is new
+        :param additional_params:
+        :return: dict with renewed metadata
+        """
+        from ovs.lib.storagerouter import StorageRouterController  # Avoid circular import
+
+        def _renew_backend_metadata(_vpool_guid, _backend_info, _additional_params, _new_vpool):
+            vpool = VPool(_vpool_guid)
+            sco_size = _additional_params['sco_size']
+            new_backend_info = copy.deepcopy(_backend_info)
+            ovs_client = OVSClient(ip=_backend_info['connection_info']['host'],
+                                   port=_backend_info['connection_info']['port'],
+                                   credentials=(_backend_info['connection_info']['client_id'],
+                                                _backend_info['connection_info']['client_secret']),
+                                   version=6,
+                                   cache_store=VolatileFactory.get_client())
+            preset_name = _backend_info['preset']
+            alba_backend_guid = _backend_info['alba_backend_guid']
+            arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid,
+                                                                                   ovs_client=ovs_client)
+            backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid),
+                                          params={'contents': 'name,usages,presets,backend,remote_stack'})
+            preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
+            print preset_info
+            if preset_name not in preset_info:
+                raise RuntimeError(
+                    'Given preset {0} is not available in backend {1}'.format(preset_name, backend_dict['name']))
+
+            policies = []
+            for policy_info in preset_info[preset_name]['policies']:
+                policy = json.loads('[{0}]'.format(policy_info.strip('()')))
+                policies.append(policy)
+            new_backend_info.update({'name': backend_dict['name'],
+                                     'preset': preset_name,
+                                     'policies': policies,
+                                     'sco_size': sco_size * 1024.0 ** 2 if _new_vpool is True else vpool.configuration['sco_size'] * 1024.0 ** 2,
+                                     'frag_size': float(preset_info[preset_name]['fragment_size']),
+                                     'total_size': float(backend_dict['usages']['size']),
+                                     'backend_guid': backend_dict['backend_guid'],
+                                     'alba_backend_guid': alba_backend_guid,
+                                     'connection_info': new_backend_info['connection_info'],
+                                     'arakoon_config': arakoon_config})
+            return new_backend_info
+
+        if additional_params is None:
+            raise RuntimeError('Additional params need to be supplied')
+        Toolbox.verify_required_params({'sco_size': (int, None)}, additional_params)
+        vpool = VPool(vpool_guid)
+        if metadata is None:
+            metadata = vpool.metadata
+        new_metadata = copy.deepcopy(metadata)
+        vpool_backend_info = metadata['backend']['backend_info']
+        new_metadata['backend']['backend_info']= _renew_backend_metadata(vpool_guid, vpool_backend_info, additional_params, new_vpool)
+        # Check for fragment and block cache
+        for storagerouter_guid, caching_data in metadata['caching_info'].iteritems():
+            for cache_type, cache_type_data in caching_data.iteritems():
+                if cache_type_data['is_backend'] is True:
+                    cache_type_data['backend_info'] = _renew_backend_metadata(vpool_guid, cache_type_data['backend_info'], additional_params, new_vpool)
+        return new_metadata
+
+    @staticmethod
+    def calculate_read_preferences(vpool_guid, storagerouter_guid, metadata=None):
+        """
+        Calculates the read preferences for a vpools metadata
+        :param vpool_guid: Guid of the vPool to calculate the read preference off
+        :param storagerouter_guid: Guid of the Storagerouter to calculate the read preference for
+        :param metadata: vPool metadata that could have been modified (Optional, will use vpools metadata when not provided)
+        :return: list with all read preferences
+        :rtype: list
+        """
+        def _calculate_read_preference(backend_info, regular_domains):
+            read_preferences = []
+            alba_backend_guid = backend_info['alba_backend_guid']
+            ovs_client = OVSClient(ip=backend_info['connection_info']['host'],
+                                   port=backend_info['connection_info']['port'],
+                                   credentials=(backend_info['connection_info']['client_id'],
+                                                backend_info['connection_info']['client_secret']),
+                                   version=6,
+                                   cache_store=VolatileFactory.get_client())
+            backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
+            if backend_dict['scaling'] == 'GLOBAL' and backend_info['connection_info']['local'] is True:
+                for node_id, value in backend_dict['remote_stack'].iteritems():
+                    if value.get('domain') is not None and value['domain']['guid'] in regular_domains:
+                        read_preferences.append(node_id)
+            return read_preferences
+
+        vpool = VPool(vpool_guid)
+        storagerouter = StorageRouter(storagerouter_guid)
+        all_read_preferences = []
+        if metadata is None:
+            metadata = vpool.metadata
+        vpool_backend_info = metadata['backend']['backend_info']
+        all_read_preferences.extend(_calculate_read_preference(vpool_backend_info, storagerouter.regular_domains))
+        # Check for fragment and block cache
+        for storagerouter_guid, caching_data in metadata['caching_info'].iteritems():
+            for cache_type, cache_type_data in caching_data.iteritems():
+                if cache_type_data['is_backend'] is True:
+                    all_read_preferences.extend(_calculate_read_preference( cache_type_data['backend_info'], storagerouter.regular_domains))
+        return all_read_preferences

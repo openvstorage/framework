@@ -245,6 +245,72 @@ class MigrationController(object):
                 vpool.metadata_store_bits = bits
                 vpool.save()
 
+        #####################################
+        # Update the vPool metadata structure
+        def _update_metadata_structure(metadata):
+            metadata = copy.deepcopy(metadata)
+            cache_structure = {'read': False,
+                               'write': False,
+                               'is_backend': False,
+                               'quota': None,
+                               'backend_info': {'name': None,  # Will be filled in when isBackend is true
+                                                'backend_guid': None,
+                                                'alba_backend_guid': None,
+                                                'policies': None,
+                                                'preset': None,
+                                                'arakoon_config': None,
+                                                'connection_info': {'client_id': None,
+                                                                    'client_secret': None,
+                                                                    'host': None,
+                                                                    'port': None,
+                                                                    'local': None}}
+                               }
+            structure_map = {'fragment_cache': {'read': 'fragment_cache_on_read',
+                                                'write': 'fragment_cache_on_write',
+                                                'quota': 'quota_fc',
+                                                'backend_prefix': 'backend_aa_{0}'},
+                             'block_cache': {'read': 'block_cache_on_read',
+                                             'write': 'block_cache_on_write',
+                                             'quota': 'quota_bc',
+                                             'backend_prefix': 'backend_bc_{0}'}}
+            if 'arakoon_config' in metadata['backend']:  # Arakoon config should be placed under the backend info
+                metadata['backend']['backend_info']['arakoon_config'] = metadata['backend'].pop('arakoon_config')
+            if 'connection_info' in metadata['backend']:  # Connection info sohuld be placed under the backend info
+                metadata['backend']['backend_info']['connection_info'] = metadata['backend'].pop('connection_info')
+            if 'caching_info' not in metadata:  # Caching info is the new key
+                would_be_caching_info = {}
+                metadata['caching_info'] = would_be_caching_info
+                # Extract all caching data for every storagerouter
+                current_caching_info = metadata['backend'].pop('caching_info')  # Pop to mutate metadata
+                for storagerouter_guid in current_caching_info.iterkeys():
+                    current_cache_data = current_caching_info[storagerouter_guid]
+                    storagerouter_caching_info = {}
+                    would_be_caching_info[storagerouter_guid] = storagerouter_caching_info
+                    for cache_type, cache_type_mapping in structure_map.iteritems():
+                        new_cache_structure = copy.deepcopy(cache_structure)
+                        storagerouter_caching_info[cache_type] = new_cache_structure
+                        for new_structure_key, old_structure_key in cache_type_mapping.iteritems():
+                            if new_structure_key == 'backend_prefix':
+                                # Get possible backend related info
+                                metadata_key = old_structure_key.format(storagerouter_guid)
+                                if metadata_key not in metadata:
+                                    continue
+                                backend_data = metadata.pop(metadata_key)  # Pop to mutate metadata
+                                new_cache_structure['is_backend'] = True
+                                # Copy over the old data
+                                new_cache_structure['backend_info']['arakoon_config'] = backend_data['arakoon_config']
+                                new_cache_structure['backend_info'].update(backend_data['backend_info'])
+                                new_cache_structure['backend_info']['connection_info'].update(backend_data['connection_info'])
+                            else:
+                                new_cache_structure[new_structure_key] = current_cache_data.get(old_structure_key)
+            return metadata
+
+        vpools = VPoolList.get_vpools()
+        for vpool in vpools:
+            new_metadata = _update_metadata_structure(vpool.metadata)
+            vpool.metadata = new_metadata
+            vpool.save()
+
         ##############################################
         # Always use indent=4 during Configuration set
         def _resave_all_config_entries(config_path='/ovs'):
