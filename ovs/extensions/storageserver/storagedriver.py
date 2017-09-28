@@ -37,7 +37,7 @@ from volumedriver.storagerouter.storagerouterclient import \
     MaxRedirectsExceededException, MDSMetaDataBackendConfig,  MDSNodeConfig, \
     ObjectNotFoundException as SRCObjectNotFoundException, \
     ReadCacheBehaviour, ReadCacheMode, SnapshotNotFoundException, \
-    Role, Statistics, VolumeInfo
+    Role, Severity, Statistics, VolumeInfo
 try:
     from volumedriver.storagerouter.storagerouterclient import VolumeRestartInProgressException
 except ImportError:
@@ -58,6 +58,13 @@ else:
         FileSystemMetaDataClient = None
 
 
+LOG_LEVEL_MAPPING = {0: Severity.debug,
+                     10: Severity.debug,
+                     20: Severity.info,
+                     30: Severity.warning,
+                     40: Severity.error,
+                     50: Severity.fatal}
+
 client_vpool_cache = {}
 oclient_vpool_cache = {}
 crclient_vpool_cache = {}
@@ -77,7 +84,9 @@ class StorageDriverClient(object):
     """
     Client to access storagedriver client
     """
-    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
+    _log_level = LOG_LEVEL_MAPPING[OVSLogger('extensions').getEffectiveLevel()]
+    # noinspection PyCallByClass,PyTypeChecker
+    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -195,7 +204,9 @@ class MetadataServerClient(object):
     Builds a MDSClient
     """
     _logger = OVSLogger('extensions')
-    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
+    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
+    # noinspection PyCallByClass,PyTypeChecker
+    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
 
@@ -209,24 +220,31 @@ class MetadataServerClient(object):
         pass
 
     @staticmethod
-    def load(service):
+    def load(service, timeout=20):
         """
         Loads a MDSClient
         :param service: Service for which the MDSClient needs to be loaded
+        :type service: ovs.dal.hybrids.service.Service
+        :param timeout: All calls performed by this MDSClient instance will time out after this period (in seconds)
+        :type timeout: int
+        :return: An MDSClient instance for the specified Service
+        :rtype: MDSClient
         """
         if service.storagerouter is None:
-            raise ValueError('MDS service {0} does not have a Storage Router linked to it'.format(service.name))
+            raise ValueError('Service {0} does not have a StorageRouter linked to it'.format(service.name))
 
         key = service.guid
-        if key not in mdsclient_service_cache:
+        # Create MDSClient instance if no instance has been cached yet or if another timeout has been specified
+        if key not in mdsclient_service_cache or timeout != mdsclient_service_cache[key]['timeout']:
             try:
                 # noinspection PyArgumentList
-                client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
-                mdsclient_service_cache[key] = client
-            except RuntimeError as ex:
-                MetadataServerClient._logger.error('Error loading MDSClient on {0}: {1}'.format(service.storagerouter.ip, ex))
+                mdsclient_service_cache[key] = {'client': MDSClient(timeout_secs=timeout,
+                                                                    mds_node_config=MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0])),
+                                                'timeout': timeout}
+            except RuntimeError:
+                MetadataServerClient._logger.exception('Error loading MDSClient on {0}'.format(service.storagerouter.ip))
                 return None
-        return mdsclient_service_cache[key]
+        return mdsclient_service_cache[key]['client']
 
 
 class ClusterRegistryClient(object):
@@ -299,36 +317,29 @@ class StorageDriverConfiguration(object):
     StorageDriver configuration class
     """
 
-    def __init__(self, config_type, vpool_guid, storagedriver_id):
+    def __init__(self, vpool_guid, storagedriver_id):
         """
         Initializes the class
         """
-        if config_type != 'storagedriver':
-            raise RuntimeError('Invalid configuration type. Allowed: storagedriver')
-
-        storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'))
+        _log_level = LOG_LEVEL_MAPPING[OVSLogger('extensions').getEffectiveLevel()]
+        # noinspection PyCallByClass,PyTypeChecker
+        storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
         # noinspection PyArgumentList
         storagerouterclient.Logger.enableLogging()
 
+        self._key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool_guid, storagedriver_id)
         self._logger = OVSLogger('extensions')
-        self.config_type = config_type
-        self.configuration = {}
-        self.key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool_guid, storagedriver_id)
-        self.remote_path = Configuration.get_configuration_path(self.key).strip('/')
-        self.is_new = True
-        self.dirty_entries = []
+        self._dirty_entries = []
 
-    def load(self):
-        """
-        Loads the configuration from a given file, optionally a remote one
-        """
-        self.configuration = {}
-        if Configuration.exists(self.key):
-            self.is_new = False
-            self.configuration = json.loads(Configuration.get(self.key, raw=True))
+        self.remote_path = Configuration.get_configuration_path(self._key).strip('/')
+        # Load configuration
+        if Configuration.exists(self._key):
+            self.configuration = json.loads(Configuration.get(self._key, raw=True))
+            self.config_missing = False
         else:
-            self._logger.debug('Could not find config {0}, a new one will be created'.format(self.key))
-        self.dirty_entries = []
+            self.configuration = {}
+            self.config_missing = True
+            self._logger.debug('Could not find config {0}, a new one will be created'.format(self._key))
 
     def save(self, client=None, force_reload=False):
         """
@@ -341,12 +352,12 @@ class StorageDriverConfiguration(object):
         :rtype: list
         """
         changes = []
-        Configuration.set(self.key, json.dumps(self.configuration, indent=4), raw=True)
+        Configuration.set(self._key, json.dumps(self.configuration, indent=4), raw=True)
 
         # No changes detected in the configuration management
-        if len(self.dirty_entries) == 0 and force_reload is False:
+        if len(self._dirty_entries) == 0 and force_reload is False:
             self._logger.debug('No need to apply changes, nothing changed')
-            self.is_new = False
+            self.config_missing = False
             return changes
 
         # Retrieve the changes from volumedriver
@@ -366,12 +377,12 @@ class StorageDriverConfiguration(object):
         # No changes
         if len(changes) == 0:
             if reloaded is True:
-                if len(self.dirty_entries) > 0:
-                    self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
+                if len(self._dirty_entries) > 0:
+                    self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self._dirty_entries)))
             else:
                 self._logger.warning('Changes were not applied since StorageDriver is unavailable')
-            self.is_new = False
-            self.dirty_entries = []
+            self.config_missing = False
+            self._dirty_entries = []
             return changes
 
         # Verify the output of the changes and log them
@@ -383,15 +394,15 @@ class StorageDriverConfiguration(object):
 
             param_name = change['param_name']
             if force_reload is False:
-                if param_name not in self.dirty_entries:
+                if param_name not in self._dirty_entries:
                     raise RuntimeError('Unexpected configuration change: {0}'.format(param_name))
-                self.dirty_entries.remove(param_name)
+                self._dirty_entries.remove(param_name)
             self._logger.info('Changed {0} from "{1}" to "{2}"'.format(param_name, change['old_value'], change['new_value']))
         self._logger.info('Changes applied')
-        if len(self.dirty_entries) > 0:
-            self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
-        self.is_new = False
-        self.dirty_entries = []
+        if len(self._dirty_entries) > 0:
+            self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self._dirty_entries)))
+        self.config_missing = False
+        self._dirty_entries = []
         return changes
 
     def __getattr__(self, item):
@@ -412,7 +423,7 @@ class StorageDriverConfiguration(object):
             if section not in self.configuration:
                 self.configuration[section] = {}
             if item not in self.configuration[section] or self.configuration[section][item] != value:
-                self.dirty_entries.append(item)
+                self._dirty_entries.append(item)
             self.configuration[section][item] = value
 
     def _delete(self, section):

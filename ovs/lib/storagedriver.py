@@ -78,9 +78,9 @@ class StorageDriverController(object):
         :return: None
         """
         if code == VolumeDriverEvents_pb2.MDSFailover:
-            disk = VDiskList.get_vdisk_by_volume_id(volume_id)
-            if disk is not None:
-                MDSServiceController.ensure_safety(disk)
+            vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+            if vdisk is not None:
+                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
 
     @staticmethod
     @ovs_task(name='ovs.storagedriver.cluster_registry_checkup', schedule=Schedule(minute='0', hour='0'), ensure_single_info={'mode': 'CHAINED'})
@@ -196,10 +196,7 @@ class StorageDriverController(object):
         except UnableToConnectException:
             raise Exception('StorageRouter with IP {0} is not reachable. Cannot refresh the configuration'.format(storagedriver.storagerouter.ip))
 
-        storagedriver_config = StorageDriverConfiguration(config_type='storagedriver',
-                                                          vpool_guid=storagedriver.vpool_guid,
-                                                          storagedriver_id=storagedriver.storagedriver_id)
-        storagedriver_config.load()
+        storagedriver_config = StorageDriverConfiguration(vpool_guid=storagedriver.vpool_guid, storagedriver_id=storagedriver.storagedriver_id)
         return len(storagedriver_config.save(client=client, force_reload=True))
 
     #########
@@ -394,8 +391,7 @@ class StorageDriverController(object):
         if Configuration.dir_exists('/ovs/vpools'):
             for vpool_guid in Configuration.list('/ovs/vpools'):
                 for storagedriver_id in Configuration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
-                    storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_guid, storagedriver_id)
-                    storagedriver_config.load()
+                    storagedriver_config = StorageDriverConfiguration(vpool_guid, storagedriver_id)
                     storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=cluster_name,
                                                                    vregistry_arakoon_cluster_nodes=arakoon_nodes)
                     storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',

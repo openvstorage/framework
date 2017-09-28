@@ -66,7 +66,8 @@ class Descriptor(object):
                     mod = __import__(fqm_name, level=0, fromlist=[type_name])
                     _ = getattr(mod, type_name)
                 except (ImportError, AttributeError):
-                    Descriptor._logger.info('Received object type {0} is not a hybrid'.format(object_type))
+                    if module_name != '__builtin__':
+                        Descriptor._logger.info('Received object type {0} is not a hybrid'.format(object_type))
                     raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
                 self._descriptor = {'fqmn': fqm_name,
                                     'type': type_name,

@@ -52,7 +52,6 @@ class MigrationController(object):
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-        from ovs.lib.generic import GenericController
 
         MigrationController._logger.info('Start out of band migrations...')
         service_manager = ServiceFactory.get_manager()
@@ -165,8 +164,7 @@ class MigrationController(object):
 
             # Update 'backend_connection_manager' section
             changes = False
-            storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-            storagedriver_config.load()
+            storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
             if 'backend_connection_manager' not in storagedriver_config.configuration:
                 continue
 

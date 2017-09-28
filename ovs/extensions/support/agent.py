@@ -69,7 +69,7 @@ class SupportAgent(object):
         try:
             # Versions
             manager = PackageFactory.get_manager()
-            data['metadata']['versions'] = dict((pkg_name, str(version)) for pkg_name, version in manager.get_installed_versions())  # Fallback to check_output
+            data['metadata']['versions'] = dict((pkg_name, str(version)) for pkg_name, version in manager.get_installed_versions().iteritems())  # Fallback to check_output
         except Exception, ex:
             data['errors'].append(str(ex))
         try:
@@ -157,7 +157,7 @@ class SupportAgent(object):
         try:
             response = requests.post(self._url,
                                      data={'data': json.dumps(self.get_heartbeat_data())},
-                                     headers={'Accept': 'application/json; version=6'})
+                                     headers={'Accept': 'application/json; version=1'})
             if response.status_code != 200:
                 raise RuntimeError('Received invalid status code: {0} - {1}'.format(response.status_code, response.text))
             return_data = response.json()

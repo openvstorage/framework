@@ -511,12 +511,13 @@ class MDSClient(object):
     _catchup = {}
     _roles = {}
 
-    def __init__(self, node_config, key=None):
+    def __init__(self, mds_node_config, timeout_secs=20, key=None):
         """
         Dummy init method
         """
+        _ = timeout_secs
         if key is None:
-            self.key = '{0}:{1}'.format(node_config.address(), node_config.port())
+            self.key = '{0}:{1}'.format(mds_node_config.address(), mds_node_config.port())
         else:
             self.key = key
 
@@ -528,43 +529,51 @@ class MDSClient(object):
         MDSClient._catchup = {}
         MDSClient._roles = {}
 
-    def catch_up(self, volume_id, dry_run):
+    def catch_up(self, nspace, dry_run):
         """
         Dummy catchup
         """
         if self.key not in MDSClient._catchup:
             MDSClient._catchup[self.key] = {}
-        if volume_id not in MDSClient._catchup[self.key]:
+        if nspace not in MDSClient._catchup[self.key]:
             raise RuntimeError('Namespace does not exist')
         if dry_run is False:
-            MDSClient._catchup[self.key][volume_id] = 0
-        return MDSClient._catchup[self.key][volume_id]
+            MDSClient._catchup[self.key][nspace] = 0
+        return MDSClient._catchup[self.key][nspace]
 
-    def create_namespace(self, volume_id):
+    def create_namespace(self, nspace):
         """
         Dummy create namespace method
         """
         if self.key not in MDSClient._catchup:
             MDSClient._catchup[self.key] = {}
-        MDSClient._catchup[self.key][volume_id] = 0
+        MDSClient._catchup[self.key][nspace] = 0
         if self.key not in MDSClient._roles:
             MDSClient._roles[self.key] = {}
-        MDSClient._roles[self.key][volume_id] = None
+        MDSClient._roles[self.key][nspace] = None
 
-    def remove_namespace(self, volume_id):
+    def list_namespaces(self):
+        """
+        Dummy list namespaces method
+        """
+        if self.key not in MDSClient._catchup:
+            return []
+        return MDSClient._catchup[self.key].keys()
+
+    def remove_namespace(self, nspace):
         """
         Dummy remove namespace method
         """
         if self.key not in MDSClient._catchup:
             MDSClient._catchup[self.key] = {}
-        if volume_id in MDSClient._catchup[self.key]:
-            del MDSClient._catchup[self.key][volume_id]
+        if nspace in MDSClient._catchup[self.key]:
+            del MDSClient._catchup[self.key][nspace]
         else:
             raise RuntimeError('Namespace does not exist')
         if self.key not in MDSClient._roles:
             MDSClient._roles[self.key] = {}
-        if volume_id in MDSClient._roles[self.key]:
-            del MDSClient._roles[self.key][volume_id]
+        if nspace in MDSClient._roles[self.key]:
+            del MDSClient._roles[self.key][nspace]
         else:
             raise RuntimeError('Namespace does not exist')
 
@@ -574,26 +583,26 @@ class MDSClient(object):
         """
         return volume_id in MDSClient._catchup.get(self.key, {}) and volume_id in MDSClient._roles.get(self.key, {})
 
-    def set_role(self, volume_id, role, _internal=False):
+    def set_role(self, nspace, role, _internal=False):
         """
         Dummy set role method
         """
         if self.key not in MDSClient._catchup:
             MDSClient._roles[self.key] = {}
-        if volume_id not in MDSClient._roles[self.key]:
+        if nspace not in MDSClient._roles[self.key]:
             raise RuntimeError('Namespace does not exist')
-        MDSClient._roles[self.key][volume_id] = role
+        MDSClient._roles[self.key][nspace] = role
         StorageRouterClient.mds_recording.append('{0}: {1} ({2})'.format(self.key, role, 'I' if _internal is True else 'E'))
 
-    def _get_role(self, volume_id):
+    def get_role(self, nspace):
         """
         Gets the role for a volume
         """
         if self.key not in MDSClient._catchup:
             MDSClient._roles[self.key] = {}
-        if volume_id not in MDSClient._roles[self.key]:
+        if nspace not in MDSClient._roles[self.key]:
             raise RuntimeError('Namespace does not exist')
-        return MDSClient._roles[self.key][volume_id]
+        return MDSClient._roles[self.key][nspace]
 
     @staticmethod
     def set_catchup(key, volume_id, tlogs):

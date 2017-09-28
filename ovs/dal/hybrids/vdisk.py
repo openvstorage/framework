@@ -37,6 +37,8 @@ class VDisk(DataObject):
     """
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     """
+    STATUSES = DataObject.enumerator('Status', ['HALTED', 'NON_RUNNING', 'RUNNING'])
+
     _logger = Logger('hybrids')
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
@@ -176,13 +178,9 @@ class VDisk(DataObject):
         if not self.volume_id or not self.vpool:
             return []
 
-        volume_id = str(self.volume_id)
+        from ovs.lib.vdisk import VDiskController
         try:
-            try:
-                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
-            except VolumeRestartInProgressException:
-                time.sleep(0.5)
-                return self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+            return VDiskController.list_snapshot_ids(vdisk=self)
         except:
             return []
 
@@ -191,7 +189,8 @@ class VDisk(DataObject):
         Fetches the information of all snapshots for this vDisk
         """
         snapshots = []
-        for snap_id in self._snapshot_ids():
+        self.invalidate_dynamics('snapshot_ids')
+        for snap_id in self.snapshot_ids:
             try:
                 snapshot = self.storagedriver_client.info_snapshot(str(self.volume_id), snap_id, req_timeout_secs=2)
             except SnapshotNotFoundException:
@@ -251,7 +250,7 @@ class VDisk(DataObject):
                                                        'port': nodeconfig.port()})
                 else:
                     vdiskinfodict[key] = objectvalue
-        vdiskinfodict['live_status'] = 'NON-RUNNING' if max_redirects is True else ('RUNNING' if vdiskinfodict['halted'] is False else 'HALTED')
+        vdiskinfodict['live_status'] = VDisk.STATUSES.NON_RUNNING if max_redirects is True else (VDisk.STATUSES.RUNNING if vdiskinfodict['halted'] is False else VDisk.STATUSES.HALTED)
         return vdiskinfodict
 
     def _statistics(self, dynamic):
