@@ -439,34 +439,39 @@ class StorageDriverController(object):
         return {}
 
     @staticmethod
-    def configure_proxies_configs(vpool_guid, storagedriver_guid, read_preferences):
+    def setup_proxy_configs(vpool_guid, storagedriver_guid, read_preferences, frag_size, local_amount_of_proxies, sdp_frags):
+        """
+        Sets up the proxies their configuration data in the configuration management
+        :param vpool_guid: Guid of the vPool to deploy proxies for
+        :param storagedriver_guid: Guid of the Storagedriver to deploy proxies for
+        :param read_preferences:
+        :param frag_size: Fragment size to be used
+        :param local_amount_of_proxies: Amount of proxies to deploy
+        :param sdp_frags:
+        :return:
+        """
+        from ovs.lib.storagerouter import StorageRouterController  # Avoid circular reference
         vpool = VPool(vpool_guid)
         storagedriver = StorageDriver(storagedriver_guid)
-        storagerouter = storagedriver.storagerouter
 
         block_cache_setting = vpool.metadata['caching_info']['block_cache']
         fragment_cache_setting = vpool.metadata['caching_info']['fragment_cache']
 
         # Validate features
-        storagerouter.invalidate_dynamics(['features'])
-        features = storagerouter.features
-        if features is None:
-            raise RuntimeError('Could not load available features')
-        supports_block_cache = 'block-cache' in features['alba']['features']
+
+        supports_block_cache = StorageRouterController.supports_block_cache(storagedriver.storagerouter_guid)
         if supports_block_cache is False and (block_cache_setting['read'] is True or block_cache_setting['write'] is True):
             raise RuntimeError('Block cache is not a supported feature')
 
-        use_block_cache_backend = block_cache_setting['is_backend']
-        use_fragment_cache_backend = fragment_cache_setting['is_backend']
         # Configure regular proxies and scrub proxies
         manifest_cache_size = 16 * 1024 * 1024 * 1024
         for proxy_id, alba_proxy in enumerate(storagedriver.alba_proxies):
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
             metadata_keys = {'backend': 'abm'}
             if fragment_cache_setting['is_backend'] is True:
-                metadata_keys['backend_aa_{0}'.format(storagerouter.guid)] = 'abm_aa'
+                metadata_keys['backend_aa_{0}'.format(storagedriver.storagerouter_guid)] = 'abm_aa'
             if block_cache_setting['is_backend'] is True:
-                metadata_keys['backend_bc_{0}'.format(storagerouter.guid)] = 'abm_bc'
+                metadata_keys['backend_bc_{0}'.format(storagedriver.storagerouter_guid)] = 'abm_bc'
             for metadata_key in metadata_keys:
                 arakoon_config = vpool.metadata[metadata_key]['arakoon_config']
                 arakoon_config = ArakoonClusterConfig.convert_config_to(config=arakoon_config, return_type='INI')
@@ -479,9 +484,7 @@ class StorageDriverController(object):
                 fragment_cache_info = ['alba', {
                     'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
                     'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
-                                                   'preset':
-                                                       vpool.metadata['backend_aa_{0}'.format(storagerouter.guid)][
-                                                           'backend_info']['preset']}],
+                                                   'preset': vpool.metadata['backend_aa_{0}'.format(storagedriver.storagerouter_guid)]['backend_info']['preset']}],
                     'manifest_cache_size': manifest_cache_size,
                     'cache_on_read': fragment_cache_setting['read'],
                     'cache_on_write': fragment_cache_setting['write']}]
@@ -502,9 +505,7 @@ class StorageDriverController(object):
                 block_cache_info = ['alba', {
                     'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_bc')),
                     'bucket_strategy': ['1-to-1', {'prefix': '{0}_bc'.format(vpool.guid),
-                                                   'preset':
-                                                       vpool.metadata['backend_bc_{0}'.format(storagerouter.guid)][
-                                                           'backend_info']['preset']}],
+                                                   'preset': vpool.metadata['backend_bc_{0}'.format(storagedriver.storagerouter_guid)]['backend_info']['preset']}],
                     'manifest_cache_size': manifest_cache_size,
                     'cache_on_read': block_cache_setting['read'],
                     'cache_on_write': block_cache_setting['write']}]

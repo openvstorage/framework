@@ -95,16 +95,42 @@ class StorageRouterController(object):
     @ovs_task(name='ovs.storagerouter.get_metadata')
     def get_metadata(storagerouter_guid):
         """
-        Gets physical information about the machine this task is running on
+        Gets physical information about the specified storagerouter
         :param storagerouter_guid: StorageRouter guid to retrieve the metadata for
         :type storagerouter_guid: str
         :return: Metadata information about the StorageRouter
         :rtype: dict
         """
+        return {'partitions': StorageRouterController.get_partition_info(storagerouter_guid),
+                'ipaddresses': StorageRouterController.get_ip_addresses(storagerouter_guid),
+                'scrub_available': StorageRouterController._check_scrub_partition_present()}
+
+    @staticmethod
+    def get_ip_addresses(storagerouter_guid):
+        """
+        Retrieves the ip addresses of a Storageroter
+        :param storagerouter_guid: Guid of the Storagerouter
+        :return: list of ip addresses
+        :rtype: list
+        """
+        storagerouter = StorageRouter(storagerouter_guid)
+        client = SSHClient(storagerouter)
+        return OSFactory.get_manager().get_ip_addresses(client=client)
+
+    @staticmethod
+    def get_partition_info(storagerouter_guid):
+        """
+        Retrieves information about the partitions of a Storagerouter
+        :param storagerouter_guid: Guid of the Storagerouter
+        :type storagerouter_guid: str
+        :return: dict with information about the partitions
+        :rtype: dict
+        """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter)
         services_mds = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER).services
-        services_arakoon = [service for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services if service.name != 'arakoon-ovsdb' and service.is_internal is True]
+        services_arakoon = [service for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services
+                            if service.name != 'arakoon-ovsdb' and service.is_internal is True]
 
         partitions = dict((role, []) for role in DiskPartition.ROLES)
         for disk in storagerouter.disks:
@@ -167,9 +193,147 @@ class StorageRouterController(object):
             if size < largest_write_cache * 5 / 100 or size < 1024 ** 3:
                 partitions[DiskPartition.ROLES.WRITE][index]['usable'] = False
 
-        return {'partitions': partitions,
-                'ipaddresses': OSFactory.get_manager().get_ip_addresses(client=client),
-                'scrub_available': StorageRouterController._check_scrub_partition_present()}
+        return partitions
+
+    @staticmethod
+    def supports_block_cache(storagerouter_guid):
+        """
+        Checks whether a Storagerouter support block cache
+        :param storagerouter_guid: Guid of the Storagerouter to check
+        :type storagerouter_guid: str
+        :return: True or False
+        :rtype: bool
+        """
+        storagerouter = StorageRouter(storagerouter_guid)
+        storagerouter.invalidate_dynamics(['features'])
+        features = storagerouter.features
+        if features is None:
+            raise RuntimeError('Could not load available features')
+        return 'block-cache' in features['alba']['features']
+
+    @staticmethod
+    def verify_fragment_cache_size(storagerouter_guid, writecache_size_requested, amount_of_proxies, fragment_cache_settings,
+                                   block_cache_settings, partition_info=None):
+        """
+        Verifies whether the fragment cache size is large enough
+        :param storagerouter_guid: Guid of the Storagerouter to check
+        :param writecache_size_requested: Requested size that should be checked if it is possible
+        :param amount_of_proxies: Amount of proxies that would be deployed
+        :param fragment_cache_settings: Information about the fragment cache
+        :param block_cache_settings: Information about the block cache
+        :param partition_info: Information about the partitions (Optional, won't query for the info if supplied)
+        :return: dict with information about the mointpoint and possible errors
+        :rtype: dict
+        """
+        if partition_info is None:
+            partition_info = StorageRouterController.get_partition_info(storagerouter_guid)
+        error_messages = []
+        # Calculate available write cache size
+        usable_write_partitions = [part for part in partition_info[DiskPartition.ROLES.WRITE] if part['usable'] is True]
+        writecache_size_available = sum(part['available'] for part in usable_write_partitions)
+
+        largest_ssd_write_partition = None
+        largest_sata_write_partition = None
+        largest_ssd = 0
+        largest_sata = 0
+        for info in usable_write_partitions:
+            if info['ssd'] is True and info['available'] > largest_ssd:
+                largest_ssd = info['available']
+                largest_ssd_write_partition = info['guid']
+            elif info['ssd'] is False and info['available'] > largest_sata:
+                largest_sata = info['available']
+                largest_sata_write_partition = info['guid']
+
+        mountpoint_cache = None
+        local_amount_of_proxies = 0
+        largest_write_mountpoint = None
+        if largest_ssd_write_partition is None and largest_sata_write_partition is None:
+            error_messages.append('No WRITE partition found to put the local caches on')
+        else:
+            largest_write_mountpoint = DiskPartition(largest_ssd_write_partition or largest_sata_write_partition)
+            if fragment_cache_settings['is_backend'] is False:
+                if fragment_cache_settings['read'] is True or fragment_cache_settings['write'] is True:  # Local fragment caching
+                    local_amount_of_proxies += amount_of_proxies
+            if block_cache_settings['is_backend'] is False:
+                if block_cache_settings['read'] is True or block_cache_settings['write'] is True:  # Local block caching
+                    local_amount_of_proxies += amount_of_proxies
+            if local_amount_of_proxies > 0:
+                mountpoint_cache = largest_write_mountpoint
+                one_gib = 1024 ** 3  # 1GiB
+                proportion = float(largest_ssd or largest_sata) * 100.0 / writecache_size_available
+                available = proportion * writecache_size_requested / 100 * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
+                fragment_size = available / local_amount_of_proxies
+                if fragment_size < one_gib:
+                    maximum = local_amount_of_proxies
+                    while True:
+                        if maximum == 0 or available / maximum > one_gib:
+                            break
+                        maximum -= 2 if local_amount_of_proxies > amount_of_proxies else 1
+                    error_messages.append(
+                        'Cache location is too small to deploy {0} prox{1}. {2}1GiB is required per proxy and with an available size of {3:.2f}GiB, {4} prox{5} can be deployed'.format(
+                            amount_of_proxies,
+                            'y' if amount_of_proxies == 1 else 'ies',
+                            '2x ' if local_amount_of_proxies > amount_of_proxies else '',
+                            available / 1024.0 ** 3, maximum, 'y' if maximum == 1 else 'ies'))
+        return {'errors': error_messages,
+                'largest_write_mountpoint': largest_write_mountpoint,
+                'mountpoint_cache': mountpoint_cache}
+
+    @staticmethod
+    def verify_required_roles(storagerouter_guid, required_roles=list(), partition_info=None):
+        """
+        Verifies if a storagerouter has all the specified required roles
+        :param storagerouter_guid: Guid of the Storagerouter
+        :param required_roles: list of roles
+        :param partition_info: Information about the partitions (Optional, won't query for the info if supplied)
+        :return: list with errors
+        :rtype: list
+        """
+        if partition_info is None:
+            partition_info = StorageRouterController.get_partition_info(storagerouter_guid)
+        error_messages = []
+        metadata = StorageRouterController.get_metadata(storagerouter_guid)
+        partition_info = metadata['partitions']
+        if metadata['scrub_available'] is False:
+            error_messages.append('At least 1 StorageRouter must have a partition with a {0} role'.format(DiskPartition.ROLES.SCRUB))
+
+        for required_role in required_roles:
+            if required_role not in partition_info:
+                error_messages.append('Missing required partition with a {0} role'.format(required_role))
+            elif len(partition_info[required_role]) == 0:
+                error_messages.append('At least 1 partition with a {0} role is required per StorageRouter'.format(required_role))
+            elif required_role in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL]:
+                if len(partition_info[required_role]) > 1:
+                    error_messages.append('Only 1 partition with a {0} role is allowed per StorageRouter'.format(required_role))
+            else:
+                total_available = [part['available'] for part in partition_info[required_role]]
+                if total_available == 0:
+                    error_messages.append('Not enough available space for {0}'.format(required_role))
+
+        return error_messages
+
+    @staticmethod
+    def verify_mounted_mointpoints(storagerouter_guid, roles=list(), partition_info=None):
+        """
+        Verify that the specified roles are actually mounted
+        :param storagerouter_guid: Guid of the Storagerouter to check mounts on
+        :param roles: list of roles to check if they are mounted
+        :param partition_info: Information about the partitions (Optional, won't query for the info if supplied)
+        :return: list of errors
+        :rtype: list
+        """
+        if partition_info is None:
+            partition_info = StorageRouterController.get_partition_info(storagerouter_guid)
+        error_messages = []
+        storagerouter = StorageRouter(storagerouter_guid)
+        client = SSHClient(storagerouter)
+        for role, part_info in partition_info.iteritems():
+            if role not in roles:
+                continue
+            for part in part_info:
+                if not client.is_mounted(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
+                    error_messages.append('Mount point {0} is not mounted'.format(part['mountpoint']))
+        return error_messages
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.add_vpool')
@@ -316,38 +480,27 @@ class StorageRouterController(object):
         partitions_mutex = volatile_mutex('add_vpool_partitions_{0}'.format(storagerouter.guid))
         try:
             partitions_mutex.acquire(wait=60)
+            error_messages = []
             # Check mount point
             metadata = StorageRouterController.get_metadata(storagerouter.guid)
-            error_messages = []
             partition_info = metadata['partitions']
+
             if StorageRouterController.mountpoint_exists(name=vpool_name, storagerouter_guid=storagerouter.guid):
                 error_messages.append('The mount point for vPool {0} already exists'.format(vpool_name))
 
             # Check mount points are mounted
-            for role, part_info in partition_info.iteritems():
-                if role not in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]:
-                    continue
-                for part in part_info:
-                    if not client.is_mounted(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
-                        error_messages.append('Mount point {0} is not mounted'.format(part['mountpoint']))
+            required_mounted_roles = [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]
+            error_messages.extend(StorageRouterController.verify_mounted_mointpoints(storagerouter_guid=storagerouter.guid,
+                                                                                     roles=required_mounted_roles,
+                                                                                     partition_info=partition_info))
 
             # Check required roles
+            required_roles = [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE]
             if metadata['scrub_available'] is False:
                 error_messages.append('At least 1 StorageRouter must have a partition with a {0} role'.format(DiskPartition.ROLES.SCRUB))
-
-            required_roles = [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE]
-            for required_role in required_roles:
-                if required_role not in partition_info:
-                    error_messages.append('Missing required partition with a {0} role'.format(required_role))
-                elif len(partition_info[required_role]) == 0:
-                    error_messages.append('At least 1 partition with a {0} role is required per StorageRouter'.format(required_role))
-                elif required_role in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL]:
-                    if len(partition_info[required_role]) > 1:
-                        error_messages.append('Only 1 partition with a {0} role is allowed per StorageRouter'.format(required_role))
-                else:
-                    total_available = [part['available'] for part in partition_info[required_role]]
-                    if total_available == 0:
-                        error_messages.append('Not enough available space for {0}'.format(required_role))
+            error_messages.extend(StorageRouterController.verify_required_roles(storagerouter_guid=storagerouter.guid,
+                                                                                required_roles=required_roles,
+                                                                                partition_info=partition_info))
 
             # Check backend information and connection information
             backend_info = parameters['backend_info']
@@ -418,54 +571,21 @@ class StorageRouterController(object):
                         error_messages.append('Specified StorageDriver config "{0}" with value {1} does not match the value {2}'.format(key, specified_value, current_value))
 
             # Verify fragment cache is large enough
-            largest_ssd_write_partition = None
-            largest_sata_write_partition = None
-            largest_ssd = 0
-            largest_sata = 0
-            for info in usable_write_partitions:
-                if info['ssd'] is True and info['available'] > largest_ssd:
-                    largest_ssd = info['available']
-                    largest_ssd_write_partition = info['guid']
-                elif info['ssd'] is False and info['available'] > largest_sata:
-                    largest_sata = info['available']
-                    largest_sata_write_partition = info['guid']
-
-            mountpoint_cache = None
             amount_of_proxies = parameters.get('parallelism', {}).get('proxies', 2)
             fragment_cache_on_read = parameters['fragment_cache_on_read']
             fragment_cache_on_write = parameters['fragment_cache_on_write']
-            local_amount_of_proxies = 0
-            largest_write_mountpoint = None
-            if largest_ssd_write_partition is None and largest_sata_write_partition is None:
-                error_messages.append('No WRITE partition found to put the local caches on')
-            else:
-                largest_write_mountpoint = DiskPartition(largest_ssd_write_partition or largest_sata_write_partition)
-                if use_fragment_cache_backend is False:
-                    if fragment_cache_on_read is True or fragment_cache_on_write is True:  # Local fragment caching
-                        local_amount_of_proxies += amount_of_proxies
-                if use_block_cache_backend is False:
-                    if block_cache_on_read is True or block_cache_on_write is True:  # Local block caching
-                        local_amount_of_proxies += amount_of_proxies
-                if local_amount_of_proxies > 0:
-                    mountpoint_cache = largest_write_mountpoint
-                    one_gib = 1024 ** 3  # 1GiB
-                    proportion = float(largest_ssd or largest_sata) * 100.0 / writecache_size_available
-                    available = proportion * writecache_size_requested / 100 * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
-                    fragment_size = available / local_amount_of_proxies
-                    if fragment_size < one_gib:
-                        maximum = local_amount_of_proxies
-                        while True:
-                            if maximum == 0 or available / maximum > one_gib:
-                                break
-                            maximum -= 2 if local_amount_of_proxies > amount_of_proxies else 1
-                        error_messages.append('Cache location is too small to deploy {0} prox{1}. {2}1GiB is required per proxy and with an available size of {3:.2f}GiB, {4} prox{5} can be deployed'.format(
-                            amount_of_proxies,
-                            'y' if amount_of_proxies == 1 else 'ies',
-                            '2x ' if local_amount_of_proxies > amount_of_proxies else '',
-                            available / 1024.0 ** 3,
-                            maximum,
-                            'y' if maximum == 1 else 'ies'
-                        ))
+
+            fragment_cache_settings = {'read': fragment_cache_on_read, 'write': fragment_cache_on_write, 'is_backend': use_fragment_cache_backend}
+            block_cache_settings = {'read': block_cache_on_read, 'write': block_cache_on_write, 'is_backend': use_block_cache_backend}
+            verify_output = StorageRouterController.verify_fragment_cache_size(storagerouter_guid=storagerouter.guid,
+                                                                               writecache_size_requested=writecache_size_requested,
+                                                                               amount_of_proxies=amount_of_proxies,
+                                                                               fragment_cache_settings=fragment_cache_settings,
+                                                                               block_cache_settings=block_cache_settings,
+                                                                               partition_info=partition_info)
+            error_messages.extend(verify_output['errors'])
+            largest_write_mountpoint = verify_output['largest_write_mountpoint']
+            mountpoint_cache = verify_output['mountpoint_cache']
 
             if error_messages:
                 raise ValueError('Errors validating the specified parameters:\n - {0}'.format('\n - '.join(set(error_messages))))
@@ -499,10 +619,6 @@ class StorageRouterController(object):
             updated_metadata['caching_info'][storagerouter.guid] = caching_info
 
             StorageRouterController._logger.info('Refreshing metadata for {0} has started'.format(vpool.name))
-            # import sys
-            # sys.path.append('/opt/OpenvStorage/pycharm-debug.egg')
-            # import pydevd
-            # pydevd.settrace('192.168.11.70', port=21000, stdoutToServer=True, stderrToServer=True)
             read_preferences = VPoolController.calculate_read_preferences(vpool.guid, storagerouter.guid, updated_metadata)
             # Load backend properties for metadata
             renewed_metadata = VPoolController.get_renewed_backend_metadata(vpool.guid, {'sco_size': sco_size}, updated_metadata, new_vpool)
