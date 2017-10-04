@@ -17,9 +17,11 @@
 """
 StorageDriver module
 """
+import time
 import copy
 import json
 from ovs.dal.hybrids.diskpartition import DiskPartition
+from ovs.dal.hybrids.j_albaproxy import AlbaProxy
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
@@ -27,6 +29,7 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -34,12 +37,17 @@ from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInst
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.generic.system import System
+from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.vpool import VPoolController
 from volumedriver.storagerouter import VolumeDriverEvents_pb2
 
 
@@ -402,6 +410,200 @@ class StorageDriverController(object):
                     storagedriver_config.save()
 
     @staticmethod
+    def create_new_storagedriver(vpool_guid, storagerouter_guid, storage_ip, amount_of_proxies):
+        """
+        Prepares a new Storagedriver for a given vPool and Storagerouter
+        :param vpool_guid: Guid of the vPool
+        :param storagerouter_guid: Guid of the Storagerouter
+        :param storage_ip: IP for the Storagedriver
+        :param amount_of_proxies: Amount of the proxies to configure for this Storagedriver
+        :return: The new Storagedriver
+        :rtype: ovs.dal.hybrids.storagedriver.StorageDriver
+        """
+        vpool = VPool(vpool_guid)
+        storagerouter = StorageRouter(storagerouter_guid)
+
+        client = SSHClient(storagerouter)
+        machine_id = System.get_my_machine_id(client)
+        port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
+        with volatile_mutex('add_vpool_get_free_ports_{0}'.format(machine_id), wait=30):
+            model_ports_in_use = []
+            for sd in StorageDriverList.get_storagedrivers():
+                if sd.storagerouter_guid == storagerouter.guid:
+                    model_ports_in_use += sd.ports.values()
+                    for proxy in sd.alba_proxies:
+                        model_ports_in_use.append(proxy.service.ports[0])
+            ports = System.get_free_ports(port_range, model_ports_in_use, 4 + amount_of_proxies, client)
+
+            vrouter_id = '{0}{1}'.format(vpool.name, machine_id)
+            storagedriver = StorageDriver()
+            storagedriver.name = vrouter_id.replace('_', ' ')
+            storagedriver.ports = {'management': ports[0],
+                                   'xmlrpc': ports[1],
+                                   'dtl': ports[2],
+                                   'edge': ports[3]}
+            storagedriver.vpool = vpool
+            storagedriver.cluster_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(machine_id))
+            storagedriver.storage_ip = storage_ip
+            storagedriver.mountpoint = '/mnt/{0}'.format(vpool.name)
+            storagedriver.description = storagedriver.name
+            storagedriver.storagerouter = storagerouter
+            storagedriver.storagedriver_id = vrouter_id
+            storagedriver.save()
+
+            # ALBA Proxies
+            proxy_service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ALBA_PROXY)
+            for proxy_id in xrange(amount_of_proxies):
+                service = Service()
+                service.storagerouter = storagerouter
+                service.ports = [ports[4 + proxy_id]]
+                service.name = 'albaproxy_{0}_{1}'.format(vpool.name, proxy_id)
+                service.type = proxy_service_type
+                service.save()
+                alba_proxy = AlbaProxy()
+                alba_proxy.service = service
+                alba_proxy.storagedriver = storagedriver
+                alba_proxy.save()
+
+        return storagedriver
+
+    @staticmethod
+    def configure_storagedriver_partitions(storagedriver_guid, fragment_cache_settings, block_cache_settings, mountpoint_settings,
+                                           amount_of_proxies, partition_info=None):
+        """
+        Configure all partitions for a storagedriver
+        Attempts to clean up in case of errors
+        :param storagedriver_guid: Guid of the Storagedriver
+        :type storagedriver_guid: str
+        :param fragment_cache_settings: Settings of the fragment cache ({is_backend: bool, read: bool, write: bool})
+        :type fragment_cache_settings: dict
+        :param block_cache_settings: Settings of the block cache ({is_backend: bool, read: bool, write: bool})
+        :type block_cache_settings: dict
+        :param mountpoint_settings: Settings about the cache ({mountpoint_cache: , writecache_size_requested: , largest_write_mountpoint}
+        :type mountpoint_settings: dict
+        :param amount_of_proxies: Amount of proxies to deploy
+        :type amount_of_proxies: int
+        :param partition_info: Information about the partitions (Optional, won't query for the info if supplied)
+        :type partition_info: dict
+        :raises: ValueError: - When calculating the cache sizes went wrong
+        :return: Dict with information about the created items
+        :rtype: dict
+        """
+        # * Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
+        # * Once the free space on a mount point is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
+        # * make sure that <backoff_gap> free space is available => backoff_gap must be <= size of the partition
+        # * Both backoff_gap and trigger_gap apply to each mount point individually, but cannot be configured on a per mount point base
+        # Assign WRITE / Fragment cache
+        from ovs.lib.storagerouter import StorageRouterController  # Avoid circular reference
+        storagedriver = StorageDriver(storagedriver_guid)
+        storagerouter = storagedriver.storagerouter
+        if partition_info is None:
+            partition_info = StorageRouterController.get_partition_info(storagerouter.guid)
+
+        usable_write_partitions = StorageRouterController.get_usable_partitions(storagedriver.storagerouter_guid, DiskPartition.ROLES.WRITE, partition_info)
+        writecache_size_available = sum(part['available'] for part in usable_write_partitions)
+        root_client = SSHClient(storagerouter, username='root')
+
+        cache_size = None
+        storagedriver_partition_caches = []
+        write_caches = []
+        smallest_write_partition = None
+        dirs_to_create = []
+        try:
+            for writecache_info in usable_write_partitions:
+                available = writecache_info['available']
+                partition = DiskPartition(writecache_info['guid'])
+                proportion = available * 100.0 / writecache_size_available
+                size_to_be_used = proportion * mountpoint_settings['writecache_size_requested'] / 100
+                write_cache_percentage = 0.98
+                if mountpoint_settings['mountpoint_cache'] is not None and partition == mountpoint_settings['mountpoint_cache']:
+                    if fragment_cache_settings['read'] is True or fragment_cache_settings['write'] is True or block_cache_settings['read'] is True or block_cache_settings['write'] is True:  # Only in this case we actually make use of the fragment caching
+                        cache_size = int(size_to_be_used * 0.10)  # Bytes
+                        write_cache_percentage = 0.88
+                    for _ in xrange(amount_of_proxies):
+                        storagedriver_partition_cache = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                                                           'role': DiskPartition.ROLES.WRITE,
+                                                                                                                           'sub_role': StorageDriverPartition.SUBROLE.FCACHE,
+                                                                                                                           'partition': partition})
+                        dirs_to_create.append(storagedriver_partition_cache.path)
+                        for subfolder in ['fc', 'bc']:
+                            dirs_to_create.append('{0}/{1}'.format(storagedriver_partition_cache.path, subfolder))
+                        storagedriver_partition_caches.append(storagedriver_partition_cache)
+
+                w_size = int(size_to_be_used * write_cache_percentage / 1024 / 4096) * 4096
+                # noinspection PyArgumentList
+                sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver,
+                                                                               {'size': long(size_to_be_used),
+                                                                                'role': DiskPartition.ROLES.WRITE,
+                                                                                'sub_role': StorageDriverPartition.SUBROLE.SCO,
+                                                                                'partition': partition})
+                write_caches.append({'path': sdp_write.path,
+                                    'size': '{0}KiB'.format(w_size)})
+                dirs_to_create.append(sdp_write.path)
+                if smallest_write_partition is None or (w_size * 1024) < smallest_write_partition:
+                    smallest_write_partition = w_size * 1024
+
+            storagedriver_partition_file_driver = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                                                     'role': DiskPartition.ROLES.WRITE,
+                                                                                                                     'sub_role': StorageDriverPartition.SUBROLE.FD,
+                                                                                                                     'partition': mountpoint_settings['largest_write_mountpoint']})
+            dirs_to_create.append(storagedriver_partition_file_driver.path)
+
+            # Assign DB
+            db_info = partition_info[DiskPartition.ROLES.DB][0]
+            storagedriver_partition_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                                               'role': DiskPartition.ROLES.DB,
+                                                                                                               'sub_role': StorageDriverPartition.SUBROLE.TLOG,
+                                                                                                               'partition': DiskPartition(db_info['guid'])})
+            storagedriver_partition_metadata = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                                                  'role': DiskPartition.ROLES.DB,
+                                                                                                                  'sub_role': StorageDriverPartition.SUBROLE.MD,
+                                                                                                                  'partition': DiskPartition(db_info['guid'])})
+            dirs_to_create.append(storagedriver_partition_tlogs.path)
+            dirs_to_create.append(storagedriver_partition_metadata.path)
+
+            # Assign DTL
+            dtl_info = partition_info[DiskPartition.ROLES.DTL][0]
+            storagedriver_partition_dtl = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                                             'role': DiskPartition.ROLES.DTL,
+                                                                                                             'partition': DiskPartition(dtl_info['guid'])})
+            dirs_to_create.append(storagedriver_partition_dtl.path)
+            dirs_to_create.append(storagedriver.mountpoint)
+
+            gap_configuration = StorageDriverController.generate_backoff_gap_settings(smallest_write_partition)
+
+            if cache_size is None and \
+                    ((fragment_cache_settings['is_backend'] is False and (fragment_cache_settings['read'] is True or fragment_cache_settings['write'] is True))
+                     or (block_cache_settings['is_backend'] is False and (block_cache_settings['read'] is True or block_cache_settings['write'] is True))):
+                raise ValueError('Something went wrong trying to calculate the cache sizes')
+
+            root_client.dir_create(dirs_to_create)
+        except Exception:
+            StorageDriverController._logger.exception('Something went wrong during the creation of directories for vPool {0} on StorageRouter {1}'
+                                                      .format(storagedriver.vpool.name, storagerouter.name))
+            failed_deletes = []
+            # Delete directories
+            for dir_to_create in dirs_to_create:
+                try:
+                    root_client.dir_delete(directories=dir_to_create)
+                except Exception:
+                    failed_deletes.append(dirs_to_create)
+            # Delete relations
+            for sdp in storagedriver.partitions:
+                sdp.delete()
+            if len(failed_deletes) > 0:
+                StorageDriverController._logger.warning('Failed to clean up following directories: {0}'.format(', '.join(failed_deletes)))
+            raise
+        storagedriver_partitions = {'cache': storagedriver_partition_caches,
+                                    'dtl': storagedriver_partition_dtl,
+                                    'tlogs': storagedriver_partition_tlogs}
+        return {'gap_configuration': gap_configuration,
+                'created_dirs': dirs_to_create,
+                'storagedriver_partitions': storagedriver_partitions,
+                'cache_size': cache_size,
+                'write_caches': write_caches}
+
+    @staticmethod
     def generate_backoff_gap_settings(cache_size):
         """
         Generates decent gap sizes for a given cache size
@@ -425,6 +627,149 @@ class StorageDriverController(object):
         return gap_configuration
 
     @staticmethod
+    def configure_storagedriver(storagedriver_guid, storagedriver_settings, write_caches, gap_configuration,
+                                new_vpool=False, mds_safety=None):
+        """
+        Configures the volumedriver with requested settings
+        :param storagedriver_guid: Guid of the Storagedriver
+        :param storagedriver_settings: Dict with information about the storagedriver
+        Eg: {sco_size: dtl_mode: cluster_size: dtl_transport: volume_write_buffer: }
+        :param write_caches: Write caches that were prepared
+        :param gap_configuration:
+        :param new_vpool: Extending or a new vpool
+        :param mds_safety: Requested mds_safety
+        :return:
+        """
+        storagedriver = StorageDriver(storagedriver_guid)
+        storagerouter = storagedriver.storagerouter
+        vpool = storagedriver.vpool
+
+        client = SSHClient(storagerouter)
+        machine_id = System.get_my_machine_id(client)
+        vrouter_id = '{0}{1}'.format(vpool.name, machine_id)
+
+        storagedriver_partition_file_driver = next(StorageDriverController.get_partitions_by_role(storagedriver_guid, DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.FD))
+        storagedriver_partition_dtl = next(StorageDriverController.get_partitions_by_role(storagedriver_guid, DiskPartition.ROLES.DTL))
+        storagedriver_partition_tlogs = next(StorageDriverController.get_partitions_by_role(storagedriver_guid, DiskPartition.ROLES.DB, StorageDriverPartition.SUBROLE.TLOG))
+        storagedriver_partition_metadata = next(StorageDriverController.get_partitions_by_role(storagedriver_guid, DiskPartition.ROLES.DB, StorageDriverPartition.SUBROLE.MD))
+
+        sco_size = storagedriver_settings['sco_size']
+        dtl_mode = storagedriver_settings['dtl_mode']
+        cluster_size = storagedriver_settings['cluster_size']
+        dtl_transport = storagedriver_settings['dtl_transport']
+        tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[sco_size]
+        # sco_factor = volume write buffer / tlog multiplier (default 20) / sco size (in MiB)
+        sco_factor = float(storagedriver_settings['volume_write_buffer']) / tlog_multiplier / sco_size
+
+        filesystem_config = {'fs_dtl_host': '',
+                             'fs_enable_shm_interface': 0,
+                             'fs_enable_network_interface': 1,
+                             'fs_metadata_backend_arakoon_cluster_nodes': [],
+                             'fs_metadata_backend_mds_nodes': [],
+                             'fs_metadata_backend_type': 'MDS',
+                             'fs_virtual_disk_format': 'raw',
+                             'fs_raw_disk_suffix': '.raw',
+                             'fs_file_event_rules': [{'fs_file_event_rule_calls': ['Rename'],
+                                                      'fs_file_event_rule_path_regex': '.*'}]}
+        if dtl_mode == 'no_sync':
+            filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
+        else:
+            filesystem_config['fs_dtl_mode'] = StorageDriverClient.VPOOL_DTL_MODE_MAP[dtl_mode]
+            filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
+
+        volume_manager_config = {'tlog_path': storagedriver_partition_tlogs.path,
+                                 'metadata_path': storagedriver_partition_metadata.path,
+                                 'clean_interval': 1,
+                                 'dtl_throttle_usecs': 4000,
+                                 'default_cluster_size': cluster_size * 1024,
+                                 'number_of_scos_in_tlog': tlog_multiplier,
+                                 'non_disposable_scos_factor': sco_factor}
+
+        queue_urls = []
+        mq_protocol = Configuration.get('/ovs/framework/messagequeue|protocol')
+        mq_user = Configuration.get('/ovs/framework/messagequeue|user')
+        mq_password = Configuration.get('/ovs/framework/messagequeue|password')
+        for current_storagerouter in StorageRouterList.get_masters():
+            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}:5672'.format(mq_protocol, mq_user, mq_password,
+                                                                           current_storagerouter.ip)})
+
+        backend_connection_manager = {'backend_type': 'MULTI',
+                                      'backend_interface_retries_on_error': 5,
+                                      'backend_interface_retry_interval_secs': 1,
+                                      'backend_interface_retry_backoff_multiplier': 2.0}
+        for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda k: k.service.ports[0])):
+            backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
+                                                      'alba_connection_port': proxy.service.ports[0],
+                                                      'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
+                                                      'alba_connection_timeout': 15,
+                                                      'alba_connection_use_rora': True,
+                                                      'alba_connection_transport': 'TCP',
+                                                      'alba_connection_rora_manifest_cache_capacity': 5000,
+                                                      'alba_connection_asd_connection_pool_capacity': 20,
+                                                      'alba_connection_rora_timeout_msecs': 50,
+                                                      'backend_type': 'ALBA'}
+        volume_router = {'vrouter_id': vrouter_id,
+                         'vrouter_redirect_timeout_ms': '120000',
+                         'vrouter_keepalive_time_secs': '15',
+                         'vrouter_keepalive_interval_secs': '5',
+                         'vrouter_keepalive_retries': '2',
+                         'vrouter_routing_retries': 10,
+                         'vrouter_volume_read_threshold': 0,
+                         'vrouter_volume_write_threshold': 0,
+                         'vrouter_file_read_threshold': 0,
+                         'vrouter_file_write_threshold': 0,
+                         'vrouter_min_workers': 4,
+                         'vrouter_max_workers': 16,
+                         'vrouter_sco_multiplier': sco_size * 1024 / cluster_size,
+                         # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
+                         'vrouter_backend_sync_timeout_ms': 60000,
+                         'vrouter_migrate_timeout_ms': 60000,
+                         'vrouter_use_fencing': True}
+
+        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+        arakoon_nodes = [{'host': node.ip,
+                          'port': node.client_port,
+                          'node_id': node.name} for node in ArakoonClusterConfig(cluster_id=arakoon_cluster_name).nodes]
+
+        # DTL path is not used, but a required parameter. The DTL transport should be the same as the one set in the DTL server.
+        storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
+        storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
+        storagedriver_config.configure_content_addressed_cache(serialize_read_cache=False,
+                                                               read_cache_serialization_path=[])
+        storagedriver_config.configure_scocache(scocache_mount_points=write_caches,
+                                                trigger_gap=Toolbox.convert_to_human_readable(size=gap_configuration['trigger']),
+                                                backoff_gap=Toolbox.convert_to_human_readable(size=gap_configuration['backoff']))
+        storagedriver_config.configure_distributed_transaction_log(dtl_path=storagedriver_partition_dtl.path,  # Not used, but required
+                                                                   dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
+        storagedriver_config.configure_filesystem(**filesystem_config)
+        storagedriver_config.configure_volume_manager(**volume_manager_config)
+        storagedriver_config.configure_volume_router(**volume_router)
+        storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
+        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=arakoon_cluster_name,
+                                                       vregistry_arakoon_cluster_nodes=arakoon_nodes)
+        storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
+                                                              dls_arakoon_cluster_id=arakoon_cluster_name,
+                                                              dls_arakoon_cluster_nodes=arakoon_nodes)
+        storagedriver_config.configure_file_driver(fd_cache_path=storagedriver_partition_file_driver.path,
+                                                   fd_extent_cache_capacity='1024',
+                                                   fd_namespace='fd-{0}-{1}'.format(vpool.name, vpool.guid))
+        storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'),
+                                                       events_amqp_uris=queue_urls)
+        storagedriver_config.configure_threadpool_component(num_threads=16)
+        storagedriver_config.configure_network_interface(network_max_neighbour_distance=StorageDriver.DISTANCES.FAR - 1)
+        storagedriver_config.save(client)
+
+        DiskController.sync_with_reality(storagerouter.guid)
+
+        MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool)
+
+        # Update the MDS safety if changed via API (vpool.configuration will be available at this point also for the newly added StorageDriver)
+        if new_vpool is False:
+            vpool.invalidate_dynamics('configuration')
+            if mds_safety is not None and vpool.configuration['mds_config']['mds_safety'] != mds_safety:
+                Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), value=mds_safety)
+
+    @staticmethod
     def calculate_update_impact(storagedriver_guid, requested_config):
         """
         Calculate the impact of the update for a storagedriver with a given config
@@ -439,26 +784,43 @@ class StorageDriverController(object):
         return {}
 
     @staticmethod
-    def setup_proxy_configs(vpool_guid, storagedriver_guid, read_preferences, frag_size, local_amount_of_proxies, sdp_frags):
+    def get_partitions_by_role(storagedriver_guid, role, sub_role=None):
+        """
+        Fetches all partitions for a Storagedriver that has a specific role (and optionally a sub role)
+        :param storagedriver_guid: Guid of the StorageDriver
+        :param role: Role of the partition
+        :type role: str (ovs.dal.hybrids.DiskPartition.ROLES)
+        :param sub_role: Sub role of the partition
+        :type sub_role: str (ovs.dal.hybrids.j_storagedriverpartition.StorageDriverPartition.SUBROLE)
+        :return: Generator object which yields StorageDriverPartition objects
+        """
+        storagedriver = StorageDriver(storagedriver_guid)
+        for storagedriver_partition in storagedriver.partitions:
+            if storagedriver_partition.role == role and (sub_role is None or storagedriver_partition.sub_role == sub_role):
+                yield storagedriver_partition
+
+    @staticmethod
+    def setup_proxy_configs(vpool_guid, storagedriver_guid, cache_size, local_amount_of_proxies, storagedriver_partitions_caches):
         """
         Sets up the proxies their configuration data in the configuration management
         :param vpool_guid: Guid of the vPool to deploy proxies for
         :param storagedriver_guid: Guid of the Storagedriver to deploy proxies for
-        :param read_preferences:
-        :param frag_size: Fragment size to be used
+        :param cache_size: Size of the cache to use for caching (Fragment and/or block cache)
         :param local_amount_of_proxies: Amount of proxies to deploy
-        :param sdp_frags:
+        :param storagedriver_partitions_caches: list of StorageDriverPartitions which were created for caching purposes
         :return:
         """
+        # @Todo figure out a way to no longer depend on sdp_caches. Currently depending on it as the order of the last matters
         from ovs.lib.storagerouter import StorageRouterController  # Avoid circular reference
         vpool = VPool(vpool_guid)
         storagedriver = StorageDriver(storagedriver_guid)
+        # Metadata is always saved before configuring so the read preference can be calculated based on the vpool metadata
+        read_preferences = VPoolController.calculate_read_preferences(vpool.guid, storagedriver.storagerouter_guid)
 
-        block_cache_setting = vpool.metadata['caching_info']['block_cache']
-        fragment_cache_setting = vpool.metadata['caching_info']['fragment_cache']
+        block_cache_setting = vpool.metadata['caching_info'][storagedriver.storagerouter_guid]['block_cache']
+        fragment_cache_setting = vpool.metadata['caching_info'][storagedriver.storagerouter_guid]['fragment_cache']
 
         # Validate features
-
         supports_block_cache = StorageRouterController.supports_block_cache(storagedriver.storagerouter_guid)
         if supports_block_cache is False and (block_cache_setting['read'] is True or block_cache_setting['write'] is True):
             raise RuntimeError('Block cache is not a supported feature')
@@ -484,7 +846,7 @@ class StorageDriverController(object):
                 fragment_cache_info = ['alba', {
                     'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
                     'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
-                                                   'preset': vpool.metadata['backend_aa_{0}'.format(storagedriver.storagerouter_guid)]['backend_info']['preset']}],
+                                                   'preset': fragment_cache_setting['backend_info']['preset']}],
                     'manifest_cache_size': manifest_cache_size,
                     'cache_on_read': fragment_cache_setting['read'],
                     'cache_on_write': fragment_cache_setting['write']}]
@@ -493,8 +855,8 @@ class StorageDriverController(object):
                     fragment_cache_scrub_info = copy.deepcopy(fragment_cache_info)
                     fragment_cache_scrub_info[1]['cache_on_read'] = False
             else:
-                fragment_cache_info = ['local', {'path': '{0}/fc'.format(sdp_frags[proxy_id].path),
-                                                 'max_size': frag_size / local_amount_of_proxies,
+                fragment_cache_info = ['local', {'path': '{0}/fc'.format(storagedriver_partitions_caches[proxy_id].path),
+                                                 'max_size': cache_size / local_amount_of_proxies,
                                                  'cache_on_read': fragment_cache_setting['read'],
                                                  'cache_on_write': fragment_cache_setting['write']}]
 
@@ -505,7 +867,7 @@ class StorageDriverController(object):
                 block_cache_info = ['alba', {
                     'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_bc')),
                     'bucket_strategy': ['1-to-1', {'prefix': '{0}_bc'.format(vpool.guid),
-                                                   'preset': vpool.metadata['backend_bc_{0}'.format(storagedriver.storagerouter_guid)]['backend_info']['preset']}],
+                                                   'preset': block_cache_setting['backend_info']['preset']}],
                     'manifest_cache_size': manifest_cache_size,
                     'cache_on_read': block_cache_setting['read'],
                     'cache_on_write': block_cache_setting['write']}]
@@ -514,8 +876,8 @@ class StorageDriverController(object):
                     block_cache_scrub_info = copy.deepcopy(block_cache_info)
                     block_cache_scrub_info[1]['cache_on_read'] = False
             else:
-                block_cache_info = ['local', {'path': '{0}/bc'.format(sdp_frags[proxy_id].path),
-                                              'max_size': frag_size / local_amount_of_proxies,
+                block_cache_info = ['local', {'path': '{0}/bc'.format(storagedriver_partitions_caches[proxy_id].path),
+                                              'max_size': cache_size / local_amount_of_proxies,
                                               'cache_on_read': block_cache_setting['read'],
                                               'cache_on_write': block_cache_setting['write']}]
 
@@ -542,3 +904,79 @@ class StorageDriverController(object):
                 scrub_proxy_config['block_cache'] = block_cache_scrub_info
             Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4), raw=True)
 
+    @staticmethod
+    def start_services(storagedriver_guid):
+        """
+        Starts all services related to the Storagedriver
+        :param storagedriver_guid: Guid of the Storagedriver
+        :return:
+        """
+        storagedriver = StorageDriver(storagedriver_guid)
+        storagerouter = storagedriver.storagerouter
+        vpool = storagedriver.vpool
+
+        root_client = SSHClient(storagerouter, username='root')
+        client = SSHClient(storagerouter)
+
+        storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
+        storagedriver_partition_dtl = next(StorageDriverController.get_partitions_by_role(storagedriver_guid, DiskPartition.ROLES.DTL))
+        # Configurations are already in place at this point
+        dtl_transport = vpool.configuration['dtl_transport']
+
+        sd_params = {'KILL_TIMEOUT': '30',
+                     'VPOOL_NAME': vpool.name,
+                     'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
+                     'CONFIG_PATH': storagedriver_config.remote_path,
+                     'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
+                     'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
+                     'LOG_SINK': Logger.get_sink_path('storagedriver_{0}'.format(storagedriver.storagedriver_id)),
+                     'METADATASTORE_BITS': 5}
+        dtl_params = {'DTL_PATH': storagedriver_partition_dtl.path,
+                      'DTL_ADDRESS': storagedriver.storage_ip,
+                      'DTL_PORT': str(storagedriver.ports['dtl']),
+                      'DTL_TRANSPORT': StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport],
+                      'LOG_SINK': Logger.get_sink_path('storagedriver-dtl_{0}'.format(storagedriver.storagedriver_id))}
+
+        sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
+        dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
+
+        service_manager = ServiceFactory.get_manager()
+        watcher_volumedriver_service = 'watcher-volumedriver'
+        try:
+            if not service_manager.has_service(watcher_volumedriver_service, client=root_client):
+                service_manager.add_service(watcher_volumedriver_service, client=root_client)
+                service_manager.start_service(watcher_volumedriver_service, client=root_client)
+
+            service_manager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
+            service_manager.start_service(dtl_service, client=root_client)
+
+            for proxy in storagedriver.alba_proxies:
+                alba_proxy_params = {'VPOOL_NAME': vpool.name,
+                                     'LOG_SINK': Logger.get_sink_path(proxy.service.name),
+                                     'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid))}
+                alba_proxy_service = 'ovs-{0}'.format(proxy.service.name)
+                service_manager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client,
+                                            target_name=alba_proxy_service)
+                service_manager.start_service(alba_proxy_service, client=root_client)
+
+            service_manager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client,
+                                        target_name=sd_service)
+
+            storagedriver = StorageDriver(storagedriver.guid)
+            current_startup_counter = storagedriver.startup_counter
+            service_manager.start_service(sd_service, client=root_client)
+        except Exception:
+            StorageDriverController._logger.exception('Failed to start the relevant services for vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
+            raise
+
+        tries = 60
+        while storagedriver.startup_counter == current_startup_counter and tries > 0:
+            StorageDriverController._logger.debug( 'Waiting for the StorageDriver to start up for vPool {0} on StorageRouter {1} ...'.format(vpool.name, storagerouter.name))
+            if service_manager.get_service_status(sd_service, client=root_client) != 'active':
+                raise RuntimeError('StorageDriver service failed to start (service not running)')
+            tries -= 1
+            time.sleep(60 - tries)
+            storagedriver = StorageDriver(storagedriver.guid)
+        if storagedriver.startup_counter == current_startup_counter:
+            raise RuntimeError('StorageDriver service failed to start (got no event)')
+        StorageDriverController._logger.debug('StorageDriver running')
