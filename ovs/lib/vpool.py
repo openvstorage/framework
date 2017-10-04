@@ -192,20 +192,19 @@ class VPoolController(object):
         return tgz_name
 
     @staticmethod
-    def get_renewed_backend_metadata(vpool_guid, additional_params=None, metadata=None, new_vpool=False):
+    def get_renewed_backend_metadata(vpool_guid, sco_size, metadata=None, new_vpool=False):
         """
         Renews and fills in the metadata from a given vpool
         :param vpool_guid: Guid of the vPool to renew the metadata for
         :param metadata: vPool metadata that could have been modified (Optional, will use vpools metadata when not provided)
         :param new_vpool: Indicates whether the supplied vpool is new
-        :param additional_params:
+        :param sco_size: Sco size in bytes
         :return: dict with renewed metadata
         """
         from ovs.lib.storagerouter import StorageRouterController  # Avoid circular import
 
-        def _renew_backend_metadata(_vpool_guid, _backend_info, _additional_params, _new_vpool):
+        def _renew_backend_metadata(_vpool_guid, _backend_info, _sco_size, _new_vpool):
             vpool = VPool(_vpool_guid)
-            sco_size = _additional_params['sco_size']
             new_backend_info = copy.deepcopy(_backend_info)
             ovs_client = OVSClient(ip=_backend_info['connection_info']['host'],
                                    port=_backend_info['connection_info']['port'],
@@ -232,7 +231,7 @@ class VPoolController(object):
             new_backend_info.update({'name': backend_dict['name'],
                                      'preset': preset_name,
                                      'policies': policies,
-                                     'sco_size': sco_size * 1024.0 ** 2 if _new_vpool is True else vpool.configuration['sco_size'] * 1024.0 ** 2,
+                                     'sco_size': _sco_size * 1024.0 ** 2 if _new_vpool is True else vpool.configuration['sco_size'] * 1024.0 ** 2,
                                      'frag_size': float(preset_info[preset_name]['fragment_size']),
                                      'total_size': float(backend_dict['usages']['size']),
                                      'backend_guid': backend_dict['backend_guid'],
@@ -241,20 +240,17 @@ class VPoolController(object):
                                      'arakoon_config': arakoon_config})
             return new_backend_info
 
-        if additional_params is None:
-            raise RuntimeError('Additional params need to be supplied')
-        Toolbox.verify_required_params({'sco_size': (int, None)}, additional_params)
         vpool = VPool(vpool_guid)
         if metadata is None:
             metadata = vpool.metadata
         new_metadata = copy.deepcopy(metadata)
         vpool_backend_info = metadata['backend']['backend_info']
-        new_metadata['backend']['backend_info']= _renew_backend_metadata(vpool_guid, vpool_backend_info, additional_params, new_vpool)
+        new_metadata['backend']['backend_info']= _renew_backend_metadata(vpool_guid, vpool_backend_info, sco_size, new_vpool)
         # Check for fragment and block cache
         for storagerouter_guid, caching_data in metadata['caching_info'].iteritems():
             for cache_type, cache_type_data in caching_data.iteritems():
                 if cache_type_data['is_backend'] is True:
-                    cache_type_data['backend_info'] = _renew_backend_metadata(vpool_guid, cache_type_data['backend_info'], additional_params, new_vpool)
+                    cache_type_data['backend_info'] = _renew_backend_metadata(vpool_guid, cache_type_data['backend_info'], sco_size, new_vpool)
         return new_metadata
 
     @staticmethod
