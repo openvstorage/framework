@@ -627,18 +627,19 @@ class StorageDriverController(object):
         return gap_configuration
 
     @staticmethod
-    def configure_storagedriver(storagedriver_guid, storagedriver_settings, write_caches, gap_configuration,
-                                new_vpool=False, mds_safety=None):
+    def configure_storagedriver(storagedriver_guid, storagedriver_settings, write_caches, gap_configuration):
         """
         Configures the volumedriver with requested settings
         :param storagedriver_guid: Guid of the Storagedriver
-        :param storagedriver_settings: Dict with information about the storagedriver
-        Eg: {sco_size: dtl_mode: cluster_size: dtl_transport: volume_write_buffer: }
+        :type storagedriver_guid: str
+        :param storagedriver_settings: Dict with information about the storagedriver (Eg: {sco_size: dtl_mode: cluster_size: dtl_transport: volume_write_buffer: })
+        :type storagedriver_settings: dict
         :param write_caches: Write caches that were prepared
-        :param gap_configuration:
-        :param new_vpool: Extending or a new vpool
-        :param mds_safety: Requested mds_safety
-        :return:
+        :type: list
+        :param gap_configuration: Trigger and backoff gap
+        :type gap_configuration: dict
+        :return: None
+        :rtype: NoneType
         """
         storagedriver = StorageDriver(storagedriver_guid)
         storagerouter = storagedriver.storagerouter
@@ -759,22 +760,14 @@ class StorageDriverController(object):
         storagedriver_config.configure_network_interface(network_max_neighbour_distance=StorageDriver.DISTANCES.FAR - 1)
         storagedriver_config.save(client)
 
-        DiskController.sync_with_reality(storagerouter.guid)
-
-        MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool)
-
-        # Update the MDS safety if changed via API (vpool.configuration will be available at this point also for the newly added StorageDriver)
-        if new_vpool is False:
-            vpool.invalidate_dynamics('configuration')
-            if mds_safety is not None and vpool.configuration['mds_config']['mds_safety'] != mds_safety:
-                Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), value=mds_safety)
-
     @staticmethod
     def calculate_update_impact(storagedriver_guid, requested_config):
         """
         Calculate the impact of the update for a storagedriver with a given config
         :param storagedriver_guid: Guid of the storage driver
+        :type storagedriver_guid: str
         :param requested_config: requested configuration
+        :type requested_config: dict
         :return: dict indicating what will be needed to be done
         :rtype: dict
         """
@@ -793,6 +786,7 @@ class StorageDriverController(object):
         :param sub_role: Sub role of the partition
         :type sub_role: str (ovs.dal.hybrids.j_storagedriverpartition.StorageDriverPartition.SUBROLE)
         :return: Generator object which yields StorageDriverPartition objects
+        :rtype: Generator
         """
         storagedriver = StorageDriver(storagedriver_guid)
         for storagedriver_partition in storagedriver.partitions:
@@ -808,7 +802,8 @@ class StorageDriverController(object):
         :param cache_size: Size of the cache to use for caching (Fragment and/or block cache)
         :param local_amount_of_proxies: Amount of proxies to deploy
         :param storagedriver_partitions_caches: list of StorageDriverPartitions which were created for caching purposes
-        :return:
+        :return: None
+        :rtype: NoneType
         """
         # @Todo figure out a way to no longer depend on sdp_caches. Currently depending on it as the order of the last matters
         from ovs.lib.storagerouter import StorageRouterController  # Avoid circular reference
@@ -817,69 +812,69 @@ class StorageDriverController(object):
         # Metadata is always saved before configuring so the read preference can be calculated based on the vpool metadata
         read_preferences = VPoolController.calculate_read_preferences(vpool.guid, storagedriver.storagerouter_guid)
 
-        block_cache_setting = vpool.metadata['caching_info'][storagedriver.storagerouter_guid]['block_cache']
-        fragment_cache_setting = vpool.metadata['caching_info'][storagedriver.storagerouter_guid]['fragment_cache']
+        block_cache_settings = vpool.metadata['caching_info'][storagedriver.storagerouter_guid]['block_cache']
+        fragment_cache_settings = vpool.metadata['caching_info'][storagedriver.storagerouter_guid]['fragment_cache']
 
         # Validate features
         supports_block_cache = StorageRouterController.supports_block_cache(storagedriver.storagerouter_guid)
-        if supports_block_cache is False and (block_cache_setting['read'] is True or block_cache_setting['write'] is True):
+        if supports_block_cache is False and (block_cache_settings['read'] is True or block_cache_settings['write'] is True):
             raise RuntimeError('Block cache is not a supported feature')
 
         # Configure regular proxies and scrub proxies
         manifest_cache_size = 16 * 1024 * 1024 * 1024
         for proxy_id, alba_proxy in enumerate(storagedriver.alba_proxies):
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
-            metadata_keys = {'backend': 'abm'}
-            if fragment_cache_setting['is_backend'] is True:
-                metadata_keys['backend_aa_{0}'.format(storagedriver.storagerouter_guid)] = 'abm_aa'
-            if block_cache_setting['is_backend'] is True:
-                metadata_keys['backend_bc_{0}'.format(storagedriver.storagerouter_guid)] = 'abm_bc'
-            for metadata_key in metadata_keys:
-                arakoon_config = vpool.metadata[metadata_key]['arakoon_config']
+            arakoon_data = {'abm': vpool.metadata['backend']['backend_info']['arakoon_config']}
+
+            if fragment_cache_settings['is_backend'] is True:
+                arakoon_data['abm_aa'] = fragment_cache_settings['backend_info']['arakoon_config']
+            if block_cache_settings['is_backend'] is True:
+                arakoon_data['abm_bc'] = block_cache_settings['backend_info']['arakoon_config']
+            for arakoon_entry, arakoon_config in arakoon_data.iteritems():
                 arakoon_config = ArakoonClusterConfig.convert_config_to(config=arakoon_config, return_type='INI')
-                Configuration.set(config_tree.format(metadata_keys[metadata_key]), arakoon_config, raw=True)
+                Configuration.set(config_tree.format(arakoon_entry), arakoon_config, raw=True)
 
             fragment_cache_scrub_info = ['none']
-            if fragment_cache_setting['read'] is False and fragment_cache_setting['write'] is False:
+            if fragment_cache_settings['read'] is False and fragment_cache_settings['write'] is False:
                 fragment_cache_info = ['none']
-            elif fragment_cache_setting['is_backend'] is True:
+            elif fragment_cache_settings['is_backend'] is True:
                 fragment_cache_info = ['alba', {
                     'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
                     'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
-                                                   'preset': fragment_cache_setting['backend_info']['preset']}],
+                                                   'preset': fragment_cache_settings['backend_info']['preset']}],
                     'manifest_cache_size': manifest_cache_size,
-                    'cache_on_read': fragment_cache_setting['read'],
-                    'cache_on_write': fragment_cache_setting['write']}]
-                if fragment_cache_setting['write'] is True:
+                    'cache_on_read': fragment_cache_settings['read'],
+                    'cache_on_write': fragment_cache_settings['write']}]
+                if fragment_cache_settings['write'] is True:
                     # The scrubbers want only cache-on-write.
                     fragment_cache_scrub_info = copy.deepcopy(fragment_cache_info)
                     fragment_cache_scrub_info[1]['cache_on_read'] = False
             else:
                 fragment_cache_info = ['local', {'path': '{0}/fc'.format(storagedriver_partitions_caches[proxy_id].path),
                                                  'max_size': cache_size / local_amount_of_proxies,
-                                                 'cache_on_read': fragment_cache_setting['read'],
-                                                 'cache_on_write': fragment_cache_setting['write']}]
+                                                 'cache_on_read': fragment_cache_settings['read'],
+                                                 'cache_on_write': fragment_cache_settings['write']}]
 
             block_cache_scrub_info = ['none']
-            if block_cache_setting['read'] is False and block_cache_setting['write'] is False:
+            if block_cache_settings['read'] is False and block_cache_settings['write'] is False:
                 block_cache_info = ['none']
-            elif block_cache_setting['is_backend'] is True:
+            elif block_cache_settings['is_backend'] is True:
                 block_cache_info = ['alba', {
                     'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_bc')),
                     'bucket_strategy': ['1-to-1', {'prefix': '{0}_bc'.format(vpool.guid),
-                                                   'preset': block_cache_setting['backend_info']['preset']}],
+                                                   'preset': block_cache_settings['backend_info']['preset']}],
                     'manifest_cache_size': manifest_cache_size,
-                    'cache_on_read': block_cache_setting['read'],
-                    'cache_on_write': block_cache_setting['write']}]
-                if block_cache_setting['write'] is True:
+                    'cache_on_read': block_cache_settings['read'],
+                    'cache_on_write': block_cache_settings['write']}]
+                if block_cache_settings['write'] is True:
                     # The scrubbers want only cache-on-write.
                     block_cache_scrub_info = copy.deepcopy(block_cache_info)
                     block_cache_scrub_info[1]['cache_on_read'] = False
             else:
                 block_cache_info = ['local', {'path': '{0}/bc'.format(storagedriver_partitions_caches[proxy_id].path),
                                               'max_size': cache_size / local_amount_of_proxies,
-                                              'cache_on_read': block_cache_setting['read'],
-                                              'cache_on_write': block_cache_setting['write']}]
+                                              'cache_on_read': block_cache_settings['read'],
+                                              'cache_on_write': block_cache_settings['write']}]
 
             main_proxy_config = {'log_level': 'info',
                                  'port': alba_proxy.service.ports[0],
@@ -909,7 +904,9 @@ class StorageDriverController(object):
         """
         Starts all services related to the Storagedriver
         :param storagedriver_guid: Guid of the Storagedriver
-        :return:
+        :type storagedriver_guid: str
+        :return: None
+        :rtype: NoneType
         """
         storagedriver = StorageDriver(storagedriver_guid)
         storagerouter = storagedriver.storagerouter
@@ -921,6 +918,7 @@ class StorageDriverController(object):
         storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
         storagedriver_partition_dtl = next(StorageDriverController.get_partitions_by_role(storagedriver_guid, DiskPartition.ROLES.DTL))
         # Configurations are already in place at this point
+        vpool.invalidate_dynamics('configuration')
         dtl_transport = vpool.configuration['dtl_transport']
 
         sd_params = {'KILL_TIMEOUT': '30',

@@ -150,8 +150,8 @@ class StorageDriver(DataObject):
             # Update the cache data matching the keys currently specified in cache_data
             cache_data.update((k, caching_info[k]) for k in cache_data.viewkeys() & caching_info.viewkeys())
             # Possible set backend_info to None to match this view
-            if caching_info.is_backend is False:
-                cache_data.backend_info = None
+            if caching_info['is_backend'] is False:
+                cache_data['backend_info'] = None
         # Add global write buffer
         vpool_backend_info['global_write_buffer'] = global_write_buffer
         return vpool_backend_info

@@ -771,9 +771,17 @@ class StorageRouterController(object):
         StorageDriverController.configure_storagedriver(storagedriver_guid=storagedriver.guid,
                                                         storagedriver_settings=storagedriver_settings,
                                                         write_caches=write_caches,
-                                                        gap_configuration=gap_configuration,
-                                                        new_vpool=new_vpool,
-                                                        mds_safety=requested_mds_safety)
+                                                        gap_configuration=gap_configuration)
+
+        DiskController.sync_with_reality(storagerouter.guid)
+
+        MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool)
+
+        # Update the MDS safety if changed via API (vpool.configuration will be available at this point also for the newly added StorageDriver)
+        vpool.invalidate_dynamics('configuration')
+        if requested_mds_safety is not None and vpool.configuration['mds_config']['mds_safety'] != requested_mds_safety:
+            Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), value=requested_mds_safety)
+
         ##################
         # START SERVICES #
         ##################
@@ -782,6 +790,7 @@ class StorageRouterController(object):
         except Exception:
             StorageRouterController._logger.exception('Error during the starting of the services')
             StorageRouterController._revert_vpool_status(vpool=vpool, status=VPool.STATUSES.FAILURE)
+            raise
 
         ###############
         # POST CHECKS #
