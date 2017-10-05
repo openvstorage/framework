@@ -787,7 +787,7 @@ class StorageRouterController(object):
                                  'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
             if supports_block_cache is True:
                 main_proxy_config['block_cache'] = block_cache_info
-            Configuration.set(config_tree.format('main'), json.dumps(main_proxy_config, indent=4), raw=True)
+            Configuration.set(key=config_tree.format('main'), value=main_proxy_config)
             scrub_proxy_config = {'log_level': 'info',
                                   'port': 0,  # Will be overruled by the scrubber scheduled task
                                   'ips': ['127.0.0.1'],
@@ -798,7 +798,7 @@ class StorageRouterController(object):
                                   'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
             if supports_block_cache is True:
                 scrub_proxy_config['block_cache'] = block_cache_scrub_info
-            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4), raw=True)
+            Configuration.set(key='/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), value=scrub_proxy_config)
 
         ###########################
         # CONFIGURE STORAGEDRIVER #

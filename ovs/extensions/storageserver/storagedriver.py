@@ -19,7 +19,6 @@ Wrapper class for the storagedriver client of the voldrv team
 """
 import os
 import copy
-import json
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger as OVSLogger
@@ -334,7 +333,7 @@ class StorageDriverConfiguration(object):
         self.remote_path = Configuration.get_configuration_path(self._key).strip('/')
         # Load configuration
         if Configuration.exists(self._key):
-            self.configuration = json.loads(Configuration.get(self._key, raw=True))
+            self.configuration = Configuration.get(self._key)
             self.config_missing = False
         else:
             self.configuration = {}
@@ -352,7 +351,7 @@ class StorageDriverConfiguration(object):
         :rtype: list
         """
         changes = []
-        Configuration.set(self._key, json.dumps(self.configuration, indent=4), raw=True)
+        Configuration.set(self._key, self.configuration)
 
         # No changes detected in the configuration management
         if len(self._dirty_entries) == 0 and force_reload is False:
