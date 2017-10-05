@@ -85,6 +85,10 @@ class StorageDriverViewSet(viewsets.ViewSet):
         Calculates what impact the proposed update configuration would have
         :param storagedriver: Storagedriver linked with the call
         :type storagedriver: StorageDriver
+        :param vpool_updates: Updates to be done to the vpool
+        :type vpool_updates: dict
+        :param storagedriver_updates: Updates to be done to the storagedriver
+        :type storagedriver_updates: dict
         :return: Data on what actions would be taken
         :rtype: object
         """
