@@ -821,15 +821,15 @@ class StorageDriverController(object):
             raise RuntimeError('Block cache is not a supported feature')
 
         # Configure regular proxies and scrub proxies
-        manifest_cache_size = 16 * 1024 * 1024 * 1024
+        manifest_cache_size = 16 * 1024 ** 3
+        arakoon_data = {'abm': vpool.metadata['backend']['backend_info']['arakoon_config']}
+        if fragment_cache_settings['is_backend'] is True:
+            arakoon_data['abm_aa'] = fragment_cache_settings['backend_info']['arakoon_config']
+        if block_cache_settings['is_backend'] is True:
+            arakoon_data['abm_bc'] = block_cache_settings['backend_info']['arakoon_config']
+
         for proxy_id, alba_proxy in enumerate(storagedriver.alba_proxies):
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
-            arakoon_data = {'abm': vpool.metadata['backend']['backend_info']['arakoon_config']}
-
-            if fragment_cache_settings['is_backend'] is True:
-                arakoon_data['abm_aa'] = fragment_cache_settings['backend_info']['arakoon_config']
-            if block_cache_settings['is_backend'] is True:
-                arakoon_data['abm_bc'] = block_cache_settings['backend_info']['arakoon_config']
             for arakoon_entry, arakoon_config in arakoon_data.iteritems():
                 arakoon_config = ArakoonClusterConfig.convert_config_to(config=arakoon_config, return_type='INI')
                 Configuration.set(config_tree.format(arakoon_entry), arakoon_config, raw=True)
