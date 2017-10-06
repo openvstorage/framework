@@ -244,10 +244,9 @@ class VPoolController(object):
         if metadata is None:
             metadata = vpool.metadata
         new_metadata = copy.deepcopy(metadata)
-        vpool_backend_info = metadata['backend']['backend_info']
-        new_metadata['backend']['backend_info']= _renew_backend_metadata(vpool_guid, vpool_backend_info, sco_size, new_vpool)
+        new_metadata['backend']['backend_info'] = _renew_backend_metadata(vpool_guid, new_metadata['backend']['backend_info'], sco_size, new_vpool)
         # Check for fragment and block cache
-        for storagerouter_guid, caching_data in metadata['caching_info'].iteritems():
+        for storagerouter_guid, caching_data in new_metadata['caching_info'].iteritems():
             for cache_type, cache_type_data in caching_data.iteritems():
                 if cache_type_data['is_backend'] is True:
                     cache_type_data['backend_info'] = _renew_backend_metadata(vpool_guid, cache_type_data['backend_info'], sco_size, new_vpool)
