@@ -18,7 +18,6 @@
 MigrationController module
 """
 import copy
-import json
 from ovs.extensions.generic.logger import Logger
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
@@ -49,6 +48,7 @@ class MigrationController(object):
         from ovs.extensions.generic.configuration import Configuration
         from ovs.extensions.generic.sshclient import SSHClient
         from ovs_extensions.generic.toolbox import ExtensionsToolbox
+        from ovs.extensions.migration.migration.ovsmigrator import OVSMigrator
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
@@ -158,9 +158,7 @@ class MigrationController(object):
                         proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
                         if proxy_scrub_config is not None and proxy_scrub_config['fragment_cache'] == ['none']:
                             proxy_scrub_config['fragment_cache'] = fragment_cache_scrub_info
-                            Configuration.set(proxy_scrub_config_key,
-                                              json.dumps(proxy_scrub_config, indent=4),
-                                              raw=True)
+                            Configuration.set(key=proxy_scrub_config_key, value=proxy_scrub_config)
 
             # Update 'backend_connection_manager' section
             changes = False
@@ -309,5 +307,28 @@ class MigrationController(object):
             new_metadata = _update_metadata_structure(vpool.metadata)
             vpool.metadata = new_metadata
             vpool.save()
+
+        ##############################################
+        # Always use indent=4 during Configuration set
+        def _resave_all_config_entries(config_path='/ovs'):
+            """
+            Recursive functions which checks every config management key if its a directory or not.
+            If not a directory, we retrieve the config and just save it again using the new indentation logic
+            """
+            for item in Configuration.list(config_path):
+                new_path = config_path + '/' + item
+                print new_path
+                if Configuration.dir_exists(new_path) is True:
+                    _resave_all_config_entries(config_path=new_path)
+                else:
+                    try:
+                        config = Configuration.get(new_path)
+                        Configuration.set(new_path, config)
+                    except:
+                        config = Configuration.get(new_path, raw=True)
+                        Configuration.set(new_path, config, raw=True)
+        if OVSMigrator.THIS_VERSION <= 13:  # There is no way of checking whether this new indentation logic has been applied, so we only perform this for version 13 and lower
+            MigrationController._logger.info('Re-saving every configuration setting with new indentation rules')
+            _resave_all_config_entries()
 
         MigrationController._logger.info('Finished out of band migrations')
