@@ -31,7 +31,7 @@ define([
 
         // Observables
         self.blockCacheSettings      = ko.observableArray(['write', 'read', 'rw', 'none']);
-        self.preset                     = ko.observable();
+        self.preset                  = ko.observable();
 
         // Computed
         self.blockCacheBackend = ko.computed({

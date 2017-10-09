@@ -97,11 +97,12 @@ define([
                     generic.trySet(self.backendName, data.metadata.backend.backend_info, 'name');
                     generic.trySet(self.backendPreset, data.metadata.backend.backend_info, 'preset');
                     generic.trySet(self.backendPolicies, data.metadata.backend.backend_info, 'policies');
-                }
-                if (data.metadata.backend.hasOwnProperty('connection_info')) {
+
+                    if (data.metadata.backend.backend_info.hasOwnProperty('connection_info')) {
                     generic.trySet(self.backendHost, data.metadata.backend.connection_info, 'host');
                     generic.trySet(self.backendPort, data.metadata.backend.connection_info, 'port');
                     generic.trySet(self.backendLocal, data.metadata.backend.connection_info, 'local');
+                    }
                 }
             }
             if (data.hasOwnProperty('vdisks_guids') && !generic.tryGet(options, 'skipDisks', false)) {
@@ -178,68 +179,13 @@ define([
                 }
             }).promise();
         };
-        self.getCachingData = function(sr_guid, returnViewModel) {
-            // @todo make this obsolete by returning a proper structure as vpool metadata
+        self.getCachingData = function(storageRouterGuid, returnViewModel) {
+            var cachingInfo = self.metadata().caching_info;
             returnViewModel = returnViewModel || false;
-            var cachingData = {};
-            var cacheStructure = {
-                'read': false,
-                'write': false,
-                'is_backend': false,
-                'quota': undefined,
-                'backend_info': {  // Will be filled in when isBackend is true
-                    // Structure is kept the same as the python api will return
-                    'name': undefined,
-                    'backend_guid': undefined,
-                    'alba_backend_guid': undefined,
-                    'policies': undefined,
-                    'preset': undefined,
-                    'connection_info': {
-                        'client_id': undefined,
-                        'client_secret': undefined,
-                        'host': undefined,
-                        'port': undefined,
-                        'local': undefined
-                    }
-                }
-            };
-            var map = {
-                'fragment_cache': {
-                    'read': 'fragment_cache_on_read',
-                    'write': 'fragment_cache_on_write',
-                    'quota': 'quota_fc',
-                    'backendPrefix': 'backend_aa_{0}'
-                },
-                'block_cache': {
-                    'read': 'block_cache_on_read',
-                    'write': 'block_cache_on_write',
-                    'quota': 'quota_bc',
-                    'backendPrefix': 'backend_bc_{0}'
-                }
-            };
-            var backendMetadata = self.metadata().backend;
-            // Extract the fragment cache and block cache read and write
-            if (backendMetadata.hasOwnProperty('caching_info') && backendMetadata['caching_info'].hasOwnProperty(sr_guid)) {
-                var cachingInfo = backendMetadata['caching_info'][sr_guid];
-                $.each(map, function(cacheType, cacheTypeData) {
-                    var metadataCacheData = $.extend(true, {}, cacheStructure);  // Deepcopy, ignores values = undefined
-                    cachingData[cacheType] = metadataCacheData;
-                    $.each(cacheTypeData, function(structureKey, metadataKey){
-                        if (structureKey === 'backendPrefix') {
-                            // Get possible backend related info
-                            metadataKey = metadataKey.format([sr_guid]);
-                            if (self.metadata().hasOwnProperty(metadataKey)) {
-                                var aaBackendData = self.metadata()[metadataKey];
-                                metadataCacheData.is_backend = true;
-                                $.extend(metadataCacheData.backend_info, aaBackendData.backend_info);
-                                $.extend(metadataCacheData.backend_info.connection_info, aaBackendData.connection_info);
-                            }
-                        } else {
-                            metadataCacheData[structureKey] = cachingInfo.hasOwnProperty(metadataKey) ? cachingInfo[metadataKey] : undefined;
-                        }
-                    });
-                });
+            if (!(storageRouterGuid in cachingInfo)) {
+                throw new Error('VPool has no metadata about Storagerouter {0}'.format([storageRouterGuid]))
             }
+            var cachingData = cachingInfo[storageRouterGuid];
             if (returnViewModel === true) {
                 return new CacheData(cachingData)
             }

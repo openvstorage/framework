@@ -978,3 +978,18 @@ class StorageDriverController(object):
         if storagedriver.startup_counter == current_startup_counter:
             raise RuntimeError('StorageDriver service failed to start (got no event)')
         StorageDriverController._logger.debug('StorageDriver running')
+
+    @staticmethod
+    def calculate_global_write_buffer(storagedriver_guid):
+        """
+        Calculate the global write buffer for a given Storagedriver
+        :param storagedriver_guid: Guid of the Storagedriver
+        :return: Calculated global write buffer
+        :rtype: int
+        """
+        storagedriver = StorageDriver(storagedriver_guid)
+        global_write_buffer = 0
+        for partition in storagedriver.partitions:
+            if partition.role == DiskPartition.ROLES.WRITE and partition.sub_role == StorageDriverPartition.SUBROLE.SCO:
+                global_write_buffer += partition.size
+        return global_write_buffer

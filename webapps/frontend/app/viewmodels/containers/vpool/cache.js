@@ -57,7 +57,7 @@ define([
         // Observables (This will ensure that these observables are present even if the data is missing them)
         self.read               = ko.observable();
         self.write              = ko.observable();
-        self.is_backend          = ko.observable();
+        self.is_backend         = ko.observable();
         self.quota              = ko.observable();
         self.cacheSettings      = ko.observableArray(['write', 'read', 'rw', 'none']);
 
@@ -99,7 +99,8 @@ define([
 
         ko.mapping.fromJS(data, backendInfoMapping, self);
 
-        self.enhancedPreset = ko.computed(function() {
+        // Computed
+        self.enhancedPreset = ko.pureComputed(function() {
             /**
              * Compute a preset to look like presetName: (1,1,1,1),(2,1,2,1)
              */
@@ -112,6 +113,10 @@ define([
             });
             return ko.utils.unwrapObservable(self.preset) + ': ' + policies.join(', ');
         });
+        self.isLocalBackend = ko.pureComputed(function() {
+            return self.connection_info.isLocalBackend()
+        })
+
     };
     var connectionInfoViewModel = function(data) {
         var self = this;
@@ -122,7 +127,8 @@ define([
         self.port           = ko.observable().extend({ numeric: {min: 1, max: 65535}});
         self.local          = ko.observable();
 
-        self.isLocalBackend = ko.pureComputed({
+        self.isLocalBackend = ko.computed({
+           deferEvaluation: true,  // Wait with computing for an actual subscription
            read: function() {
                if (self.local() === undefined) {
                    // Default to True for reading purposes

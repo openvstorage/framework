@@ -23,22 +23,18 @@ define([
         var self = this;
 
         // Observables
-        self.albaProxyGuids           = ko.observableArray([]);
-        self.backendInfo              = ko.observable();
-        self.blockCacheBackendInfo    = ko.observable();
-        self.blockCacheConnectionInfo = ko.observable();
-        self.connectionInfo           = ko.observable();
-        self.guid                     = ko.observable(guid);
-        self.loaded                   = ko.observable(false);
-        self.loading                  = ko.observable(false);
-        self.mountpoint               = ko.observable();
-        self.name                     = ko.observable();
-        self.ports                    = ko.observableArray([0, 0, 0, 0]);
-        self.storageIP                = ko.observable();
-        self.storageRouterGuid        = ko.observable();
-        self.vdiskGuids               = ko.observableArray([]);
-        self.vpoolBackendInfo         = ko.observable();
-        self.localSummary             = ko.observable();
+        self.albaProxyGuids                 = ko.observableArray([]);
+        self.guid                           = ko.observable(guid);
+        self.loaded                         = ko.observable(false);
+        self.loading                        = ko.observable(false);
+        self.mountpoint                     = ko.observable();
+        self.name                           = ko.observable();
+        self.ports                          = ko.observableArray([0, 0, 0, 0]);
+        self.storageIP                      = ko.observable();
+        self.storageRouterGuid              = ko.observable();
+        self.vdiskGuids                     = ko.observableArray([]);
+        self.vpoolBackendInfo               = ko.observable();
+        self.localSummary                   = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -51,12 +47,6 @@ define([
             generic.trySet(self.vpoolBackendInfo, data, 'vpool_backend_info');
             generic.trySet(self.albaProxyGuids, data, 'alba_proxies_guids');
             generic.trySet(self.localSummary, data, 'local_summary');
-            if (data.hasOwnProperty('vpool_backend_info')) {
-                generic.trySet(self.backendInfo, data.vpool_backend_info, 'backend_info');
-                generic.trySet(self.connectionInfo, data.vpool_backend_info, 'connection_info');
-                generic.trySet(self.blockCacheBackendInfo, data.vpool_backend_info, 'block_cache_backend_info');
-                generic.trySet(self.blockCacheConnectionInfo, data.vpool_backend_info, 'block_cache_connection_info');
-            }
             self.loaded(true);
             self.loading(false);
         };
@@ -80,44 +70,29 @@ define([
         };
 
         // Computed
-        self.caching = ko.computed(function() {
-            if (self.vpoolBackendInfo() === undefined) {
-                return 'none'
-            }
-            var read = self.vpoolBackendInfo().cache_read,
-                write = self.vpoolBackendInfo().cache_write;
-
-            if (read === true && write === true) {
-                return 'read_and_write';
-            }
-            if (read === true && write === false) {
-                return 'read';
-            }
-            if (read === false && write === true) {
-                return 'write';
-            }
-            return 'none';
-        });
-        self.blockCaching = ko.computed(function() {
-            if (self.vpoolBackendInfo() === undefined) {
-                return 'none'
-            }
-            var read = self.vpoolBackendInfo().block_cache_read,
-                write = self.vpoolBackendInfo().block_cache_write;
-
-            if (read === true && write === true) {
-                return 'read_and_write';
-            }
-            if (read === true && write === false) {
-                return 'read';
-            }
-            if (read === false && write === true) {
-                return 'write';
-            }
-            return 'none';
-        });
-        self.canBeDeleted = ko.computed(function() {
+        self.canBeDeleted = ko.pureComputed(function() {
             return self.vdiskGuids().length === 0;
         });
+
+        // Functions
+        self.stringifiedCaching = function(cache) {
+            /**
+             * @param cache: caching data eg: self.vpoolBackendInfo().fragment_cache
+             */
+            if (self.vpoolBackendInfo() === undefined) {
+                return 'none';
+            }
+            if (cache.read === true && cache.write === true) {
+                return 'read_and_write';
+            }
+            if (cache.read === true && cache.write === false) {
+                return 'read';
+            }
+            if (cache.read === false && cache.write === true) {
+                return 'write';
+            }
+            return 'none';
+        };
+
     };
 });

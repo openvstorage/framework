@@ -120,7 +120,7 @@ define([
                 } else {
                     self.loadingBackend(true);
                     generic.xhrAbort(self.loadAlbaBackendHandle);
-                    var connectionInfo = vPool.metadata().backend.connection_info,
+                    var connectionInfo = vPool.metadata().backend.backend_info.connection_info,
                         getData = {ip: connectionInfo.host,
                                    port: connectionInfo.port,
                                    client_id: connectionInfo.client_id,

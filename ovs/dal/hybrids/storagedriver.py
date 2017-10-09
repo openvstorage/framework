@@ -18,6 +18,7 @@
 StorageDriver module
 """
 
+import copy
 import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
@@ -26,6 +27,7 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.lib.storagedriver import StorageDriverController
 
 
 class StorageDriver(DataObject):
@@ -123,29 +125,23 @@ class StorageDriver(DataObject):
         :return: Information about vPool and accelerated Backend
         :rtype: dict
         """
-        from ovs.dal.hybrids.diskpartition import DiskPartition
-        from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
-
-        global_write_buffer = 0
-        for partition in self.partitions:
-            if partition.role == DiskPartition.ROLES.WRITE and partition.sub_role == StorageDriverPartition.SUBROLE.SCO:
-                global_write_buffer += partition.size
-
-        vpool_backend_info = {'fragment_cache': {'read': False,
-                                                 'write': False,
-                                                 'quota': None,
-                                                 'backend_info': None},  # Will contain connection info if it wouldn't be None
-                              'block_cache': {'read': False,
-                                              'write': False,
-                                              'quota': None,
-                                              'backend_info': None}}
+        global_write_buffer = StorageDriverController.calculate_global_write_buffer(self.guid)
+        vpool_backend_info = {'backend': copy.deepcopy(self.vpool.metadata['backend']),
+                              'caching_info': {'fragment_cache': {'read': False,
+                                                                  'write': False,
+                                                                  'quota': None,
+                                                                  'backend_info': None},  # Will contain connection info if it wouldn't be None
+                                               'block_cache': {'read': False,
+                                                               'write': False,
+                                                               'quota': None,
+                                                               'backend_info': None}}}
         if 'caching_info' not in self.vpool.metadata:
             self._logger.critical('Metadata structure has not been updated yet')
             return vpool_backend_info
         if self.storagerouter_guid not in self.vpool.metadata['caching_info']:
             # No caching configured
             return vpool_backend_info
-        for cache_type, cache_data in vpool_backend_info.iteritems():
+        for cache_type, cache_data in vpool_backend_info['caching_info'].iteritems():
             caching_info = self.vpool.metadata['caching_info'][self.storagerouter_guid][cache_type]
             # Update the cache data matching the keys currently specified in cache_data
             cache_data.update((k, caching_info[k]) for k in cache_data.viewkeys() & caching_info.viewkeys())
