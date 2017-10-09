@@ -27,7 +27,6 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.lib.storagedriver import StorageDriverController
 
 
 class StorageDriver(DataObject):
@@ -125,6 +124,7 @@ class StorageDriver(DataObject):
         :return: Information about vPool and accelerated Backend
         :rtype: dict
         """
+        from ovs.lib.storagedriver import StorageDriverController
         global_write_buffer = StorageDriverController.calculate_global_write_buffer(self.guid)
         vpool_backend_info = {'backend': copy.deepcopy(self.vpool.metadata['backend']),
                               'caching_info': {'fragment_cache': {'read': False,
