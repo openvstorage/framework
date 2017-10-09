@@ -71,14 +71,14 @@ class MonitoringController(object):
         """
         MonitoringController._logger.info('Starting vDisk caching quota verification...')
         alba_guid_size_map = {}
+        vdisk_cache_quota_mapping = {'fragment_cache': 'fragment',
+                                     'block_cache': 'block'}
         for storagedriver in StorageDriverList.get_storagedrivers():
             storagedriver.invalidate_dynamics(['vpool_backend_info', 'vdisks_guids'])
-
-            for cache_type in [['cache_quota_fc', 'backend_info', 'connection_info', 'fragment'],
-                               ['cache_quota_bc', 'block_cache_backend_info', 'block_cache_connection_info', 'block']]:
-                cache_quota = storagedriver.vpool_backend_info[cache_type[0]]
-                backend_info = storagedriver.vpool_backend_info[cache_type[1]]
-                connection_info = storagedriver.vpool_backend_info[cache_type[2]]
+            for cache_type, cache_type_data in storagedriver.vpool_backend_info['caching_info'].iteritems():
+                cache_quota = cache_type_data['quota']
+                backend_info = cache_type_data['backend_info']
+                connection_info = cache_type_data.get('backend_info', {}).get('connection_info', None)
                 if backend_info is None or connection_info is None:
                     continue
 
@@ -102,7 +102,7 @@ class MonitoringController(object):
 
                 for vdisk_guid in storagedriver.vdisks_guids:
                     vdisk = VDisk(vdisk_guid)
-                    vdisk_cq = vdisk.cache_quota.get(cache_type[3]) if vdisk.cache_quota is not None else None
+                    vdisk_cq = vdisk.cache_quota.get(vdisk_cache_quota_mapping[cache_type]) if vdisk.cache_quota is not None else None
                     if vdisk_cq is None:
                         alba_guid_size_map[alba_backend_guid]['requested_size'] += cache_quota if cache_quota is not None else 0
                     else:

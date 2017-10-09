@@ -283,7 +283,7 @@ define([
                     new_config.cache_quota *= Math.pow(1024, 3);
                 } else {
                     // Update current configuration to default value stored in vPool, otherwise 'Save' button will be enabled after saving
-                    var quota = vd.vpool().metadata().backend.caching_info[self.vDisk().storageRouterGuid()].quota;
+                    var quota = vd.vpool().metadata().caching_info[self.vDisk().storageRouterGuid()].quota;
                     vd.configuration().cache_quota = quota / Math.pow(1024.0, 3);
                 }
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
@@ -425,19 +425,19 @@ define([
         };
 
         // Computed
-        self.canBeModified = ko.computed(function() {
+        self.canBeModified = ko.pureComputed(function() {
             if (self.vDisk() === undefined) {
                 return false;
             }
             return !self.convertingToTemplate() && !self.removing() && !self.restarting() && self.vDisk().liveStatus() === 'RUNNING';
         });
-        self.canSetAsTemplate = ko.computed(function() {
+        self.canSetAsTemplate = ko.pureComputed(function() {
             if (self.vDisk() === undefined) {
                 return false;
             }
             return self.vDisk().parentVDiskGuid() === null && self.vDisk().childrenGuids().length === 0;
         });
-        self.tooltipSetAsTemplate = ko.computed(function(){
+        self.tooltipSetAsTemplate = ko.pureComputed(function(){
             if (self.vDisk() === undefined) {
                 return '';
             }
@@ -449,7 +449,7 @@ define([
             }
             return $.t('ovs:vdisks.detail.set_as_template');
         });
-        self.equalsDefaultCacheQuota = ko.computed(function() {
+        self.equalsDefaultCacheQuota = ko.pureComputed(function() {
             var allFalse = {fragment: false, block: false};
             if (self.vDisk() === undefined || self.vDisk().configuration() === undefined) {
                 return allFalse;
@@ -458,24 +458,24 @@ define([
             if (vPool === undefined || vPool.metadata() === undefined) {
                 return allFalse;
             }
-            if (vPool.metadata().backend.caching_info.hasOwnProperty(self.vDisk().storageRouterGuid())) {
-                var cachingInfo = vPool.metadata().backend.caching_info[self.vDisk().storageRouterGuid()],
-                    vPoolFragment = cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_fc', null) : null,
-                    vPoollock = cachingInfo !== null && cachingInfo !== undefined ? generic.tryGet(cachingInfo, 'quota_bc', null) : null,
-                    vDiskFragment = self.vDisk().fragmentCQ() !== undefined && self.vDisk().fragmentCQ() !== '' ? Math.round(self.vDisk().fragmentCQ() * Math.pow(1024.0, 3)) : null,
-                    vDiskBlock = self.vDisk().blockCQ() !== undefined && self.vDisk().blockCQ() !== '' ? Math.round(self.vDisk().blockCQ() * Math.pow(1024.0, 3)) : null;
-                return {fragment: vPoolFragment === vDiskFragment, block: vPoollock === vDiskBlock};
+            if (vPool.metadata().caching_info.hasOwnProperty(self.vDisk().storageRouterGuid())) {
+                var cachingInfo = vPool.metadata().caching_info[self.vDisk().storageRouterGuid()];
+                var vPoolFragment = generic.tryGet(cachingInfo.fragment_cache, 'quota', null);
+                var vPoolBlock = generic.tryGet(cachingInfo.block_cache, 'quota', null);
+                var vDiskFragment = self.vDisk().fragmentCQ() !== undefined && self.vDisk().fragmentCQ() !== '' ? Math.round(self.vDisk().fragmentCQ() * Math.pow(1024.0, 3)) : null;
+                var vDiskBlock = self.vDisk().blockCQ() !== undefined && self.vDisk().blockCQ() !== '' ? Math.round(self.vDisk().blockCQ() * Math.pow(1024.0, 3)) : null;
+                return {fragment: vPoolFragment === vDiskFragment, block: vPoolBlock === vDiskBlock};
             }
             return allFalse;
         });
-        self.hasCacheQuota = ko.computed(function() {
+        self.hasCacheQuota = ko.pureComputed(function() {
             if (self.vDisk() !== undefined && self.vDisk().storageRouter() !== undefined && self.vDisk().storageRouter().features() !== undefined) {
                 var features = self.vDisk().storageRouter().features();
                 return features.alba.features !== undefined && features.alba.features.contains('cache-quota');
             }
             return false;
         });
-        self.hasBlockCache = ko.computed(function() {
+        self.hasBlockCache = ko.pureComputed(function() {
             if (self.vDisk() !== undefined && self.vDisk().storageRouter() !== undefined && self.vDisk().storageRouter().features() !== undefined) {
                 var features = self.vDisk().storageRouter().features();
                 return features.alba.features !== undefined && features.alba.features.contains('block-cache');
