@@ -19,7 +19,6 @@ GenericTaskController module
 """
 import os
 import copy
-import json
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -427,7 +426,7 @@ class GenericController(object):
                     scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))
                     scrub_config['port'] = port
                     scrub_config['transport'] = 'tcp'
-                    Configuration.set(scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
+                    Configuration.set(key=scrub_config_key, value=scrub_config)
 
                     params = {'VPOOL_NAME': vpool.name,
                               'LOG_SINK': Logger.get_sink_path(alba_proxy_service),
@@ -446,7 +445,7 @@ class GenericController(object):
                             value['alba_connection_host'] = '127.0.0.1'
                             value['alba_connection_port'] = scrub_config['port']
                 # Copy backend connection manager information in separate key
-                Configuration.set(backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
+                Configuration.set(key=backend_config_key, value={"backend_connection_manager": backend_config})
         except Exception:
             message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
             error_messages.append(message)
