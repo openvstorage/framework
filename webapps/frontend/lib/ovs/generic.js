@@ -568,8 +568,8 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
             if (ko.isObservable(obj[prop])) {
                 if (obj[prop].isObservableArray) {  // ObservableArray
                     obj[prop]([]);
-                } else {
-                    obj[prop](undefined);
+                } else if (obj[prop].isObservableDictionary) {
+                    obj[prop].removeAll();
                 }
             } else {
                 obj[prop] = undefined;
@@ -604,6 +604,10 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
                 array.push(child.subscribe(func))
             }
         });
+    }
+    function isFunction(functionToCheck) {
+        var getType = {};
+        return functionToCheck && getType.toString.call(functionToCheck) === '[object Function]';
     }
     function _arrayGetItem(array, prop, index){
         var foundItem = undefined;
@@ -769,6 +773,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         getTimestamp: getTimestamp,
         ipSort: ipSort,
         isEmpty: isEmpty,
+        isFunction: isFunction,
         keys: keys,
         log: log,
         lower: lower,

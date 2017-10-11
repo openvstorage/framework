@@ -14,8 +14,25 @@
             <td data-i18n="ovs:generic.null"></td>
             <td data-i18n="ovs:generic.null"></td>
             <td data-i18n="ovs:generic.null"></td>
-            <td data-i18n="ovs:generic.null"></td>
             <td style="height:37px;">
+            <button type="button"
+                    class="btn btn-mini btn-default hand"
+                    data-bind="click: $root.addStorageRouter,
+                               tooltip: 'ovs:vpools.detail.extend',
+                               enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
+                               attr: { id: 'button_add_' + guid()},
+                               visible: !$root.updatingStorageRouters()">
+                <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
+            </button>
+                <button type="button"
+                    class="btn btn-mini btn-default hand"
+                    data-bind="click: $root.addStorageRouter2,
+                               tooltip: 'ovs:vpools.detail.extend',
+                               enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
+                               attr: { id: 'button_add_' + guid()},
+                               visible: !$root.updatingStorageRouters()">
+                <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
+            </button>
             </td>
         <!-- /ko -->
         <!-- ko if: $root.srSDMap()[guid()] !== undefined -->
@@ -105,7 +122,7 @@
                             <span data-i18n="ovs:vpools.fragment_caching"></span>
                         </td>
                         <td>
-                            <!-- ko with: vpoolBackendInfo().fragment_cache -->
+                            <!-- ko with: vpoolBackendInfo().caching_info.fragment_cache -->
                                 <!-- ko compose: { view: 'vpool-detail-storagerouter-cache.html', area: 'site/vpool'}-->
                                 <!--/ko-->
                             <!-- /ko -->
@@ -124,7 +141,7 @@
                             <span data-i18n="ovs:vpools.block_caching"></span>
                         </td>
                         <td>
-                            <!-- ko with: vpoolBackendInfo().block_cache -->
+                            <!-- ko with: vpoolBackendInfo().caching_info.block_cache -->
                                 <!-- ko compose: { view: 'vpool-detail-storagerouter-cache.html', area: 'site/vpool', mode: 'templated', cacheViews:true}-->
                                     <!-- ko if: $parent.features() !== undefined && !$parent.features()['alba']['features'].contains('block-cache') -->
                                     <span data-part="cacheTypeTranslation" data-i18n="ovs:generic.null"></span>

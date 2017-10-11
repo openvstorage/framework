@@ -179,10 +179,24 @@ define([
                 }
             }).promise();
         };
-        self.getCachingData = function(storageRouterGuid, returnViewModel) {
+        /**
+         * Get the caching data for a certain StorageRouter that is linked to this vpool
+         * @param storageRouterGuid: Guid of the StorageRouter
+         * @type storageRouterGuid: str
+         * @param returnViewModel: Return a ViewModel object or not
+         * @type returnViewModel: bool
+         * @param allowEmpty: Allow an empty ViewModel to be returned
+         * @type allowEmpty: bool
+         * @return {*}
+         */
+        self.getCachingData = function(storageRouterGuid, returnViewModel, allowEmpty) {
             var cachingInfo = self.metadata().caching_info;
+            allowEmpty = (typeof allowEmpty !== 'undefined') ? allowEmpty : false;
             returnViewModel = returnViewModel || false;
             if (!(storageRouterGuid in cachingInfo)) {
+                if (allowEmpty === true) {
+                    return new CacheData()
+                }
                 throw new Error('VPool has no metadata about Storagerouter {0}'.format([storageRouterGuid]))
             }
             var cachingData = cachingInfo[storageRouterGuid];
@@ -191,6 +205,12 @@ define([
             }
             return cachingData
         };
+        /**
+         * Get configuration data of this vpool
+         * @param returnViewModel: Return a viewmodel or plain object
+         * @type returnViewModel: bool
+         * @return {*}
+         */
         self.getConfiguration = function(returnViewModel) {
             returnViewModel = returnViewModel || false;
             var configuration = self.configuration();
