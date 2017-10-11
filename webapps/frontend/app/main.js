@@ -16,20 +16,20 @@
 /*global requirejs, define, window */
 requirejs.config({
     paths: {  // paths for module names not found under baseUrl (http://requirejs.org/docs/api.html#config-paths)
-        'text'              : '../lib/require/text',
-        'durandal'          : '../lib/durandal/js',
-        'plugins'           : '../lib/durandal/js/plugins',
-        'transitions'       : '../lib/durandal/js/transitions',
-        'knockout'          : '../lib/knockout/knockout-3.3.0',
-        'knockout-mapping'  : '../lib/knockout/plugins/knockout-mapping-2.4.1',
-        'knockout-reactor'  : '../lib/knockout/plugins/ko-reactor-1.3.8',
-        'bootstrap'         : '../lib/bootstrap/js/bootstrap',
-        'jquery'            : '../lib/jquery/jquery-1.9.1',
-        'jqp'               : '../lib/jquery-plugins/js',
-        'd3'                : '../lib/d3/d3.v3.min',
-        'd3p'               : '../lib/d3-plugins/js',
-        'ovs'               : '../lib/ovs',
-        'i18next'           : '../lib/i18next/i18next.amd.withJQuery-1.7.1'
+        'text'                  : '../lib/require/text',
+        'durandal'              : '../lib/durandal/js',
+        'plugins'               : '../lib/durandal/js/plugins',
+        'transitions'           : '../lib/durandal/js/transitions',
+        'knockout'              : '../lib/knockout/knockout-3.3.0',
+        'knockout-mapping'      : '../lib/knockout/plugins/knockout-mapping-2.4.1',
+        'knockout-dictionary'   : '../lib/knockout/plugins/observableDictionary',
+        'bootstrap'             : '../lib/bootstrap/js/bootstrap',
+        'jquery'                : '../lib/jquery/jquery-1.9.1',
+        'jqp'                   : '../lib/jquery-plugins/js',
+        'd3'                    : '../lib/d3/d3.v3.min',
+        'd3p'                   : '../lib/d3-plugins/js',
+        'ovs'                   : '../lib/ovs',
+        'i18next'               : '../lib/i18next/i18next.amd.withJQuery-1.7.1'
     },
     shim: {
         'knockout-mapping': {
@@ -71,11 +71,10 @@ define([
     'ovs/shared',
     'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions', 'ovs/extensions/knockout-extenders',
     'bootstrap',
-    'knockout-reactor' // Ko plugins
-],  function(system, app, viewLocator, binder, $, i18n, shared) {
+    'knockout-dictionary'// Ko plugins
+],  function( system, app, viewLocator, binder, $, i18n, shared) {
     "use strict";
     system.debug(true);
-
     shared.defaultLanguage = shared.language = window.navigator.userLanguage || window.navigator.language || 'en-US';
     var i18nOptions = {
         detectFromHeaders: false,

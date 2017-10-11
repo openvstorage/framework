@@ -15,9 +15,8 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define(['jquery', 'knockout',
-    'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/storagerouter/storagerouter'],
-    function($, ko, generic, api, shared, StorageRouter){
+    'ovs/generic', 'ovs/api', 'ovs/shared'],
+    function($, ko, generic, api, shared){
     "use strict";
     var singleton;
     singleton = function() {

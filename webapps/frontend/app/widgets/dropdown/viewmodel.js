@@ -131,7 +131,7 @@ define([
             if (settings.items.isObservableArray) {
                 self.items = settings.items;
             } else {
-                self.items(settings.items)
+                self.items(ko.utils.unwrapObservable(settings.items))  // Can be a normal array / computed / observable
             }
             self.target = settings.target;
             self.enabled = generic.tryGet(settings, 'enabled', ko.observable(true));
