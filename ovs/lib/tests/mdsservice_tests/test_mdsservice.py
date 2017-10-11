@@ -73,7 +73,7 @@ class MDSServices(unittest.TestCase):
             capacity = _mds_service.capacity
             if capacity == -1:
                 capacity = 'infinite'
-            _load, _ = MDSServiceController._get_mds_load(_mds_service)
+            _load, _ = MDSServiceController.get_mds_load(_mds_service)
             if _load == float('inf'):
                 _load = 'infinite'
             else:
@@ -88,7 +88,7 @@ class MDSServices(unittest.TestCase):
     def test_load_calculation(self):
         """
         Validates whether the load calculation works
-        MDSServiceController._get_mds_load returns the current load and load in case 1 extra vDisk would be created for this MDS
+        MDSServiceController.get_mds_load returns the current load and load in case 1 extra vDisk would be created for this MDS
             * Current load: Amount of vdisks for this MDS service / Amount of vdisks this MDS service can serve * 100
             * Next load: Amount of vdisks for this MDS service + 1 / Amount of vdisks this MDS service can serve * 100
         This test does:
@@ -114,25 +114,25 @@ class MDSServices(unittest.TestCase):
         )
         mds_service = structure['mds_services'][1]
         vdisks = DalHelper.create_vdisks_for_mds_service(amount=2, start_id=1, mds_service=mds_service)
-        load, load_plus = MDSServiceController._get_mds_load(mds_service)
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
         self.assertEqual(load, 20, 'There should be a 20% load. {0}'.format(load))
         self.assertEqual(load_plus, 30, 'There should be a 30% plus load. {0}'.format(load_plus))
         vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=3, start_id=len(vdisks) + 1, mds_service=mds_service))
-        load, load_plus = MDSServiceController._get_mds_load(mds_service)
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
         self.assertEqual(load, 50, 'There should be a 50% load. {0}'.format(load))
         self.assertEqual(load_plus, 60, 'There should be a 60% plus load. {0}'.format(load_plus))
         vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=5, start_id=len(vdisks) + 1, mds_service=mds_service))
-        load, load_plus = MDSServiceController._get_mds_load(mds_service)
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
         self.assertEqual(load, 100, 'There should be a 100% load. {0}'.format(load))
         self.assertEqual(load_plus, 110, 'There should be a 110% plus load. {0}'.format(load_plus))
         mds_service.capacity = -1
         mds_service.save()
-        load, load_plus = MDSServiceController._get_mds_load(mds_service)
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
         self.assertEqual(load, 50, 'There should be a 50% load. {0}'.format(load))
         self.assertEqual(load_plus, 50, 'There should be a 50% plus load. {0}'.format(load_plus))
         mds_service.capacity = 0
         mds_service.save()
-        load, load_plus = MDSServiceController._get_mds_load(mds_service)
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
         self.assertEqual(load, float('inf'), 'There should be infinite load. {0}'.format(load))
         self.assertEqual(load_plus, float('inf'), 'There should be infinite plus load. {0}'.format(load_plus))
 
@@ -1418,14 +1418,14 @@ class MDSServices(unittest.TestCase):
 
         MDSServiceController.mds_checkup()
         self.assertEqual(len(vpool.mds_services), 1)
-        self.assertEqual(MDSServiceController._get_mds_load(mds_service), (0, 10))
+        self.assertEqual(MDSServiceController.get_mds_load(mds_service), (0, 10))
 
         DalHelper.create_vdisks_for_mds_service(amount=8, start_id=1, mds_service=mds_service)
         MDSServiceController.mds_checkup()
         self.assertEqual(len(vpool.mds_services), 2)
         mds_service2 = [mdss for mdss in vpool.mds_services if mdss.guid != mds_service.guid][0]
-        self.assertEqual(MDSServiceController._get_mds_load(mds_service), (80, 90))
-        self.assertEqual(MDSServiceController._get_mds_load(mds_service2), (8, 9))
+        self.assertEqual(MDSServiceController.get_mds_load(mds_service), (80, 90))
+        self.assertEqual(MDSServiceController.get_mds_load(mds_service2), (8, 9))
 
         storagedriver_config = StorageDriverConfiguration(vpool.guid, vpool.storagedrivers[0].storagedriver_id)
         contents = LocalStorageRouterClient.configurations[storagedriver_config._key]
@@ -1464,9 +1464,9 @@ class MDSServices(unittest.TestCase):
         MDSServiceController.mds_checkup()
         sorted_services = sorted(vpool.mds_services, key=lambda _mds: _mds.service.ports[0])
         self.assertEqual(first=3, second=len(vpool.mds_services))
-        self.assertEqual(first=(200, 210), second=MDSServiceController._get_mds_load(sorted_services[0]))  # 20 masters - All vDisk's master services are still on this service
-        self.assertEqual(first=(10, 11), second=MDSServiceController._get_mds_load(sorted_services[1]))  # 10 slaves - All vDisks have now a slave on either 1 of the newly created slaves --> thus increasing the MDS load again
-        self.assertEqual(first=(10, 11), second=MDSServiceController._get_mds_load(sorted_services[2]))  # 10 slaves
+        self.assertEqual(first=(200, 210), second=MDSServiceController.get_mds_load(sorted_services[0]))  # 20 masters - All vDisk's master services are still on this service
+        self.assertEqual(first=(10, 11), second=MDSServiceController.get_mds_load(sorted_services[1]))  # 10 slaves - All vDisks have now a slave on either 1 of the newly created slaves --> thus increasing the MDS load again
+        self.assertEqual(first=(10, 11), second=MDSServiceController.get_mds_load(sorted_services[2]))  # 10 slaves
 
         # Running the MDS checkup again should result in:
         #    - A new MDS service, because the total load is now 210% + 11% + 11% = 232%, which is larger than the amount of MDS services multiplied by max_load (3 * 70%)
@@ -1474,10 +1474,10 @@ class MDSServices(unittest.TestCase):
         MDSServiceController.mds_checkup()
         sorted_services = sorted(vpool.mds_services, key=lambda _mds: _mds.service.ports[0])
         self.assertEqual(first=4, second=len(vpool.mds_services))
-        self.assertEqual(first=(70, 80), second=MDSServiceController._get_mds_load(sorted_services[0]))  # 7 masters - Only the maximum amount of vDisks remain with this service as master
-        self.assertEqual(first=(7, 8), second=MDSServiceController._get_mds_load(sorted_services[1]))  # 7 masters - Another 7 vDisks have their master here (which was a catching up slave in previous iteration)
-        self.assertEqual(first=(6, 7), second=MDSServiceController._get_mds_load(sorted_services[2]))  # 6 masters - Another 6 vDisks have their master here (which was a catching up slave in previous iteration)
-        self.assertEqual(first=(0, 1), second=MDSServiceController._get_mds_load(sorted_services[3]))  # Newly created service which does not have any load so far
+        self.assertEqual(first=(70, 80), second=MDSServiceController.get_mds_load(sorted_services[0]))  # 7 masters - Only the maximum amount of vDisks remain with this service as master
+        self.assertEqual(first=(7, 8), second=MDSServiceController.get_mds_load(sorted_services[1]))  # 7 masters - Another 7 vDisks have their master here (which was a catching up slave in previous iteration)
+        self.assertEqual(first=(6, 7), second=MDSServiceController.get_mds_load(sorted_services[2]))  # 6 masters - Another 6 vDisks have their master here (which was a catching up slave in previous iteration)
+        self.assertEqual(first=(0, 1), second=MDSServiceController.get_mds_load(sorted_services[3]))  # Newly created service which does not have any load so far
 
         # Verify the MDS configuration
         contents = LocalStorageRouterClient.configurations[storagedriver_config._key]

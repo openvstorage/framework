@@ -168,8 +168,8 @@ class HybridRunner(object):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) and member[1].__module__ == name:
+                for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                    if member[1].__module__ == name:
                         current_class = member[1]
                         try:
                             current_descriptor = Descriptor(current_class).descriptor
@@ -343,10 +343,8 @@ class Migration(object):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                    if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
                         migrators.append((member[1].identifier, member[1].migrate))
         for identifier, method in migrators:
             base_version = data[identifier] if identifier in data else 0

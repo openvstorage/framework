@@ -28,7 +28,7 @@ class MigrationController(object):
     This controller contains (part of the) migration code. It runs out-of-band with the updater so we reduce the risk of
     failures during the update
     """
-    _logger = Logger('lib')
+    _logger = Logger(name='update', forced_target_type='file')
 
     @staticmethod
     @ovs_task(name='ovs.migration.migrate', schedule=Schedule(minute='0', hour='6'), ensure_single_info={'mode': 'DEFAULT'})
@@ -39,6 +39,8 @@ class MigrationController(object):
         * "dangerous" migration code (it needs certain running services)
         * Migration code depending on a cluster-wide state
         * ...
+        * Successfully finishing a piece of migration code, should create an entry in /ovs/framework/migration in case it should not be executed again
+        *     Eg: /ovs/framework/migration|stats_monkey_integration: True
         """
         MigrationController._logger.info('Preparing out of band migrations...')
 
@@ -264,5 +266,31 @@ class MigrationController(object):
         if OVSMigrator.THIS_VERSION <= 13:  # There is no way of checking whether this new indentation logic has been applied, so we only perform this for version 13 and lower
             MigrationController._logger.info('Re-saving every configuration setting with new indentation rules')
             _resave_all_config_entries()
+
+        ######################################
+        # Integration of stats monkey (2.10.2)
+        if Configuration.get(key='/ovs/framework/migration|stats_monkey_integration', default=False) is False:
+            try:
+                # Get content of old key into new key
+                old_stats_monkey_key = '/statsmonkey/statsmonkey'
+                if Configuration.exists(key=old_stats_monkey_key) is True:
+                    Configuration.set(key='/ovs/framework/monitoring/statsmonkey',
+                                      value=Configuration.get(key=old_stats_monkey_key))
+                    Configuration.delete(key=old_stats_monkey_key)
+
+                # Make sure to disable the stats monkey by default or take over the current schedule if it was configured manually before
+                celery_key = '/ovs/framework/scheduling/celery'
+                current_value = None
+                scheduling_config = Configuration.get(key=celery_key, default={})
+                if 'statsmonkey.run_all_stats' in scheduling_config:
+                    current_value = scheduling_config.pop('statsmonkey.run_all_stats')
+                scheduling_config['ovs.statsmonkey.run_all'] = current_value
+                scheduling_config['alba.statsmonkey.run_all'] = current_value
+                Configuration.set(key=celery_key, value=scheduling_config)
+
+                # Make sure once this finished, it never runs again by setting this key to True
+                Configuration.set(key='/ovs/framework/migration|stats_monkey_integration', value=True)
+            except Exception:
+                MigrationController._logger.exception('Integration of statsmonkey failed')
 
         MigrationController._logger.info('Finished out of band migrations')

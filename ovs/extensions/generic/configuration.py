@@ -103,7 +103,9 @@ class Configuration(_Configuration):
                          'arakoon_clusters': {},
                          'stores': {'persistent': 'pyrakoon',
                                     'volatile': 'memcache'},
-                         'logging': {'type': 'console', 'level': 'INFO'}})
+                         'logging': {'type': 'console', 'level': 'DEBUG'},
+                         'scheduling/celery': {'ovs.statsmonkey.run_all': None,  # Disable statsmonkey scheduled task by default
+                                               'alba.statsmonkey.run_all': None}})
         if logging_target is not None:
             base_cfg['logging'] = logging_target
         if cls.exists('/ovs/framework/memcache') is False:

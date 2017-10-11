@@ -47,8 +47,8 @@ class Migrator(object):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) and member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
+                for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                    if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
                         migrators.append((member[1].identifier, member[1].migrate))
 
         end_version = 0

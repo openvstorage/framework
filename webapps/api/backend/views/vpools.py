@@ -200,7 +200,7 @@ class VPoolViewSet(viewsets.ViewSet):
     @load(VPool)
     def scrub_multiple_vdisks(self, vpool, vdisk_guids=None):
         """
-        Scrubs the specified vDisks or all vDisks of the vPool is no guids are passed in
+        Scrubs the specified vDisks or all vDisks of the vPool if no guids are passed in
         :param vpool: The vPool to which the vDisks belong to scrub
         :type vpool: ovs.dal.hybrids.vpool.VPool
         :param vdisk_guids: The guids of the vDisks to scrub
