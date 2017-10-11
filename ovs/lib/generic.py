@@ -21,6 +21,7 @@ import os
 import copy
 import json
 import time
+import uuid
 from datetime import datetime, timedelta
 from Queue import Empty, Queue
 from threading import Thread
@@ -400,10 +401,11 @@ class GenericController(object):
         service_manager = ServiceFactory.get_manager()
         client = None
         lock_time = 5 * 60
+        random_uuid = uuid.uuid4()
         storagerouter = scrub_info['storage_router']
         partition_guid = scrub_info['partition_guid']
-        alba_proxy_service = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vpool.name, storagerouter.name, partition_guid)
-        scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, partition_guid)
+        alba_proxy_service = 'ovs-albaproxy_{0}_scrub'.format(random_uuid)
+        scrub_directory = '{0}/scrub_work_{1}'.format(scrub_info['scrub_path'], random_uuid)
         scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, partition_guid)
         backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, partition_guid)
 
