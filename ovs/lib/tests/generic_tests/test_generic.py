@@ -667,7 +667,7 @@ class Generic(unittest.TestCase):
         counter = 0
         for log in Logger._logs['lib']:
             if 'threads for proxy service' in log:
-                match = re.match('^Scrubber - .*ovs-albaproxy_[1|2]_([1|2])_.*', log)
+                match = re.match('^Scrubber - vPool [1|2] - StorageRouter ([1|2]) - .*ovs-albaproxy_.*_scrub', log)
                 self.assertIsNotNone(match)
                 if match.groups()[0] == storagerouters[1].name:
                     expected_threads = 5
