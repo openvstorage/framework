@@ -25,7 +25,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'  # Used by migrator.py, so don't remove
-    THIS_VERSION = 12
+    THIS_VERSION = 13
 
     def __init__(self):
         """ Init method """
@@ -50,6 +50,7 @@ class OVSMigrator(object):
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         if working_version < OVSMigrator.THIS_VERSION:
+            from ovs.dal.lists.vpoollist import VPoolList
             from ovs.extensions.generic.configuration import Configuration
             from ovs.extensions.generic.sshclient import SSHClient
             from ovs.extensions.generic.system import System
@@ -60,5 +61,16 @@ class OVSMigrator(object):
             # Multiple Proxies
             if local_client.dir_exists(directory='/opt/OpenvStorage/config/storagedriver/storagedriver'):
                 local_client.dir_delete(directories=['/opt/OpenvStorage/config/storagedriver/storagedriver'])
+
+            # MDS safety granularity on vPool level
+            mds_safety_key = '/ovs/framework/storagedriver'
+            if Configuration.exists(key=mds_safety_key):
+                current_mds_settings = Configuration.get(key=mds_safety_key)
+                for vpool in VPoolList.get_vpools():
+                    vpool_key = '/ovs/vpools/{0}'.format(vpool.guid)
+                    if Configuration.dir_exists(key=vpool_key):
+                        Configuration.set(key='{0}/mds_config'.format(vpool_key),
+                                          value=current_mds_settings)
+                Configuration.delete(key=mds_safety_key)
 
         return OVSMigrator.THIS_VERSION

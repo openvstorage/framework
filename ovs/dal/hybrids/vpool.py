@@ -17,9 +17,11 @@
 """
 VPool module
 """
+
 import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
+from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration
 
 
@@ -133,8 +135,14 @@ class VPool(DataObject):
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
         dtl_enabled = not (dtl_config_mode == StorageDriverClient.VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
 
+        try:
+            mds_config = Configuration.get('/ovs/vpools/{0}/mds_config'.format(self.guid))
+        except NotFoundException:
+            mds_config = {}
+
         return {'sco_size': sco_size,
                 'dtl_mode': StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode] if dtl_enabled is True else 'no_sync',
+                'mds_config': mds_config,
                 'dtl_enabled': dtl_enabled,
                 'cluster_size': cluster_size,
                 'write_buffer': write_buffer,

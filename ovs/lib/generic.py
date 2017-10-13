@@ -333,7 +333,7 @@ class GenericController(object):
                         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
                         if configs[0].get('ip') != storagedriver.storagerouter.ip:
                             GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - MDS master is not local, trigger handover'.format(vpool.name, storagerouter.name, vdisk.name))
-                            MDSServiceController.ensure_safety(VDisk(vdisk_guid))  # Do not use a remote VDisk instance here
+                            MDSServiceController.ensure_safety(vdisk_guid=vdisk_guid)  # Do not use a remote VDisk instance here
                             configs = _verify_mds_config(current_vdisk=vdisk)
                             if configs[0].get('ip') != storagedriver.storagerouter.ip:
                                 GenericController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because master MDS still not local'.format(vpool.name, storagerouter.name, vdisk.name))
@@ -400,10 +400,11 @@ class GenericController(object):
         service_manager = ServiceFactory.get_manager()
         client = None
         lock_time = 5 * 60
+        random_uuid = uuid.uuid4()
         storagerouter = scrub_info['storage_router']
         partition_guid = scrub_info['partition_guid']
-        alba_proxy_service = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vpool.name, storagerouter.name, partition_guid)
-        scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, partition_guid)
+        alba_proxy_service = 'ovs-albaproxy_{0}_scrub'.format(random_uuid)
+        scrub_directory = '{0}/scrub_work_{1}'.format(scrub_info['scrub_path'], random_uuid)
         scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, partition_guid)
         backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, partition_guid)
 

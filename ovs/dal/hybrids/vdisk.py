@@ -38,6 +38,7 @@ class VDisk(DataObject):
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     """
     _logger = LogHandler.get('dal', name='hybrid')
+    STATUSES = DataObject.enumerator('Status', ['HALTED', 'NON_RUNNING', 'RUNNING'])
 
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
@@ -252,7 +253,7 @@ class VDisk(DataObject):
                                                        'port': nodeconfig.port()})
                 else:
                     vdiskinfodict[key] = objectvalue
-        vdiskinfodict['live_status'] = 'NON-RUNNING' if max_redirects is True else ('RUNNING' if vdiskinfodict['halted'] is False else 'HALTED')
+        vdiskinfodict['live_status'] = VDisk.STATUSES.NON_RUNNING if max_redirects is True else (VDisk.STATUSES.RUNNING if vdiskinfodict['halted'] is False else VDisk.STATUSES.HALTED)
         return vdiskinfodict
 
     def _statistics(self, dynamic):

@@ -43,9 +43,6 @@ class Configuration(_Configuration):
                    'support': {'enablesupport': False,
                                'enabled': True,
                                'interval': 60},
-                   'storagedriver': {'mds_safety': 3,
-                                     'mds_tlogs': 100,
-                                     'mds_maxload': 75},
                    'webapps': {'html_endpoint': '/',
                                'oauth2': {'mode': 'local'}}}
 
