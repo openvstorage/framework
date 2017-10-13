@@ -26,6 +26,7 @@ define([
         self.text          = undefined;
         self.unique        = generic.getTimestamp().toString();
 
+        self.itemsSubscription = undefined;
         // Observables
         self.key            = ko.observable();
         self.keyIsFunction  = ko.observable(false);
@@ -130,8 +131,13 @@ define([
             // Items can be dynamic if it is an observable array but this is not required
             if (settings.items.isObservableArray) {
                 self.items = settings.items;
+            } else if (ko.isObservable(settings.items)) {  // Handle the case where it would be an observable / computed so updates can be pushed
+                self.items(settings.items());
+                self.itemsSubscription = settings.items.subscribe(function(newValue){
+                    self.items(newValue)
+                })
             } else {
-                self.items(ko.utils.unwrapObservable(settings.items))  // Can be a normal array / computed / observable
+                self.items(settings.items)  // Can be a normal array / computed / observable
             }
             self.target = settings.target;
             self.enabled = generic.tryGet(settings, 'enabled', ko.observable(true));
@@ -181,5 +187,12 @@ define([
                 self.target.valueHasMutated();
             }
         };
+        self.deactivate = function() {
+            // Dispose of the subscriptions
+            if (self.itemsSubscription !== undefined) {
+                self.itemsSubscription.dispose();
+            }
+
+        }
     };
 });

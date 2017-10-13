@@ -16,30 +16,73 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <p data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.basic_info"></p>
+    <p data-i18n="ovs:wizards.add_vpool.gather_vpool.basic_info"></p>
     <!-- ko with: data.vPool -->
-    <div class="form-group">
-        <label class="col-lg-3 control-label" for="inputVpoolName" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.vpool_name"></label>
+    <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('name') }">
+        <label class="col-lg-3 control-label" for="inputVpoolName" data-i18n="ovs:wizards.add_vpool.gather_vpool.name"></label>
         <div class="col-lg-7">
-            <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: name, valueUpdate: 'input', disable: true" />
-        </div>
-    </div>
-    <div class="form-group">
-        <label class="col-lg-3 control-label" for="inputBackendName" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.backend_name"></label>
-        <div class="col-lg-7" style="margin-bottom: -5px;">
-            <input type="text" id="inputBackendName" class="autofocus form-control" data-bind="value: backendName, valueUpdate: 'input', disable: true" />
-        </div>
-    </div>
-    <div class="form-group">
-        <label class="col-lg-3 control-label" for="inputPreset" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.preset"></label>
-        <div class="col-lg-7" style="margin-bottom: -5px;">
-            <input type="text" id="inputPreset" class="autofocus form-control" data-bind="value: $root.enhancedPreset, valueUpdate: 'input', disable: true" />
+            <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: name, valueUpdate: 'input', disable: $data !== undefined" />
         </div>
     </div>
     <!-- /ko -->
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></label>
+        <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }" style="margin-bottom: -5px;">
+            <!-- ko if: data.loadingBackends() === true -->
+                <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
+            <!-- /ko -->
+            <!-- ko if: data.loadingBackends() === false && (vpoolBackends() === undefined || vpoolBackends().length === 0) -->
+                <i data-i18n="[html]ovs:wizards.add_vpool.gather_vpool.no_backends"
+                   style="display: inline-block; margin-top: 7px;"></i>
+            <!-- /ko -->
+            <!-- ko if: data.loadingBackends() === false && (vpoolBackends() !== undefined && vpoolBackends().length > 0) -->
+                <span data-bind="visible: (data.vPool() === undefined || vpoolBackend() !== undefined),
+                                 dropdown: {
+                                     enabled: data.isExtend,
+                                     key: 'guid', keyisfunction: false,
+                                     items: vpoolBackends, target: vpoolBackend,
+                                     text: function(item) {
+                                         if (item !== undefined) {
+                                             return item.name;
+                                         }
+                                     }
+                                 }">
+                </span>
+            <!-- /ko -->
+            <button type='button' class="btn btn-default"  style="margin-left: 10px;"
+                    data-bind="click: loadBackends,
+                               style: {'margin-top': (vpoolBackends() !== undefined && vpoolBackends().length > 0 ? '-26px' : '')},
+                               enable: !data.loadingBackends(),
+                               visible: !data.backendData.isLocalBackend() && data.vPool() === undefined">
+                <span class="fa fa-" data-bind="css: { 'fa-spin': data.loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
+                <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
+            </button>
+        </div>
+    </div>
+    <div class="form-group" data-bind="visible: vpoolBackend() !== undefined">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
+        <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('preset') }" style="margin-bottom: -5px;">
+            <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && preset() === undefined)"></span>
+            <span data-bind="visible: (data.vPool() === undefined || preset() !== undefined),
+                             dropdown: {
+                                 enabled: data.isExtend,
+                                 key: 'name', keyisfunction: false,
+                                 items: enhancedPresets, target: preset,
+                                 text: function(item) {
+                                     var policies = [];
+                                     if (item !== undefined) {
+                                         $.each(item.policies, function(index, policy) {
+                                             policies.push(policy.text);
+                                         });
+                                         return item.name + ': ' + policies.join(', ');
+                                     }
+                                 }
+                             }"></span>
+        </div>
+    </div>
     <!-- ko with: data.storageDriverParams -->
     <div class="form-group">
-        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.proxy_amount"></label>
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.proxy_amount"></label>
         <div class="col-lg-3">
             <div data-bind="widget: {kind: 'numberinput', item: proxyAmount}"></div>
         </div>
@@ -62,37 +105,18 @@ but WITHOUT ANY WARRANTY of any kind.
             </span>
         </div>
     </div>
-    <pre data-bind="text: ko.toJSON(_storageRouterIpAddresses)"></pre>
     <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageip') }">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.ip_address"></label>
         <div class="col-lg-7" style="margin-bottom: -5px;">
             <div data-bind="visible: data.loadingStorageRouters()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
             <span data-bind="visible: !data.loadingStorageRouters(),
                              dropdown: {
-                                 items: _storageRouterIpAddresses,
+                                 items: storageRouterIpAddresses,
                                  target: storageRouterIpAddress,
                                  emptyisloading: false
                              }"></span>
         </div>
     </div>
-    <!-- ko with: data.storageRouter -->
-    <p data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.extended_info"></p>
-    <div class="form-group">
-        <label class="col-lg-3 control-label" for="inputStorageRouter" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.storagerouter_name"></label>
-        <div class="col-lg-7" style="margin-bottom: -5px;">
-            <input type="text" id="inputStorageRouter" class="autofocus form-control"
-                   data-bind="value: name(), valueUpdate: 'input', disable: true" />
-        </div>
-    </div>
-    <!-- /ko -->
-    <!-- ko with: data.storageDriverParams -->
-    <div class="form-group">
-        <label class="col-lg-3 control-label" for="inputStorageIP" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.storage_ip"></label>
-        <div class="col-lg-7" style="margin-bottom: -5px;">
-            <input type="text" id="inputStorageIP" class="autofocus form-control" data-bind="value: storageIP, valueUpdate: 'input', disable: true" />
-        </div>
-    </div>
-    <!-- /ko -->
     <div class="alert alert-danger" style="margin-bottom: -3px;"
          data-bind="visible: !canContinue().value || canContinue().showErrors">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>

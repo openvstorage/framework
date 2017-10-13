@@ -16,11 +16,11 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <p data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.basic_info"></p>
+    <p data-i18n="ovs:wizards.add_vpool.gather_block_cache.basic_info"></p>
     <!-- ko with: data.cachingData.block_cache -->
     <!-- Root is the wizard, as is the parent-->
     <div class="form-group">
-        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.block_cache" style="padding-top: 8px;"></label>
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.block_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
             <span data-bind="dropdown: {
                                  items: cacheSettings, target: cacheSetting,
@@ -37,25 +37,25 @@ but WITHOUT ANY WARRANTY of any kind.
             <div class="col-lg-7">
                 <input type="radio" name="fcBackend" id="useAcceleratedAlbaNo" class="autofocus"
                        data-bind="checked: is_backend, checkedValue: false" />
-                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.use_local_disk"
+                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_local_disk"
                        style="font-weight: normal;"></label><br />
                 <input type="radio" name="fcBackend" id="useAcceleratedAlbaYes" class="autofocus"
                        data-bind="checked: is_backend, checkedValue: true" />
-                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.use_backend_fc"
+                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_backend_fc"
                        style="font-weight: normal;"></label>
             </div>
         </div>
         <div data-bind="visible: is_backend()">
-            <p data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.accelerated_info"></p>
+            <p data-i18n="ovs:wizards.add_vpool.gather_block_cache.accelerated_info"></p>
             <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('quota') }">
                 <label class="col-lg-3 control-label" style="padding-top: 8px;">
                     <a data-bind="popover: {
-                                      title: 'ovs:wizards.reconfigure_vpool.gather_block_cache.cache_quota_title',
-                                      content: 'ovs:wizards.reconfigure_vpool.gather_block_cache.cache_quota_info'
+                                      title: 'ovs:wizards.add_vpool.gather_block_cache.cache_quota_title',
+                                      content: 'ovs:wizards.add_vpool.gather_block_cache.cache_quota_info'
                                  }"
                        class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
                     </a>
-                    <span data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.cache_quota_label"></span>
+                    <span data-i18n="ovs:wizards.add_vpool.gather_block_cache.cache_quota_label"></span>
                 </label>
                 <div class="col-lg-2">
                     <input class="form-control" type="text" style="text-align: center;"
@@ -64,36 +64,36 @@ but WITHOUT ANY WARRANTY of any kind.
                 <label class="col-lg-1" data-i18n="ovs:generic.units.gib" style="padding-top: 7px; padding-left: 0"></label>
             </div>
             <!-- ko with: backend_info.connection_info -->
-            <p data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.backend_info"></p>
+            <p data-i18n="ovs:wizards.add_vpool.gather_block_cache.backend_info"></p>
             <div data-bind="visible: $root.localBackendsAvailable()">
                 <div class="form-group">
                     <div class="col-lg-3"></div>
                     <div class="col-lg-7">
                         <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: isLocalBackend" />
-                        <label for="inputBackendLocalHost" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.local_backend" style="font-weight: normal;"></label>
+                        <label for="inputBackendLocalHost" data-i18n="ovs:wizards.add_vpool.gather_block_cache.local_backend" style="font-weight: normal;"></label>
                     </div>
                 </div>
             </div>
             <div data-bind="visible: !isLocalBackend()">
                 <div data-bind="css: { 'has-error': $root.canContinue().fields.contains('invalid_alba_info') }">
                     <div class="form-group">
-                        <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.host"></label>
+                        <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_block_cache.host"></label>
                         <div class="col-lg-3">
                             <input type="text" id="inputBackendHost" class="autofocus form-control" data-bind="value: host, valueUpdate: 'input'" />
                         </div>
-                        <label class="col-lg-1 control-label" for="inputBackendPort" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.port"></label>
+                        <label class="col-lg-1 control-label" for="inputBackendPort" data-i18n="ovs:wizards.add_vpool.gather_block_cache.port"></label>
                         <div class="col-lg-2">
                             <input type="text" id="inputBackendPort" class="autofocus form-control" data-bind="value: port, valueUpdate: 'input'" />
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="col-lg-3 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.client_id"></label>
+                        <label class="col-lg-3 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.add_vpool.gather_block_cache.client_id"></label>
                         <div class="col-lg-7">
                             <input type="text" id="inputBackendClientId" class="autofocus form-control" data-bind="value: client_id, valueUpdate: 'input'" />
                         </div>
                     </div>
                     <div class="form-group" >
-                        <label class="col-lg-3 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.client_secret"></label>
+                        <label class="col-lg-3 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.add_vpool.gather_block_cache.client_secret"></label>
                         <div class="col-lg-7">
                             <input type="password" id="inputBackendClientSecret" class="autofocus form-control" data-bind="value: client_secret, valueUpdate: 'input'" />
                         </div>
@@ -101,7 +101,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
             <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('backend') }">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.alba_backend"></label>
+                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_backend"></label>
                 <div class="col-lg-7">
                     <!-- ko if: $root.data.loadingBackends() === true -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
@@ -109,7 +109,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <!-- ko if: $root.data.loadingBackends() === false && ($root.blockCacheBackends() === undefined || $root.blockCacheBackends().length === 0) -->
                         <div>
                             <label class="col-lg-5 control-label" style="text-align: left; padding-left: 0">
-                                <i data-i18n="[html]ovs:wizards.reconfigure_vpool.gather_block_cache.no_backends"></i>
+                                <i data-i18n="[html]ovs:wizards.add_vpool.gather_block_cache.no_backends"></i>
                             </label>
                         </div>
                     <!-- /ko -->
@@ -137,7 +137,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
             <div class="form-group" data-bind="visible: $root.blockCacheBackend() !== undefined">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.reconfigure_vpool.gather_block_cache.alba_preset"></label>
+                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_preset"></label>
                 <div class="col-lg-7" data-bind="css: { 'has-error': $root.canContinue().fields.contains('preset') }">
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: ($root.preset() === undefined)"></span>
                     <span data-bind="visible: ($root.preset() !== undefined),

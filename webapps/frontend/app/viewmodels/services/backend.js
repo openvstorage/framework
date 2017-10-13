@@ -148,7 +148,7 @@ define([
 
         var parsedPresets = [];
         $.each(presets, function (index, preset) {
-            parsedPresets.push(wizardData.parsePreset(preset));
+            parsedPresets.push(parsePreset(preset));
         });
         if (sortFunction !== null){
             parsedPresets = parsedPresets.sort(sortFunction);

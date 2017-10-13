@@ -18,6 +18,7 @@ but WITHOUT ANY WARRANTY of any kind.
 <div>
     <!-- ko with: data.configParams -->
     <pre data-bind="text: ko.toJSON(ko.mapping.toJS($root.data.configParams), null, 2)"></pre>
+    <pre data-bind="text: ko.toJSON(ko.mapping.toJS($root.data.storageDriverParams), null, 2)"></pre>
     <!-- Root is the wizard, as is the parent-->
     <div style="margin-bottom: 5px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_config.dtl"></span>
@@ -28,13 +29,14 @@ but WITHOUT ANY WARRANTY of any kind.
            class="hand fa noline" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
         </a>
     </div>
+
     <div class="form-group">
         <label class="col-lg-4 control-label" for="dtlMode" data-i18n="ovs:wizards.add_vpool.gather_config.dtl_mode"></label>
         <div class="col-lg-7" style="margin-bottom: -5px;">
             <span id="dtlMode"
                   data-bind="dropdown: {
                                  items: $root.dtlModes,
-                                 target: dtl_mode,
+                                 target: dtl_mode
                              }">
             </span>
         </div>
@@ -45,7 +47,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <span id="dtlTransport"
                   data-bind="dropdown: {
                                  items: $root.dtlTransportModes,
-                                 target: dtl_transport,
+                                 target: dtl_transport
                              }">
             </span>
         </div>
@@ -57,7 +59,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <label class="col-lg-4 control-label" for="writeBufferGlobal" data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer"></label>
         <div class="col-lg-2">
             <input type="text" id="writeBufferGlobal" class="autofocus form-control" style="text-align: center; width: 110px;"
-                   data-bind="value: $root.data.globalWriteBuffer, valueUpdate: 'afterkeydown'" />
+                   data-bind="value: $root.data.storageDriverParams.globalWriteBuffer, valueUpdate: 'afterkeydown'" />
         </div>
         <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib"></label>
     </div>

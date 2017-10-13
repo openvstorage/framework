@@ -20,13 +20,17 @@ define([
 ], function(ko, generic) {
     "use strict";
     // Return a constructor for a viewModel
+    var configurationMapping = {
+        // Not a data view model so these properties have to be explicitly included
+        'include': ["storageIP", "proxyAmount", "globalWriteBuffer"]
+    };
     var ConfigurationViewModel = function(data) {
         var self = this;
         self.storageIP = ko.observable('').extend({regex: generic.ipRegex});
         self.proxyAmount = ko.observable(2).extend({numeric: {min: 1, max: 16}});
         self.globalWriteBuffer = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
 
-        ko.mapping.fromJS(data, {}, self)  // Bind the data into this
+        ko.mapping.fromJS(data, configurationMapping, self)  // Bind the data into this
     };
     return ConfigurationViewModel;
 });

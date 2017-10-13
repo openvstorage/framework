@@ -17,8 +17,9 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic', 'ovs/shared',
+    'viewmodels/services/backend',
     './data'
-], function($, ko, api, generic, shared, data) {
+], function($, ko, api, generic, shared, backendService, data) {
     "use strict";
     return function(options) {
         var self = this;
@@ -75,7 +76,8 @@ define([
             return self.data.filterBackendsByLocationKey('local').length >= localBackendsRequiredAmount;
         });
         self.enhancedPresets = ko.pureComputed(function() {
-            return self.data.parsePresets(self.fragmentCacheBackend())
+            var presets = self.fragmentCacheBackend() === undefined ? [] : self.fragmentCacheBackend().presets;
+            return backendService.parsePresets(presets)
         });
         self.preset = ko.computed({
             deferEvaluation: true,  // Wait with computing for an actual subscription
@@ -95,7 +97,7 @@ define([
                     }
                     return parsedPreset
                 }
-                return self.data.parsePreset(preset);
+                return backendService.parsePreset(preset);
             },
             write: function(preset) {
                 var backendInfo = self.data.cachingData.fragment_cache.backend_info;

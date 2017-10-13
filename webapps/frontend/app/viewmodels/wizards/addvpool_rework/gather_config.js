@@ -15,7 +15,8 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic', './data'
+    'jquery', 'knockout', 'ovs/generic',
+    './data'
 ], function ($, ko, generic, data) {
     "use strict";
     return function () {
@@ -38,21 +39,21 @@ define([
             deferEvaluation: true,  // Wait with computing for an actual subscription
             write: function (mode) {
                 if (mode.name === 'no_sync') {
-                    self.data.dtlEnabled(false);
+                    self.data.configParams.dtl_enabled(false);
                 } else {
-                    self.data.dtlEnabled(true);
+                    self.data.configParams.dtl_enabled(true);
                 }
                 self.data.dtlMode(mode);
             },
             read: function () {
-                if (self.data.configParams.dtlEnabled() === false) {
+                if (self.data.configParams.dtl_enabled() === false) {
                     return {name: 'no_sync', disabled: false};
                 }
-                return self.data.dtlMode();
+                return self.data.configParams.dtl_mode();
             }
         });
         self.globalWriteBufferOverAllocation = ko.pureComputed(function() {
-           return self.data.globalWriteBufferMax() < self.data.globalWriteBuffer();
+           return self.data.globalWriteBufferMax() < self.data.storageDriverParams.globalWriteBuffer();
         });
         self.canContinue = ko.pureComputed(function () {
             var reasons = [], fields = [];
@@ -64,13 +65,14 @@ define([
             var total_available = 0 ;
             var largest_ssd = 0 ;
             var largest_sata = 0;
-            var amount_of_proxies = self.data.proxyAmount();
+            var amount_of_proxies = self.data.storageDriverParams.proxyAmount();
             var maximum = amount_of_proxies;
-            if (self.data.srPartitions() === undefined || self.data.srPartitions()['WRITE'] === undefined) {
+            var srPartitions = self.data.getStorageRouterMetadata(self.data.storageRouter().guid()).metadata.partitions;
+            if (srPartitions === undefined || srPartitions['WRITE'] === undefined) {
                 fields.push('writeBufferGlobal');
                 reasons.push($.t('ovs:wizards.add_vpool.gather_config.noMetadata'));
             } else {
-                $.each(self.data.srPartitions()['WRITE'], function(index, value) {
+                $.each(srPartitions['WRITE'], function(index, value) {
                     total_available += value['available'];
                     if (value['ssd'] === true && value['available'] > largest_ssd) {
                         largest_ssd = value['available']
@@ -83,7 +85,7 @@ define([
                 if (useLocalFC || useLocalBC) {
                     var proxies = useLocalFC && useLocalBC ? amount_of_proxies * 2 : amount_of_proxies;
                     var proportion = (largest_ssd || largest_sata) * 100.0 / total_available ;
-                    var available = proportion * self.data.globalWriteBuffer() / 100 * 0.10;  // Only 10% is used on the largest WRITE partition for fragment caching
+                    var available = proportion * self.data.storageDriverParams.globalWriteBuffer() / 100 * 0.10;  // Only 10% is used on the largest WRITE partition for fragment caching
                     var fragment_size = available / proxies;
                     if (fragment_size < Math.pow(1024, 3)) {
                         while (maximum > 0) {
@@ -111,16 +113,10 @@ define([
                 return
             }
             var configParams = self.data.configParams;
-            $.each(configParams.dtlModes, function (index, dtlMode) {
-                self.dtlModes.push(dtlMode);
-            });
-            $.each(configParams.dtlTransportModes, function (index, dtlTransportMode) {
-                // Check if RDMA option should be disabled
-                if (dtlTransportMode === 'rdma' && !self.data.storageRouter().rdmaCapable() === true) {
-                    return true // Continue
-                }
-                self.dtlTransportModes.push(dtlTransportMode);
-            });
+            self.dtlModes(configParams.dtlModes);
+            self.dtlTransportModes(configParams.dtlTransportModes.filter(function(item){
+                return !(item === 'rdma' && self.data.storageRouter().rdmaCapable() === false);
+            }));
             self.activated = true;
         };
     };

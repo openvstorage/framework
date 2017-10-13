@@ -16,9 +16,9 @@
 /*global define */
 define(['jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared', 'ovs/errors',
-    'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vpool/vpool',
-    'viewmodels/services/backend', 'viewmodels/services/storagerouter'
-],function($, ko, generic, api, shared, errors, StorageRouter, VPool, backendService, storageRouterService){
+    'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/configuration',
+    'viewmodels/services/backend', 'viewmodels/services/storagerouter', 'viewmodels/services/vpool'
+],function($, ko, generic, api, shared, errors, StorageRouter, VPool, StorageDriverParams, backendService, storageRouterService, vpoolService){
     "use strict";
     var singleton;
     singleton = function() {
@@ -29,6 +29,7 @@ define(['jquery', 'knockout',
             // Changes
             // General vPool changes
             configParams:                       undefined,  // Params related to general configs (sco size, dtl ...) Undefined as a viewmodel will be set
+            backendData:                        undefined,  // Params related to the backend. Undefined as a viewmodel will be set
             // Storage driver changes
             cachingData:                        undefined,  // Params related to fragment cache and block cache. Undefined as a viewmodel will be set
             storageDriverParams:                undefined,  // Params related to the StorageDriver in general (proxies, globalWriteBuffer, storageIp) Undefined as a viewmodel will be set
@@ -47,10 +48,14 @@ define(['jquery', 'knockout',
             globalWriteBufferMax:               ko.observable(),  // Used to detect over allocation
             srPartitions:                       ko.observable(),
             storageRoutersAvailable:            ko.observableArray([]),
-            storageRoutersUsed:                 ko.observableArray([])
+            storageRoutersUsed:                 ko.observableArray([]),
+            vPools:                             ko.observableArray([])
         };
 
         // Computed
+        wizardData.isExtend = ko.computed(function() {
+            return wizardData.vPool() !== undefined;
+        });
         wizardData.hasCacheQuota = ko.pureComputed(function() {
             return wizardData.storageRouter() !== undefined &&
                 wizardData.storageRouter().features() !== undefined &&
@@ -60,6 +65,13 @@ define(['jquery', 'knockout',
             return wizardData.storageRouter() !== undefined &&
                 wizardData.storageRouter().features() !== undefined &&
                 wizardData.storageRouter().features().alba.edition === 'enterprise';
+        });
+        wizardData.scrubAvailable = ko.pureComputed(function() {
+            // Scrub available is returned for all storagerouters (bad api design?)
+            var mappedStorageRouters = wizardData.storageRouterMap.values();
+            if (mappedStorageRouters.length > 0) {
+                return mappedStorageRouters[0].metadata.scrub_avaible
+            }
         });
 
         // Functions
@@ -76,6 +88,7 @@ define(['jquery', 'knockout',
             }
             // Fire up some asynchronous calls
             wizardData.loadBackends();
+            wizardData.loadVPools();
             wizardData.loadStorageRouters()
                 .then(function(data) {
                     wizardData.loadingStorageRouters(true);
@@ -104,7 +117,9 @@ define(['jquery', 'knockout',
                 });
             // Set all configurable data
             var vpool = wizardData.vPool() === undefined ? new VPool() : wizardData.vPool();
-            wizardData.cachingData =vpool.getCachingData(wizardData.storageRouter().guid(), true, true);
+            wizardData.storageDriverParams = new StorageDriverParams();
+            wizardData.backendData = vpool.getBackendInfo(true);
+            wizardData.cachingData = vpool.getCachingData(wizardData.storageRouter().guid(), true, true);
             wizardData.configParams = vpool.getConfiguration(true);
 
         };
@@ -252,6 +267,18 @@ define(['jquery', 'knockout',
                         deferred.reject();
                     });
             }).promise();
+        };
+        wizardData.loadVPools = function() {
+            return vpoolService.loadVPools()
+                .then(function(data) {
+                    var guids = data.data.map(function(item) { return item.guid});
+                    generic.crossFiller(
+                        guids, wizardData.vPools,
+                        function (guid) {
+                            return new VPool(guid);
+                        }, 'guid'
+                    );
+                });
         };
         /**
          * Load up the StorageRouters and map them as used or available

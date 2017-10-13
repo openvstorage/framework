@@ -18,8 +18,8 @@ define([
     'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
     'viewmodels/containers/backend/backendtype', 'viewmodels/containers/vdisk/vdisk',
-    'viewmodels/containers/vpool/cache', 'viewmodels/containers/vpool/configuration'
-], function($, ko, shared, generic, api, BackendType, VDisk, CacheData, Configuration) {
+    './cache', './configuration', './backend'
+], function($, ko, shared, generic, api, BackendType, VDisk, CacheData, Configuration, BackendInfo) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -57,7 +57,7 @@ define([
         self.loaded               = ko.observable(false);
         self.loading              = ko.observable(false);
         self.metadata             = ko.observable();
-        self.name                 = ko.observable();
+        self.name                 = ko.observable().extend({regex: generic.nameRegex});
         self.notExtensibleReasons = ko.observableArray([]);
         self.rdmaEnabled          = ko.observable();
         self.readSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -219,5 +219,19 @@ define([
             }
             return configuration;
         };
+        /**
+         * Get backend data of this vpool
+         * @param returnViewModel: Return a viewmodel or plain object
+         * @type returnViewModel: bool
+         * @return {*}
+         */
+        self.getBackendInfo = function(returnViewModel) {
+            returnViewModel = returnViewModel || false;
+            var backendInfo = self.metadata().backend;
+            if (returnViewModel === true) {
+                return new BackendInfo(backendInfo)
+            }
+            return backendInfo
+        }
     };
 });
