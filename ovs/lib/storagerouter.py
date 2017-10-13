@@ -724,7 +724,7 @@ class StorageRouterController(object):
         # CONFIGURATION MANAGEMENT #
         ############################
         # Configure regular proxies and scrub proxies
-        manifest_cache_size = 16 * 1024 * 1024 * 1024
+        manifest_cache_size = 500 * 1024 * 1024
         for proxy_id, alba_proxy in enumerate(storagedriver.alba_proxies):
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
             metadata_keys = {'backend': 'abm'}
@@ -849,11 +849,11 @@ class StorageRouterController(object):
             backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
                                                       'alba_connection_port': proxy.service.ports[0],
                                                       'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
-                                                      'alba_connection_timeout': 15,
+                                                      'alba_connection_timeout': 30,
                                                       'alba_connection_use_rora': True,
                                                       'alba_connection_transport': 'TCP',
-                                                      'alba_connection_rora_manifest_cache_capacity': 5000,
-                                                      'alba_connection_asd_connection_pool_capacity': 20,
+                                                      'alba_connection_rora_manifest_cache_capacity': 25000,
+                                                      'alba_connection_asd_connection_pool_capacity': 10,
                                                       'alba_connection_rora_timeout_msecs': 50,
                                                       'backend_type': 'ALBA'}
         volume_router = {'vrouter_id': vrouter_id,

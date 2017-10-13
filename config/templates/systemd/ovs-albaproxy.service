@@ -7,6 +7,7 @@ Before=ovs-volumedriver_<VPOOL_NAME>.service
 Type=simple
 User=root
 Group=root
+Environment=ALBA_FAIL_FAST=true
 Environment=LD_LIBRARY_PATH=/usr/lib/alba
 # Garbage collection for ALBA
 Environment=OCAMLRUNPARAM='b,a=1,s=4096k,O=50'
