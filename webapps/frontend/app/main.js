@@ -72,9 +72,9 @@ define([
     'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions', 'ovs/extensions/knockout-extenders',
     'bootstrap',
     'knockout-dictionary'// Ko plugins
-],  function( system, app, viewLocator, binder, $, i18n, shared) {
+],  function(system, app, viewLocator, binder, $, i18n, shared) {
     "use strict";
-    system.debug(true);
+    system.debug(true);  // To be changed when building production
     shared.defaultLanguage = shared.language = window.navigator.userLanguage || window.navigator.language || 'en-US';
     var i18nOptions = {
         detectFromHeaders: false,

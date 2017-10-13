@@ -16,19 +16,20 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic'
-], function($, ko, generic) {
+    'ovs/generic',
+    './shared/backend_info'
+], function($, ko, generic, backendInfoViewModel) {
     "use strict";
     // Caching data viewModel which is parsed from JS
     // Return a constructor for a nested viewModel
     var cacheMapping = {
-       'fragment_cache': {
+        'fragment_cache': {
             create: function (options) {
                 if (options.data !== null) return new cacheTypeViewModel(options.data);
             }
         },
         'block_cache': {
-           create: function (options) {
+            create: function (options) {
                 if (options.data !== null) return new cacheTypeViewModel(options.data);
             }
         }
@@ -40,28 +41,32 @@ define([
             }
         }
     };
-    var backendInfoMapping = {
-        'connection_info': {
-            create: function (options) {
-                if (options.data !== null) return new connectionInfoViewModel(options.data);
-            }
-        }
-    };
-    var connectionInfoMapping = {};
     var cacheViewModel = function(data) {
         var self = this;
-        ko.mapping.fromJS(data, cacheMapping, self)  // Bind the data into this
+
+        // Default data
+        var vmData = $.extend({
+            fragment_cache: {},
+            block_cache: {}
+        }, data);
+
+        ko.mapping.fromJS(vmData, cacheMapping, self)  // Bind the data into this
     };
     var cacheTypeViewModel = function(data) {
         var self = this;
-        // Observables (This will ensure that these observables are present even if the data is missing them)
-        self.read               = ko.observable();
-        self.write              = ko.observable();
-        self.is_backend         = ko.observable();
-        self.quota              = ko.observable();
+        // Observables
         self.cacheSettings      = ko.observableArray(['write', 'read', 'rw', 'none']);
 
-        ko.mapping.fromJS(data, cacheTypeMapping, self);
+        // Default data
+        var vmData = $.extend({
+            read: false,
+            write: false,
+            is_backend: false,
+            quota: undefined,
+            backend_info: {}
+        }, data);
+
+        ko.mapping.fromJS(vmData, cacheTypeMapping, self);
 
         // Computed
         self.isUsed = ko.pureComputed(function() {
@@ -87,72 +92,6 @@ define([
             }
         });
 
-    };
-    var backendInfoViewModel = function(data) {
-        var self = this;
-        // Observables (This will ensure that these observables are present even if the data is missing them)
-        self.name                = ko.observable();
-        self.backend_guid        = ko.observable();
-        self.alba_backend_guid   = ko.observable();
-        self.policies            = ko.observableArray([]);
-        self.preset              = ko.observable();
-
-        ko.mapping.fromJS(data, backendInfoMapping, self);
-
-        // Computed
-        self.enhancedPreset = ko.pureComputed(function() {
-            /**
-             * Compute a preset to look like presetName: (1,1,1,1),(2,1,2,1)
-             */
-            if (self.policies() === undefined || self.preset() === undefined) {
-                return null;
-            }
-            var policies = [];
-            ko.utils.arrayForEach(self.policies(), function (policy) {
-                policies.push('(' + policy.join(', ') + ')')
-            });
-            return ko.utils.unwrapObservable(self.preset) + ': ' + policies.join(', ');
-        });
-        self.isLocalBackend = ko.pureComputed(function() {
-            return self.connection_info.isLocalBackend()
-        })
-
-    };
-    var connectionInfoViewModel = function(data) {
-        var self = this;
-        // Observables (This will ensure that these observables are present even if the data is missing them)
-        self.client_id      = ko.observable().extend({removeWhiteSpaces: null});
-        self.client_secret  = ko.observable().extend({removeWhiteSpaces: null});
-        self.host           = ko.observable().extend({regex: generic.hostRegex});
-        self.port           = ko.observable().extend({ numeric: {min: 1, max: 65535}});
-        self.local          = ko.observable();
-
-        self.isLocalBackend = ko.computed({
-           deferEvaluation: true,  // Wait with computing for an actual subscription
-           read: function() {
-               if (self.local() === undefined) {
-                   // Default to True for reading purposes
-                   return true;
-            }
-            return self.local();
-           },
-           write: function(value) {
-               self.local(value)
-           }
-        });
-        self.hasRemoteInfo = ko.pureComputed(function (){
-            var requiredProps = [self.client_id, self.client_secret, self.host, self.port];
-            var hasRemoteInfo = true;
-            $.each(requiredProps, function(index, prop) {
-                if (ko.utils.unwrapObservable(prop) === undefined){
-                    hasRemoteInfo = false;
-                    return false  // Break
-                }
-            });
-            return hasRemoteInfo;
-        });
-
-        ko.mapping.fromJS(data, connectionInfoMapping, self)
     };
     return cacheViewModel;
 });
