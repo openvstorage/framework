@@ -80,26 +80,29 @@ define([
                             fields.push('invalid_alba_info');
                         }
             }
-            if (self.data.loadingMetadata() === true) {
+            if (self.data.scrubAvailable() === false) {
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: 'SCRUB'}));
+            }
+            try {
+                var partitions = self.data.getStorageRouterMetadata(self.data.storageRouter().guid()).metadata.partitions;
+                if (partitions !== undefined) {
+                $.each(partitions, function (role, partitions) {
+                    if (requiredRoles.contains(role) && partitions.length > 0) {
+                        generic.removeElement(requiredRoles, role);
+                    }
+                });
+                $.each(requiredRoles, function (index, role) {
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: role}));
+                });
+            }
+            }
+            catch (error) {
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
-            } else {
-                if (self.data.scrubAvailable() === false) {
-                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: 'SCRUB'}));
-                }
-                if (self.data.partitions() !== undefined) {
-                    $.each(self.data.partitions(), function (role, partitions) {
-                        if (requiredRoles.contains(role) && partitions.length > 0) {
-                            generic.removeElement(requiredRoles, role);
-                        }
-                    });
-                    $.each(requiredRoles, function (index, role) {
-                        reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: role}));
-                    });
-                }
-                if (self.data.storageIP() === undefined) {
-                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_storage_ip'));
-                    fields.push('storageip');
-                }
+            }
+
+            if (self.data.storageDriverParams.storageIP() === undefined) {
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_storage_ip'));
+                fields.push('storageip');
             }
             return { value: reasons.length === 0, reasons: reasons, fields: fields, showErrors: showErrors };
         });
@@ -240,15 +243,16 @@ define([
         };
         self.preValidate = function () {
             var validationResult = {valid: true, reasons: [], fields: []};
+            var vpoolName = self.data.vPool().name();
             $.Deferred(function (deferred) {
                 self.loadingPrevalidations(true);
                 generic.xhrAbort(self.checkMtptHandle);
-                self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', {data: {name: self.data.name()}})
+                self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', {data: {name: vpoolName}})
                     .then(self.shared.tasks.wait)
                     .done(function (data) {
                         if (data === true) {
                             validationResult.valid = false;
-                            validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.mtpt_in_use', {what: self.data.name()}));
+                            validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.mtpt_in_use', {what: vpoolName}));
                             validationResult.fields.push('name');
                         }
                         deferred.resolve();

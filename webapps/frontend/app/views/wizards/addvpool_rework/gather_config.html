@@ -17,8 +17,6 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <!-- ko with: data.configParams -->
-    <pre data-bind="text: ko.toJSON(ko.mapping.toJS($root.data.configParams), null, 2)"></pre>
-    <pre data-bind="text: ko.toJSON(ko.mapping.toJS($root.data.storageDriverParams), null, 2)"></pre>
     <!-- Root is the wizard, as is the parent-->
     <div style="margin-bottom: 5px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_config.dtl"></span>

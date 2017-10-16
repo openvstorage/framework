@@ -38,8 +38,11 @@ define([
         self.dtl_transport      = ko.observable();
         self.sco_size           = ko.observable();
         self.tlog_multiplier    = ko.observable();
-        self.write_buffer       = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
+        self.write_buffer       = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});  // Volume Write buffer
 
+        var vmData = $.extend({
+            mds_config: {}
+        }, data);
 
         // Constants
         self.clusterSizes      = [4, 8, 16, 32, 64];
@@ -47,21 +50,7 @@ define([
         self.dtlTransportModes = ['tcp', 'rdma'];
         self.scoSizes          = [4, 8, 16, 32, 64, 128];
 
-        // Computed
-        self.dtlMode = ko.computed({
-            deferEvaluation: true,  // Wait with computing for an actual subscription
-            read: function() {
-
-            },
-            write: function(mode) {
-                if (self.dtlModes.contains(mode)) {
-                    self.dtl_mode(mode)
-                } else {
-                    throw new Error('Unsupported mode: {0}. Current supported modes are: {1}'.format([mode, self.dtlModes.join(', ')]));
-                }
-            }
-        });
-        ko.mapping.fromJS(data, configurationMapping, self)  // Bind the data into this
+        ko.mapping.fromJS(vmData, configurationMapping, self)  // Bind the data into this
     };
     var MDSConfigModel = function(data) {
         var self = this;
