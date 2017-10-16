@@ -202,7 +202,7 @@ class GenericController(object):
 
     @staticmethod
     @ovs_task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), ensure_single_info={'mode': 'DEDUPED'})
-    def execute_scrub(vpool_guids=None, vdisk_guids=None, storagerouter_guid=None):
+    def execute_scrub(vpool_guids=list(), vdisk_guids=list(), storagerouter_guid=None, manual=False):
         """
         Divide the scrub work among all StorageRouters with a SCRUB partition
         :param vpool_guids: Guids of the vPools that need to be scrubbed completely
@@ -211,17 +211,40 @@ class GenericController(object):
         :type vdisk_guids: list
         :param storagerouter_guid: Guid of the StorageRouter to execute the scrub work on
         :type storagerouter_guid: str
+        :param manual: Indicator whether the execute_scrub is called manually or as scheduled task (automatically)
+        :type manual: bool
         :return: None
         :rtype: NoneType
         """
-        if vpool_guids is not None and not isinstance(vpool_guids, list):
+        if not isinstance(vpool_guids, list):
             raise ValueError('vpool_guids should be a list')
-        if vdisk_guids is not None and not isinstance(vdisk_guids, list):
+        if not isinstance(vdisk_guids, list):
             raise ValueError('vdisk_guids should be a list')
         if storagerouter_guid is not None and not isinstance(storagerouter_guid, basestring):
             raise ValueError('storagerouter_guid should be a str')
 
+        if manual is False and (len(vpool_guids) > 0 or len(vdisk_guids) > 0):
+            raise ValueError('When specifying vDisks or vPools, "manual" must be True')
+
         GenericController._logger.info('Scrubber - Started')
+        if manual is True:
+            vpool_vdisk_map = {}
+            for vpool_guid in set(vpool_guids):
+                vpool = VPool(vpool_guid)
+                vpool_vdisk_map[vpool] = list(vpool.vdisks)
+            for vdisk_guid in set(vdisk_guids):
+                vdisk = VDisk(vdisk_guid)
+                if vdisk.vpool not in vpool_vdisk_map:
+                    vpool_vdisk_map[vdisk.vpool] = []
+                if vdisk not in vpool_vdisk_map[vdisk.vpool]:
+                    vpool_vdisk_map[vdisk.vpool].append(vdisk)
+        else:
+            vpool_vdisk_map = dict((vpool, list(vpool.vdisks)) for vpool in VPoolList.get_vpools())
+
+        if len(vpool_vdisk_map) == 0:
+            GenericController._logger.info('Scrubber - Nothing to scrub')
+            return
+
         scrub_locations = []
         storagerouters = StorageRouterList.get_storagerouters() if storagerouter_guid is None else [StorageRouter(storagerouter_guid)]
         for storage_router in storagerouters:
@@ -242,22 +265,6 @@ class GenericController(object):
 
         if len(scrub_locations) == 0:
             raise ValueError('No scrub locations found, cannot scrub')
-
-        vpool_vdisk_map = {}
-        if vpool_guids is None and vdisk_guids is None:
-            vpool_vdisk_map = dict((vpool, list(vpool.vdisks)) for vpool in VPoolList.get_vpools())
-        else:
-            if vpool_guids is not None:
-                for vpool_guid in set(vpool_guids):
-                    vpool = VPool(vpool_guid)
-                    vpool_vdisk_map[vpool] = list(vpool.vdisks)
-            if vdisk_guids is not None:
-                for vdisk_guid in set(vdisk_guids):
-                    vdisk = VDisk(vdisk_guid)
-                    if vdisk.vpool not in vpool_vdisk_map:
-                        vpool_vdisk_map[vdisk.vpool] = []
-                    if vdisk not in vpool_vdisk_map[vdisk.vpool]:
-                        vpool_vdisk_map[vdisk.vpool].append(vdisk)
 
         number_of_vpools = len(vpool_vdisk_map)
         if number_of_vpools >= 6:

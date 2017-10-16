@@ -518,4 +518,4 @@ class VDiskViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
-        return GenericController.execute_scrub.delay(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter_guid)
+        return GenericController.execute_scrub.delay(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter_guid, manual=True)
