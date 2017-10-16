@@ -45,6 +45,7 @@ define(['jquery', 'knockout',
             invalidBackendInfo:                 ko.observable(),
             loadingBackends:                    ko.observable(),
             loadingStorageRouters:              ko.observable(),
+            loadingMetadata:                    ko.observable(),
             globalWriteBufferMax:               ko.observable(),  // Used to detect over allocation
             srPartitions:                       ko.observable(),
             storageRoutersAvailable:            ko.observableArray([]),
@@ -57,21 +58,30 @@ define(['jquery', 'knockout',
             return wizardData.vPool() !== undefined;
         });
         wizardData.hasCacheQuota = ko.pureComputed(function() {
-            return wizardData.storageRouter() !== undefined &&
-                wizardData.storageRouter().features() !== undefined &&
-                wizardData.storageRouter().features().alba.features.contains('cache-quota');
-        });
-        wizardData.hasEE = ko.pureComputed(function() {
-            return wizardData.storageRouter() !== undefined &&
-                wizardData.storageRouter().features() !== undefined &&
-                wizardData.storageRouter().features().alba.edition === 'enterprise';
+            var storageRouter = undefined;
+            // These observables should only change once during the lifetime of the wizard and will cause less recomputing
+            var storageRouters = [].concat(wizardData.storageRoutersUsed(), wizardData.storageRoutersAvailable());
+            if (storageRouters.length > 0) {
+                storageRouter = storageRouters[0];
+            }
+            return storageRouterService.hasCacheQuota(storageRouter);
         });
         wizardData.scrubAvailable = ko.pureComputed(function() {
             // Scrub available is returned for all storagerouters (bad api design?)
             var mappedStorageRouters = wizardData.storageRouterMap.values();
             if (mappedStorageRouters.length > 0) {
-                return mappedStorageRouters[0].metadata.scrub_avaible
+                return mappedStorageRouters[0].scrub_avaible
             }
+            return false;
+        });
+        wizardData.supportsBlockCache = ko.pureComputed(function() {
+            var storageRouter = undefined;
+            // These observables should only change once during the lifetime of the wizard and will cause less recomputing
+            var storageRouters = [].concat(wizardData.storageRoutersUsed(), wizardData.storageRoutersAvailable());
+            if (storageRouters.length > 0) {
+                storageRouter = storageRouters[0];
+            }
+            return storageRouterService.hasBlockCache(storageRouter)
         });
 
         // Functions
@@ -91,7 +101,7 @@ define(['jquery', 'knockout',
             wizardData.loadVPools();
             wizardData.loadStorageRouters()
                 .then(function(data) {
-                    wizardData.loadingStorageRouters(true);
+                    wizardData.loadingMetadata(true);
                     // Load in metadata about these storagerouters
                     var storageRouters = [].concat(data.used, data.available);
                     var calls = [];
@@ -113,7 +123,7 @@ define(['jquery', 'knockout',
                         });
                 })
                 .always(function() {
-                    wizardData.loadingStorageRouters(false)
+                    wizardData.loadingMetadata(false)
                 });
             // Set all configurable data
             var vpool = wizardData.vPool() === undefined ? new VPool() : wizardData.vPool();

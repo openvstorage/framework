@@ -23,6 +23,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.block_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
             <span data-bind="dropdown: {
+                                 enabled: $root.data.supportsBlockCache,
                                  items: cacheSettings, target: cacheSetting,
                                  text: function(item) {
                                      return $.t('ovs:generic.blockCaches.' + item);
@@ -41,7 +42,7 @@ but WITHOUT ANY WARRANTY of any kind.
                        style="font-weight: normal;"></label><br />
                 <input type="radio" name="fcBackend" id="useAcceleratedAlbaYes" class="autofocus"
                        data-bind="checked: is_backend, checkedValue: true" />
-                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_backend_fc"
+                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_backend"
                        style="font-weight: normal;"></label>
             </div>
         </div>
@@ -160,6 +161,16 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <!-- /ko -->
         </div>
+    </div>
+    <div class="alert alert-info" data-bind="visible: !$root.data.supportsBlockCache() || !$root.data.hasCacheQuota()" style="margin-top: 20px;">
+        <span data-bind="visible: !$root.data.supportsBlockCache()">
+            <span data-i18n="ovs:generic.ee_teasers.no_block_cache"></span>
+            <span data-i18n="ovs:generic.version_teasers.no_block_cache"></span>
+        </span>
+        <span data-bind="visible: !$root.data.hasCacheQuota() && $root.data.supportsBlockCache()">
+            <span data-i18n="ovs:generic.ee_teasers.no_cache_quota"></span>
+            <span data-i18n="ovs:generic.version_teasers.no_cache_quota"></span>
+        </span>
     </div>
     <div class="alert alert-danger" data-bind="visible: (isUsed() && !$root.data.loadingBackends()) && (!$root.canContinue().value || $root.canContinue().showErrors)" style="margin-bottom: -10px;">
         <p data-bind="visible: $root.canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>

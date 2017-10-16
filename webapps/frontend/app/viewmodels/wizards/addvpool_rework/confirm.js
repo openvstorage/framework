@@ -30,30 +30,74 @@ define([
 
         // Observables
         self.loadingUpdateImpact = ko.observable(false);
+        self.postData = ko.observable();
         // Computed
         self.canContinue = ko.pureComputed(function() {
             return { value: true, reasons: [], fields: [] };
         });
 
         // Functions
+        self.getPostData = function() {
+            var vpoolBackendInfo = self.data.backendData.backend_info;
+            var fragmentCacheData = self.data.cachingData.fragment_cache;
+            var blockCacheData = self.data.cachingData.block_cache;
+            var cacheQuotaFC = fragmentCacheData.quota();
+            var cacheQuotaBC = blockCacheData.quota();
+            var postData = {
+                call_parameters: {
+                    // VPool - StorageDriver related
+                    vpool_name: self.data.vPool().name(),
+                    storagerouter_ip: self.data.storageRouter().ipAddress(),
+                    // VPool backend info
+                    backend_info: {
+                        preset: vpoolBackendInfo.preset(),
+                        alba_backend_guid: vpoolBackendInfo.alba_backend_guid()
+                    },
+                    connection_info: vpoolBackendInfo.connection_info.toJS(),
+                    config_params: {
+                        dtl_mode: (self.data.configParams.dtl_enabled() === true ? self.data.configParams.dtl_mode(): 'no_sync'),
+                        sco_size: self.data.configParams.sco_size(),
+                        cluster_size: self.data.configParams.cluster_size(),
+                        write_buffer: self.data.configParams.write_buffer(),
+                        dtl_transport: self.data.configParams.dtl_transport()
+                    },
+                    storage_ip: self.data.storageDriverParams.storageIP(),
+                    writecache_size: self.data.storageDriverParams.globalWriteBuffer(),
+                    mds_config_params: {
+                        mds_safety: self.data.configParams.mds_config.mds_safety()
+                    },
+                    parallelism: {
+                        proxies: self.data.storageDriverParams.proxyAmount()
+                    },
+                    // Cache related
+                    // Fragment Cache - Backend data will be added later
+                    fragment_cache_on_read: fragmentCacheData.read(),
+                    fragment_cache_on_write: fragmentCacheData.write(),
+                    cache_quota_fc: cacheQuotaFC !== undefined ? Math.round(cacheQuotaFC * Math.pow(1024, 3)) : undefined,
+                    // Block Cache - Backend data will be added later
+                    block_cache_on_read: blockCacheData.read(),
+                    block_cache_on_write: blockCacheData.write(),
+                    cache_quota_bc: cacheQuotaBC !== undefined ? Math.round(cacheQuotaBC * Math.pow(1024, 3)) : undefined
+                }
+            };
+            // Add caching backend data where needed
+            $.each([{suffix: 'fc', data: fragmentCacheData}, {suffix: 'bc', data: blockCacheData}], function(index, cacheData) {
+                var cachingData = cacheData.data;
+                if (cachingData.is_backend()) {
+                    var connectionInfo = cachingData.backend_info.connection_info.toJS();
+                    var backendInfo = {
+                        preset: cachingData.backend_info.preset(),
+                        alba_backend_guid: cachingData.backend_info.alba_backend_guid()
+                    };
+                    postData.call_parameters['connection_info_{0}'.format([cacheData.suffix])] = connectionInfo;
+                    postData.call_parameters['backend_info_{0}'.format([cacheData.suffix])] = backendInfo;
+
+                }
+            });
+            return postData
+        };
         self.formatFloat = function(value) {
             return parseFloat(value);
-        };
-        self.calculateUpdateImpact = function () {
-            var postData = {
-                vpool_updates: ko.mapping.toJS(self.data.configParams),
-                storagedriver_updates: ko.mapping.toJS(self.data.cachingData)
-            };
-            postData.storagedriver_updates.proxy_amount = self.data.proxyAmount();
-            postData.storagedriver_updates.global_write_buffer = self.data.globalWriteBuffer();
-            self.loadingUpdateImpact(true);
-            return api.post('storagedrivers/{0}/calculate_update_impact'.format([self.data.storageDriver().guid()]), {data: postData})
-                .done(function(data) {
-                    console.log(data)
-                })
-                .always(function() {
-                    self.loadingUpdateImpact(false);
-                })
         };
         self.finish = function() {
             return $.Deferred(function (deferred) {
@@ -170,7 +214,7 @@ define([
             if (self.activated === true){
                 return
             }
-            self.calculateUpdateImpact()
+            var postData = self.getPostData();
             self.activated = true;
         }
     };

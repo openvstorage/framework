@@ -866,15 +866,15 @@
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
                 "invalid_quota_nan": "Quota should be a number",
                 "loading_backend_information": "Backend information is being loaded",
-                "local_host": "Use local Open vStorage backend",
+                "local_backend": "Use local Open vStorage backend",
                 "local_path": "Local path",
                 "local_size": "Size",
                 "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
                 "re_use_connection_info": "Re-use connection info:",
-                "use_backend_bc": "Use another Backend as Cache",
-                "use_local": "Use local disk"
+                "use_backend": "Use another Backend as Cache",
+                "use_local_disk": "Use local disk"
             },
             "gather_config": {
                 "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
@@ -919,15 +919,15 @@
                 "invalid_local_size": "The given size is invalid",
                 "invalid_quota_nan": "Quota should be a number",
                 "loading_backend_information": "Backend information is being loaded",
-                "local_host": "Use local Open vStorage backend",
+                "local_backend": "Use local Open vStorage backend",
                 "local_path": "Local path",
                 "local_size": "Size",
                 "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
                 "re_use_connection_info": "Re-use connection info:",
-                "use_backend_fc": "Use another Backend as Cache",
-                "use_local": "Use local disk"
+                "use_backend": "Use another Backend as Cache",
+                "use_local_disk": "Use local disk"
             },
             "gather_vpool": {
                 "alba_backend": "Backend:",

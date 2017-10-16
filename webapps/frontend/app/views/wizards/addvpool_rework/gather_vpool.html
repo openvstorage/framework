@@ -108,8 +108,8 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageip') }">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.ip_address"></label>
         <div class="col-lg-7" style="margin-bottom: -5px;">
-            <div data-bind="visible: data.loadingStorageRouters()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
-            <span data-bind="visible: !data.loadingStorageRouters(),
+            <div data-bind="visible: data.loadingStorageRouters() || data.loadingMetadata()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
+            <span data-bind="visible: !data.loadingStorageRouters() && !data.loadingMetadata(),
                              dropdown: {
                                  items: storageRouterIpAddresses,
                                  target: storageRouterIpAddress,

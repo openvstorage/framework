@@ -43,7 +43,7 @@ define([
                 } else {
                     self.data.configParams.dtl_enabled(true);
                 }
-                self.data.dtlMode(mode);
+                self.data.configParams.dtl_mode(mode);
             },
             read: function () {
                 if (self.data.configParams.dtl_enabled() === false) {

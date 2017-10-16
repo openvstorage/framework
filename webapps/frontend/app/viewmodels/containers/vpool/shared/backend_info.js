@@ -16,8 +16,9 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic'
-], function($, ko, generic) {
+    'ovs/generic',
+    'viewmodels/containers/shared/base_container'
+], function($, ko, generic, BaseModel) {
     "use strict";
     // Caching data viewModel which is parsed from JS
     // Return a constructor for a nested viewModel
@@ -67,7 +68,10 @@ define([
         });
         self.isLocalBackend = ko.pureComputed(function() {
             return self.connection_info.isLocalBackend()
-        })
+        });
+
+        // Inherit from base
+        BaseModel.call(self);
 
     };
     var connectionInfoViewModel = function(data) {
@@ -91,6 +95,7 @@ define([
 
         ko.mapping.fromJS(vmData, connectionInfoMapping, self);
 
+        // Computed
         self.isLocalBackend = ko.computed({
            deferEvaluation: true,  // Wait with computing for an actual subscription
            read: function() {
@@ -115,6 +120,9 @@ define([
             });
             return hasRemoteInfo;
         });
+
+        // Inherit from base
+        BaseModel.call(self);
     };
     return backendInfoViewModel;
 });
