@@ -16,7 +16,7 @@ Depends: aptdaemon, rabbitmq-server (>= 3.2.4), python-memcache (>= 1.47-2), mem
  python-pika, python-six, python-protobuf, python-pyudev, sshpass, at,
  python-billiard (>= 3.3.0.20), python-billiard (<< 3.3.1),
  python-requests (>=2.9.1), redis-server, python-redis, python-ujson,
- openvstorage-extensions (>= 0.1.0)
+ openvstorage-extensions (>= 0.1.1)
 Recommends: avahi-utils (>= 0.6.31), openvpn, ntp
 Description: OpenvStorage core
  Core components for the Open vStorage product
@@ -26,7 +26,7 @@ Architecture: amd64
 Pre-Depends: openvstorage-core (= ${binary:Version})
 Depends: python-django (>= 1.5.1-2), nginx (>= 1.2.6), python-djangorestframework (= 2.3.12-1),
  gunicorn (>= 0.15.0-1), python-gevent (>= 0.13.0-1build2), python-markdown (>= 2.3.1-1),
- openvstorage-extensions
+ openvstorage-extensions (>= 0.1.1)
 Description: OpenvStorage Web Applications
  Web components for the Open vStorage product
 
