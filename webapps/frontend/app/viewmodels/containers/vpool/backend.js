@@ -34,7 +34,7 @@ define([
         // Default data
         var vmData = $.extend({
             // Placing the observables declared above to automatically include them into our mapping object (else include must be used in the mapping)
-            backend_info: {},
+            backend_info: {}
         }, data);
 
         ko.mapping.fromJS(data, backendMapping, self);

@@ -20,14 +20,13 @@ define([
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/containers/vpool/vpool',
     'viewmodels/services/backend',
-    './data'
-], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, backendService, data) {
+], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, backendService) {
     "use strict";
-    return function () {
+    return function (options) {
         var self = this;
 
         // Variables
-        self.data   = data;
+        self.data   = options.data;
         self.shared = shared;
 
         // Observables

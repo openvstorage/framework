@@ -17,13 +17,12 @@
 define([
     'jquery', 'knockout', 'ovs/generic',
     '../build', './data', './gather_config', './gather_vpool', './gather_fragment_cache', './gather_block_cache', './confirm'
-], function($, ko, generic, build, data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
+], function($, ko, generic, Build, data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
     "use strict";
     return function(options) {
-        // Inject all data first before building all steps to avoid computing
-
         var self = this;
-        build(self);
+        // Inherit
+        Build.call(self);
 
         // Setup
         self.modal(generic.tryGet(options, 'modal', false));

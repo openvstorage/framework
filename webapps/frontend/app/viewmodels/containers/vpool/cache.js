@@ -74,6 +74,7 @@ define([
 
         });
         self.cacheSetting = ko.computed({
+            deferEvaluation: true,  // Wait with computing for an actual subscription
             read: function() {
                 if (self.read() && self.write()) {
                     return 'rw';

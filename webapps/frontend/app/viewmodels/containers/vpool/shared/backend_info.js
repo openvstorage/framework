@@ -32,6 +32,10 @@ define([
     var connectionInfoMapping = {};
     var backendInfoViewModel = function(data) {
         var self = this;
+
+        // Inherit from base
+        BaseModel.call(self);
+
         // Observables (This will ensure that these observables are present even if the data is missing them)
         self.name                = ko.observable();
         self.backend_guid        = ko.observable();
@@ -69,13 +73,13 @@ define([
         self.isLocalBackend = ko.pureComputed(function() {
             return self.connection_info.isLocalBackend()
         });
+    };
+    var connectionInfoViewModel = function(data) {
+        var self = this;
 
         // Inherit from base
         BaseModel.call(self);
 
-    };
-    var connectionInfoViewModel = function(data) {
-        var self = this;
         // Observables
         self.client_id      = ko.observable().extend({removeWhiteSpaces: null});
         self.client_secret  = ko.observable().extend({removeWhiteSpaces: null});
@@ -120,9 +124,6 @@ define([
             });
             return hasRemoteInfo;
         });
-
-        // Inherit from base
-        BaseModel.call(self);
     };
     return backendInfoViewModel;
 });

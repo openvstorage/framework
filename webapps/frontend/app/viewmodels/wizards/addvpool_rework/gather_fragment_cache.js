@@ -18,15 +18,14 @@ define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic', 'ovs/shared',
     'viewmodels/services/backend',
-    './data'
-], function($, ko, api, generic, shared, backendService, data) {
+], function($, ko, api, generic, shared, backendService) {
     "use strict";
     return function(options) {
         var self = this;
 
         // Variables
         self.actived = false;
-        self.data = options !== undefined && options.data !== undefined ? options.data : data;
+        self.data = options.data;
         self.shared = shared;
         self.options = options;
 

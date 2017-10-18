@@ -119,7 +119,7 @@
 
         pushAll: function (dictionary) {
             var self = this;
-            var items = self.items();
+            var items = self.items();  // Edit the underlying array to avoid notifying all subscribers for every inserted item
 
             if (dictionary instanceof Array) {
                 $.each(dictionary, function (index, item) {
@@ -138,7 +138,7 @@
                     }
                 }
             }
-
+            // Notify any subscribers that the array has changed
             self.items.valueHasMutated();
         },
 

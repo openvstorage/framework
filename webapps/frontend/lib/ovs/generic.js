@@ -475,7 +475,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         }
         if (object1.constructor !== object2.constructor) {
             // They must have the exact same prototype chain, the closest we can do is
-            // test there constructor.
+            // test thie constructor.
             return false;
         }
         for (var p in object1) {
@@ -605,6 +605,11 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
             }
         });
     }
+
+    function isObject(o) {
+        return o instanceof Object && o.constructor === Object;
+    }
+
     function isFunction(functionToCheck) {
         var getType = {};
         return functionToCheck && getType.toString.call(functionToCheck) === '[object Function]';
@@ -774,6 +779,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         ipSort: ipSort,
         isEmpty: isEmpty,
         isFunction: isFunction,
+        isObject: isObject,
         keys: keys,
         log: log,
         lower: lower,
