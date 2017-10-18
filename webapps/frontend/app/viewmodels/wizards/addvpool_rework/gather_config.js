@@ -16,19 +16,21 @@
 /*global define */
 define([
     'jquery', 'knockout', 'ovs/generic',
-    './data'
 ], function ($, ko, generic, data) {
     "use strict";
-    return function () {
+    return function (options) {
         var self = this;
 
         // Variables
         self.activated = false;
-        self.data = data;
+        self.data = options.data;
 
         // Observables
         self.dtlModes = ko.observableArray([]);
         self.dtlTransportModes = ko.observableArray([]);
+
+        self.advancedSettings = ko.observable();
+        self.acceptedAdvancedSettings = ko.observable();
 
         // Computed
         self.canContinue = ko.pureComputed(function () {
@@ -105,6 +107,14 @@ define([
                 }
             }
             return { value: reasons.length === 0, reasons: reasons, fields: fields };
+        });
+
+        // Subscriptions
+        self.advancedSettings.subscribe(function(newValue) {
+            self.data.configParams.advanced(newValue);
+            if (newValue === false) {
+                self.acceptedAdvancedSettings(newValue)
+            }
         });
 
         // Durandal

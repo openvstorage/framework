@@ -20,64 +20,66 @@ define(['jquery', 'knockout',
     'viewmodels/services/backend', 'viewmodels/services/storagerouter', 'viewmodels/services/vpool'
 ],function($, ko, generic, api, shared, errors, StorageRouter, VPool, StorageDriverParams, backendService, storageRouterService, vpoolService){
     "use strict";
-    var singleton;
-    singleton = function() {
-        var wizardData = {
-            storageDriver:                      ko.observable(),
-            storageRouter:                      ko.observable(),
-            vPool:                              ko.observable(),
-            // Changes
-            // General vPool changes
-            configParams:                       undefined,  // Params related to general configs (sco size, dtl ...) Undefined as a viewmodel will be set
-            backendData:                        undefined,  // Params related to the backend. Undefined as a viewmodel will be set
-            // Storage driver changes
-            cachingData:                        undefined,  // Params related to fragment cache and block cache. Undefined as a viewmodel will be set
-            storageDriverParams:                undefined,  // Params related to the StorageDriver in general (proxies, globalWriteBuffer, storageIp) Undefined as a viewmodel will be set
-            // Shared across the pages
-            // Handles
-            loadBackendsHandle:                 undefined,
-            loadAvailableStorageRoutersHandle:  undefined,
-            loadStorageRoutersHandle:           undefined,
-            // Data
-            storageRouterMap:                   ko.observableDictionary({}),
-            albaPresetMap:                      ko.observable({}),
-            backends:                           ko.observableArray([]),
-            invalidBackendInfo:                 ko.observable(),
-            loadingBackends:                    ko.observable(),
-            loadingStorageRouters:              ko.observable(),
-            loadingMetadata:                    ko.observable(),
-            globalWriteBufferMax:               ko.observable(),  // Used to detect over allocation
-            srPartitions:                       ko.observable(),
-            storageRoutersAvailable:            ko.observableArray([]),
-            storageRoutersUsed:                 ko.observableArray([]),
-            vPools:                             ko.observableArray([])
-        };
+    // This data is not a singleton but a constructor
+    return function(storageRouter, vPool) {
+        // Default values
+        var isExtend = (typeof vPool !== 'undefined');
+        vPool = isExtend ? vPool : new VPool();
+
+        var self = this;
+        // Properties
+        // General vPool changes
+        self.configParams =                       undefined;  // Params related to general configs (sco size, dtl ...) Undefined as a viewmodel will be set
+        self.backendData =                        undefined;  // Params related to the backend. Undefined as a viewmodel will be set
+        // Storage driver changes
+        self.cachingData =                        undefined;  // Params related to fragment cache and block cache. Undefined as a viewmodel will be set
+        self.storageDriverParams =                undefined;  // Params related to the StorageDriver in general (proxies, globalWriteBuffer, storageIp) Undefined as a viewmodel will be set
+        // Shared across the pages
+        // Handles
+        self.loadBackendsHandle =                 undefined;
+        self.loadAvailableStorageRoutersHandle =  undefined;
+        self.loadStorageRoutersHandle =           undefined;
+
+        // Observables
+        self.storageRouter =                      ko.observable(storageRouter);
+        self.vPool =                              ko.observable(vPool);
+        self.isExtend =                           ko.observable(isExtend);
+        // Data observables
+        self.storageRouterMap =                   ko.observableDictionary({});
+        self.albaPresetMap =                      ko.observable({});
+        self.backends =                           ko.observableArray([]);
+        self.invalidBackendInfo =                 ko.observable();
+        self.loadingBackends =                    ko.observable();
+        self.loadingStorageRouters =              ko.observable();
+        self.loadingMetadata =                    ko.observable();
+        self.globalWriteBufferMax =               ko.observable();  // Used to detect over allocation
+        self.srPartitions =                       ko.observable();
+        self.storageRoutersAvailable =            ko.observableArray([]);
+        self.storageRoutersUsed =                 ko.observableArray([]);
+        self.vPools =                             ko.observableArray([]);
 
         // Computed
-        wizardData.isExtend = ko.computed(function() {
-            return wizardData.vPool() !== undefined;
-        });
-        wizardData.hasCacheQuota = ko.pureComputed(function() {
+        self.hasCacheQuota = ko.pureComputed(function() {
             var storageRouter = undefined;
             // These observables should only change once during the lifetime of the wizard and will cause less recomputing
-            var storageRouters = [].concat(wizardData.storageRoutersUsed(), wizardData.storageRoutersAvailable());
+            var storageRouters = [].concat(self.storageRoutersUsed(), self.storageRoutersAvailable());
             if (storageRouters.length > 0) {
                 storageRouter = storageRouters[0];
             }
             return storageRouterService.hasCacheQuota(storageRouter);
         });
-        wizardData.scrubAvailable = ko.pureComputed(function() {
+        self.scrubAvailable = ko.pureComputed(function() {
             // Scrub available is returned for all storagerouters (bad api design?)
-            var mappedStorageRouters = wizardData.storageRouterMap.values();
+            var mappedStorageRouters = self.storageRouterMap.values();
             if (mappedStorageRouters.length > 0) {
                 return mappedStorageRouters[0].scrub_avaible
             }
             return false;
         });
-        wizardData.supportsBlockCache = ko.pureComputed(function() {
+        self.supportsBlockCache = ko.pureComputed(function() {
             var storageRouter = undefined;
             // These observables should only change once during the lifetime of the wizard and will cause less recomputing
-            var storageRouters = [].concat(wizardData.storageRoutersUsed(), wizardData.storageRoutersAvailable());
+            var storageRouters = [].concat(self.storageRoutersUsed(), self.storageRoutersAvailable());
             if (storageRouters.length > 0) {
                 storageRouter = storageRouters[0];
             }
@@ -85,8 +87,8 @@ define(['jquery', 'knockout',
         });
 
         // Functions
-        wizardData.fillData = function() {
-            var requiredObservables = [wizardData.storageRouter, wizardData.vPool];
+        self.fillData = function() {
+            var requiredObservables = [self.storageRouter];
             var missingObservables = [];
             $.each(requiredObservables, function(index, obs) {
                 if (ko.utils.unwrapObservable(obs) === undefined) {
@@ -97,11 +99,11 @@ define(['jquery', 'knockout',
                 throw new Error('The wizard does not have the necessary data to continue.')
             }
             // Fire up some asynchronous calls
-            wizardData.loadBackends();
-            wizardData.loadVPools();
-            wizardData.loadStorageRouters()
+            self.loadBackends();
+            self.loadVPools();
+            self.loadStorageRouters()
                 .then(function(data) {
-                    wizardData.loadingMetadata(true);
+                    self.loadingMetadata(true);
                     // Load in metadata about these storagerouters
                     var storageRouters = [].concat(data.used, data.available);
                     var calls = [];
@@ -109,40 +111,39 @@ define(['jquery', 'knockout',
                         calls.push(
                             storageRouterService.getMetadata(storageRouter.guid())
                                 .then(function(data) {
-                                    wizardData.storageRouterMap.set(storageRouter.guid(), data)
+                                    self.storageRouterMap.set(storageRouter.guid(), data)
                                 })
                         )
                     });
                     return $.when.apply($, calls)  // Return this Promise to chain it for the always
                         .done(function() {
                            // loadStorageRouters will have set a storagerouter so set some extra data
-                            var metadata = wizardData.getStorageRouterMetadata(wizardData.storageRouter().guid());
+                            var metadata = self.getStorageRouterMetadata(self.storageRouter().guid());
                             var globalWriteBufferMax = metadata.writeCacheSize / Math.pow(1024, 3);
-                           wizardData.globalWriteBufferMax(globalWriteBufferMax);
-                           wizardData.storageDriverParams.globalWriteBuffer(globalWriteBufferMax);  // Initially set it to the max write buffer
+                           self.globalWriteBufferMax(globalWriteBufferMax);
+                           self.storageDriverParams.globalWriteBuffer(globalWriteBufferMax);  // Initially set it to the max write buffer
                         });
                 })
                 .always(function() {
-                    wizardData.loadingMetadata(false)
+                    self.loadingMetadata(false)
                 });
             // Set all configurable data
-            var vpool = wizardData.vPool() === undefined ? new VPool() : wizardData.vPool();
-            wizardData.storageDriverParams = new StorageDriverParams();
-            wizardData.backendData = vpool.getBackendInfo(true);
-            wizardData.cachingData = vpool.getCachingData(wizardData.storageRouter().guid(), true, true);
-            wizardData.configParams = vpool.getConfiguration(true);
+            self.storageDriverParams = new StorageDriverParams();
+            self.backendData = self.vPool().getBackendInfo(true);
+            self.cachingData = self.vPool().getCachingData(self.storageRouter().guid(), true, true);
+            self.configParams = self.vPool().getConfiguration(true);
 
         };
         /**
          * Retrieves metadata from the cache
          * @param storageRouterGuid
          */
-        wizardData.getStorageRouterMetadata = function(storageRouterGuid) {
-            if (!wizardData.storageRouterMap.contains(storageRouterGuid)) {
+        self.getStorageRouterMetadata = function(storageRouterGuid) {
+            if (!self.storageRouterMap.contains(storageRouterGuid)) {
                 throw new errors.OVSError('str_not_found', 'No information about Storagerouter {0}'.format([storageRouterGuid]))
             }
             // Do some additional calculation
-            var srData = wizardData.storageRouterMap.get(storageRouterGuid, false)();
+            var srData = self.storageRouterMap.get(storageRouterGuid, false)();
             var writeCacheSize = 0;
             $.each(srData.partitions.WRITE, function(index, info) {
                 if (info['usable'] === true) {
@@ -152,22 +153,22 @@ define(['jquery', 'knockout',
             return {metadata: srData, writeCacheSize: writeCacheSize}
 
         };
-        wizardData.filterBackendsByLocationKey = function(locationKey) {
+        self.filterBackendsByLocationKey = function(locationKey) {
             if (locationKey === undefined) {
-                return wizardData.backends();
+                return self.backends();
             }
-            return ko.utils.arrayFilter(wizardData.backends(), function(backend) {
+            return ko.utils.arrayFilter(self.backends(), function(backend) {
                 return backend.locationKey.toLowerCase().startsWith(locationKey);
             });
         };
-        wizardData.buildLocationKey = function(connectionInfo) {
+        self.buildLocationKey = function(connectionInfo) {
             if (connectionInfo === undefined || connectionInfo.isLocalBackend() === true) {
                 return 'local';
             }
             return '{0}:{1}'.format([ko.utils.unwrapObservable(connectionInfo.host), ko.utils.unwrapObservable(connectionInfo.port)])
         };
-        wizardData.getBackend = function(backendGuid) {
-            var currentList = wizardData.backends();
+        self.getBackend = function(backendGuid) {
+            var currentList = self.backends();
             var currentFilters = {'backend_guid': backendGuid};
             $.each(currentFilters, function(itemKey, filterValue){
                 currentList = ko.utils.arrayFilter(currentList, function(item) {
@@ -176,9 +177,9 @@ define(['jquery', 'knockout',
             });
             return currentList.length === 0 ? undefined : currentList[0];
         };
-        wizardData.getPreset = function(albaBackendGuid, presetName) {
-            if (albaBackendGuid in wizardData.albaPresetMap()) {
-                var backendPreset = wizardData.albaPresetMap()[albaBackendGuid];
+        self.getPreset = function(albaBackendGuid, presetName) {
+            if (albaBackendGuid in self.albaPresetMap()) {
+                var backendPreset = self.albaPresetMap()[albaBackendGuid];
                 if (presetName in backendPreset) {
                     return backendPreset[presetName];
                 }
@@ -186,7 +187,7 @@ define(['jquery', 'knockout',
             }
             return undefined;
         };
-        wizardData.getDistinctBackends = function(backends) {
+        self.getDistinctBackends = function(backends) {
             /**
              * Filter out backend duplicates
              * @param backends: array of backends
@@ -209,9 +210,9 @@ define(['jquery', 'knockout',
          * @param connectionInfo: Object with connection information (optional)
          * @returns {Promise}
         */
-        wizardData.loadBackends = function(connectionInfo) {
+        self.loadBackends = function(connectionInfo) {
             return $.Deferred(function(deferred) {
-                generic.xhrAbort(wizardData.loadBackendsHandle);
+                generic.xhrAbort(self.loadBackendsHandle);
                 var relay = '';
                 var queryParams = {
                     contents: 'available'
@@ -225,12 +226,12 @@ define(['jquery', 'knockout',
                     remoteInfo.client_secret = connectionInfo.client_secret().replace(/\s+/, "");
                 }
                 $.extend(queryParams, remoteInfo);
-                wizardData.loadingBackends(true);
-                wizardData.invalidBackendInfo(false);
-                wizardData.loadBackendsHandle = backendService.loadAlbaBackends(queryParams, relay)
+                self.loadingBackends(true);
+                self.invalidBackendInfo(false);
+                self.loadBackendsHandle = backendService.loadAlbaBackends(queryParams, relay)
                     .done(function(data) {
                         var calls = [];
-                        var availableBackends = wizardData.backends();
+                        var availableBackends = self.backends();
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
                                 queryParams.contents = 'name,ns_statistics,presets,usages,backend';
@@ -239,11 +240,11 @@ define(['jquery', 'knockout',
                                         var backendSize = data.usages.size;
                                         if ((backendSize !== undefined && backendSize > 0)) {
                                             // Add some metadata about the location
-                                            data.locationKey = wizardData.buildLocationKey(connectionInfo);
+                                            data.locationKey = self.buildLocationKey(connectionInfo);
                                             availableBackends.push(data);
-                                            wizardData.albaPresetMap()[data.guid] = {};
+                                            self.albaPresetMap()[data.guid] = {};
                                             $.each(data.presets, function (_, preset) {
-                                                wizardData.albaPresetMap()[data.guid][preset.name] = preset;
+                                                self.albaPresetMap()[data.guid][preset.name] = preset;
                                             });
                                         }
                                     })
@@ -252,38 +253,38 @@ define(['jquery', 'knockout',
                         });
                         $.when.apply($, calls)
                             .then(function() {
-                                availableBackends = wizardData.getDistinctBackends(availableBackends);
+                                availableBackends = self.getDistinctBackends(availableBackends);
                                 if (availableBackends.length > 0) {
                                     var sortFunction = function(backend1, backend2) {
                                         return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
                                     };
                                     availableBackends = availableBackends.sort(sortFunction);
-                                    wizardData.backends(availableBackends);
+                                    self.backends(availableBackends);
                                 }
-                                wizardData.loadingBackends(false);
+                                self.loadingBackends(false);
                             })
-                            .done(deferred.resolve(wizardData.backends()))
+                            .done(deferred.resolve(self.backends()))
                             .fail(function() {
-                                availableBackends = wizardData.getDistinctBackends(availableBackends);
-                                wizardData.backends(availableBackends);
-                                wizardData.loadingBackends(false);
-                                wizardData.invalidBackendInfo(true);
+                                availableBackends = self.getDistinctBackends(availableBackends);
+                                self.backends(availableBackends);
+                                self.loadingBackends(false);
+                                self.invalidBackendInfo(true);
                                 deferred.reject();
                             });
                     })
                     .fail(function() {
-                        wizardData.loadingBackends(false);
-                        wizardData.invalidBackendInfo(true);
+                        self.loadingBackends(false);
+                        self.invalidBackendInfo(true);
                         deferred.reject();
                     });
             }).promise();
         };
-        wizardData.loadVPools = function() {
+        self.loadVPools = function() {
             return vpoolService.loadVPools()
                 .then(function(data) {
                     var guids = data.data.map(function(item) { return item.guid});
                     generic.crossFiller(
-                        guids, wizardData.vPools,
+                        guids, self.vPools,
                         function (guid) {
                             return new VPool(guid);
                         }, 'guid'
@@ -293,11 +294,11 @@ define(['jquery', 'knockout',
         /**
          * Load up the StorageRouters and map them as used or available
          */
-        wizardData.loadStorageRouters = function(){
-            wizardData.loadingStorageRouters(true);
+        self.loadStorageRouters = function(){
+            self.loadingStorageRouters(true);
             var promise;
-            if (wizardData.vPool() !== undefined) {
-                promise = wizardData.vPool().loadStorageRouters();
+            if (self.vPool() !== undefined) {
+                promise = self.vPool().loadStorageRouters();
             } else {
                 promise = $.Deferred(function (deferred) {
                     deferred.resolve();
@@ -305,8 +306,8 @@ define(['jquery', 'knockout',
             }
             return promise
                 .then(function () {
-                    generic.xhrAbort(wizardData.loadStorageRoutersHandle);
-                    return wizardData.loadStorageRoutersHandle = storageRouterService.loadStorageRouters({contents: 'storagedrivers,features', sort: 'name'})
+                    generic.xhrAbort(self.loadStorageRoutersHandle);
+                    return self.loadStorageRoutersHandle = storageRouterService.loadStorageRouters({contents: 'storagedrivers,features', sort: 'name'})
                         .then(function (data) {
                             var guids = [], srdata = {};
                             $.each(data.data, function (index, item) {
@@ -314,47 +315,48 @@ define(['jquery', 'knockout',
                                 srdata[item.guid] = item;
                             });
                             generic.crossFiller(
-                                guids, wizardData.storageRoutersAvailable,
+                                guids, self.storageRoutersAvailable,
                                 function (guid) {
-                                    if (wizardData.vPool() === undefined || !wizardData.vPool().storageRouterGuids().contains(guid)) {
+                                    if (self.vPool() === undefined || !self.vPool().storageRouterGuids().contains(guid)) {
                                         return new StorageRouter(guid);
                                     }
                                 }, 'guid'
                             );
                             generic.crossFiller(
-                                guids, wizardData.storageRoutersUsed,
+                                guids, self.storageRoutersUsed,
                                 function (guid) {
-                                    if (wizardData.vPool() !== undefined && wizardData.vPool().storageRouterGuids().contains(guid)) {
+                                    if (self.vPool() !== undefined && self.vPool().storageRouterGuids().contains(guid)) {
                                         return new StorageRouter(guid);
                                     }
                                 }, 'guid'
                             );
-                            $.each(wizardData.storageRoutersAvailable(), function (index, storageRouter) {
+                            $.each(self.storageRoutersAvailable(), function (index, storageRouter) {
                                 storageRouter.fillData(srdata[storageRouter.guid()]);
                             });
-                            $.each(wizardData.storageRoutersUsed(), function (index, storageRouter) {
+                            $.each(self.storageRoutersUsed(), function (index, storageRouter) {
                                 storageRouter.fillData(srdata[storageRouter.guid()]);
                             });
-                            wizardData.storageRoutersAvailable.sort(function (sr1, sr2) {
+                            self.storageRoutersAvailable.sort(function (sr1, sr2) {
                                 return sr1.name() < sr2.name() ? -1 : 1;
                             });
-                            wizardData.storageRoutersUsed.sort(function (sr1, sr2) {
+                            self.storageRoutersUsed.sort(function (sr1, sr2) {
                                 return sr1.name() < sr2.name() ? -1 : 1;
                             });
-                            if (wizardData.storageRouter() === undefined && wizardData.storageRoutersAvailable().length > 0) {
-                                wizardData.storageRouter(wizardData.storageRoutersAvailable()[0]);
+                            if (self.storageRouter() === undefined && self.storageRoutersAvailable().length > 0) {
+                                self.storageRouter(self.storageRoutersAvailable()[0]);
                             }
                             return {
-                                used: wizardData.storageRoutersUsed(),
-                                available: wizardData.storageRoutersAvailable()
+                                used: self.storageRoutersUsed(),
+                                available: self.storageRoutersAvailable()
                             }
                         })
                         .always(function() {
-                            wizardData.loadingStorageRouters(false)
+                            self.loadingStorageRouters(false)
                         })
                 });
         };
-        return wizardData;
+
+        // Fill in the required data
+        self.fillData();
     };
-    return singleton();
 });

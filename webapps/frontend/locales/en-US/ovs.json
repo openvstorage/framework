@@ -877,6 +877,14 @@
                 "use_local_disk": "Use local disk"
             },
             "gather_config": {
+                "advanced": {
+                    "accept_text": "I understand the risks",
+                    "advanced_text": "Advanced settings",
+                    "advanced_warning": "Configuring these settings can help shape the Open vStorage Volumedriver to your specific needs.<br/><br/>When settings these parameters, make sure to understand their impact towards the backend and its preset. Improperly configured settings can cause performance loss!",
+                    "calculate_message": "Adjusting the Volume Writer Buffer will set the parameters below to a standard. Reconfiguring any of the parameters below will update the Volume Write Buffer.",
+                    "number_of_scos_in_tlog": "Number of SCOs in tlog:",
+                    "non_disposable_scos_factor": "Non disposable SCO factor:"
+                },
                 "cache_no_proxies": "No proxies can be deployed making use of local Cache with current Global Write Buffer size",
                 "cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local Cache with current Global Write Buffer size",
                 "cluster_size": "Cluster Size:",

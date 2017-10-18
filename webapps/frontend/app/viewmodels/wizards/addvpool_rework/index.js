@@ -17,22 +17,16 @@
 define([
     'jquery', 'knockout', 'ovs/generic',
     '../build', './data', './gather_config', './gather_vpool', './gather_fragment_cache', './gather_block_cache', './confirm'
-], function($, ko, generic, build, data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
+], function($, ko, generic, Build, Data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
+        // Create a new data instance to be passed around
+        var data = new Data(options.storageRouter, options.vPool);
+        var stepOptions = {data: data};
 
-        // Inject all data first before building all steps
-        generic.cleanObject(data, 0, ['albaPresetMap', 'storageDriverParams', 'storageRouterMap', 'backendData', 'cachingData']);
-        data.albaPresetMap({});  // set this to an empty object as cleanObject will set it to undefined
-        // Set current data
-        data.vPool(options.vPool);
-        data.storageRouter(options.storageRouter);
-        data.completed = options.completed;
-        // Fill in all wizard data which is derived from the options above
-        data.fillData();
-
-        build(self);
+        // Inherit from build
+        Build.call(self);
 
         // Setup
         self.modal(generic.tryGet(options, 'modal', false));
@@ -42,7 +36,12 @@ define([
         }
         self.title(generic.tryGet(options, 'title', defaultTitle));
 
-        self.steps([new GatherVPool(), new GatherFragmentCache(), new GatherBlockCache(), new GatherConfig(), new Confirm()]);
+        self.steps([
+            new GatherVPool(stepOptions),
+            new GatherFragmentCache(stepOptions),
+            new GatherBlockCache(stepOptions),
+            new GatherConfig(stepOptions),
+            new Confirm(stepOptions)]);
 
         self.step(0);
         self.activateStep();

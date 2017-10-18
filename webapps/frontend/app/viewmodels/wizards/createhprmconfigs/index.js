@@ -17,11 +17,12 @@
 define([
     'jquery', 'ovs/generic',
     '../build', './data', './gather', '../addvpool/gather_fragment_cache', '../addvpool/gather_block_cache', './confirm'
-], function($, generic, build, data, GatherInfo, GatherFragmentCache, GatherBlockCache, Confirm) {
+], function($, generic, Build, data, GatherInfo, GatherFragmentCache, GatherBlockCache, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
-        build(self);
+        // Inherit
+        Build.call(self);
 
         // Setup
         self.modal(generic.tryGet(options, 'modal', false));
