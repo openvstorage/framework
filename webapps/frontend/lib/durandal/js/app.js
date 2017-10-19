@@ -1,4 +1,9 @@
-﻿/**
+/**
+ * Durandal 2.2.0 Copyright (c) 2010-2016 Blue Spire Consulting, Inc. All Rights Reserved.
+ * Available via the MIT license.
+ * see: http://durandaljs.com or https://github.com/BlueSpire/Durandal for details.
+ */
+/**
  * The app module controls app startup, plugin loading/configuration and root visual display.
  * @module app
  * @requires system
@@ -121,7 +126,43 @@ define(['durandal/system', 'durandal/viewEngine', 'durandal/composition', 'duran
                 settings.model = root;
             }
 
-            composition.compose(hostElement, settings);
+            function finishComposition() {
+                if(settings.model) {
+                    if (settings.model.canActivate) {
+                        try {
+                            var result = settings.model.canActivate();
+                            if (result && result.then) {
+                                result.then(function (actualResult) {
+                                    if (actualResult) {
+                                        composition.compose(hostElement, settings);
+                                    }
+                                }).fail(function (err) {
+                                    system.error(err);
+                                });
+                            } else if (result) {
+                                composition.compose(hostElement, settings);
+                            }
+                        } catch (er) {
+                            system.error(er);
+                        }
+                    } else {
+                        composition.compose(hostElement, settings);
+                    }
+                } else {
+                    composition.compose(hostElement, settings);
+                }
+            }
+
+            if(system.isString(settings.model)) {
+                system.acquire(settings.model).then(function(module) {
+                    settings.model = system.resolveObject(module);
+                    finishComposition();
+                }).fail(function(err) {
+                    system.error('Failed to load root module (' + settings.model + '). Details: ' + err.message);
+                });
+            } else {
+                finishComposition();
+            }
         }
     };
 

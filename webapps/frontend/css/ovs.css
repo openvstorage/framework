@@ -258,3 +258,12 @@ code {
 .label-missing {
     background-color: buttonface;
 }
+
+.modal-open {
+  overflow: inherit;
+}
+
+.modal-body {
+    max-height: 75vh;
+    overflow-y: auto;
+}

@@ -20,11 +20,11 @@ requirejs.config({
         'durandal'              : '../lib/durandal/js',
         'plugins'               : '../lib/durandal/js/plugins',
         'transitions'           : '../lib/durandal/js/transitions',
-        'knockout'              : '../lib/knockout/knockout-3.3.0',
-        'knockout-mapping'      : '../lib/knockout/plugins/knockout-mapping-2.4.1',
-        'knockout-dictionary'   : '../lib/knockout/plugins/observableDictionary',
+        'knockout'              : '../lib/knockout/knockout-3.4.0',
+        'knockout-mapping'      : '../lib/knockout-plugins/knockout-mapping-2.4.1',
+        'knockout-dictionary'   : '../lib/knockout-plugins/observableDictionary',
         'bootstrap'             : '../lib/bootstrap/js/bootstrap',
-        'jquery'                : '../lib/jquery/jquery-1.9.1',
+        'jquery'                : '../lib/jquery/jquery-3.2.1',
         'jqp'                   : '../lib/jquery-plugins/js',
         'd3'                    : '../lib/d3/d3.v3.min',
         'd3p'                   : '../lib/d3-plugins/js',
@@ -56,7 +56,7 @@ requirejs.config({
             exports: 'd3'
         }
     },
-    urlArgs: 'version=0.0.0b0',
+    // urlArgs: 'version=0.0.0b0',
     waitSeconds: 300,
     // Configuration dependencies
     deps: ['knockout', 'knockout-mapping'],
