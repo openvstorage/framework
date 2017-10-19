@@ -228,6 +228,19 @@ code {
     background-color:#f5f5f5
 }
 
+.table-storagedriver-details {
+    width: 100%;
+}
+.table-storagedriver-details td{
+    min-height: 2.5em;
+}
+.table-storagedriver-details td:nth-child(odd){
+    width: 20%;
+}
+.table-storagedriver-details td:nth-child(even){
+    width: 30%;
+}
+
 .notification-message * {
     color: #d71c16;
     font-size: 0.9em;
@@ -244,4 +257,13 @@ code {
 
 .label-missing {
     background-color: buttonface;
+}
+
+.modal-open {
+  overflow: inherit;
+}
+
+.modal-body {
+    max-height: 75vh;
+    overflow-y: auto;
 }
