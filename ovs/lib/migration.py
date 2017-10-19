@@ -17,6 +17,7 @@
 """
 MigrationController module
 """
+
 import copy
 from ovs.extensions.generic.logger import Logger
 from ovs.lib.helpers.decorators import ovs_task
@@ -330,5 +331,96 @@ class MigrationController(object):
         if OVSMigrator.THIS_VERSION <= 13:  # There is no way of checking whether this new indentation logic has been applied, so we only perform this for version 13 and lower
             MigrationController._logger.info('Re-saving every configuration setting with new indentation rules')
             _resave_all_config_entries()
+
+        ############################
+        # Update some default values
+        def _update_manifest_cache_size(_proxy_config_key):
+            updated = False
+            manifest_cache_size = 500 * 1024 * 1024
+            if Configuration.exists(key=_proxy_config_key):
+                _proxy_config = Configuration.get(key=_proxy_config_key)
+                for cache_type in ['block_cache', 'fragment_cache']:
+                    if cache_type in _proxy_config and _proxy_config[cache_type][0] == 'alba':
+                        if _proxy_config[cache_type][1]['manifest_cache_size'] != manifest_cache_size:
+                            updated = True
+                            _proxy_config[cache_type][1]['manifest_cache_size'] = manifest_cache_size
+                if _proxy_config['manifest_cache_size'] != manifest_cache_size:
+                    updated = True
+                    _proxy_config['manifest_cache_size'] = manifest_cache_size
+
+                if updated is True:
+                    Configuration.set(key=_proxy_config_key, value=_proxy_config)
+            return updated
+
+        for storagedriver in StorageDriverList.get_storagedrivers():
+            try:
+                vpool = storagedriver.vpool
+                root_client = sr_client_map[storagedriver.storagerouter_guid]
+                _update_manifest_cache_size('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))  # Generic scrub proxy is deployed every time scrubbing kicks in, so no need to restart these services
+                for alba_proxy in storagedriver.alba_proxies:
+                    if _update_manifest_cache_size('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)) is True:
+                        # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
+                        ExtensionsToolbox.edit_version_file(client=root_client, package_name='alba', old_service_name=alba_proxy.service.name)
+
+                # Update 'backend_connection_manager' section
+                changes = False
+                storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
+                if 'backend_connection_manager' not in storagedriver_config.configuration:
+                    continue
+
+                current_config = storagedriver_config.configuration['backend_connection_manager']
+                for key, value in current_config.iteritems():
+                    if key.isdigit() is True:
+                        if value.get('alba_connection_asd_connection_pool_capacity') != 10:
+                            changes = True
+                            value['alba_connection_asd_connection_pool_capacity'] = 10
+                        if value.get('alba_connection_timeout') != 30:
+                            changes = True
+                            value['alba_connection_timeout'] = 30
+                        if value.get('alba_connection_rora_manifest_cache_capacity') != 25000:
+                            changes = True
+                            value['alba_connection_rora_manifest_cache_capacity'] = 25000
+
+                if changes is True:
+                    storagedriver_config.clear_backend_connection_manager()
+                    storagedriver_config.configure_backend_connection_manager(**current_config)
+                    storagedriver_config.save(root_client)
+
+                    # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
+                    ExtensionsToolbox.edit_version_file(client=root_client,
+                                                        package_name='volumedriver',
+                                                        old_service_name='volumedriver_{0}'.format(vpool.name))
+            except Exception:
+                MigrationController._logger.exception('Updating default configuration values failed for StorageDriver {0}'.format(storagedriver.storagedriver_id))
+
+        ####################################################
+        # Adding proxy fail fast as env variable for proxies
+        changed_clients = set()
+        for storagerouter in StorageRouterList.get_storagerouters():
+            root_client = sr_client_map[storagerouter.guid]
+            for service_name in service_manager.list_services(client=root_client):
+                if not service_name.startswith('ovs-albaproxy_'):
+                    continue
+
+                if ServiceFactory.get_service_type() == 'systemd':
+                    path = '/lib/systemd/system/{0}.service'.format(service_name)
+                    check = 'Environment=ALBA_FAIL_FAST=true'
+                else:
+                    path = '/etc/init/{0}.conf'.format(service_name)
+                    check = 'env ALBA_FAIL_FAST=true'
+
+                if not root_client.file_exists(path):
+                    continue
+                if check in root_client.file_read(path):
+                    continue
+
+                try:
+                    service_manager.regenerate_service(name='ovs-albaproxy', client=root_client, target_name=service_name)
+                    changed_clients.add(root_client)
+                    ExtensionsToolbox.edit_version_file(client=root_client, package_name='alba', old_service_name=service_name)
+                except:
+                    MigrationController._logger.exception('Error rebuilding service {0}'.format(service_name))
+        for root_client in changed_clients:
+            root_client.run(['systemctl', 'daemon-reload'])
 
         MigrationController._logger.info('Finished out of band migrations')

@@ -303,7 +303,7 @@ class Generic(unittest.TestCase):
         storagerouter.disks[0].partitions[0].roles = []
         storagerouter.disks[0].partitions[0].save()
         with self.assertRaises(ValueError) as raise_info:
-            GenericController.execute_scrub(vdisk_guids=[vdisk.guid])
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid], manual=True)
         self.assertIn(member='No scrub locations found',
                       container=raise_info.exception.message)
         self.assertNotIn(member=expected_log,
@@ -315,7 +315,7 @@ class Generic(unittest.TestCase):
         storagerouter.invalidate_dynamics('partition_config')
         SSHClient._raise_exceptions[storagerouter.ip] = {'users': ['root'], 'exception': UnableToConnectException('No route to host')}
         with self.assertRaises(ValueError):
-            GenericController.execute_scrub(vdisk_guids=[vdisk.guid])
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid], manual=True)
         logs = Logger._logs['lib']
         self.assertIn(member=expected_log,
                       container=logs)
@@ -325,14 +325,14 @@ class Generic(unittest.TestCase):
         # Now actually attempt to scrub
         SSHClient._raise_exceptions = {}
         with self.assertRaises(Exception) as raise_info:
-            GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid)
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid, manual=True)
         self.assertIn(member='StorageRouter {0} - vDisk {1} - Scrubbing failed'.format(storagerouter.name, vdisk.name),
                       container=raise_info.exception.message)
 
         # Make sure scrubbing succeeds now
         LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                      'scrub_work': [0]}
-        GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid)
+        GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid, manual=True)
         with vdisk.storagedriver_client.make_locked_client(vdisk.volume_id) as locked_client:
             self.assertEqual(first=len(locked_client.get_scrubbing_workunits()),
                              second=0,
@@ -566,7 +566,7 @@ class Generic(unittest.TestCase):
         # Scrub all volumes of vPool1
         for vdisk_id, vdisk in vdisks.iteritems():
             LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
-        GenericController.execute_scrub(vpool_guids=[vpools[1].guid])
+        GenericController.execute_scrub(vpool_guids=[vpools[1].guid], manual=True)
         for vdisk_id, vdisk in vdisks.iteritems():
             if vdisk.vpool == vpools[1]:
                 expected_work = []
@@ -578,7 +578,7 @@ class Generic(unittest.TestCase):
         # Scrub a specific vDisk
         for vdisk_id, vdisk in vdisks.iteritems():
             LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
-        GenericController.execute_scrub(vdisk_guids=[vdisks[2].guid])
+        GenericController.execute_scrub(vdisk_guids=[vdisks[2].guid], manual=True)
         for vdisk_id, vdisk in vdisks.iteritems():
             if vdisk == vdisks[2]:
                 expected_work = []
@@ -590,7 +590,7 @@ class Generic(unittest.TestCase):
         # Scrub a combination of a vPool and a vDisk
         for vdisk_id, vdisk in vdisks.iteritems():
             LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
-        GenericController.execute_scrub(vpool_guids=[vpools[2].guid], vdisk_guids=[vdisks[2].guid])
+        GenericController.execute_scrub(vpool_guids=[vpools[2].guid], vdisk_guids=[vdisks[2].guid], manual=True)
         for vdisk_id, vdisk in vdisks.iteritems():
             if vdisk == vdisks[2] or vdisk.vpool == vpools[2]:
                 expected_work = []
@@ -667,7 +667,7 @@ class Generic(unittest.TestCase):
         counter = 0
         for log in Logger._logs['lib']:
             if 'threads for proxy service' in log:
-                match = re.match('^Scrubber - .*ovs-albaproxy_[1|2]_([1|2])_.*', log)
+                match = re.match('^Scrubber - vPool [1|2] - StorageRouter ([1|2]) - .*ovs-albaproxy_.*_scrub', log)
                 self.assertIsNotNone(match)
                 if match.groups()[0] == storagerouters[1].name:
                     expected_threads = 5

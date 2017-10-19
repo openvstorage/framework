@@ -214,7 +214,7 @@ class UpdateController(object):
                                     continue
 
                                 did_check = True
-                                if running_version is not None and LooseVersion(running_version) < binaries[mapped_package_name]:
+                                if running_version is not None and (LooseVersion(running_version) < binaries[mapped_package_name] or '-reboot' in running_version):
                                     if mapped_package_name not in component_info:
                                         component_info[mapped_package_name] = copy.deepcopy(default_entry)
                                     component_info[mapped_package_name]['installed'] = running_version
