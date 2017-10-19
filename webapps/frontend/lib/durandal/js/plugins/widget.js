@@ -1,4 +1,9 @@
-﻿/**
+/**
+ * Durandal 2.2.0 Copyright (c) 2010-2016 Blue Spire Consulting, Inc. All Rights Reserved.
+ * Available via the MIT license.
+ * see: http://durandaljs.com or https://github.com/BlueSpire/Durandal for details.
+ */
+/**
  * Layers the widget sugar on top of the composition system.
  * @module widget
  * @requires system

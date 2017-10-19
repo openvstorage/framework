@@ -1,4 +1,9 @@
-﻿/**
+/**
+ * Durandal 2.2.0 Copyright (c) 2010-2016 Blue Spire Consulting, Inc. All Rights Reserved.
+ * Available via the MIT license.
+ * see: http://durandaljs.com or https://github.com/BlueSpire/Durandal for details.
+ */
+/**
  * The viewEngine module provides information to the viewLocator module which is used to locate the view's source file. The viewEngine also transforms a view id into a view instance.
  * @module viewEngine
  * @requires system
@@ -22,6 +27,7 @@ define(['durandal/system', 'jquery'], function (system, $) {
      * @static
      */
     return {
+        cache:{},
         /**
          * The file extension that view source files are expected to have.
          * @property {string} viewExtension
@@ -34,6 +40,12 @@ define(['durandal/system', 'jquery'], function (system, $) {
          * @default text
          */
         viewPlugin: 'text',
+        /**
+         * Parameters passed to the RequireJS loader plugin used by the viewLocator to obtain the view source.
+         * @property {string} viewPluginParameters
+         * @default The empty string by default.
+         */
+        viewPluginParameters: '',
         /**
          * Determines if the url is a url for a view, according to the view engine.
          * @method isViewUrl
@@ -59,7 +71,8 @@ define(['durandal/system', 'jquery'], function (system, $) {
          * @return {string} The require path.
          */
         convertViewIdToRequirePath: function (viewId) {
-            return this.viewPlugin + '!' + viewId + this.viewExtension;
+            var plugin = this.viewPlugin ? this.viewPlugin + '!' : '';
+            return plugin + viewId + this.viewExtension + this.viewPluginParameters;
         },
         /**
          * Parses the view engine recognized markup and returns DOM elements.
@@ -85,7 +98,9 @@ define(['durandal/system', 'jquery'], function (system, $) {
          * @return {DOMElement} A single element.
          */
         ensureSingleElement:function(allElements){
-            if (allElements.length == 1) {
+            if (!allElements) { 
+                $('<div></div>')[0];
+            } else if (allElements.length == 1) {
                 return allElements[0];
             }
 
@@ -112,6 +127,24 @@ define(['durandal/system', 'jquery'], function (system, $) {
             return withoutCommentsOrEmptyText[0];
         },
         /**
+         * Gets the view associated with the id from the cache of parsed views.
+         * @method tryGetViewFromCache
+         * @param {string} id The view id to lookup in the cache.
+         * @return {DOMElement|null} The cached view or null if it's not in the cache.
+         */
+        tryGetViewFromCache:function(id) {
+            return this.cache[id];
+        },
+        /**
+         * Puts the view associated with the id into the cache of parsed views.
+         * @method putViewInCache
+         * @param {string} id The view id whose view should be cached.
+         * @param {DOMElement} view The view to cache.
+         */
+        putViewInCache: function (id, view) {
+            this.cache[id] = view;
+        },
+        /**
          * Creates the view associated with the view id.
          * @method createView
          * @param {string} viewId The view id whose view should be created.
@@ -120,18 +153,27 @@ define(['durandal/system', 'jquery'], function (system, $) {
         createView: function(viewId) {
             var that = this;
             var requirePath = this.convertViewIdToRequirePath(viewId);
+            var existing = this.tryGetViewFromCache(requirePath);
+
+            if (existing) {
+                return system.defer(function(dfd) {
+                    dfd.resolve(existing.cloneNode(true));
+                }).promise();
+            }
 
             return system.defer(function(dfd) {
                 system.acquire(requirePath).then(function(markup) {
                     var element = that.processMarkup(markup);
                     element.setAttribute('data-view', viewId);
-                    dfd.resolve(element);
-                }).fail(function(err){
-                        that.createFallbackView(viewId, requirePath, err).then(function(element){
-                            element.setAttribute('data-view', viewId);
-                            dfd.resolve(element);
-                        });
+                    that.putViewInCache(requirePath, element);
+                    dfd.resolve(element.cloneNode(true));
+                }).fail(function(err) {
+                    that.createFallbackView(viewId, requirePath, err).then(function(element) {
+                        element.setAttribute('data-view', viewId);
+                        that.cache[requirePath] = element;
+                        dfd.resolve(element.cloneNode(true));
                     });
+                });
             }).promise();
         },
         /**

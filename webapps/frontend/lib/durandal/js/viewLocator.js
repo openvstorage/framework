@@ -1,4 +1,9 @@
-﻿/**
+/**
+ * Durandal 2.2.0 Copyright (c) 2010-2016 Blue Spire Consulting, Inc. All Rights Reserved.
+ * Available via the MIT license.
+ * see: http://durandaljs.com or https://github.com/BlueSpire/Durandal for details.
+ */
+/**
  * The viewLocator module collaborates with the viewEngine module to provide views (literally dom sub-trees) to other parts of the framework as needed. The primary consumer of the viewLocator is the composition module.
  * @module viewLocator
  * @requires system
@@ -98,7 +103,7 @@ define(['durandal/system', 'durandal/viewEngine'], function (system, viewEngine)
             var funcNameRegex = /function (.{1,})\(/;
             var results = (funcNameRegex).exec((obj).constructor.toString());
             var typeName = (results && results.length > 1) ? results[1] : "";
-
+            typeName = typeName.trim();
             return 'views/' + typeName;
         },
         /**

@@ -16,20 +16,26 @@
 /*global requirejs, define, window */
 requirejs.config({
     paths: {  // paths for module names not found under baseUrl (http://requirejs.org/docs/api.html#config-paths)
-        'text'       : '../lib/require/text',
-        'durandal'   : '../lib/durandal/js',
-        'plugins'    : '../lib/durandal/js/plugins',
-        'transitions': '../lib/durandal/js/transitions',
-        'knockout'   : '../lib/knockout/knockout-3.3.0',
-        'bootstrap'  : '../lib/bootstrap/js/bootstrap',
-        'jquery'     : '../lib/jquery/jquery-1.9.1',
-        'jqp'        : '../lib/jquery-plugins/js',
-        'd3'         : '../lib/d3/d3.v3.min',
-        'd3p'        : '../lib/d3-plugins/js',
-        'ovs'        : '../lib/ovs',
-        'i18next'    : '../lib/i18next/i18next.amd.withJQuery-1.7.1'
+        'text'                  : '../lib/require/text',
+        'durandal'              : '../lib/durandal/js',
+        'plugins'               : '../lib/durandal/js/plugins',
+        'transitions'           : '../lib/durandal/js/transitions',
+        'knockout'              : '../lib/knockout/knockout-3.4.0',
+        'knockout-mapping'      : '../lib/knockout-plugins/knockout-mapping-2.4.1',
+        'knockout-dictionary'   : '../lib/knockout-plugins/observableDictionary',
+        'bootstrap'             : '../lib/bootstrap/js/bootstrap',
+        'jquery'                : '../lib/jquery/jquery-3.2.1',
+        'jqp'                   : '../lib/jquery-plugins/js',
+        'd3'                    : '../lib/d3/d3.v3.min',
+        'd3p'                   : '../lib/d3-plugins/js',
+        'ovs'                   : '../lib/ovs',
+        'i18next'               : '../lib/i18next/i18next.amd.withJQuery-1.7.1'
     },
     shim: {
+        'knockout-mapping': {
+            deps: ['knockout'],
+                exports: 'knockout-mapping'
+        },
         'bootstrap': {
             deps   : ['jquery'],
             exports: 'jQuery'
@@ -50,19 +56,25 @@ requirejs.config({
             exports: 'd3'
         }
     },
-    urlArgs: 'version=0.0.0b0',
-    waitSeconds: 300
+    // urlArgs: 'version=0.0.0b0',
+    waitSeconds: 300,
+    // Configuration dependencies
+    deps: ['knockout', 'knockout-mapping'],
+    // Configuration callback - executed when all dependencies are loaded
+    callback: function (ko, mapping) {
+        ko.mapping = mapping;  // Load in the plugin
+    }
 });
 
 define([
     'durandal/system', 'durandal/app', 'durandal/viewLocator', 'durandal/binder', 'jquery', 'i18next',
     'ovs/shared',
     'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions', 'ovs/extensions/knockout-extenders',
-    'bootstrap'
+    'bootstrap',
+    'knockout-dictionary'// Ko plugins
 ],  function(system, app, viewLocator, binder, $, i18n, shared) {
     "use strict";
-    system.debug(true);
-
+    system.debug(true);  // To be changed when building production
     shared.defaultLanguage = shared.language = window.navigator.userLanguage || window.navigator.language || 'en-US';
     var i18nOptions = {
         detectFromHeaders: false,
