@@ -53,11 +53,8 @@ define([
          * Calculate the number of scos in tlog and the non disposable scos factor
          * @return {object}
          */
-        self.calculateVolumeWriteBuffer = function(numberOfScosInTlog, nonDisposableScoFactor) {
-            var volumeWriteBuffer = nonDisposableScoFactor * (numberOfScosInTlog * self.sco_size);
-            return {
-                volume_write_buffer: volumeWriteBuffer
-            }
+        self.calculateVolumeWriteBuffer = function(numberOfScosInTlog, nonDisposableScoFactor, scoSize) {
+            return nonDisposableScoFactor * (numberOfScosInTlog * scoSize);
         };
     };
     return new StorageDriverService()

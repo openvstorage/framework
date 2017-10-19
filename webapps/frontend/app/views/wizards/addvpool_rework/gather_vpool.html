@@ -16,7 +16,8 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <p data-i18n="ovs:wizards.add_vpool.gather_vpool.basic_info"></p>
+    <p data-bind="visible: data.isExtend() === false" data-i18n="ovs:wizards.add_vpool.gather_vpool.basic_info_add"></p>
+    <p data-bind="visible: data.isExtend() === true" data-i18n="ovs:wizards.add_vpool.gather_vpool.basic_info_extend"></p>
     <!-- ko with: data.vPool -->
     <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('name') }">
         <label class="col-lg-3 control-label" for="inputVpoolName" data-i18n="ovs:wizards.add_vpool.gather_vpool.name"></label>
@@ -80,6 +81,7 @@ but WITHOUT ANY WARRANTY of any kind.
                              }"></span>
         </div>
     </div>
+    <p data-i18n="ovs:wizards.add_vpool.gather_vpool.extended_info"></p>
     <!-- ko with: data.storageDriverParams -->
     <div class="form-group">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.proxy_amount"></label>
@@ -116,6 +118,9 @@ but WITHOUT ANY WARRANTY of any kind.
                                  emptyisloading: false
                              }"></span>
         </div>
+    </div>
+    <div class="alert alert-info" data-bind="visible: canContinue().value && data.isExtend() === true" style="margin-top: 20px;">
+        <p data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.information_extend'"></p>
     </div>
     <div class="alert alert-danger" style="margin-bottom: -3px;"
          data-bind="visible: !canContinue().value || canContinue().showErrors">

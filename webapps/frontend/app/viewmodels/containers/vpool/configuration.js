@@ -15,9 +15,9 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'durandal/app',
+    'jquery', 'knockout', 'durandal/app', 'ovs/generic',
     'viewmodels/containers/shared/base_container', 'viewmodels/services/storagedriver'
-], function($, ko, app, BaseModel, storageDriverService) {
+], function($, ko, app, generic, BaseModel, storageDriverService) {
     "use strict";
     // Configuration viewModel which is parsed from JS
     // Return a constructor for a nested viewModel
@@ -49,7 +49,9 @@ define([
         self.dtl_transport      = ko.observable();
         self.sco_size           = ko.observable();
         self.tlog_multiplier    = ko.observable();  // Number of sco's in tlog - returned by the vpool metadata
-        self.write_buffer       = ko.observable().extend({numeric: {min: 128, max: 10240, allowUndefined: true, validate: true}});  // Volume Write buffer
+        self.write_buffer       = ko.observable()   // Volume Write buffer
+            .extend({numeric: {min: 128, max: 10240, allowUndefined: false, validate: true},
+                     rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
         // Own properties
         self.advanced           = ko.observable(false);  // Make use of the advanced config
         // Event subscriptions
@@ -77,21 +79,43 @@ define([
             128: 1
         };
 
+        // Subscriptions
+        self.sco_size.subscribe(function(newValue) {
+            app.trigger('vpool_configuration:update', $.extend(self.advancedSettings(), {sco_size: newValue}));
+        });
+        self.write_buffer.subscribe(function(newValue) {
+            // Notify other models when write buffer changes
+             app.trigger('vpool_configuration:update', $.extend(self.advancedSettings(), {write_buffer: newValue}));
+        });
+
         // Computed
-        self.advancedSettings = ko.computed(function() {
-           // Compute propagate changes to sco size and write buffer
-           var scoSize = self.sco_size();
-           var writeBuffer = self.write_buffer();
-           var advancedSettings = {sco_size: scoSize, write_buffer: writeBuffer};
-           app.trigger('vpool_configuration:update', advancedSettings);
-           return advancedSettings;
-        }).extend({ deferred: true });
+        self.advancedSettings = ko.computed({
+            // Compute propagate changes to sco size and write buffer
+            read: function() {
+                return {
+                    'sco_size': self.sco_size(),
+                    'write_buffer': self.write_buffer()
+                };
+            },
+            write: function(newSettings) {
+                // Determine if the values changed
+                if (generic.objectEquals(self.advancedSettings(), newSettings)) {
+                    return
+                }
+                self.sco_size(newSettings.sco_size);
+                self.write_buffer(newSettings.write_buffer);
+           }
+        });
 
         // Functions
         self.subscribeConfigurations = function() {
             var advancedUpdateSub = app.on('vpool_configuration_advanced:update').then(function(data) {
                 // Update the write buffer when the advanced config changes
-                self.write_buffer(storageDriverService.calculateVolumeWriteBuffer(data.number_of_scos_in_tlog, data.non_disposable_scos_factor).volume_write_buffer)
+                var advancedSettings = {
+                    sco_size: self.sco_size(),
+                    write_buffer: storageDriverService.calculateVolumeWriteBuffer(data.number_of_scos_in_tlog, data.non_disposable_scos_factor, self.sco_size())
+                };
+                self.advancedSettings(advancedSettings);
             });
             self.eventSubscriptions.push(advancedUpdateSub);
         };
@@ -125,8 +149,12 @@ define([
         BaseModel.call(self);
 
         // Observables
-        self.number_of_scos_in_tlog =       ko.observable();
-        self.non_disposable_scos_factor =   ko.observable();
+        self.number_of_scos_in_tlog =       ko.observable()
+            .extend({numeric: {min: 4, max: 10240, allowUndefined: false, validate: true},
+                     rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
+        self.non_disposable_scos_factor =   ko.observable()
+            .extend({numeric: {min: 128, max: 10240, allowUndefined: false, validate: true},
+                     rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
         // Event subscriptions
         self.eventSubscriptions = ko.observableArray();
 
@@ -136,11 +164,41 @@ define([
             non_disposable_scos_factor: undefined
         }, data);
 
+        // Bind the data into this
+        ko.mapping.fromJS(vmData, {}, self);
+
+        // Subscriptions
+        self.non_disposable_scos_factor.subscribe(function(newValue) {
+            app.trigger('vpool_configuration_advanced:update', $.extend(self.advancedSettings(), {non_disposable_scos_factor: newValue}));
+        });
+        self.number_of_scos_in_tlog.subscribe(function (newValue) {
+            app.trigger('vpool_configuration_advanced:update', $.extend(self.advancedSettings(), {number_of_scos_in_tlog: newValue}));
+        });
+
+        // Computed
+        self.advancedSettings = ko.computed({
+            // Compute propagate changes to sco size and write buffer
+            read: function() {
+                return {
+                    'number_of_scos_in_tlog': self.number_of_scos_in_tlog(),
+                    'non_disposable_scos_factor': self.non_disposable_scos_factor()
+                };
+            },
+            write: function(newSettings) {
+                // Determine if the values changed
+                if (generic.objectEquals(self.advancedSettings(), newSettings)) {
+                    return
+                }
+                self.number_of_scos_in_tlog(newSettings.number_of_scos_in_tlog);
+                self.non_disposable_scos_factor(newSettings.non_disposable_scos_factor);
+           }
+        });
+
         // Functions
         self.subscribeConfigurations = function() {
             var advancedUpdateSub = app.on('vpool_configuration:update').then(function(settings) {
                 // Update the configuration
-                ko.mapping.fromJS(storageDriverService.calculateAdvancedFactors(settings.sco_size, settings.write_buffer), self);
+                self.advancedSettings(storageDriverService.calculateAdvancedFactors(settings.sco_size, settings.write_buffer));
             });
             self.eventSubscriptions.push(advancedUpdateSub);
         };
@@ -154,8 +212,6 @@ define([
 
         // Subscribe by default
         self.subscribeConfigurations();
-        // Bind the data into this
-        ko.mapping.fromJS(data, {}, self);
 
     };
     return ConfigurationViewModel;
