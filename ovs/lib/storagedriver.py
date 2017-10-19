@@ -702,11 +702,11 @@ class StorageDriverController(object):
             backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
                                                       'alba_connection_port': proxy.service.ports[0],
                                                       'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
-                                                      'alba_connection_timeout': 15,
+                                                      'alba_connection_timeout': 30,
                                                       'alba_connection_use_rora': True,
                                                       'alba_connection_transport': 'TCP',
-                                                      'alba_connection_rora_manifest_cache_capacity': 5000,
-                                                      'alba_connection_asd_connection_pool_capacity': 20,
+                                                      'alba_connection_rora_manifest_cache_capacity': 25000,
+                                                      'alba_connection_asd_connection_pool_capacity': 10,
                                                       'alba_connection_rora_timeout_msecs': 50,
                                                       'backend_type': 'ALBA'}
         volume_router = {'vrouter_id': vrouter_id,
@@ -821,7 +821,7 @@ class StorageDriverController(object):
             raise RuntimeError('Block cache is not a supported feature')
 
         # Configure regular proxies and scrub proxies
-        manifest_cache_size = 16 * 1024 ** 3
+        manifest_cache_size = 500 * 1024 ** 3
         arakoon_data = {'abm': vpool.metadata['backend']['backend_info']['arakoon_config']}
         if fragment_cache_settings['is_backend'] is True:
             arakoon_data['abm_aa'] = fragment_cache_settings['backend_info']['arakoon_config']
