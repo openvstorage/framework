@@ -70,14 +70,6 @@ define([
         self.dtlModes           = ['no_sync', 'a_sync', 'sync'];
         self.dtlTransportModes  = ['tcp', 'rdma'];
         self.scoSizes           = [4, 8, 16, 32, 64, 128];
-        self.tlogMultiplierMap  = {  // Maps sco size to a tlog_multiplier
-            4: 16,
-            8: 8,
-            16: 4,
-            32: 2,
-            64: 1,
-            128: 1
-        };
 
         // Subscriptions
         self.sco_size.subscribe(function(newValue) {
@@ -120,15 +112,13 @@ define([
             self.eventSubscriptions.push(advancedUpdateSub);
         };
 
-        self.unsubscribeConfigurations = function() {
+        self.unSubscribeConfigurations = function() {
             $.each(self.eventSubscriptions(), function(index, subscription){
                 subscription.off();
             });
             self.eventSubscriptions.removeAll()
         };
 
-        // Subscribe by default
-        self.subscribeConfigurations();
         // Bind the data into this
         ko.mapping.fromJS(vmData, configurationMapping, self);
     };
@@ -148,11 +138,13 @@ define([
         // Inherit
         BaseModel.call(self);
 
+        // Properties
+        var eventTriggeredUpdate = false;  // Keep track if the update happens because of direct editing or through the advancedSettings computed
         // Observables
-        self.number_of_scos_in_tlog =       ko.observable()
+        self.number_of_scos_in_tlog = ko.observable()
             .extend({numeric: {min: 4, max: 10240, allowUndefined: false, validate: true},
                      rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
-        self.non_disposable_scos_factor =   ko.observable()
+        self.non_disposable_scos_factor = ko.observable()
             .extend({numeric: {min: 128, max: 10240, allowUndefined: false, validate: true},
                      rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
         // Event subscriptions
@@ -167,52 +159,44 @@ define([
         // Bind the data into this
         ko.mapping.fromJS(vmData, {}, self);
 
-        // Subscriptions
-        self.non_disposable_scos_factor.subscribe(function(newValue) {
-            app.trigger('vpool_configuration_advanced:update', $.extend(self.advancedSettings(), {non_disposable_scos_factor: newValue}));
-        });
-        self.number_of_scos_in_tlog.subscribe(function (newValue) {
-            app.trigger('vpool_configuration_advanced:update', $.extend(self.advancedSettings(), {number_of_scos_in_tlog: newValue}));
-        });
-
-        // Computed
-        self.advancedSettings = ko.computed({
-            // Compute propagate changes to sco size and write buffer
-            read: function() {
-                return {
-                    'number_of_scos_in_tlog': self.number_of_scos_in_tlog(),
-                    'non_disposable_scos_factor': self.non_disposable_scos_factor()
-                };
-            },
-            write: function(newSettings) {
-                // Determine if the values changed
-                if (generic.objectEquals(self.advancedSettings(), newSettings)) {
-                    return
-                }
-                self.number_of_scos_in_tlog(newSettings.number_of_scos_in_tlog);
-                self.non_disposable_scos_factor(newSettings.non_disposable_scos_factor);
-           }
+        // Subscription
+        self.advancedSettings = ko.computed(function() {
+            // This computed is used to subscribe on multiple observables and not used to return a value
+            var advancedSettings = {
+                'number_of_scos_in_tlog': self.number_of_scos_in_tlog(),
+                'non_disposable_scos_factor': self.non_disposable_scos_factor()
+            };
+            if (eventTriggeredUpdate === false) {
+                app.trigger('vpool_configuration_advanced:update', advancedSettings);
+            }
+            // Reset
+            eventTriggeredUpdate = false;
         });
 
         // Functions
         self.subscribeConfigurations = function() {
             var advancedUpdateSub = app.on('vpool_configuration:update').then(function(settings) {
+                eventTriggeredUpdate = true;
                 // Update the configuration
-                self.advancedSettings(storageDriverService.calculateAdvancedFactors(settings.sco_size, settings.write_buffer));
+                self.updateSettings(storageDriverService.calculateAdvancedFactors(settings.sco_size, settings.write_buffer));
             });
             self.eventSubscriptions.push(advancedUpdateSub);
         };
-
-        self.unsubscribeConfigurations = function() {
+        self.unSubscribeConfigurations = function() {
             $.each(self.eventSubscriptions(), function(index, subscription){
                 subscription.off();
             });
             self.eventSubscriptions.removeAll()
         };
-
-        // Subscribe by default
-        self.subscribeConfigurations();
-
+        self.updateSettings = function(newSettings) {
+            // Used to update the view models settings when the event emitted
+            if (generic.objectEquals(self.advancedSettings(), newSettings)) {
+                return
+            }
+            self.update(newSettings);
+            // self.number_of_scos_in_tlog(newSettings.number_of_scos_in_tlog);
+            // self.non_disposable_scos_factor(newSettings.non_disposable_scos_factor);
+       }
     };
     return ConfigurationViewModel;
 });

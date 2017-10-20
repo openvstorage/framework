@@ -32,12 +32,20 @@ define([
             return ko.toJSON(self.toJS())
         };
         /**
-         * return a javascript Object from this object
+         * Return a javascript Object from this object
          * Will respect the mapping applied to the viewModel
          * @return {object}
          */
         self.toJS = function() {
             return ko.mapping.toJS(self)
+        };
+        /**
+         * Update the current view model with the supplied data
+         * @param data: Data to update on this view model (keys map with the observables)
+         * @type data: Object
+         */
+        self.update = function(data) {
+            ko.mapping.fromJS(data, self)
         }
     };
     return baseModel;

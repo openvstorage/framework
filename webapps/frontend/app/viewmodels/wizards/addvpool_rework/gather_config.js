@@ -119,15 +119,18 @@ define([
 
         // Durandal
         self.activate = function () {
-            if (self.activated === true){
-                return
-            }
             var configParams = self.data.configParams;
             self.dtlModes(configParams.dtlModes);
             self.dtlTransportModes(configParams.dtlTransportModes.filter(function(item){
                 return !(item === 'rdma' && self.data.storageRouter().rdmaCapable() === false);
             }));
-            self.activated = true;
+            self.data.configParams.subscribeConfigurations();
+            self.data.configParams.advanced_config.subscribeConfigurations();
+
+        };
+        self.deactivate = function() {
+            self.data.configParams.unSubscribeConfigurations();
+            self.data.configParams.advanced_config.unSubscribeConfigurations();
         };
     };
 });
