@@ -39,9 +39,9 @@ class Configuration(_Configuration):
                                          'generic': []},
                    'paths': {'basedir': '/opt/OpenvStorage',
                              'ovsdb': '/opt/OpenvStorage/db'},
-                   'support': {'enablesupport': False,
-                               'enabled': True,
-                               'interval': 60},
+                   'support': {'interval': 60,
+                               'remote_access': False,
+                               'support_agent': True},
                    'webapps': {'html_endpoint': '/',
                                'oauth2': {'mode': 'local'}}}
 
@@ -104,8 +104,8 @@ class Configuration(_Configuration):
                          'stores': {'persistent': 'pyrakoon',
                                     'volatile': 'memcache'},
                          'logging': {'type': 'console', 'level': 'DEBUG'},
-                         'scheduling/celery': {'ovs.statsmonkey.run_all': None,  # Disable statsmonkey scheduled task by default
-                                               'alba.statsmonkey.run_all': None}})
+                         'scheduling/celery': {'ovs.stats_monkey.run_all': None,  # Disable stats monkey scheduled task by default
+                                               'alba.stats_monkey.run_all': None}})
         if logging_target is not None:
             base_cfg['logging'] = logging_target
         if cls.exists('/ovs/framework/memcache') is False:

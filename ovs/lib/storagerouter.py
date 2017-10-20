@@ -46,6 +46,7 @@ from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.packages.packagefactory import PackageFactory
@@ -66,7 +67,6 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
-    SUPPORT_AGENT = 'support-agent'
     _logger = Logger('lib')
     _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
     # noinspection PyCallByClass,PyTypeChecker
@@ -83,6 +83,8 @@ class StorageRouterController(object):
         :type storagerouter_guid: str
         :param timestamp: Timestamp to compare to
         :type timestamp: float
+        :return: None
+        :rtype: NoneType
         """
         with volatile_mutex('storagerouter_heartbeat_{0}'.format(storagerouter_guid)):
             storagerouter = StorageRouter(storagerouter_guid)
@@ -178,6 +180,7 @@ class StorageRouterController(object):
         :param parameters: Parameters for vPool creation
         :type parameters: dict
         :return: None
+        :rtype: NoneType
         """
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
@@ -1030,6 +1033,7 @@ class StorageRouterController(object):
                                              WHETHER VPOOL WILL BE DELETED DEPENDS ON THIS
         :type offline_storage_router_guids: list
         :return: None
+        :rtype: NoneType
         """
         storage_driver = StorageDriver(storagedriver_guid)
         StorageRouterController._logger.info('StorageDriver {0} - Deleting StorageDriver {1}'.format(storage_driver.guid, storage_driver.name))
@@ -1363,25 +1367,28 @@ class StorageRouterController(object):
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_support_info')
-    def get_support_info(storagerouter_guid):
+    def get_support_info():
         """
-        Returns support information regarding a given StorageRouter
-        :param storagerouter_guid: StorageRouter guid to get support information for
-        :type storagerouter_guid: str
+        Returns support information for the entire cluster
         :return: Support information
         :rtype: dict
         """
-        return {'storagerouter_guid': storagerouter_guid,
-                'nodeid': System.get_my_machine_id(),
-                'clusterid': Configuration.get('/ovs/framework/cluster_id'),
-                'enabled': Configuration.get('/ovs/framework/support|enabled'),
-                'enablesupport': Configuration.get('ovs/framework/support|enablesupport')}
+        celery_scheduling = Configuration.get(key='/ovs/framework/scheduling/celery', default={})
+        stats_monkey_disabled = 'ovs.stats_monkey.run_all' in celery_scheduling and celery_scheduling['ovs.stats_monkey.run_all'] is None
+        stats_monkey_disabled &= 'alba.stats_monkey.run_all' in celery_scheduling and celery_scheduling['alba.stats_monkey.run_all'] is None
+        return {'cluster_id': Configuration.get(key='/ovs/framework/cluster_id'),
+                'stats_monkey': not stats_monkey_disabled,
+                'support_agent': Configuration.get(key='/ovs/framework/support|support_agent'),
+                'remote_access': Configuration.get(key='ovs/framework/support|remote_access'),
+                'stats_monkey_config': Configuration.get(key='ovs/framework/monitoring/stats_monkey', default={})}
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_support_metadata')
     def get_support_metadata():
         """
         Returns support metadata for a given storagerouter. This should be a routed task!
+        :return: Metadata of the StorageRouter
+        :rtype: dict
         """
         return SupportAgent().get_heartbeat_data()
 
@@ -1417,6 +1424,8 @@ class StorageRouterController(object):
         :type storagerouter_guid: str
         :param vpool_guid: Guid of the vPool for which the proxy is configured
         :type vpool_guid: str
+        :return: The ALBA proxy configuration
+        :rtype: dict
         """
         vpool = VPool(vpool_guid)
         storagerouter = StorageRouter(storagerouter_guid)
@@ -1429,38 +1438,139 @@ class StorageRouterController(object):
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.configure_support')
-    def configure_support(enable, enable_support):
+    def configure_support(support_info):
         """
         Configures support on all StorageRouters
-        :param enable: If True support agent will be enabled and started, else disabled and stopped
-        :type enable: bool
-        :param enable_support: If False openvpn will be stopped
-        :type enable_support: bool
-        :return: True
-        :rtype: bool
+        :param support_info: Information about which components should be configured
+            {'stats_monkey': True,  # Enable/disable the stats monkey scheduled task
+             'support_agent': True,  # Responsible for enabling the ovs-support-agent service, which collects heart beat data
+             'remote_access': False,  # Cannot be True when support agent is False. Is responsible for opening an OpenVPN tunnel to allow for remote access
+             'stats_monkey_config': {}}  # Dict with information on how to configure the stats monkey (Only required when enabling the stats monkey
+        :type support_info: dict
+        :return: None
+        :rtype: NoneType
         """
-        clients = []
+        Toolbox.verify_required_params(verify_keys=True,
+                                       actual_params=support_info,
+                                       required_params={'stats_monkey': (bool, None, False),
+                                                        'remote_access': (bool, None, False),
+                                                        'support_agent': (bool, None, False),
+                                                        'stats_monkey_config': (dict, None, False)})
+        # All settings are optional, so if nothing is specified, no need to change anything
+        if len(support_info) == 0:
+            StorageRouterController._logger.warning('Configure support called without any specific settings. Doing nothing')
+            return
+
+        # Collect information
+        support_agent_key = '/ovs/framework/support|support_agent'
+        support_agent_new = support_info.get('support_agent')
+        support_agent_old = Configuration.get(key=support_agent_key)
+        support_agent_change = support_agent_new is not None and support_agent_old != support_agent_new
+
+        remote_access_key = '/ovs/framework/support|remote_access'
+        remote_access_new = support_info.get('remote_access')
+        remote_access_old = Configuration.get(key=remote_access_key)
+        remote_access_change = remote_access_new is not None and remote_access_old != remote_access_new
+
+        stats_monkey_celery_key = '/ovs/framework/scheduling/celery'
+        stats_monkey_config_key = '/ovs/framework/monitoring/stats_monkey'
+        stats_monkey_new_config = support_info.get('stats_monkey_config')
+        stats_monkey_old_config = Configuration.get(key=stats_monkey_config_key, default={})
+        stats_monkey_celery_config = Configuration.get(key=stats_monkey_celery_key, default={})
+        stats_monkey_new = support_info.get('stats_monkey')
+        stats_monkey_old = stats_monkey_celery_config.get('ovs.stats_monkey.run_all') is not None or stats_monkey_celery_config.get('alba.stats_monkey.run_all') is not None
+        stats_monkey_change = stats_monkey_new is not None and (stats_monkey_old != stats_monkey_new or stats_monkey_new_config != stats_monkey_old_config)
+
+        # Make sure support agent is enabled when trying to enable remote access
+        if remote_access_new is True:
+            if support_agent_new is False or (support_agent_new is None and support_agent_old is False):
+                raise RuntimeError('Remote access cannot be enabled without the heart beat enabled')
+
+        # Collect root_client information
+        root_clients = {}
+        for storagerouter in StorageRouterList.get_storagerouters():
+            try:
+                root_clients[storagerouter] = SSHClient(endpoint=storagerouter, username='root')
+            except UnableToConnectException:
+                raise RuntimeError('Not all StorageRouters are reachable')
+
+        if stats_monkey_new is True:
+            Toolbox.verify_required_params(actual_params=stats_monkey_new_config,
+                                           required_params={'host': (str, Toolbox.regex_ip),
+                                                            'port': (int, {'min': 1, 'max': 65535}),
+                                                            'database': (str, None),
+                                                            'interval': (int, {'min': 1, 'max': 86400}),
+                                                            'password': (str, None),
+                                                            'transport': (str, ['influxdb', 'redis']),
+                                                            'environment': (str, None)})
+            if stats_monkey_new_config['transport'] == 'influxdb':
+                Toolbox.verify_required_params(actual_params=stats_monkey_new_config, required_params={'username': (str, None)})
+
+        # Configure remote access
         service_manager = ServiceFactory.get_manager()
-        try:
-            for storagerouter in StorageRouterList.get_storagerouters():
-                clients.append((SSHClient(storagerouter), SSHClient(storagerouter, username='root')))
-        except UnableToConnectException:
-            raise RuntimeError('Not all StorageRouters are reachable')
-        Configuration.set('/ovs/framework/support|enabled', enable)
-        Configuration.set('/ovs/framework/support|enablesupport', enable_support)
-        for ovs_client, root_client in clients:
-            if enable_support is False:
-                root_client.run('service openvpn stop')
-                root_client.file_delete('/etc/openvpn/ovs_*')
-            if enable is True:
-                if not service_manager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    service_manager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                service_manager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-            else:
-                if service_manager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    service_manager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                    service_manager.remove_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-        return True
+        if remote_access_change is True:
+            Configuration.set(key=remote_access_key, value=remote_access_new)
+            cid = Configuration.get('/ovs/framework/cluster_id').replace(r"'", r"'\''")
+            for storagerouter, root_client in root_clients.iteritems():
+                if remote_access_new is False:
+                    StorageRouterController._logger.info('Un-configuring remote access on StorageRouter {0}'.format(root_client.ip))
+                    nid = storagerouter.machine_id.replace(r"'", r"'\''")
+                    service_name = 'openvpn@ovs_{0}-{1}'.format(cid, nid)
+                    if service_manager.has_service(name=service_name, client=root_client):
+                        service_manager.stop_service(name=service_name, client=root_client)
+                    root_client.file_delete(filenames=['/etc/openvpn/ovs_*'])
+
+        # Configure support agent
+        if support_agent_change is True:
+            service_name = 'support-agent'
+            Configuration.set(key=support_agent_key, value=support_agent_new)
+            for root_client in root_clients.itervalues():
+                if support_agent_new is True:
+                    StorageRouterController._logger.info('Configuring support agent on StorageRouter {0}'.format(root_client.ip))
+                    if service_manager.has_service(name=service_name, client=root_client) is False:
+                        service_manager.add_service(name=service_name, client=root_client)
+                    service_manager.restart_service(name=service_name, client=root_client)
+                else:
+                    StorageRouterController._logger.info('Un-configuring support agent on StorageRouter {0}'.format(root_client.ip))
+                    if service_manager.has_service(name=service_name, client=root_client):
+                        service_manager.stop_service(name=service_name, client=root_client)
+                        service_manager.remove_service(name=service_name, client=root_client)
+
+        # Configure stats monkey
+        if stats_monkey_change is True:
+            # 2 keys matter here:
+            #    - /ovs/framework/scheduling/celery --> used to check whether the stats monkey is disabled or not
+            #    - /ovs/framework/monitoring/stats_monkey --> contains the actual configuration parameters when enabling the stats monkey, such as host, port, username, ...
+            service_name = 'scheduled-tasks'
+            if stats_monkey_new is True:  # Enable the scheduled task by removing the key
+                StorageRouterController._logger.info('Configuring stats monkey')
+                interval = stats_monkey_new_config['interval']
+                # The scheduled task cannot be configured to run more than once a minute, so for intervals < 60, the stats monkey task handles this itself
+                StorageRouterController._logger.debug('Requested interval to run at: {0}'.format(interval))
+                Configuration.set(key=stats_monkey_config_key, value=stats_monkey_new_config)
+                if interval > 60:
+                    days, hours, minutes, _ = ExtensionsToolbox.convert_to_days_hours_minutes_seconds(seconds=interval)
+                    if days == 1:  # Max interval is 24 * 60 * 60, so once every day at 3 AM
+                        schedule = {'hour': '3'}
+                    elif hours > 0:
+                        schedule = {'hour': '*/{0}'.format(hours)}
+                    else:
+                        schedule = {'minute': '*/{0}'.format(minutes)}
+                    stats_monkey_celery_config['ovs.stats_monkey.run_all'] = schedule
+                    stats_monkey_celery_config['alba.stats_monkey.run_all'] = schedule
+                    StorageRouterController._logger.debug('Configured schedule is: {0}'.format(schedule))
+                else:
+                    stats_monkey_celery_config.pop('ovs.stats_monkey.run_all', None)
+                    stats_monkey_celery_config.pop('alba.stats_monkey.run_all', None)
+            else:  # Disable the scheduled task by setting the values for the celery tasks to None
+                StorageRouterController._logger.info('Un-configuring stats monkey')
+                stats_monkey_celery_config['ovs.stats_monkey.run_all'] = None
+                stats_monkey_celery_config['alba.stats_monkey.run_all'] = None
+
+            Configuration.set(key=stats_monkey_celery_key, value=stats_monkey_celery_config)
+            for root_client in root_clients.itervalues():
+                StorageRouterController._logger.debug('Restarting ovs-scheduled-tasks service on node with IP {0}'.format(root_client.ip))
+                service_manager.restart_service(name=service_name, client=root_client)
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.mountpoint_exists')
@@ -1485,6 +1595,7 @@ class StorageRouterController(object):
         :param storagerouter_guid: Guid of the StorageRouter to refresh the hardware on
         :type storagerouter_guid: str
         :return: None
+        :rtype: NoneType
         """
         StorageRouterController.set_rdma_capability(storagerouter_guid)
         DiskController.sync_with_reality(storagerouter_guid)
@@ -1496,6 +1607,7 @@ class StorageRouterController(object):
         :param storagerouter_guid: Guid of the StorageRouter to check and set
         :type storagerouter_guid: str
         :return: None
+        :rtype: NoneType
         """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter, username='root')
@@ -1535,6 +1647,7 @@ class StorageRouterController(object):
         :param roles: Roles assigned to the partition
         :type roles: list
         :return: None
+        :rtype: NoneType
         """
         # Validations
         storagerouter = StorageRouter(storagerouter_guid)
@@ -1630,7 +1743,8 @@ class StorageRouterController(object):
     def _check_scrub_partition_present():
         """
         Checks whether at least 1 scrub partition is present on any StorageRouter
-        :return: boolean
+        :return: True if at least 1 SCRUB role present in the cluster else False
+        :rtype: bool
         """
         for storage_router in StorageRouterList.get_storagerouters():
             for disk in storage_router.disks:
@@ -1645,6 +1759,7 @@ class StorageRouterController(object):
         Retrieve the mount points
         :param client: SSHClient to retrieve the mount points on
         :return: List of mount points
+        :rtype: list[str]
         """
         mountpoints = []
         for mountpoint in client.run(['mount', '-v']).strip().splitlines():
@@ -1674,6 +1789,8 @@ class StorageRouterController(object):
     def _revert_vpool_status(vpool, status=VPool.STATUSES.RUNNING, storagedriver=None, client=None, dirs_created=None):
         """
         Remove the vPool being created or revert the vPool being extended
+        :return: None
+        :rtype: NoneType
         """
         vpool.status = status
         vpool.save()

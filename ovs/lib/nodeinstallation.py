@@ -848,7 +848,7 @@ class NodeInstallationController(object):
                           cluster_ip=cluster_ip)
 
         if enable_heartbeats is False:
-            Configuration.set('/ovs/framework/support|enabled', False)
+            Configuration.set('/ovs/framework/support|support_agent', False)
         else:
             service = 'support-agent'
             if not service_manager.has_service(service, target_client):
@@ -888,7 +888,7 @@ class NodeInstallationController(object):
             Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
         NodeTypeController.add_services(client=target_client, node_type='extra', logger=NodeInstallationController._logger)
 
-        enabled = Configuration.get('/ovs/framework/support|enabled')
+        enabled = Configuration.get('/ovs/framework/support|support_agent')
         if enabled is True:
             service = 'support-agent'
             if not service_manager.has_service(service, target_client):

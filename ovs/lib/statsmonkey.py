@@ -51,10 +51,15 @@ class StatsMonkeyController(StatsMonkey):
         raise RuntimeError('StatsMonkeyController is a static class')
 
     @staticmethod
-    @ovs_task(name='ovs.statsmonkey.run_all', schedule=Schedule(minute='*', hour='*'), ensure_single_info={"mode": "DEFAULT"})
+    @ovs_task(name='ovs.stats_monkey.run_all', schedule=Schedule(minute='*', hour='*'), ensure_single_info={"mode": "DEFAULT"})
     def run_all():
         """
         Run all the get stats methods from StatsMonkeyController
+        Prerequisites when adding content:
+            * New methods which need to be picked up by this method need to start with 'get_stats_'
+            * New methods need to collect the information and return a bool and list of stats. Then 'run_all_get_stat_methods' method, will send the stats to the configured instance (influx / redis)
+            * The frequency each method needs to be executed can be configured via the configuration management by setting the function name as key and the interval in seconds as value
+            *    Eg: {'get_stats_mds': 20}  --> Every 20 seconds, the MDS statistics will be checked upon
         """
         StatsMonkeyController.run_all_get_stat_methods()
 

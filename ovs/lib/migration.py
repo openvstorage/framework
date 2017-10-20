@@ -274,23 +274,28 @@ class MigrationController(object):
                 # Get content of old key into new key
                 old_stats_monkey_key = '/statsmonkey/statsmonkey'
                 if Configuration.exists(key=old_stats_monkey_key) is True:
-                    Configuration.set(key='/ovs/framework/monitoring/statsmonkey',
-                                      value=Configuration.get(key=old_stats_monkey_key))
+                    Configuration.set(key='/ovs/framework/monitoring/stats_monkey', value=Configuration.get(key=old_stats_monkey_key))
                     Configuration.delete(key=old_stats_monkey_key)
 
                 # Make sure to disable the stats monkey by default or take over the current schedule if it was configured manually before
                 celery_key = '/ovs/framework/scheduling/celery'
                 current_value = None
                 scheduling_config = Configuration.get(key=celery_key, default={})
-                if 'statsmonkey.run_all_stats' in scheduling_config:
+                if 'statsmonkey.run_all_stats' in scheduling_config:  # Old celery task name of the stats monkey
                     current_value = scheduling_config.pop('statsmonkey.run_all_stats')
-                scheduling_config['ovs.statsmonkey.run_all'] = current_value
-                scheduling_config['alba.statsmonkey.run_all'] = current_value
+                scheduling_config['ovs.stats_monkey.run_all'] = current_value
+                scheduling_config['alba.stats_monkey.run_all'] = current_value
                 Configuration.set(key=celery_key, value=scheduling_config)
+
+                support_key = '/ovs/framework/support'
+                support_config = Configuration.get(key=support_key)
+                support_config['support_agent'] = support_config.pop('enabled')
+                support_config['remote_access'] = support_config.pop('enablesupport')
+                Configuration.set(key=support_key, value=support_config)
 
                 # Make sure once this finished, it never runs again by setting this key to True
                 Configuration.set(key='/ovs/framework/migration|stats_monkey_integration', value=True)
             except Exception:
-                MigrationController._logger.exception('Integration of statsmonkey failed')
+                MigrationController._logger.exception('Integration of stats monkey failed')
 
         MigrationController._logger.info('Finished out of band migrations')
