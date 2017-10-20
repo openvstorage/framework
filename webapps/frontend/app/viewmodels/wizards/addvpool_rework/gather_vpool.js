@@ -19,7 +19,7 @@ define([
     'ovs/shared', 'ovs/api', 'ovs/generic',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/containers/vpool/vpool',
-    'viewmodels/services/backend',
+    'viewmodels/services/backend'
 ], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, backendService) {
     "use strict";
     return function (options) {

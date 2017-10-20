@@ -26,7 +26,10 @@ define([
     var StorageDriverService = function(){
         var self = this;
 
-        // Properties
+        // Constants
+        self.minNonDisposableScosFactor = 1.5;
+        self.defaultNumberOfScosInTlog = 4;
+
         self.tlogMultiplierMap  = {  // Maps sco size to a tlog_multiplier
             4: 16,
             8: 8,
@@ -39,6 +42,7 @@ define([
         // Functions
         /**
          * Calculate the number of scos in tlog and the non disposable scos factor
+         * This uses the mapping to have the simple mode available
          * @return {object}
          */
         self.calculateAdvancedFactors = function(sco_size, write_buffer) {
