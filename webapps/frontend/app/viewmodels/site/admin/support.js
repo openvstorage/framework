@@ -143,14 +143,8 @@ define([
                             $.t('ovs:support.settings.failed'),
                             $.t('ovs:support.settings.failed_msg', {error: generic.extractErrorMessage(error)})
                         );
-                        // In case of failure, remove the selected setting again
-                        if (self.origStatsMonkeyConfig.isInitialized() === false) {
-                            var index = self.selectedSupportSettings.indexOf('stats_monkey');
-                            if (index > -1) {
-                                self.selectedSupportSettings.splice(index, 1);
-                            }
-                        }
-                        // In case of failure, restore the original configuration
+                        // In case of failure, remove the selected settings again and restore the original configuration
+                        self.selectedSupportSettings(self.oldSupportSettings());
                         self.newStatsMonkeyConfig.update(self.origStatsMonkeyConfig.toJS());
                     })
                     .always(function() {

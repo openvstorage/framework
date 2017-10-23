@@ -44,7 +44,7 @@ class SupportAgent(object):
         """
         Initializes the client
         """
-        self._cluster_id = Configuration.get('/ovs/framework/cluster_id')
+        self._cluster_id = Configuration.get('/ovs/framework/cluster_id').replace(r"'", r"'\''")
         self._service_type = ServiceFactory.get_service_type()
         self._storagerouter = System.get_my_storagerouter()
         self._package_manager = PackageFactory.get_manager()
@@ -104,14 +104,14 @@ class SupportAgent(object):
         """
         try:
             SupportAgent._logger.debug('Processing: {0}'.format(task_code))
-            cid = Configuration.get('/ovs/framework/cluster_id').replace(r"'", r"'\''")
-            nid = self._storagerouter.machine_id.replace(r"'", r"'\''")
+            node_id = self._storagerouter.machine_id.replace(r"'", r"'\''")
+            service_name = 'openvpn@ovs_{0}-{1}'.format(self._cluster_id, node_id)
 
             if task_code == 'OPEN_TUNNEL':
                 if self._service_type == 'upstart':
                     check_output('service openvpn stop', shell=True)
                 else:
-                    check_output("systemctl stop 'openvpn@ovs_{0}-{1}' || true".format(cid, nid), shell=True)
+                    check_output("systemctl stop '{0}' || true".format(service_name), shell=True)
                 check_output('rm -f /etc/openvpn/ovs_*', shell=True)
                 for filename, contents in metadata['files'].iteritems():
                     with open(filename, 'w') as the_file:
@@ -119,12 +119,12 @@ class SupportAgent(object):
                 if self._service_type == 'upstart':
                     check_output('service openvpn start', shell=True)
                 else:
-                    check_output("systemctl start 'openvpn@ovs_{0}-{1}'".format(cid, nid), shell=True)
+                    check_output("systemctl start '{0}'".format(service_name), shell=True)
             elif task_code == 'CLOSE_TUNNEL':
                 if self._service_type == 'upstart':
                     check_output('service openvpn stop', shell=True)
                 else:
-                    check_output("systemctl stop 'openvpn@ovs_{0}-{1}'".format(cid, nid), shell=True)
+                    check_output("systemctl stop '{0}'".format(service_name), shell=True)
                 check_output('rm -f /etc/openvpn/ovs_*', shell=True)
             elif task_code == 'UPLOAD_LOGFILES':
                 logfile = check_output('ovs collect logs', shell=True).strip()
@@ -137,8 +137,8 @@ class SupportAgent(object):
                 ), shell=True)
             else:
                 raise RuntimeError('Unknown task')
-        except Exception, ex:
-            SupportAgent._logger.exception('Unexpected error while processing task {0} (data: {1}): {2}'.format(task_code, json.dumps(metadata), ex))
+        except Exception:
+            SupportAgent._logger.exception('Unexpected error while processing task {0} (data: {1})'.format(task_code, json.dumps(metadata)))
             raise
         finally:
             SupportAgent._logger.debug('Completed')

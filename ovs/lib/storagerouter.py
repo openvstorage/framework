@@ -1450,8 +1450,7 @@ class StorageRouterController(object):
         :return: None
         :rtype: NoneType
         """
-        Toolbox.verify_required_params(verify_keys=True,
-                                       actual_params=support_info,
+        Toolbox.verify_required_params(actual_params=support_info,
                                        required_params={'stats_monkey': (bool, None, False),
                                                         'remote_access': (bool, None, False),
                                                         'support_agent': (bool, None, False),
