@@ -1,0 +1,86 @@
+<!--
+Copyright (C) 2017 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <!-- ko with: data.origConfig -->
+        <p data-i18n="ovs:wizards.stats_monkey_configure.basic_info"></p>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" for="transporttype" data-i18n="ovs:wizards.stats_monkey_configure.type"></label>
+            <div class="col-lg-7">
+                <span id="transporttype"
+                      data-bind="dropdown: {
+                          items: $data.transports, target: $data.transport,
+                          text: function(item) {
+                              return $.t('ovs:wizards.stats_monkey_configure.transport_types.' + item);
+                          }
+                      }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" for="interval" data-i18n="ovs:wizards.stats_monkey_configure.interval"></label>
+            <div class="col-lg-2">
+                <input type="text" id="interval" class="autofocus form-control" data-bind="value: $data.interval, valueUpdate: 'afterkeydown'">
+            </div>
+            <span class="col-lg-1 control-label" data-i18n="ovs:generic.seconds" style="padding-left: 0;"></span>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('database') }">
+            <label class="col-lg-3 control-label" for="database" data-i18n="ovs:wizards.stats_monkey_configure.database"></label>
+            <div class="col-lg-4">
+                <input type="text" id="database" class="autofocus form-control" data-bind="value: $data.database, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('environment') }">
+            <label class="col-lg-3 control-label" for="environment" data-i18n="ovs:wizards.stats_monkey_configure.environment"></label>
+            <div class="col-lg-4">
+                <input type="text" id="environment" class="autofocus form-control" data-bind="value: $data.environment, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <p data-i18n="ovs:wizards.stats_monkey_configure.connection_info"></p>
+        <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('host') }">
+            <label class="col-lg-3 control-label" for="host" data-i18n="ovs:wizards.stats_monkey_configure.host"></label>
+            <div class="col-lg-4">
+                <input type="text" id="host" class="autofocus form-control" data-bind="value: $data.host, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" for="port" data-i18n="ovs:wizards.stats_monkey_configure.port"></label>
+            <div class="col-lg-4">
+                <input type="text" id="port" class="autofocus form-control" data-bind="value: $data.port, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('username') }, visible: $data.transport() === 'influxdb'">
+            <label class="col-lg-3 control-label" for="username" data-i18n="ovs:wizards.stats_monkey_configure.username"></label>
+            <div class="col-lg-4">
+                <input type="text" id="username" class="autofocus form-control" data-bind="value: $data.username, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('password') }">
+            <label class="col-lg-3 control-label" for="password" data-i18n="ovs:wizards.stats_monkey_configure.password"></label>
+            <div class="col-lg-4">
+                <input type="password" id="password" class="autofocus form-control" data-bind="value: $data.password, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+    <!-- /ko -->
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

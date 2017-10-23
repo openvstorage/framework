@@ -110,10 +110,8 @@ class UnitTest(object):
                             UnitTest._invalid_test_modules.append(filepath)
                             continue
                         filepath = filepath.replace('.py', '')
-                        for member in inspect.getmembers(mod):
-                            if inspect.isclass(member[1]) and \
-                               member[1].__module__ == name and \
-                               'TestCase' in [base.__name__ for base in member[1].__bases__]:
+                        for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                            if member[1].__module__ == name and 'TestCase' in [base.__name__ for base in member[1].__bases__]:
                                     class_name = member[0]
                                     class_cl = member[1]
                                     full_class_path = '{0}.{1}'.format(filepath, class_name)

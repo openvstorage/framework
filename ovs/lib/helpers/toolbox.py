@@ -68,10 +68,8 @@ class Toolbox(object):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                    if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
                         for submember in inspect.getmembers(member[1]):
                             if hasattr(submember[1], 'hooks') \
                                     and isinstance(submember[1].hooks, dict) \
@@ -170,7 +168,7 @@ class Toolbox(object):
                 elif DalToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
                     error_messages.append('{0} param "{1}" with value "{2}" does not match regex "{3}"'.format(mandatory_or_optional, required_key, actual_value, expected_value.pattern))
         if error_messages:
-            raise RuntimeError('\n' + '\n'.join(error_messages))
+            raise RuntimeError('Invalid parameters detected\n' + '\n'.join(error_messages))
 
     @staticmethod
     def get_hash(length=16):

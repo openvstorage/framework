@@ -95,7 +95,9 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         var computed = ko.computed({
             read: target,
             write: function(newValue) {
-                target(newValue.replace(/ /g, ''))
+                if (newValue !== undefined) {
+                    target(newValue.replace(/ /g, ''));
+                }
             }
         }).extend({ notify: 'always' });
         computed(target());

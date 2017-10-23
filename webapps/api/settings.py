@@ -171,7 +171,7 @@ LOGGING = {
     'loggers': {
         'default': {
             'handlers': ['logfile'],
-            'level': 'INFO',
+            'level': 'DEBUG',
             'propogate': False
         },
     },

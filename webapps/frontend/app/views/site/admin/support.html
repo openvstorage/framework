@@ -28,16 +28,16 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-md-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <b data-i18n="ovs:support.information"></b>
+                    <b data-i18n="ovs:support.information.title"></b>
                 </div>
                 <div class="panel-body">
-                    <p data-i18n="[html]ovs:support.description"></p>
-                    <span data-i18n="ovs:support.clusterid"></span> <span data-bind="text: clusterid"></span><br />
-                    <span data-i18n="ovs:support.nodes"></span><br />
+                    <p data-i18n="[html]ovs:support.information.description"></p>
+                    <span data-i18n="ovs:support.information.cluster_id"></span> <span data-bind="text: clusterID"></span><br />
+                    <span data-i18n="ovs:support.information.nodes"></span><br />
                     <ul data-bind="foreach: storageRouters">
                          <li style="margin-top: 2px;">
-                            <span data-bind="text: name"></span>&nbsp; &nbsp;
-                            <button type="button" class="btn btn-mini btn-default hand" id="buttonDownload"
+                            <span data-bind="text: name"></span>
+                            <button type="button" class="btn btn-mini btn-default hand" id="buttonDownload" style="margin-left: 0.7em;"
                                     data-bind="click: downloadLogfiles,
                                                enable: $root.shared.user.roles().contains('manage') && downLoadingLogs() === false,
                                                tooltip: downloadLogState()">
@@ -58,12 +58,26 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-md-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <b data-i18n="ovs:support.callhome"></b>
+                    <b data-i18n="ovs:support.settings.title"></b>
                 </div>
                 <div class="panel-body">
-                    <input type="checkbox" data-bind="checked: enable" id="enable"/> <label for="enable" data-i18n="ovs:support.enable"></label><br />
-                    <input type="checkbox" data-bind="checked: enableSupport, enable: enable" id="enable-support" /> <label for="enable-support" data-i18n="ovs:support.enablesupport"></label><br />
-                    <button data-bind="click: save, enable: dirty && $root.shared.user.roles().contains('manage')" class="btn" data-i18n="ovs:support.save"></button>
+                    <!-- ko foreach: allSupportSettings -->
+                        <input type="checkbox" title="" data-bind="click: $data.func, value: $data.name, enable: $data.enable, checked: $parent.selectedSupportSettings, attr: {id: $data.name}"/>
+                        <label data-bind="attr: {for: $data.name}, translate: 'ovs:support.settings.' + $data.name"></label>
+                        <!-- ko if: $data.func -->
+                            <button type="button" class="btn btn-mini btn-default hand" id="buttonEditConfig" style="margin-left: 0.7em;"
+                                    data-bind="click: function() {$data.func(true);},
+                                               enable: $root.shared.user.roles().contains('manage') && $root.selectedSupportSettings().contains('stats_monkey') && $root.origStatsMonkeyConfig.isInitialized(),
+                                               tooltip: 'ovs:wizards.stats_monkey_configure.configure_edit'">
+                                <span class="hand fa" data-i18n="[html]ovs:icons.edit"></span>
+                            </button>
+                        <!-- /ko -->
+                        <br />
+                    <!-- /ko -->
+                    <button type="button" class="btn btn-mini btn-default hand"
+                            data-bind="click: save, enable: !saving() && supportSettingsChanged() && $root.shared.user.roles().contains('manage')"
+                            data-i18n="ovs:support.settings.save">
+                    </button>
                 </div>
             </div>
         </div>
@@ -72,10 +86,10 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-md-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <b data-i18n="ovs:support.metadata"></b> -
-                    <span data-i18n="ovs:support.lastheartbeat"></span>:
+                    <b data-i18n="ovs:support.heart_beat.title"></b> -
+                    <span data-i18n="ovs:support.heart_beat.last_heart_beat"></span>:
                     <span data-bind="visible: lastHeartbeat() !== undefined, timeago: lastHeartbeat()"></span>
-                    <span data-bind="visible: lastHeartbeat() === undefined" data-i18n="ovs:support.no_heartbeat"></span>
+                    <span data-bind="visible: lastHeartbeat() === undefined" data-i18n="ovs:support.heart_beat.no_heart_beat"></span>
                 </div>
                 <div class="panel-body">
                     <ul data-bind="foreach: storageRouters">
@@ -93,7 +107,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-md-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <b data-i18n="ovs:support.installedproducts"></b>
+                    <b data-i18n="ovs:support.packages.title"></b>
                 </div>
                 <div class="panel-body">
                     <ul data-bind="foreach: storageRouters">
@@ -103,7 +117,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                style="margin-left: 10px;"></i>
                             <ul data-bind="foreach: packageNames">
                                 <li>
-                                    <span data-bind="translate: 'ovs:support.' + $data"></span>:
+                                    <span data-bind="translate: 'ovs:support.packages.' + $data"></span>:
                                     <span data-bind="text: $parent.versions()[$data]"></span>
                                 </li>
                             </ul>
@@ -117,29 +131,29 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-md-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <b data-i18n="ovs:support.importantwebsites"></b>
+                    <b data-i18n="ovs:support.websites.title"></b>
                 </div>
                 <div class="panel-body">
                     <ul>
                         <li>
-                            <span data-i18n="ovs:support.projectwebsite"></span>
-                            <a data-bind="attr: { href: $.t('ovs:support.projectwebsiteurl') }"
-                               data-i18n="ovs:support.projectwebsiteurl"></a>
+                            <span data-i18n="ovs:support.websites.project_website"></span>
+                            <a data-bind="attr: { href: $.t('ovs:support.websites.project_website_url') }"
+                               data-i18n="ovs:support.websites.project_website_url"></a>
                         </li>
                         <li>
-                            <span data-i18n="ovs:support.commercialsupport"></span>
-                            <a data-bind="attr: { href: $.t('ovs:support.commercialsupporturl') }"
-                               data-i18n="ovs:support.commercialsupporturl"></a>
+                            <span data-i18n="ovs:support.websites.commercial_support"></span>
+                            <a data-bind="attr: { href: $.t('ovs:support.websites.commercial_support_url') }"
+                               data-i18n="ovs:support.websites.commercial_support_url"></a>
                         </li>
                         <li>
-                            <span data-i18n="ovs:support.communitysupport"></span>
-                            <a data-bind="attr: { href: $.t('ovs:support.communitysupporturl') }"
-                               data-i18n="ovs:support.communitysupporturl"></a>
+                            <span data-i18n="ovs:support.websites.community_support"></span>
+                            <a data-bind="attr: { href: $.t('ovs:support.websites.community_support_url') }"
+                               data-i18n="ovs:support.websites.community_support_url"></a>
                         </li>
                         <li>
-                            <span data-i18n="ovs:support.sourcecode"></span>
-                            <a data-bind="attr: { href: $.t('ovs:support.sourcecodeurl') }"
-                               data-i18n="ovs:support.sourcecodeurl"></a>
+                            <span data-i18n="ovs:support.websites.source_code"></span>
+                            <a data-bind="attr: { href: $.t('ovs:support.websites.source_code_url') }"
+                               data-i18n="ovs:support.websites.source_code_url"></a>
                         </li>
                     </ul>
                 </div>

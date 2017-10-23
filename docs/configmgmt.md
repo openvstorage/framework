@@ -47,8 +47,8 @@ plugins/$plugin_a/config = {"nsm": {"safety": 3,
                                     "maxload": 75}}
 stores = {"persistent": "pyrakoon",
           "volatile": "memcache"}
-support = {"enablesupport": True|False,
-           "enabled": True|False,
+support = {"remote_access": True|False,
+           "support_agent": True|False,
            "interval": 60}
 webapps = {"html_endpoint": "/",
            "oauth2": {"mode": "local|remote",

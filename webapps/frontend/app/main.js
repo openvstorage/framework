@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2016 iNuron NV
+// Copyright (C) 2016 iNuron NV
 //
 // This file is part of Open vStorage Open Source Edition (OSE),
 // as available from
