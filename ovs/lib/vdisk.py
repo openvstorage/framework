@@ -434,6 +434,14 @@ class VDiskController(object):
             VDiskController._logger.error('Cloning snapshot to new vDisk {0} failed: {1}'.format(name, str(ex)))
             raise
 
+        try:
+            VDiskController._logger.debug('Scheduling a backend sync for clone with ID {0}'.format(volume_id))
+            vdisk.storagedriver_client.schedule_backend_sync(volume_id=volume_id,
+                                                             req_timeout_secs=10)
+        except Exception:
+            # If this would fail, it doesn't matter because this is only a workaround for this: https://github.com/openvstorage/volumedriver/issues/148
+            VDiskController._logger.exception('Scheduling backend sync for clone {0} failed'.format(volume_id))
+
         with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
@@ -732,6 +740,14 @@ class VDiskController(object):
         except Exception as ex:
             VDiskController._logger.error('Cloning vTemplate {0} failed: {1}'.format(vdisk.name, str(ex)))
             raise
+
+        try:
+            VDiskController._logger.debug('Scheduling a backend sync for clone from template with ID {0}'.format(volume_id))
+            vdisk.storagedriver_client.schedule_backend_sync(volume_id=volume_id,
+                                                             req_timeout_secs=10)
+        except Exception:
+            # If this would fail, it doesn't matter because this is only a workaround for this: https://github.com/openvstorage/volumedriver/issues/148
+            VDiskController._logger.exception('Scheduling backend sync for clone from template {0} failed'.format(volume_id))
 
         with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
