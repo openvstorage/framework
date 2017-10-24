@@ -264,6 +264,10 @@ code {
 }
 
 .modal-body {
-    max-height: 75vh;
+    max-height: 60vh;  /* 60% of the total view-height */
     overflow-y: auto;
+}
+
+.modal-dialog {
+    margin-top: -30vh !important;
 }

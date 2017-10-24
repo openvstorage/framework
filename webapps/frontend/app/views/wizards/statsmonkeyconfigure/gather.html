@@ -34,7 +34,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="form-group">
             <label class="col-lg-3 control-label" for="interval" data-i18n="ovs:wizards.stats_monkey_configure.interval"></label>
             <div class="col-lg-2">
-                <input type="text" id="interval" class="autofocus form-control" data-bind="value: $data.interval, valueUpdate: 'afterkeydown'">
+                <input type="text" id="interval" class="form-control" data-bind="value: $data.interval, valueUpdate: 'afterkeydown'">
             </div>
             <span class="col-lg-1 control-label" data-i18n="ovs:generic.seconds" style="padding-left: 0;"></span>
         </div>
@@ -47,32 +47,32 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('environment') }">
             <label class="col-lg-3 control-label" for="environment" data-i18n="ovs:wizards.stats_monkey_configure.environment"></label>
             <div class="col-lg-4">
-                <input type="text" id="environment" class="autofocus form-control" data-bind="value: $data.environment, valueUpdate: 'afterkeydown'">
+                <input type="text" id="environment" class="form-control" data-bind="value: $data.environment, valueUpdate: 'afterkeydown'">
             </div>
         </div>
         <p data-i18n="ovs:wizards.stats_monkey_configure.connection_info"></p>
         <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('host') }">
             <label class="col-lg-3 control-label" for="host" data-i18n="ovs:wizards.stats_monkey_configure.host"></label>
             <div class="col-lg-4">
-                <input type="text" id="host" class="autofocus form-control" data-bind="value: $data.host, valueUpdate: 'afterkeydown'">
+                <input type="text" id="host" class="form-control" data-bind="value: $data.host, valueUpdate: 'afterkeydown'">
             </div>
         </div>
         <div class="form-group">
             <label class="col-lg-3 control-label" for="port" data-i18n="ovs:wizards.stats_monkey_configure.port"></label>
             <div class="col-lg-4">
-                <input type="text" id="port" class="autofocus form-control" data-bind="value: $data.port, valueUpdate: 'afterkeydown'">
+                <input type="text" id="port" class="form-control" data-bind="value: $data.port, valueUpdate: 'afterkeydown'">
             </div>
         </div>
         <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('username') }, visible: $data.transport() === 'influxdb'">
             <label class="col-lg-3 control-label" for="username" data-i18n="ovs:wizards.stats_monkey_configure.username"></label>
             <div class="col-lg-4">
-                <input type="text" id="username" class="autofocus form-control" data-bind="value: $data.username, valueUpdate: 'afterkeydown'">
+                <input type="text" id="username" class="form-control" data-bind="value: $data.username, valueUpdate: 'afterkeydown'">
             </div>
         </div>
         <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('password') }">
             <label class="col-lg-3 control-label" for="password" data-i18n="ovs:wizards.stats_monkey_configure.password"></label>
             <div class="col-lg-4">
-                <input type="password" id="password" class="autofocus form-control" data-bind="value: $data.password, valueUpdate: 'afterkeydown'">
+                <input type="password" id="password" class="form-control" data-bind="value: $data.password, valueUpdate: 'afterkeydown'">
             </div>
         </div>
     <!-- /ko -->
