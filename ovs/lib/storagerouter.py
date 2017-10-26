@@ -553,6 +553,7 @@ class StorageRouterController(object):
                         model_ports_in_use += sd.ports.values()
                         for proxy in sd.alba_proxies:
                             model_ports_in_use.append(proxy.service.ports[0])
+
                 ports = System.get_free_ports(port_range, model_ports_in_use, 4 + amount_of_proxies, client)
 
                 vrouter_id = '{0}{1}'.format(vpool_name, unique_id)

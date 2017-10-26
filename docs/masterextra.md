@@ -4,7 +4,7 @@ Within an Open vStorage cluster not all nodes are equal. You have master nodes a
 ![](/Images/Open-vStorge-Services.png)
 
 ### <a name="extra"></a>Extra Nodes
-Once you have 3 master nodes in your environment, each additional node will be by default configured as extra node. All nodes, extra nodes and master nodes, run 2 types of services:
+Once you have 3 master nodes in your environment, each additional node will be configured as extra node by default. All nodes, extra nodes and master nodes, run 2 types of services:
 
 * Extra services: the celery workers and the volume router consumer. The celery worker executes the tasks put on the celery queue by RabbitMQ. The volume router consumer watches directories on KVM to detect VM config files and store these in the model.
 * vPool services: these services are only available in case a vPool is configured on the node. Per vPool a volume driver service and a Distributed Transaction Log service, the FOC service, are started. Depending on the type of backend, an additional proxy service will be started as well.
