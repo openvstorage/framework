@@ -392,8 +392,8 @@ class MigrationController(object):
 
 
         ######################################
-        # Introduction of version key
-        if Configuration.get('key', default=False) not in ['community', 'enterprise']:
+        # change to edition key
+        if Configuration.get(key='/ovs/framework/edition', default=False) not in ['community', 'enterprise']:
             try:
                 storagerouters = StorageRouterList.get_storagerouters()
                 for sr in storagerouters:
@@ -403,7 +403,6 @@ class MigrationController(object):
                         break
                     except:
                         MigrationController._logger.exception('StorageRouter {0} did not yield edition value'.format(sr.name))
-                        continue
             except Exception:
                 MigrationController._logger.exception('Introduction of version key failed')
         MigrationController._logger.info('Finished out of band migrations')

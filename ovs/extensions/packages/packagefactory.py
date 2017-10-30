@@ -26,8 +26,8 @@ class PackageFactory(_PackageFactory):
     Factory class returning specialized classes
     """
     universal_packages = ['arakoon', 'openvstorage', 'openvstorage-backend', 'openvstorage-sdm']
-    ose_only_packages = ['alba','volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']
-    ee_only_packages = ['alba-ee','volumedriver-ee-base', 'volumedriver-ee-server']
+    ose_only_packages = ['alba', 'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']
+    ee_only_packages = ['alba-ee', 'volumedriver-ee-base', 'volumedriver-ee-server']
 
     universal_binaries = ['arakoon']
     ose_only_binaries = ['alba', 'volumedriver-no-dedup-server']
@@ -47,10 +47,10 @@ class PackageFactory(_PackageFactory):
                 raise ValueError('Edition could not be found in configuration')
         else:
             package_names = cls.ose_only_packages + cls.ee_only_packages
-            binaries = cls.ee_only_binaries + cls.ee_only_binaries
+            binaries = cls.ose_only_binaries + cls.ee_only_binaries
 
-        return {'names': package_names+cls.universal_packages,
-                'binaries': binaries+cls.universal_binaries}
+        return {'names': package_names + cls.universal_packages,
+                'binaries': binaries + cls.universal_binaries}
 
     @classmethod
     def _get_versions(cls):
