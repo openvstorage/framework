@@ -614,6 +614,18 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         var getType = {};
         return functionToCheck && getType.toString.call(functionToCheck) === '[object Function]';
     }
+    /**
+     * Chain promises more neatly instead of writing .then yourselves
+     * Used the .then(function()) {return new Promise)
+     * All of the data of the previous callback can be used in the next one (eg. chainPromises([api.get('test'), function(testAPIData) { console.log(testAPIData}]
+     * Calling .done on the return value will ensure that all previous chained promises have been completed
+     * @param callbackList: list of callbacks to use
+     */
+    function chainPromises(callbackList) {
+        return callbackList.reduce(function(chain, func){
+            chain ? chain.then(func) : func();
+        }, null)
+    }
     function _arrayGetItem(array, prop, index){
         var foundItem = undefined;
         if (index > array.length - 1 || index < 0){

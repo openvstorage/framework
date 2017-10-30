@@ -24,15 +24,6 @@
                                visible: !$root.updatingStorageRouters()">
                 <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
             </button>
-                <button type="button"
-                    class="btn btn-mini btn-default hand"
-                    data-bind="click: $root.addStorageRouter2,
-                               tooltip: 'ovs:vpools.detail.extend',
-                               enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
-                               attr: { id: 'button_add_' + guid()},
-                               visible: !$root.updatingStorageRouters()">
-                <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
-            </button>
             </td>
         <!-- /ko -->
         <!-- ko if: $root.srSDMap()[guid()] !== undefined -->

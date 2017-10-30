@@ -297,6 +297,19 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
+        def lacks_connection_info(_connection_info, check_none=False):
+            if check_none is True and _connection_info is None:
+                return True
+            else:
+                return 'host' not in _connection_info or _connection_info['host'] in ['', None]
+
+        def get_default_connection_info(_client, _connection_info):
+            _connection_info['client_id'] = _client.client_id
+            _connection_info['client_secret'] = _client.client_secret
+            _connection_info['host'] = local_storagerouter.ip
+            _connection_info['port'] = 443
+            _connection_info['local'] = True
+            return _connection_info
         # API backwards compatibility
         if 'backend_connection_info' in call_parameters:
             raise HttpNotAcceptableException(error='invalid_data',
@@ -309,16 +322,14 @@ class StorageRouterViewSet(viewsets.ViewSet):
         connection_info = call_parameters['connection_info']
         if 'backend_info_aa' in call_parameters:
             # Backwards compatibility
-            call_parameters['backend_info_fc'] = call_parameters['backend_info_aa']
-            del call_parameters['backend_info_aa']
+            call_parameters['backend_info_fc'] = call_parameters.pop('backend_info_aa')
         if 'connection_info_aa' in call_parameters:
             # Backwards compatibility
-            call_parameters['connection_info_fc'] = call_parameters['connection_info_aa']
-            del call_parameters['connection_info_aa']
+            call_parameters['connection_info_fc'] = call_parameters.pop('connection_info_aa')
         connection_info_fc = call_parameters.get('connection_info_fc')
         connection_info_bc = call_parameters.get('connection_info_bc')
-        if connection_info['host'] == '' or (connection_info_fc is not None and connection_info_fc['host'] == '') or \
-                                            (connection_info_bc is not None and connection_info_bc['host'] == ''):
+        # Keeping '' for backwards compatibility
+        if lacks_connection_info(connection_info) or lacks_connection_info(connection_info_fc, True) or lacks_connection_info(connection_info_bc, True):
             client = None
             for _client in request.client.user.clients:
                 if _client.ovs_type == 'INTERNAL' and _client.grant_type == 'CLIENT_CREDENTIALS':
@@ -326,24 +337,15 @@ class StorageRouterViewSet(viewsets.ViewSet):
             if client is None:
                 raise HttpNotAcceptableException(error='invalid_data',
                                                  error_description='Invalid call_parameters passed')
-            if connection_info['host'] == '':
-                connection_info['client_id'] = client.client_id
-                connection_info['client_secret'] = client.client_secret
-                connection_info['host'] = local_storagerouter.ip
-                connection_info['port'] = 443
-                connection_info['local'] = True
-            if connection_info_fc is not None and connection_info_fc['host'] == '':
-                connection_info_fc['client_id'] = client.client_id
-                connection_info_fc['client_secret'] = client.client_secret
-                connection_info_fc['host'] = local_storagerouter.ip
-                connection_info_fc['port'] = 443
-                connection_info_fc['local'] = True
-            if connection_info_bc is not None and connection_info_bc['host'] == '':
-                connection_info_bc['client_id'] = client.client_id
-                connection_info_bc['client_secret'] = client.client_secret
-                connection_info_bc['host'] = local_storagerouter.ip
-                connection_info_bc['port'] = 443
-                connection_info_bc['local'] = True
+            if lacks_connection_info(connection_info):
+                connection_info = get_default_connection_info(client, connection_info)
+                call_parameters['connection_info'] = connection_info
+            if connection_info_fc is not None and lacks_connection_info(connection_info_fc):
+                connection_info_fc = get_default_connection_info(client, connection_info_fc)
+                call_parameters['connection_info_fc'] = connection_info_fc
+            if connection_info_bc is not None and lacks_connection_info(connection_info_bc):
+                connection_info_bc = get_default_connection_info(client, connection_info_bc)
+                call_parameters['connection_info_bc'] = connection_info_bc
 
         if 'block_cache_on_read' not in call_parameters:
             call_parameters['block_cache_on_read'] = False

@@ -109,22 +109,23 @@ define([
             }
             return $.Deferred(function(deferred) {
                 // Wrap within a deferred to let the build close to modal but handle the code async
-                return deferred.resolve(api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', {data: postData})
+                api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', {data: postData})
                     .then(self.shared.tasks.wait)
                     // Using then instead of deferred to chain the returned promise
                     .then(function () {
                         // Success
-                        if (vpool === undefined) {
+                        if (self.data.isExtend() === false) {
                             generic.alertSuccess($.t('ovs:wizards.add_vpool.confirm.success_title'),
                                 $.t('ovs:wizards.add_vpool.confirm.success_message', {what: vpool.name()}));
                         } else {
                             generic.alertSuccess($.t('ovs:wizards.extend_vpool.confirm.success_title'),
                                 $.t('ovs:wizards.extend_vpool.confirm.success_message', {what: vpool.name()}));
                         }
+                        self.data.completed.resolve()
                     }, function (error) {
                         // fail
                         error = generic.extractErrorMessage(error);
-                        if (vpool === undefined) {
+                        if (self.data.isExtend() === false) {
                             generic.alertError($.t('ovs:wizards.add_vpool.confirm.failure_title'),
                                 $.t('ovs:wizards.add_vpool.confirm.failure_message', {what: vpool.name(), why: error}));
                         } else {
@@ -134,8 +135,9 @@ define([
                                     why: error
                                 }));
                         }
-                    })
-                )
+                        self.data.completed.reject()
+                    });
+                deferred.resolve()
             });
         };
 

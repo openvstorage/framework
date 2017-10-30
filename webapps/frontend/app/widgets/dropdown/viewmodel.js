@@ -140,7 +140,16 @@ define([
                 self.items(settings.items)  // Can be a normal array / computed / observable
             }
             self.target = settings.target;
-            self.enabled = generic.tryGet(settings, 'enabled', ko.observable(true));
+            if ('enabled' in settings) {
+                self.enabled = settings.enabled
+            } else if ('disabled' in settings) {
+                self.enabled = ko.pureComputed(function() {
+                   return !settings.disabled()
+                });
+            } else {
+                // Default to true
+                self.enabled = ko.observable(true)
+            }
             self.key(generic.tryGet(settings, 'key', undefined));
             self.small(generic.tryGet(settings, 'small', false));
             self.keyIsFunction(generic.tryGet(settings, 'keyisfunction', false));

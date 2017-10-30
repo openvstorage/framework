@@ -286,11 +286,8 @@ class StorageRouterController(object):
         if partition_info is None:
             partition_info = StorageRouterController.get_partition_info(storagerouter_guid)
         error_messages = []
-        metadata = StorageRouterController.get_metadata(storagerouter_guid)
-        partition_info = metadata['partitions']
-        if metadata['scrub_available'] is False:
+        if StorageRouterController._check_scrub_partition_present() is False:
             error_messages.append('At least 1 StorageRouter must have a partition with a {0} role'.format(DiskPartition.ROLES.SCRUB))
-
         for required_role in required_roles:
             if required_role not in partition_info:
                 error_messages.append('Missing required partition with a {0} role'.format(required_role))
@@ -382,12 +379,14 @@ class StorageRouterController(object):
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
-                           'writecache_size': (int, {'min': 1, 'max': 10240}),  # Global Writebuffer
+                           'writecache_size': (int, {'min': 1, 'max': 10240}),  # Global write buffer
                            'config_params': (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                                                     'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                                                     'cluster_size': (int, StorageDriverClient.CLUSTER_SIZES),
                                                     'write_buffer': (int, {'min': 128, 'max': 10240}),  # Volume write buffer
-                                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys())}),
+                                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
+                                                    'advanced': (dict, {'number_of_scos_in_tlog': (float, {'min': 4, 'max': 20}),
+                                                                        'non_disposable_scos_factor': (float, {'min': 1.5, 'max': 20})})}),
                            'mds_config_params': (dict, {'mds_safety': (int, {'min': 1, 'max': 5}, False)}, False),
                            'fragment_cache_on_read': (bool, None),
                            'fragment_cache_on_write': (bool, None),
@@ -415,7 +414,6 @@ class StorageRouterController(object):
         Toolbox.verify_required_params(required_params, parameters)
 
         client = SSHClient(parameters['storagerouter_ip'])
-        machine_id = System.get_my_machine_id(client)
 
         sd_config_params = parameters['config_params']
         sco_size = sd_config_params['sco_size']

@@ -43,6 +43,7 @@ define([
         self._advancedSettings  = undefined;  // Used for caching
         // Observables
         // Properties returned by the api:
+        self.cluster_size       = ko.observable();
         self.dtl_config_mode    = ko.observable();
         self.dtl_enabled        = ko.observable();
         self.dtl_mode           = ko.observable();
@@ -59,10 +60,15 @@ define([
 
         // Default data
         var vmData = $.extend({
-            mds_config: {},
             advanced_config: {
-                number_of_scos_in_tlog: data.tlog_multiplier  // Map to the advanced config view
-            }
+                number_of_scos_in_tlog: generic.tryGet(data, 'tlog_multiplier', undefined)  // Map to the advanced config view
+            },
+            cluster_size: 4,
+            dtl_transport: 'tcp',
+            dtl_mode: 'no_sync',
+            mds_config: {},
+            sco_size: 4,
+            write_buffer: 128
         }, data);
 
         // Constants
@@ -142,10 +148,10 @@ define([
         var eventTriggeredUpdate = false;  // Keep track if the update happens because of direct editing or through the advancedSettings computed
         // Observables
         self.number_of_scos_in_tlog = ko.observable()
-            .extend({numeric: {min: 4, max: 10240, allowUndefined: false, validate: true},
+            .extend({numeric: {min: 4, max: 20, allowUndefined: false, validate: true},
                      rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
         self.non_disposable_scos_factor = ko.observable()
-            .extend({numeric: {min: 128, max: 10240, allowUndefined: false, validate: true},
+            .extend({numeric: {min: 1.5, max: 20, allowUndefined: false, validate: true},
                      rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
         // Event subscriptions
         self.eventSubscriptions = ko.observableArray();

@@ -45,49 +45,9 @@ define([
             .then(shared.tasks.wait)
     }
 
-    /**
-     * Determines whether a StorageRouter supports block cache
-     * @param storageRouter: StorageRouter object
-     * @return {boolean|*}
-     */
-    function hasBlockCache(storageRouter) {
-        storageRouter = ko.utils.unwrapObservable(storageRouter);
-        if (storageRouter === undefined) return false;
-        var features = ko.utils.unwrapObservable(storageRouter.features);
-        return features !== undefined && features.alba.features.contains('block-cache')
-    }
-
-    /**
-     * Determines whether a StorageRouter supports cache quotas
-     * @param storageRouter: StorageRouter object
-     * @return {boolean|*}
-     */
-    function hasCacheQuota(storageRouter) {
-        storageRouter = ko.utils.unwrapObservable(storageRouter);
-        if (storageRouter === undefined) return false;
-        var features = ko.utils.unwrapObservable(storageRouter.features);
-        return features !== undefined && features.alba.features.contains('cache-quota');
-    }
-
-    /**
-     * Determines whether a StorageRouter is part of an enterprise edition cluster
-     * @param storageRouter: StorageRouter object
-     * @return {boolean}
-     */
-    function isEnterpriseEdition(storageRouter) {
-        storageRouter = ko.utils.unwrapObservable(storageRouter);
-        if (storageRouter === undefined) return false;
-        var features = ko.utils.unwrapObservable(storageRouter.features);
-        return features !== undefined && features.alba.edition === 'enterprise';
-    }
-
     return {
         loadStorageRouters: loadStorageRouters,
-        getMetadata: getMetadata,
-        hasBlockCache: hasBlockCache,
-        hasCacheQuota: hasCacheQuota,
-        isEnterpriseEdition: isEnterpriseEdition
-
+        getMetadata: getMetadata
     }
 
 });

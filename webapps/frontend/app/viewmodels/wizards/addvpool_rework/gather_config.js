@@ -15,7 +15,7 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic',
+    'jquery', 'knockout', 'ovs/generic'
 ], function ($, ko, generic, data) {
     "use strict";
     return function (options) {
