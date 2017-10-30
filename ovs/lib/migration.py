@@ -390,4 +390,20 @@ class MigrationController(object):
             except Exception:
                 MigrationController._logger.exception('Integration of stats monkey failed')
 
+
+        ######################################
+        # Introduction of version key
+        if Configuration.get('key', default=False) not in ['community', 'enterprise']:
+            try:
+                storagerouters = StorageRouterList.get_storagerouters()
+                for sr in storagerouters:
+                    try:
+                        val = sr.features['alba']['edition']
+                        Configuration.set('/ovs/framework/edition', val)
+                        break
+                    except:
+                        MigrationController._logger.exception('StorageRouter {0} did not yield edition value'.format(sr.name))
+                        continue
+            except Exception:
+                MigrationController._logger.exception('Introduction of version key failed')
         MigrationController._logger.info('Finished out of band migrations')
