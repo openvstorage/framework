@@ -972,6 +972,12 @@ class NodeInstallationController(object):
             storagerouter.rdma_capable = False
         storagerouter.node_type = node_type
         storagerouter.save()
+        try:
+            if not Configuration.exists('/ovs/framework/edition'):
+                val = storagerouter.features['alba']['edition']
+                Configuration.set(key='/ovs/framework/edition', value=val)
+        except Exception:
+            NodeInstallationController._logger.exception('Error loading edition for StorageRouter {0}'.format(node_name))
 
         StorageRouterController.set_rdma_capability(storagerouter.guid)
         try:
