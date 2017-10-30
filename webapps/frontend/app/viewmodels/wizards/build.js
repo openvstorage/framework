@@ -103,8 +103,9 @@ define([
                     if (step.hasOwnProperty('next') && step.next && step.next.call) {
                         chainPromise = chainPromise.then(step.next);
                     }
-                    chainPromise.done(deferred.resolve)
-                        .fail(deferred.reject);
+                    chainPromise
+                        .done(deferred.resolve())
+                        .fail(deferred.reject());
                 }).promise()
                     .done(function() {
                         var next = true;
@@ -195,21 +196,21 @@ define([
                                 .fail(function() {
                                     prevalidateDeferred.reject({ abort: true, data: undefined });
                                 })
-                                .done(prevalidateDeferred.resolve);
+                                .done(prevalidateDeferred.resolve());
                         }).promise();
                     });
                 }
                 chainPromise.then(function() {
-                        return $.Deferred(function (finishDeferred) {
-                            step.finish()
-                                .fail(function(data) {
-                                    finishDeferred.reject({ abort: false, data: data });
-                                })
-                                .done(finishDeferred.resolve);
-                        }).promise();
-                    })
-                    .done(deferred.resolve)
-                    .fail(deferred.reject);
+                    return $.Deferred(function (finishDeferred) {
+                        step.finish()
+                            .fail(function(data) {
+                                finishDeferred.reject({ abort: false, data: data });
+                            })
+                            .done(finishDeferred.resolve());
+                    }).promise();
+                })
+                    .done(deferred.resolve())
+                    .fail(deferred.reject());
             }).promise()
                 .done(function(data) {
                     dialog.close(self, {

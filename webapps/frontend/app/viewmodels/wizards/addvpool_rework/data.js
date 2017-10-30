@@ -21,42 +21,45 @@ define(['jquery', 'knockout',
 ],function($, ko, generic, api, shared, errors, StorageRouter, VPool, StorageDriverParams, backendService, storageRouterService, vpoolService){
     "use strict";
     // This data is not a singleton but a constructor
-    return function(storageRouter, vPool) {
+    return function(storageRouter, vPool, completed) {
         // Default values
-        var isExtend = (typeof vPool !== 'undefined');
+        var isExtend = (vPool !== undefined);
         vPool = isExtend ? vPool : new VPool();
+        storageRouter = storageRouter === undefined? new StorageRouter() : storageRouter;
+        completed = (completed === undefined)? $.Deferred().promise() : completed;
 
         var self = this;
         // Properties
+        self.completed                          = completed;
         // General vPool changes
-        self.configParams =                       undefined;  // Params related to general configs (sco size, dtl ...) Undefined as a viewmodel will be set
-        self.backendData =                        undefined;  // Params related to the backend. Undefined as a viewmodel will be set
+        self.configParams                       = undefined;  // Params related to general configs (sco size, dtl ...) Undefined as a viewmodel will be set
+        self.backendData                        = undefined;  // Params related to the backend. Undefined as a viewmodel will be set
         // Storage driver changes
-        self.cachingData =                        undefined;  // Params related to fragment cache and block cache. Undefined as a viewmodel will be set
-        self.storageDriverParams =                undefined;  // Params related to the StorageDriver in general (proxies, globalWriteBuffer, storageIp) Undefined as a viewmodel will be set
+        self.cachingData                        = undefined;  // Params related to fragment cache and block cache. Undefined as a viewmodel will be set
+        self.storageDriverParams                = undefined;  // Params related to the StorageDriver in general (proxies, globalWriteBuffer, storageIp) Undefined as a viewmodel will be set
         // Shared across the pages
         // Handles
-        self.loadBackendsHandle =                 undefined;
-        self.loadAvailableStorageRoutersHandle =  undefined;
-        self.loadStorageRoutersHandle =           undefined;
+        self.loadBackendsHandle     = undefined;
+        self.loadAvailableStorageRoutersHandle  = undefined;
+        self.loadStorageRoutersHandle           = undefined;
 
         // Observables
-        self.storageRouter =                      ko.observable(storageRouter);
-        self.vPool =                              ko.observable(vPool);
-        self.isExtend =                           ko.observable(isExtend);
+        self.storageRouter                      = ko.observable(storageRouter);
+        self.vPool                              = ko.observable(vPool);
+        self.isExtend                           = ko.observable(isExtend);
         // Data observables
-        self.storageRouterMap =                   ko.observableDictionary({});
-        self.albaPresetMap =                      ko.observable({});
-        self.backends =                           ko.observableArray([]);
-        self.invalidBackendInfo =                 ko.observable();
-        self.loadingBackends =                    ko.observable();
-        self.loadingStorageRouters =              ko.observable();
-        self.loadingMetadata =                    ko.observable();
-        self.globalWriteBufferMax =               ko.observable();  // Used to detect over allocation
-        self.srPartitions =                       ko.observable();
-        self.storageRoutersAvailable =            ko.observableArray([]);
-        self.storageRoutersUsed =                 ko.observableArray([]);
-        self.vPools =                             ko.observableArray([]);
+        self.storageRouterMap                   = ko.observableDictionary({});
+        self.albaPresetMap                      = ko.observable({});
+        self.backends                           = ko.observableArray([]);
+        self.invalidBackendInfo                 = ko.observable();
+        self.loadingBackends                    = ko.observable();
+        self.loadingStorageRouters              = ko.observable();
+        self.loadingMetadata                    = ko.observable();
+        self.globalWriteBufferMax               = ko.observable();  // Used to detect over allocation
+        self.srPartitions                       = ko.observable();
+        self.storageRoutersAvailable            = ko.observableArray([]);
+        self.storageRoutersUsed                 = ko.observableArray([]);
+        self.vPools                             = ko.observableArray([]);
 
         // Computed
         self.hasCacheQuota = ko.pureComputed(function() {
@@ -66,7 +69,7 @@ define(['jquery', 'knockout',
             if (storageRouters.length > 0) {
                 storageRouter = storageRouters[0];
             }
-            return storageRouterService.hasCacheQuota(storageRouter);
+            return storageRouter.supportsCacheQuota();
         });
         self.scrubAvailable = ko.pureComputed(function() {
             // Scrub available is returned for all storagerouters (bad api design?)
@@ -83,12 +86,12 @@ define(['jquery', 'knockout',
             if (storageRouters.length > 0) {
                 storageRouter = storageRouters[0];
             }
-            return storageRouterService.hasBlockCache(storageRouter)
+            return storageRouter.supportsBlockCache()
         });
 
         // Functions
         self.fillData = function() {
-            var requiredObservables = [self.storageRouter];
+            var requiredObservables = [];
             var missingObservables = [];
             $.each(requiredObservables, function(index, obs) {
                 if (ko.utils.unwrapObservable(obs) === undefined) {
@@ -280,15 +283,24 @@ define(['jquery', 'knockout',
             }).promise();
         };
         self.loadVPools = function() {
-            return vpoolService.loadVPools()
+            return vpoolService.loadVPools({contents: ''})
                 .then(function(data) {
-                    var guids = data.data.map(function(item) { return item.guid});
+                    var guids = [], vpData = {};
+                    $.each(data.data, function (index, item) {
+                        guids.push(item.guid);
+                        vpData[item.guid] = item;
+                    });
                     generic.crossFiller(
                         guids, self.vPools,
                         function (guid) {
                             return new VPool(guid);
                         }, 'guid'
                     );
+                    $.each(self.vPools(), function (index, vpool) {
+                        if (guids.contains(vpool.guid())) {
+                            vpool.fillData(vpData[vpool.guid()]);
+                        }
+                    });
                 });
         };
         /**
@@ -297,7 +309,7 @@ define(['jquery', 'knockout',
         self.loadStorageRouters = function(){
             self.loadingStorageRouters(true);
             var promise;
-            if (self.vPool() !== undefined) {
+            if (self.isExtend() === true) {
                 promise = self.vPool().loadStorageRouters();
             } else {
                 promise = $.Deferred(function (deferred) {
@@ -342,7 +354,7 @@ define(['jquery', 'knockout',
                             self.storageRoutersUsed.sort(function (sr1, sr2) {
                                 return sr1.name() < sr2.name() ? -1 : 1;
                             });
-                            if (self.storageRouter() === undefined && self.storageRoutersAvailable().length > 0) {
+                            if (self.storageRouter().guid() === undefined && self.storageRoutersAvailable().length > 0) {
                                 self.storageRouter(self.storageRoutersAvailable()[0]);
                             }
                             return {

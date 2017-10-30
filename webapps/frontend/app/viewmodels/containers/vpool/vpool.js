@@ -190,8 +190,8 @@ define([
          * @return {*}
          */
         self.getCachingData = function(storageRouterGuid, returnViewModel, allowEmpty) {
-            var cachingInfo = self.metadata().caching_info;
-            allowEmpty = (typeof allowEmpty !== 'undefined') ? allowEmpty : false;
+            allowEmpty = (allowEmpty === undefined) ? false : allowEmpty;
+            var cachingInfo = self.metadata() === undefined? {} : self.metadata().caching_info;
             returnViewModel = returnViewModel || false;
             if (!(storageRouterGuid in cachingInfo)) {
                 if (allowEmpty === true) {
@@ -226,8 +226,8 @@ define([
          * @return {*}
          */
         self.getBackendInfo = function(returnViewModel) {
-            returnViewModel = returnViewModel || false;
-            var backendInfo = self.metadata().backend;
+            returnViewModel = (returnViewModel === undefined) ? false : returnViewModel;
+            var backendInfo = self.metadata() === undefined? {} : self.metadata().backend;
             if (returnViewModel === true) {
                 return new BackendInfo(backendInfo)
             }

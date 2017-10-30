@@ -198,6 +198,7 @@ class Watcher(object):
             self.log_message(target, 'Unexpected exception: {0}'.format(ex), 2)
             return False
 
+
 if __name__ == '__main__':
     given_target = sys.argv[1]
     mode = sys.argv[2]

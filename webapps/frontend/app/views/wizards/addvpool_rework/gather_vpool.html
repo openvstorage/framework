@@ -22,7 +22,7 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('name') }">
         <label class="col-lg-3 control-label" for="inputVpoolName" data-i18n="ovs:wizards.add_vpool.gather_vpool.name"></label>
         <div class="col-lg-7">
-            <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: name, valueUpdate: 'input', disable: $data !== undefined" />
+            <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: name, valueUpdate: 'input', disable: $parent.data.isExtend()" />
         </div>
     </div>
     <!-- /ko -->
@@ -39,7 +39,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <!-- ko if: data.loadingBackends() === false && (vpoolBackends() !== undefined && vpoolBackends().length > 0) -->
                 <span data-bind="visible: (data.vPool() === undefined || vpoolBackend() !== undefined),
                                  dropdown: {
-                                     enabled: data.isExtend,
+                                     disabled: data.isExtend,
                                      key: 'guid', keyisfunction: false,
                                      items: vpoolBackends, target: vpoolBackend,
                                      text: function(item) {
@@ -66,7 +66,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && preset() === undefined)"></span>
             <span data-bind="visible: (data.vPool() === undefined || preset() !== undefined),
                              dropdown: {
-                                 enabled: data.isExtend,
+                                 disabled: data.isExtend,
                                  key: 'name', keyisfunction: false,
                                  items: enhancedPresets, target: preset,
                                  text: function(item) {

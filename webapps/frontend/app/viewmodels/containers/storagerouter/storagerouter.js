@@ -106,6 +106,19 @@ define([
             });
             return updatesFound;
         });
+        // Feature Computed
+        self.supportsBlockCache = ko.pureComputed(function() {
+            var features = self.features();
+            return features !== undefined && features.alba.features.contains('block-cache')
+        });
+        self.supportsCacheQuota = ko.pureComputed(function() {
+            var features = self.features();
+            return features !== undefined && features.alba.features.contains('cache-quota');
+        });
+        self.isEnterpriseEdition = ko.pureComputed(function() {
+            var features = self.features();
+            return features !== undefined && features.alba.edition === 'enterprise';
+        });
 
         // Functions
         self.getUpdateMetadata = function () {

@@ -37,7 +37,7 @@ define([
             backend_info: {}
         }, data);
 
-        ko.mapping.fromJS(data, backendMapping, self);
+        ko.mapping.fromJS(vmData, backendMapping, self);
 
         // Computed
         self.isLocalBackend = ko.pureComputed(function() {

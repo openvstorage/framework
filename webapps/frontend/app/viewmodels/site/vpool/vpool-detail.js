@@ -19,12 +19,11 @@ define([
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vdisk/vdisk',
-    'viewmodels/wizards/addvpool/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index',
-    'viewmodels/wizards/addvpool_rework/index'
+    'viewmodels/wizards/addvpool_rework/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index'
 ], function($, app, dialog, ko, router,
             shared, generic, Refresher, api,
             VPool, StorageDriver, StorageRouter, VDisk,
-            ExtendVPool, CreateHPRMConfigsWizard, ReconfigureVPool, ExtendVPool2) {
+            ExtendVPool, CreateHPRMConfigsWizard, ReconfigureVPool) {
     "use strict";
     return function() {
         var self = this;
@@ -241,44 +240,9 @@ define([
                     $.t('ovs:wizards.extend_vpool.prohibited.title', {name: self.vPool().name()}),
                     [$.t('ovs:generic.ok')]
                 )
-                    .always(function() {
-                        self.updatingStorageRouters(false);
-                    });
-            }
-        };
-        // @todo remove after testing
-        self.addStorageRouter2 = function(sr) {
-            self.updatingStorageRouters(true);
-            if (self.vPool().extensible()) {
-                var deferred = $.Deferred(),
-                    wizard = new ExtendVPool2({
-                        modal: true,
-                        completed: deferred,
-                        vPool: self.vPool(),
-                        storageRouter: sr
-                    });
-                wizard.closing.always(function() {
-                    deferred.resolve();
-                });
-                dialog.show(wizard);
-                deferred.always(function() {
+                .always(function() {
                     self.updatingStorageRouters(false);
                 });
-            } else {
-                var reasons = self.vPool().notExtensibleReasons(),
-                    message = $.t('ovs:wizards.extend_vpool.prohibited.message', {name: self.vPool().name(), multi: reasons.length === 1 ? '' : 's'});
-                $.each(reasons, function(index, reason) {
-                    message += '<li>' + $.t('ovs:wizards.extend_vpool.prohibited.reasons.' + reason) + '</li>';
-                }) ;
-                message += '</ul>';
-                app.showMessage(
-                    message,
-                    $.t('ovs:wizards.extend_vpool.prohibited.title', {name: self.vPool().name()}),
-                    [$.t('ovs:generic.ok')]
-                )
-                    .always(function() {
-                        self.updatingStorageRouters(false);
-                    });
             }
         };
         self.reconfigureStorageRouter = function(sr, sd) {

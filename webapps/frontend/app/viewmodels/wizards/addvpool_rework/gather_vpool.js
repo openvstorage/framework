@@ -18,9 +18,8 @@ define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/storagedriver/storagedriver',
-    'viewmodels/containers/vpool/vpool',
     'viewmodels/services/backend'
-], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, backendService) {
+], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, backendService) {
     "use strict";
     return function (options) {
         var self = this;
@@ -39,7 +38,7 @@ define([
             var showErrors = false;
             var reasons = [], fields = [];
             var requiredRoles = ['DB', 'DTL', 'WRITE'];
-            if (self.data.vPool() === undefined) {
+            if (self.data.vPool().guid() === undefined) {
                 if (!self.data.vPool().name.valid()) {
                     fields.push('name');
                     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.invalid_name'));
@@ -48,6 +47,7 @@ define([
                         if (vpool.name() === self.data.vPool().name()) {
                             fields.push('name');
                             reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.duplicate_name'));
+                            return false;
                         }
                     });
                 }
@@ -234,7 +234,7 @@ define([
         };
         self.resetBackend = function() {
             // Will force to recompute everything
-            self.vpoolBackend({'name': undefined, 'backend_guid':undefined, 'alba_backend_guid': undefined});
+            self.vpoolBackend({'name': undefined, 'backend_guid': undefined, 'alba_backend_guid': undefined});
             self.resetPreset();
         };
         self.resetPreset = function() {
@@ -243,26 +243,21 @@ define([
         self.preValidate = function () {
             var validationResult = {valid: true, reasons: [], fields: []};
             var vpoolName = self.data.vPool().name();
-            $.Deferred(function (deferred) {
-                self.loadingPrevalidations(true);
-                generic.xhrAbort(self.checkMtptHandle);
-                self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', {data: {name: vpoolName}})
-                    .then(self.shared.tasks.wait)
-                    .done(function (data) {
-                        if (data === true) {
-                            validationResult.valid = false;
-                            validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.mtpt_in_use', {what: vpoolName}));
-                            validationResult.fields.push('name');
-                        }
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject)
-                    .always(function () {
-                        self.preValidateResult(validationResult);
-                        self.loadingPrevalidations(false);
-                    })
-
-            }).promise();
+            self.loadingPrevalidations(true);
+            generic.xhrAbort(self.checkMtptHandle);
+            return self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', {data: {name: vpoolName}})
+                .then(self.shared.tasks.wait)
+                .then(function (data) {
+                    if (data === true) {
+                        validationResult.valid = false;
+                        validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.mtpt_in_use', {what: vpoolName}));
+                        validationResult.fields.push('name');
+                    }
+                })
+                .always(function () {
+                    self.preValidateResult(validationResult);
+                    self.loadingPrevalidations(false);
+                })
         };
 
     };
