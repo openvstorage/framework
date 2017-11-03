@@ -23,7 +23,7 @@ define([
     /**
      * Returns a singleton instance of this service (same instance is served throughout the application)
      */
-    var StorageDriverService = function(){
+    function StorageDriverService(){
         var self = this;
 
         // Constants
@@ -60,6 +60,6 @@ define([
         self.calculateVolumeWriteBuffer = function(numberOfScosInTlog, nonDisposableScoFactor, scoSize) {
             return nonDisposableScoFactor * (numberOfScosInTlog * scoSize);
         };
-    };
+    }
     return new StorageDriverService()
 });

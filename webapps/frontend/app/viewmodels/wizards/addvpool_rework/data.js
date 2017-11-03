@@ -26,7 +26,7 @@ define(['jquery', 'knockout',
         var isExtend = (vPool !== undefined);
         vPool = isExtend ? vPool : new VPool();
         storageRouter = storageRouter === undefined? new StorageRouter() : storageRouter;
-        completed = (completed === undefined)? $.Deferred().promise() : completed;
+        completed = (completed === undefined)? $.Deferred() : completed;
 
         var self = this;
         // Properties
@@ -135,8 +135,8 @@ define(['jquery', 'knockout',
             self.backendData = self.vPool().getBackendInfo(true);
             self.cachingData = self.vPool().getCachingData(self.storageRouter().guid(), true, true);
             self.configParams = self.vPool().getConfiguration(true);
-
         };
+
         /**
          * Retrieves metadata from the cache
          * @param storageRouterGuid
@@ -199,12 +199,7 @@ define(['jquery', 'knockout',
              */
             var seen = [];
             return ko.utils.arrayFilter(backends, function(backend) {
-                // Add up the two keys
-                var uniqueKey = backend.backend_guid;
-                if (backend.locationKey) {
-                    uniqueKey += backend.locationKey
-                }
-                return !seen.contains(uniqueKey) && seen.push(uniqueKey);
+                return !seen.contains(backend.backend_guid) && seen.push(backend.backend_guid);
             });
         };
         /**
@@ -216,29 +211,27 @@ define(['jquery', 'knockout',
         self.loadBackends = function(connectionInfo) {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadBackendsHandle);
-                var relay = '';
                 var queryParams = {
                     contents: 'available'
                 };
-                var remoteInfo = {};
+                var relayInfo = {};
                 if (connectionInfo !== undefined && connectionInfo.isLocalBackend() === false) {
-                    relay = 'relay/';
-                    remoteInfo.ip = connectionInfo.host();
-                    remoteInfo.port = connectionInfo.port();
-                    remoteInfo.client_id = connectionInfo.client_id().replace(/\s+/, "");
-                    remoteInfo.client_secret = connectionInfo.client_secret().replace(/\s+/, "");
+                    relayInfo.relay = 'relay/';
+                    relayInfo.ip = connectionInfo.host();
+                    relayInfo.port = connectionInfo.port();
+                    relayInfo.client_id = connectionInfo.client_id().replace(/\s+/, "");
+                    relayInfo.client_secret = connectionInfo.client_secret().replace(/\s+/, "");
                 }
-                $.extend(queryParams, remoteInfo);
                 self.loadingBackends(true);
                 self.invalidBackendInfo(false);
-                self.loadBackendsHandle = backendService.loadAlbaBackends(queryParams, relay)
+                self.loadBackendsHandle = backendService.loadAlbaBackends(queryParams, relayInfo)
                     .done(function(data) {
                         var calls = [];
                         var availableBackends = self.backends();
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
                                 queryParams.contents = 'name,ns_statistics,presets,usages,backend';
-                                calls.push(backendService.loadAlbaBackend(item.guid, queryParams, relay)
+                                calls.push(backendService.loadAlbaBackend(item.guid, queryParams, relayInfo)
                                     .then(function(data) {
                                         var backendSize = data.usages.size;
                                         if ((backendSize !== undefined && backendSize > 0)) {

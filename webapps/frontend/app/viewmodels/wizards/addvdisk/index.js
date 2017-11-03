@@ -18,11 +18,11 @@
 define([
     'jquery', 'ovs/generic',
     '../build', './data', './gather'
-], function($, generic, build, data, Gather) {
+], function($, generic, Build, data, Gather) {
     "use strict";
     return function(options) {
         var self = this;
-        build(self);
+        Build.call(self);
 
         // Variables
         self.data = data;

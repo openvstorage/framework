@@ -19,27 +19,28 @@
  */
 define([
     'jquery', 'knockout',
-    'ovs/api', 'ovs/generic'
-], function ($, ko, api, generic) {
-    /**
-     * Loads in all vpools for the current supplied data
-     * @param queryParams: Additional query params. Defaults to no params
-     * @param relay: Relay to use (Optional, defaults to no relay)
-     * @returns {Deferred}
-    */
-    function loadVPools(queryParams, relay) {
-        relay = (typeof sortFunction !== 'undefined') ? relay: '';
-        queryParams = (typeof queryParams !== 'undefined') ? queryParams : {};
-        return api.get(relay + 'vpools', { queryparams: queryParams })
-    }
-    function loadVPool(vPoolGuid, queryParams, relay) {
-        relay = (typeof sortFunction !== 'undefined') ? relay: '';
-        queryParams = (typeof queryParams !== 'undefined') ? queryParams : {};
-        return api.get(relay + 'vpools/{0}'.format([vPoolGuid]), { queryparams: queryParams })
-    }
-    return {
-        loadVPool: loadVPool,
-        loadVPools: loadVPools
-    }
+    'ovs/api'
+], function ($, ko, api) {
 
+    function VPoolService() {
+        var self = this;
+
+        // Variables
+        self.cacheTypes = ko.observableArray(['fragment_cache', 'block_cache']);
+
+        // Functions
+        /**
+         * Loads in all vpools for the current supplied data
+         * @param queryParams: Additional query params. Defaults to no params
+         * @param relayParams: Relay to use (Optional, defaults to no relay)
+         * @returns {Deferred}
+         */
+        self.loadVPools = function(queryParams, relayParams) {
+            return api.get('vpools', { queryparams: queryParams, relayParams: relayParams })
+        };
+        self.loadVPool = function(vPoolGuid, queryParams, relayParams) {
+            return api.get('vpools/{0}'.format([vPoolGuid]), { queryparams: queryParams, relayParams: relayParams })
+        };
+    }
+    return new VPoolService();
 });

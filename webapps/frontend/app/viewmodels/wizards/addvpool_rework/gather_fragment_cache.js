@@ -17,7 +17,7 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic', 'ovs/shared',
-    'viewmodels/services/backend',
+    'viewmodels/services/backend'
 ], function($, ko, api, generic, shared, backendService) {
     "use strict";
     return function(options) {
@@ -32,6 +32,7 @@ define([
         // Observables
         self.fragmentCacheSettings      = ko.observableArray(['write', 'read', 'rw', 'none']);
         self.preset                     = ko.observable();
+        self._reUsedStorageRouter    = ko.observable();
 
         // Computed
         self.fragmentCacheBackend = ko.computed({
@@ -127,6 +128,31 @@ define([
                 }
             }
             return { value: reasons.length === 0, reasons: reasons, fields: fields };
+        });
+        self.reUsedStorageRouter = ko.computed({
+            deferEvaluation: true,  // Wait with computing for an actual subscription
+            read: function() {
+                return self._reUsedStorageRouter()
+            },
+            write: function(data) {
+                self._reUsedStorageRouter(data);
+                // Set connection info
+                if (data !== undefined) {
+                    var connectionInfo = self.data.vPool().getCacheConnectionInfoMapping().fragment_cache[data.guid()];
+                    self.data.cachingData.fragment_cache.backend_info.connection_info.update(connectionInfo)
+                }
+            }
+        });
+        self.reUsableStorageRouters = ko.pureComputed(function() {
+            var mapping = self.data.vPool().getCacheConnectionInfoMapping();
+            var storagerouters = [];
+            $.each(self.data.storageRoutersUsed(), function(index, storagerouter) {
+                if (storagerouter.guid() in mapping.fragment_cache) {
+                    storagerouters.push(storagerouter)
+                }
+            });
+            storagerouters.unshift(undefined);  // Insert undefined as element 0
+            return storagerouters;
         });
 
         // Functions

@@ -18,8 +18,8 @@ define([
     'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
     'viewmodels/containers/backend/backendtype', 'viewmodels/containers/vdisk/vdisk',
-    './cache', './configuration', './backend'
-], function($, ko, shared, generic, api, BackendType, VDisk, CacheData, Configuration, BackendInfo) {
+    './cache', './configuration', './backend', 'viewmodels/services/vpool'
+], function($, ko, shared, generic, api, BackendType, VDisk, CacheData, Configuration, BackendInfo, vpoolService) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -204,6 +204,25 @@ define([
                 return new CacheData(cachingData)
             }
             return cachingData
+        };
+        /**
+         * Get possible connection info for caches
+         */
+        self.getCacheConnectionInfoMapping = function() {
+            var mapping = {};
+            var cachingInfo = self.metadata() === undefined? {} : self.metadata().caching_info;
+            $.each(vpoolService.cacheTypes(), function(index, cacheType) {
+                mapping[cacheType] = {};
+            });
+            $.each(cachingInfo, function(strGuid, cacheTypeData) {
+                var cacheData = new CacheData(cacheTypeData);
+                $.each(vpoolService.cacheTypes(), function(index, cacheType) {
+                    if (cacheData[cacheType].is_backend() === true) {
+                        mapping[cacheType][strGuid] = cacheData[cacheType].backend_info.connection_info.toJS()
+                    }
+                });
+            });
+            return mapping
         };
         /**
          * Get configuration data of this vpool

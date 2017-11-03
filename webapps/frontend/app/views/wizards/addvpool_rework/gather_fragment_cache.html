@@ -75,6 +75,27 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
             <div data-bind="visible: !isLocalBackend()">
+                <div data-bind="visible: $root.reUsableStorageRouters().length > 1">
+                    <div class="form-group">
+                        <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.re_use_connection_info"></label>
+                        <div class="col-lg-7">
+                            <span data-bind="dropdown: {
+                                                 key: 'guid',
+                                                 keyisfunction: true,
+                                                 items: $root.reUsableStorageRouters,
+                                                 target: $root.reUsedStorageRouter,
+                                                 text: function(item) {
+                                                     if (item !== undefined) {
+                                                         return item.name();
+                                                     } else {
+                                                         return '-';
+                                                     }
+                                                 }
+                                             }">
+                            </span>
+                        </div>
+                    </div>
+                </div>
                 <div data-bind="css: { 'has-error': $root.canContinue().fields.contains('invalid_alba_info') }">
                     <div class="form-group">
                         <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.host"></label>

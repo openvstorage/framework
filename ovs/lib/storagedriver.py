@@ -43,7 +43,6 @@ from ovs.lib.helpers.toolbox import Toolbox
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.extensions.generic.system import System
-from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
@@ -957,8 +956,7 @@ class StorageDriverController(object):
                                             target_name=alba_proxy_service)
                 service_manager.start_service(alba_proxy_service, client=root_client)
 
-            service_manager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client,
-                                        target_name=sd_service)
+            service_manager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
 
             storagedriver = StorageDriver(storagedriver.guid)
             current_startup_counter = storagedriver.startup_counter
@@ -969,7 +967,7 @@ class StorageDriverController(object):
 
         tries = 60
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
-            StorageDriverController._logger.debug( 'Waiting for the StorageDriver to start up for vPool {0} on StorageRouter {1} ...'.format(vpool.name, storagerouter.name))
+            StorageDriverController._logger.debug('Waiting for the StorageDriver to start up for vPool {0} on StorageRouter {1} ...'.format(vpool.name, storagerouter.name))
             if service_manager.get_service_status(sd_service, client=root_client) != 'active':
                 raise RuntimeError('StorageDriver service failed to start (service not running)')
             tries -= 1
