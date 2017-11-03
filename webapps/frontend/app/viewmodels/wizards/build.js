@@ -92,21 +92,22 @@ define([
          */
         self.next = function() {
             if (self.step() < self.stepsLength() ) {
-                var step = self.steps()[self.step()],
-                    chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
+                var step = self.steps()[self.step()];
+                // Build the promise chain
+                var chainPromise = $.Deferred().resolve().promise();
                 self.loadingNext(true);
-                $.Deferred(function(deferred) {
-                    chainDeferred.resolve();
-                    if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
-                        chainPromise = chainPromise.then(step.preValidate);
-                    }
-                    if (step.hasOwnProperty('next') && step.next && step.next.call) {
-                        chainPromise = chainPromise.then(step.next);
-                    }
-                    chainPromise
-                        .done(deferred.resolve())
-                        .fail(deferred.reject());
-                }).promise()
+                if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
+                    // Return the pre-validate promise which will resolve or reject
+                    chainPromise.then(function() { return step.preValidate() })
+                }
+                if (step.hasOwnProperty('next') && step.next && step.next.call) {
+                    // Return the next promise which will resolve or reject
+                    chainPromise.then(function() {
+                        return step.next()
+                    })
+                }
+                // Handle finishing of the chain
+                chainPromise
                     .done(function() {
                         var next = true;
                         while (next) {
@@ -114,12 +115,8 @@ define([
                             var step = self.steps()[self.step()];
                             if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
                                 step.shouldSkip()
-                                    .done(function(skip) {
-                                        next = skip === true && self.step() < self.stepsLength() - 1;
-                                    })
-                                    .fail(function() {
-                                        next = false;
-                                    });
+                                    .done(function(skip) { next = skip === true && self.step() < self.stepsLength() - 1; })
+                                    .fail(function() { next = false; });
                             } else {
                                 next = false;
                             }
@@ -185,33 +182,19 @@ define([
         self.finish = function() {
             self.running(true);
             var step = self.steps()[self.step()];
-            var chainDeferred = $.Deferred();
-            var chainPromise = chainDeferred.promise();
-            $.Deferred(function(deferred) {
-                chainDeferred.resolve();
-                if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
-                    chainPromise = chainPromise.then(function() {
-                        return $.Deferred(function (prevalidateDeferred) {
-                            step.preValidate()
-                                .fail(function() {
-                                    prevalidateDeferred.reject({ abort: true, data: undefined });
-                                })
-                                .done(prevalidateDeferred.resolve());
-                        }).promise();
-                    });
-                }
+            // Build the promise chain, immediately resolve the deferred to kick off all the chained promises
+            var chainPromise = $.Deferred().resolve().promise();
+            if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
                 chainPromise.then(function() {
-                    return $.Deferred(function (finishDeferred) {
-                        step.finish()
-                            .fail(function(data) {
-                                finishDeferred.reject({ abort: false, data: data });
-                            })
-                            .done(finishDeferred.resolve());
-                    }).promise();
+                    // Return the pre-validate promise which will resolve or reject itself and mutate the data to use in our finish
+                    return step.preValidate().then(function(data) { return data }, function(error) { return { abort: true, data: undefined }})
+                });
+            }
+            // Add the step finish to the chain
+            chainPromise.then(function() {
+                    return step.finish().then(function(data) { return data }, function(error) {return { abort: false, data: error }})
                 })
-                    .done(deferred.resolve())
-                    .fail(deferred.reject());
-            }).promise()
+                // Handle finishing of the chain
                 .done(function(data) {
                     dialog.close(self, {
                         success: true,

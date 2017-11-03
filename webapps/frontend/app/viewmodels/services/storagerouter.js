@@ -21,33 +21,33 @@ define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/shared'
 ], function ($, ko, api, shared) {
-    /**
-     * Loads in all StorageRouters for the current supplied data
-     * @param queryParams: Additional query params. Defaults to no params
-     * @returns {Deferred}
-    */
-    function loadStorageRouters(queryParams){
-        queryParams = (typeof queryParams !== 'undefined') ? queryParams : {};
-        return api.get('storagerouters', {queryparams: queryParams})
-    }
 
-    /**
-     * Fetches metadata of a StorageRouter
-     * The API resolves into a Celery task id
-     * @param storageRouterGuid: Guid of the StorageRouter
-     * @return {Deferred}
-     */
-    function getMetadata(storageRouterGuid){
-        if (storageRouterGuid === undefined) {
-            throw new Error('A guid of an existing StorageRouter should be supplied')
-        }
-        return api.post('storagerouters/' + storageRouterGuid + '/get_metadata')
-            .then(shared.tasks.wait)
-    }
+    function StorageRouterService() {
+        var self = this;
+        /**
+         * Loads in all StorageRouters for the current supplied data
+         * @param queryParams: Additional query params. Defaults to no params
+         * @returns {Deferred}
+         */
+        self.loadStorageRouters = function(queryParams) {
+            queryParams = (typeof queryParams !== 'undefined') ? queryParams : {};
+            return api.get('storagerouters', {queryparams: queryParams})
+        };
 
-    return {
-        loadStorageRouters: loadStorageRouters,
-        getMetadata: getMetadata
-    }
+        /**
+         * Fetches metadata of a StorageRouter
+         * @param storageRouterGuid: Guid of the StorageRouter
+         * @return {Deferred}
+         */
+        self.getMetadata = function(storageRouterGuid) {
+            if (storageRouterGuid === undefined) {
+                throw new Error('A guid of an existing StorageRouter should be supplied')
+            }
+            // Task id api, resolve it within the service and return the result
+            return api.post('storagerouters/' + storageRouterGuid + '/get_metadata')
+                .then(shared.tasks.wait)
+        };
 
+    }
+    return new StorageRouterService();
 });

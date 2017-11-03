@@ -381,9 +381,7 @@ class StorageRouterController(object):
                                                     'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                                                     'cluster_size': (int, StorageDriverClient.CLUSTER_SIZES),
                                                     'write_buffer': (int, {'min': 128, 'max': 10240}),  # Volume write buffer
-                                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
-                                                    'advanced': (dict, {'number_of_scos_in_tlog': (float, {'min': 4, 'max': 20}),
-                                                                        'non_disposable_scos_factor': (float, {'min': 1.5, 'max': 20})})}),
+                                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys())}),
                            'mds_config_params': (dict, {'mds_safety': (int, {'min': 1, 'max': 5}, False)}, False),
                            'fragment_cache_on_read': (bool, None),
                            'fragment_cache_on_write': (bool, None),
@@ -410,6 +408,10 @@ class StorageRouterController(object):
             raise ValueError('Parameters should be of type "dict"')
         Toolbox.verify_required_params(required_params, parameters)
 
+        if 'advanced' in parameters['config_params']:
+            Toolbox.verify_required_params(required_params={'number_of_scos_in_tlog': (float, {'min': 4, 'max': 20}),
+                                                            'non_disposable_scos_factor': (float, {'min': 1.5, 'max': 20})},
+                                           actual_params=parameters['config_params']['advanced'])
         client = SSHClient(parameters['storagerouter_ip'])
 
         sd_config_params = parameters['config_params']
