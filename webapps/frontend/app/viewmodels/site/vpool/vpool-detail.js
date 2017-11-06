@@ -19,7 +19,7 @@ define([
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vdisk/vdisk',
-    'viewmodels/wizards/addvpool_rework/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index'
+    'viewmodels/wizards/addvpool/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index'
 ], function($, app, dialog, ko, router,
             shared, generic, Refresher, api,
             VPool, StorageDriver, StorageRouter, VDisk,

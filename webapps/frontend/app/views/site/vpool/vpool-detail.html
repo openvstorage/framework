@@ -257,7 +257,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td style="padding: 0 0 20px 0;">
                                 <h4 data-i18n="ovs:vpools.detail.storagerouter_vpool_link"></h4>
-                                <table style="width: 100%;" class="table table-noborder table-hover table-condensed">
+                                <table style="width: 100%;" class="table table-noborder table-condensed table-hover-tbodies">
                                     <thead>
                                         <tr>
                                             <th style="width: 5%;">
@@ -274,8 +274,202 @@ but WITHOUT ANY WARRANTY of any kind.
                                         </tr>
                                     </thead>
                                     <!-- ko foreach: $root.storageRouters() -->
-                                        <!-- ko compose: { view: 'vpool-detail-storagerouter.html', area: 'site/vpool'}-->
-                                        <!--/ko-->
+                                        <tbody>
+                                            <tr>
+                                                <td>
+                                                    <span class="hand fa" data-i18n="[html]alba:icons.collapse"
+                                                          data-bind="visible: expanded(), click: function() { expanded(!expanded()); }"></span>
+                                                    <span class="hand fa" data-i18n="[html]alba:icons.expand"
+                                                          data-bind="visible: !expanded(), click: function() { expanded(!expanded()); }"></span>
+                                                </td>
+                                                <td>
+                                                    <a data-bind="attr: {href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid })}">
+                                                        <span data-bind="text: name" class="hand"></span></a>
+                                                </td>
+                                                <!-- ko if: $root.srSDMap()[guid()] === undefined -->
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td style="height:37px;">
+                                                    <button type="button"
+                                                            class="btn btn-mini btn-default hand"
+                                                            data-bind="click: $root.addStorageRouter,
+                                                                       tooltip: 'ovs:vpools.detail.extend',
+                                                                       enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
+                                                                       attr: { id: 'button_add_' + guid()},
+                                                                       visible: !$root.updatingStorageRouters()">
+                                                        <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
+                                                    </button>
+                                                    </td>
+                                                <!-- /ko -->
+                                                <!-- ko if: $root.srSDMap()[guid()] !== undefined -->
+                                                    <!-- ko with: $root.srSDMap()[guid()] -->
+                                                    <!-- Binding context of the StorageDriver. The parent is the StorageRouter, root is the vpool_detail -->
+                                                    <td>
+                                                        <span class="label label-success pointer"
+                                                              data-bind="tooltip: localSummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.ok'),
+                                                                        text: localSummary() === undefined ? 0 : localSummary().proxies.green"></span>&nbsp;
+                                                        <span class="label label-warning pointer"
+                                                              data-bind="tooltip: localSummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.warning'),
+                                                                        text: localSummary() === undefined ? 0 : localSummary().proxies.orange"></span>&nbsp;
+                                                        <span class="label label-danger pointer"
+                                                              data-bind="tooltip: localSummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.error'),
+                                                                        text: localSummary() === undefined ? 0 : localSummary().proxies.red"></span>&nbsp;
+                                                    </td>
+
+                                                    <td>
+                                                        <span data-bind="text: storageIP()"></span>
+                                                    </td>
+                                                    <td>
+                                                        <span data-bind="text: ports().edge"></span>
+                                                    </td>
+
+                                                    <td style="height:37px;">
+                                                        <button type="button"
+                                                                class="btn btn-mini btn-default hand"
+                                                                data-bind="click: function() {$root.reconfigureStorageRouter($parent, $data)},
+                                                                           tooltip: 'ovs:vpools.detail.reconfigure',
+                                                                           style: { color: $root.refreshList().contains($parent.guid()) ? 'lightgrey' : '' },
+                                                                           attr: { id: 'button_reconfigure' + $parent.guid(), disabled: ($root.updatingStorageRouters() === true || $root.vPool().status() !== 'RUNNING') }">
+                                                            <span class="fa hand" data-i18n="[html]ovs:icons.edit"></span>
+                                                        </button>
+                                                        <button type="button"
+                                                                class="btn btn-mini btn-default hand"
+                                                                data-bind="click: function() {$root.refreshConfiguration($parent)},
+                                                                           tooltip: 'ovs:vpools.detail.refresh_config',
+                                                                           style: { color: $root.refreshList().contains($parent.guid()) ? 'lightgrey' : '' },
+                                                                           attr: { id: 'button_refresh_' + $parent.guid(), disabled: ($root.updatingStorageRouters() === true || $root.vPool().status() !== 'RUNNING') }">
+                                                            <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>
+                                                        </button>
+                                                        <button type="button"
+                                                                class="btn btn-mini btn-default hand"
+                                                                data-bind="click: function() {$root.removeStorageRouter($parent)},
+                                                                           tooltip: (canBeDeleted() === true) ? 'ovs:vpools.detail.remove' : 'ovs:wizards.shrink_vpool.confirm.cannot_remove',
+                                                                           style: { color: (canBeDeleted() === false || $root.refreshList().length > 0) ? 'lightgrey' : '' },
+                                                                           attr: { id: 'button_remove_' + $parent.guid(), disabled: ($root.updatingStorageRouters() === true || $root.vPool().status() !== 'RUNNING') }">
+                                                            <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
+                                                        </button>
+                                                    </td>
+                                                    <!-- /ko -->
+                                                <!-- /ko -->
+                                            </tr>
+                                        </tbody>
+                                        <tbody data-bind="visible: expanded()">
+                                        <!-- ko if: $root.srSDMap()[guid()] !== undefined -->
+                                        <!-- ko with: $root.srSDMap()[guid()] -->
+                                        <!-- Binding context of the StorageDriver. The parent is the storagerouter, root is the vpool_detail -->
+                                            <tr>
+                                                <!-- Empty to fill in for the expand button -->
+                                                <td></td>
+                                                <th colspan="3" data-i18n="ovs:vpools.configuration"></th>
+                                                <th colspan="2" data-i18n="ovs:vpools.ports"></th>
+                                            </tr>
+                                            <tr>
+                                                <!-- Empty to fill in for the expand button -->
+                                                <td></td>
+                                                <!-- First column -->
+                                                <td>
+                                                    <span data-i18n="ovs:vpools.global_write_buffer"></span>
+                                                </td>
+                                                <td colspan="2">
+                                                    <span data-bind="text: vpoolBackendInfo() === undefined ? '' : $root.formatBytes(vpoolBackendInfo().global_write_buffer)"></span>
+                                                </td>
+                                                <!-- Second column -->
+                                                <td>
+                                                    <span data-i18n="ovs:generic.mgmtport"></span>
+                                                </td>
+                                                <td colspan="1">
+                                                    <span data-bind="text: ports().management"></span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <!-- Empty to fill in for the expand button -->
+                                                <td></td>
+                                                <!-- First column -->
+                                                <td>
+                                                    <span data-i18n="ovs:vpools.fragment_caching"></span>
+                                                </td>
+                                                <td colspan="2">
+                                                    <!-- ko with: vpoolBackendInfo().caching_info.fragment_cache -->
+                                                        <div>
+                                                            <span data-bind="translate: 'ovs:vpools.caching_types.' + $parent.stringifiedCaching($data)"></span>
+                                                            <!-- ko ifnot: $parent.stringifiedCaching($data) === 'none' -->
+                                                                <span data-i18n="ovs:generic.on"></span>
+                                                                <!-- ko if: [null, undefined].contains(backend_info) -->
+                                                                    <span data-i18n="ovs:generic.local"></span>
+                                                                <!-- /ko -->
+                                                                <!-- ko ifnot: [null, undefined].contains(backend_info) -->
+                                                                    <a data-bind="attr: {
+                                                                                      href: 'https://' + backend_info.connection_info.host + ':' + backend_info.connection_info.port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backend_info.backend_guid }),
+                                                                                      target: (backend_info.connection_info.local !== false ? '' : '_blank')
+                                                                                  }">
+                                                                        <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: backend_info.connection_info.local === false"></i> <span data-bind="text: backend_info.name" class="hand"></span>
+                                                                    </a>
+                                                                    (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: backend_info.preset"></span>&quot;)
+                                                                <!-- /ko -->
+                                                                <!-- ko if: quota !== undefined && quota > 0 -->
+                                                                    <br /><span data-i18n="ovs:generic.cache_quota"></span>: <span data-bind="text: $root.formatBytes(quota)"></span>
+                                                                <!-- /ko -->
+                                                            <!-- /ko -->
+                                                        </div>
+                                                    <!-- /ko -->
+                                                </td>
+                                                <!-- Second column -->
+                                                <td>
+                                                    <span data-i18n="ovs:generic.xmlrpcport"></span>
+                                                </td>
+                                                <td colspan="1">
+                                                    <span data-bind="text: ports().xmlrpc"></span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <!-- Empty to fill in for the expand button -->
+                                                <td></td>
+                                                <!-- First column -->
+                                                <td>
+                                                    <span data-i18n="ovs:vpools.block_caching"></span>
+                                                </td>
+                                                <td colspan="2">
+                                                    <!-- ko with: vpoolBackendInfo().caching_info.block_cache -->
+                                                        <div>
+                                                            <!-- ko ifnot: $parents[1].supportsBlockCache() -->
+                                                                <span data-i18n="ovs:generic.null"></span>
+                                                            <!-- /ko -->
+                                                            <!-- ko if: $parents[1].supportsBlockCache() -->
+                                                                <span data-bind="translate: 'ovs:vpools.caching_types.' + $parent.stringifiedCaching($data)"></span>
+                                                                <!-- ko ifnot: $parent.stringifiedCaching($data) === 'none' -->
+                                                                    <span data-i18n="ovs:generic.on"></span>
+                                                                    <!-- ko if: [null, undefined].contains(backend_info) -->
+                                                                        <span data-i18n="ovs:generic.local"></span>
+                                                                    <!-- /ko -->
+                                                                    <!-- ko ifnot: [null, undefined].contains(backend_info) -->
+                                                                        <a data-bind="attr: {
+                                                                                          href: 'https://' + backend_info.connection_info.host + ':' + backend_info.connection_info.port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backend_info.backend_guid }),
+                                                                                          target: (backend_info.connection_info.local !== false ? '' : '_blank')
+                                                                                      }">
+                                                                            <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: backend_info.connection_info.local === false"></i> <span data-bind="text: backend_info.name" class="hand"></span>
+                                                                        </a>
+                                                                        (<span data-i18n="ovs:generic.preset"></span> &quot;<span data-bind="text: backend_info.preset"></span>&quot;)
+                                                                    <!-- /ko -->
+                                                                    <!-- ko if: quota !== undefined && quota > 0 -->
+                                                                        <br /><span data-i18n="ovs:generic.cache_quota"></span>: <span data-bind="text: $root.formatBytes(quota)"></span>
+                                                                    <!-- /ko -->
+                                                                <!-- /ko -->
+                                                            <!-- /ko -->
+                                                        </div>
+                                                    <!-- /ko -->
+                                                </td>
+                                                <!-- Second column -->
+                                                <td>
+                                                    <span data-i18n="ovs:generic.dtl_port"></span>
+                                                </td>
+                                                <td colspan="1">
+                                                    <span data-bind="text: ports().dtl"></span>
+                                                </td>
+                                            </tr>
+                                        <!-- /ko -->
+                                        <!-- /ko -->
+                                        </tbody>
                                     <!-- /ko -->
                                 </table>
                             </td>

@@ -52,15 +52,9 @@ define([
         }
     });
     // Check if the setPrototypeOf exists
-    if (Object.setPrototypeOf) {
-        Object.setPrototypeOf(OVSError, Error);
-    }
-    else {
-        OVSError.__proto__ = Error;
-    }
+    if (Object.setPrototypeOf) { Object.setPrototypeOf(OVSError, Error); }
+    else { OVSError.__proto__ = Error; }
 
-    return {
-        OVSError: OVSError
-    }
+    return { OVSError: OVSError }
 
 });

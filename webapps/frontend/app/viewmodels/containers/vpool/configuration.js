@@ -135,7 +135,12 @@ define([
         self.mds_tlogs          = ko.observable();
         self.mds_safety         = ko.observable().extend({ numeric: {min: 1, max: 5}});
 
-        ko.mapping.fromJS(data, {}, self);
+        // Default data
+        var vmData = $.extend({
+            mds_safety: 3
+        }, data);
+
+        ko.mapping.fromJS(vmData, {}, self);
     };
 
     var AdvancedConfigModel = function(data) {

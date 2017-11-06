@@ -18,7 +18,7 @@ define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     'viewmodels/containers/vpool/vpool',
-    'viewmodels/wizards/addvpool_rework/index'
+    'viewmodels/wizards/addvpool/index'
 ], function($, dialog, ko, shared, generic, Refresher, api, VPool, AddVPoolWizard) {
     "use strict";
     return function() {
