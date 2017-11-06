@@ -93,7 +93,7 @@ define([
             client_id: undefined,
             client_secret: undefined,
             host: undefined,
-            port: undefined,
+            port: 443,
             local: undefined
         }, data);
 
