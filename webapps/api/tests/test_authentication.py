@@ -374,8 +374,8 @@ class Authentication(unittest.TestCase):
         self.assertDictEqual(response_content, result)
 
         # Test config expiration
-        week_expiration = 60 * 60 * 24 * 7
-        Configuration.set('ovs/framework/api/oauth|expiration_client', week_expiration)
+        day_expiration = 60 * 60 * 24 * 1
+        Configuration.set('ovs/framework/api/oauth|expiration_client', day_expiration)
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.6', HTTP_AUTHORIZATION=header)
         response = OAuth2TokenView.as_view()(request)
         self.assertEqual(response.status_code, 200)
@@ -383,7 +383,7 @@ class Authentication(unittest.TestCase):
         self.assertIn('access_token', response_content)
         result = {'access_token': response_content['access_token'],
                   'token_type': 'bearer',
-                  'expires_in': OAuth2Toolbox.EXPIRATION_CLIENT}
+                  'expires_in': day_expiration}
         self.assertDictEqual(response_content, result)
 
     def test_specify_scopes(self):

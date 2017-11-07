@@ -50,7 +50,7 @@ class OAuth2TokenView(View):
         Handles token post
         """
         expiration_user = Configuration.get('ovs/framework/api/oauth|expiration_user', default=OAuth2Toolbox.EXPIRATION_USER)
-        expiration_client = Configuration.get('ovs/framework/api/oauth|expiration_user', default=OAuth2Toolbox.EXPIRATION_CLIENT)
+        expiration_client = Configuration.get('ovs/framework/api/oauth|expiration_client', default=OAuth2Toolbox.EXPIRATION_CLIENT)
         _ = args, kwargs
         if 'grant_type' not in request.POST:
             raise HttpBadRequestException(error='invalid_request',
