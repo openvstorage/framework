@@ -31,8 +31,8 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
-from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.api.exceptions import HttpBadRequestException
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 
 
@@ -42,9 +42,6 @@ class OAuth2TokenView(View):
     """
     logger = Logger('api')
 
-    EXPIRATION_PASSWORD = 60 * 60 * 12
-    EXPIRATION_CLIENT = 60 * 60
-
     @log()
     @auto_response()
     @limit(amount=5, per=60, timeout=60)
@@ -52,12 +49,8 @@ class OAuth2TokenView(View):
         """
         Handles token post
         """
-        expiration = Configuration.get('ovs/framework/api/oauth|expiration', default={})
-        if not isinstance(expiration, dict):
-            self.logger.exception('The oauth expiration configuration is not an object. Falling back to defaults')
-            expiration = {}
-        expiration_password = expiration.get('password', self.EXPIRATION_PASSWORD)
-        expiration_client = expiration.get('client', self.EXPIRATION_CLIENT)
+        expiration_user = Configuration.get('ovs/framework/api/oauth|expiration_user', default=OAuth2Toolbox.EXPIRATION_USER)
+        expiration_client = Configuration.get('ovs/framework/api/oauth|expiration_user', default=OAuth2Toolbox.EXPIRATION_CLIENT)
         _ = args, kwargs
         if 'grant_type' not in request.POST:
             raise HttpBadRequestException(error='invalid_request',
@@ -87,7 +80,7 @@ class OAuth2TokenView(View):
             client = clients[0]
             try:
                 access_token, _ = OAuth2Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
-                access_token.expiration = int(time.time() + expiration_password)
+                access_token.expiration = int(time.time() + expiration_user)
                 access_token.save()
             except ValueError as error:
                 if error.message == 'invalid_scope':
@@ -97,7 +90,7 @@ class OAuth2TokenView(View):
             OAuth2Toolbox.clean_tokens(client)
             return HttpResponse(json.dumps({'access_token': access_token.access_token,
                                             'token_type': 'bearer',
-                                            'expires_in': expiration_password}),
+                                            'expires_in': expiration_user}),
                                 content_type='application/json')
         elif grant_type == 'client_credentials':
             # Client Credentials
