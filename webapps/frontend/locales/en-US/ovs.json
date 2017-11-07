@@ -971,7 +971,7 @@
                 "invalid_name": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "ip_address": "Storage IP:",
                 "loading_backend_information": "Backend information is being loaded",
-                "local_host": "Use local Open vStorage backend",
+                "local_backend": "Use local Open vStorage backend",
                 "metadata_loading": "MetaData is being loaded",
                 "missing_role": "Missing required partition role: __what__",
                 "missing_storage_ip": "A Storage IP must be selected",

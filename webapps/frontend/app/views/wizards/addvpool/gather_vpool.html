@@ -26,6 +26,44 @@ but WITHOUT ANY WARRANTY of any kind.
         </div>
     </div>
     <!-- /ko -->
+    <div data-bind="visible: data.isExtend() === false">
+        <!-- ko with: data.backendData.backend_info.connection_info -->
+        <p data-i18n="ovs:wizards.add_vpool.gather_vpool.backend_info"></p>
+        <div class="form-group">
+            <div class="col-lg-3"></div>
+            <div class="col-lg-7">
+                <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: isLocalBackend" />
+                <label for="inputBackendLocalHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.local_backend" style="font-weight: normal;"></label>
+            </div>
+            <div data-bind="visible: !isLocalBackend()">
+                <div data-bind="css: { 'has-error': $root.canContinue().fields.contains('invalid_alba_info') }">
+                    <div class="form-group">
+                        <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></label>
+                        <div class="col-lg-3">
+                            <input type="text" id="inputBackendHost" class="autofocus form-control" data-bind="value: host, valueUpdate: 'input'" />
+                        </div>
+                        <label class="col-lg-1 control-label" for="inputBackendPort" data-i18n="ovs:wizards.add_vpool.gather_vpool.port"></label>
+                        <div class="col-lg-2">
+                            <input type="text" id="inputBackendPort" class="autofocus form-control" data-bind="value: port, valueUpdate: 'input'" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="col-lg-3 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.add_vpool.gather_vpool.client_id"></label>
+                        <div class="col-lg-7">
+                            <input type="text" id="inputBackendClientId" class="autofocus form-control" data-bind="value: client_id, valueUpdate: 'input'" />
+                        </div>
+                    </div>
+                    <div class="form-group" >
+                        <label class="col-lg-3 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.add_vpool.gather_vpool.client_secret"></label>
+                        <div class="col-lg-7">
+                            <input type="password" id="inputBackendClientSecret" class="autofocus form-control" data-bind="value: client_secret, valueUpdate: 'input'" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /ko -->
+    </div>
     <div class="form-group">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></label>
         <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }" style="margin-bottom: -5px;">
@@ -54,7 +92,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     data-bind="click: loadBackends,
                                style: {'margin-top': (vpoolBackends() !== undefined && vpoolBackends().length > 0 ? '-26px' : '')},
                                enable: !data.loadingBackends(),
-                               visible: !data.backendData.isLocalBackend() && data.vPool() === undefined">
+                               visible: !data.backendData.backend_info.isLocalBackend()">
                 <span class="fa fa-" data-bind="css: { 'fa-spin': data.loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
                 <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
             </button>

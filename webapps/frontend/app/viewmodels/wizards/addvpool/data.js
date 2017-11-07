@@ -39,12 +39,12 @@ define(['jquery', 'knockout',
         self.storageDriverParams                = undefined;  // Params related to the StorageDriver in general (proxies, globalWriteBuffer, storageIp) Undefined as a viewmodel will be set
         // Shared across the pages
         // Handles
-        self.loadBackendsHandle     = undefined;
+        self.loadBackendsHandle                 = undefined;
         self.loadAvailableStorageRoutersHandle  = undefined;
         self.loadStorageRoutersHandle           = undefined;
 
         // Observables
-        self._storageRouter                      = ko.observable(storageRouter);
+        self._storageRouter                     = ko.observable(storageRouter);
         self.vPool                              = ko.observable(vPool);
         self.isExtend                           = ko.observable(isExtend);
         // Data observables

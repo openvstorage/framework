@@ -93,15 +93,17 @@ define([
             }
             if (data.metadata !== undefined && data.metadata !== null && data.metadata.hasOwnProperty('backend')) {
                 if (data.metadata.backend.hasOwnProperty('backend_info')) {
-                    generic.trySet(self.backendGuid, data.metadata.backend.backend_info, 'backend_guid');
-                    generic.trySet(self.backendName, data.metadata.backend.backend_info, 'name');
-                    generic.trySet(self.backendPreset, data.metadata.backend.backend_info, 'preset');
-                    generic.trySet(self.backendPolicies, data.metadata.backend.backend_info, 'policies');
+                    var backendInfo = data.metadata.backend.backend_info;
+                    generic.trySet(self.backendGuid, backendInfo, 'backend_guid');
+                    generic.trySet(self.backendName, backendInfo, 'name');
+                    generic.trySet(self.backendPreset, backendInfo, 'preset');
+                    generic.trySet(self.backendPolicies, backendInfo, 'policies');
 
-                    if (data.metadata.backend.backend_info.hasOwnProperty('connection_info')) {
-                    generic.trySet(self.backendHost, data.metadata.backend.connection_info, 'host');
-                    generic.trySet(self.backendPort, data.metadata.backend.connection_info, 'port');
-                    generic.trySet(self.backendLocal, data.metadata.backend.connection_info, 'local');
+                    if (backendInfo.hasOwnProperty('connection_info')) {
+                        var connectionInfo = backendInfo.connection_info;
+                        generic.trySet(self.backendHost, connectionInfo, 'host');
+                        generic.trySet(self.backendPort, connectionInfo, 'port');
+                        generic.trySet(self.backendLocal, connectionInfo, 'local');
                     }
                 }
             }

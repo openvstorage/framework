@@ -37,7 +37,7 @@ define([
             relayParams.client_id = relayParams.client_id.replace(/\s+/, "");
             relayParams.client_secret = relayParams.client_secret.replace(/\s+/, "");
         }
-        if (!relayParams.relay.endsWith('/')) { relayParams.relay = relayParams.relay + '/'; }
+        if (relayParams.relay && !relayParams.relay.endsWith('/')) { relayParams.relay = relayParams.relay + '/'; }
         // Add relay params to query params, looping in favor of extending because of the warning
         $.each(relayParams, function(key, value) {
             if (key === 'relay') { return true; }
