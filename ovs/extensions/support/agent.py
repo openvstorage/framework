@@ -40,20 +40,77 @@ class SupportAgent(object):
     """
     _logger = Logger('extensions-support')
 
+    DEFAULT_INTERVAL = 5
+    LOCATION_CLUSTER_ID = '/ovs/framework/cluster_id'
+    LOCATION_INTERVAL = '/ovs/framework/support|interval'
+    LOCATION_SUPPORT_AGENT = '/ovs/framework/support|support_agent'
+    LOCATION_REMOTE_ACCESS = '/ovs/framework/support|remote_access'
+    CONFIGURATION_MESSAGE = 'Unable to retrieve "{0}" within the configuration Arakoon. Running support agent with the default.'
+
     def __init__(self):
         """
         Initializes the client
         """
-        self._cluster_id = Configuration.get('/ovs/framework/cluster_id').replace(r"'", r"'\''")
-        self._service_type = ServiceFactory.get_service_type()
-        self._storagerouter = System.get_my_storagerouter()
+        # Safe calls
+        self._node_id = System.get_my_machine_id().replace(r"'", r"'\''")
         self._package_manager = PackageFactory.get_manager()
         self._service_manager = ServiceFactory.get_manager()
-        self._client = SSHClient(endpoint=self._storagerouter)
-        self._node_id = self._storagerouter.machine_id.replace(r"'", r"'\''")
+        self._service_type = ServiceFactory.get_service_type()
+
+        # Potential failing calls
+        try:
+            # Might fail when Arakoon would be down
+            self._cluster_id = Configuration.get(self.LOCATION_CLUSTER_ID).replace(r"'", r"'\''")
+        except:
+            self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_CLUSTER_ID))
+            # Fall back to the config file
+            with open(Configuration.CONFIG_STORE_LOCATION, 'r') as config_file:
+                config = json.load(config_file)
+                if 'cluster_id' in config:
+                    self._cluster_id = config['cluster_id']
+                else:
+                    raise
+        try:
+            self.interval = Configuration.get(self.LOCATION_INTERVAL, default=self.DEFAULT_INTERVAL)
+        except:
+            self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_INTERVAL))
+            self.interval = self.DEFAULT_INTERVAL
+
         self._openvpn_service_name = 'openvpn@ovs_{0}-{1}'.format(self._cluster_id, self._node_id)
 
-        self.interval = Configuration.get('/ovs/framework/support|interval', default=60)
+        # Calls to look out for. These could still be None when using them
+        self._storagerouter = None
+        self._client = None
+        self._set_storagerouter()
+        self._set_client()
+
+    def _set_storagerouter(self):
+        """
+        Set the clients storagerouter if the storagerouter is None.
+        :return: Value for StorageRouter (either None or the StorageRouter object)
+        :rtype: NoneType or ovs.dal.hybrids.storagerouter.StorageRouter
+        """
+        if self._storagerouter is None:
+            try:
+                # Will fail when Arakoon is down
+                self._storagerouter = System.get_my_storagerouter()
+            except:
+                self._logger.exception('Unable to set the storagerouter. Heartbeat will be affected.')
+        return self._storagerouter
+
+    def _set_client(self):
+        """
+        Sets the clients SSHClient if the storagerouter is not None.
+        :return: Value for client (either None or the SSHClient object)
+        :rtype: NoneType or ovs.extensions.generic.sshclient.SSHClient
+        """
+        if self._storagerouter is None:
+            logger.exception('Unable to build a local client, no storagerouter was found to use.')
+            return
+        else:
+            if self._client is None:
+                self._client = SSHClient(endpoint=self._storagerouter)
+        return self._client
 
     def get_heartbeat_data(self):
         """
@@ -63,25 +120,29 @@ class SupportAgent(object):
         versions = collections.OrderedDict()
         services = collections.OrderedDict()
 
-        # Versions
-        try:
-            for pkg_name, version in self._package_manager.get_installed_versions().iteritems():
-                versions[pkg_name] = str(version)
-        except Exception as ex:
-            errors.append(str(ex))
+        # Check for the existence of the client
+        if self._client is None and self._set_client() is None:
+            errors.append('Unable to create a local client')
+        else:
+            # Versions
+            try:
+                for pkg_name, version in self._package_manager.get_installed_versions(client=self._client).iteritems():
+                    versions[pkg_name] = str(version)
+            except Exception as ex:
+                errors.append(str(ex))
 
-        # Services
-        try:
-            for service_info in sorted(self._service_manager.list_services(client=self._client, add_status_info=True)):
-                if not service_info.startswith('ovs-'):
-                    continue
-                service_name = service_info.split()[0].strip()
-                services[service_name] = ' '.join(service_info.split()[1:])
-        except Exception as ex:
-            errors.append(str(ex))
+            # Services
+            try:
+                for service_info in sorted(self._service_manager.list_services(client=self._client, add_status_info=True)):
+                    if not service_info.startswith('ovs-'):
+                        continue
+                    service_name = service_info.split()[0].strip()
+                    services[service_name] = ' '.join(service_info.split()[1:])
+            except Exception as ex:
+                errors.append(str(ex))
 
         data = {'cid': self._cluster_id,
-                'nid': self._storagerouter.machine_id,
+                'nid': self._node_id,
                 'metadata': {'versions': versions,
                              'services': services}}
         if len(errors) > 0:
@@ -213,13 +274,20 @@ class SupportAgent(object):
 
         try:
             # Try to save the timestamp at which we last successfully send the heartbeat data
+            if self._storagerouter is None:
+                self._set_storagerouter()  # Try to set the storagerouter.
             self._storagerouter.last_heartbeat = time.time()
             self._storagerouter.save()
         except Exception:
             self._logger.exception('Could not save last heartbeat timestamp')
             # Ignore this error, it's not mandatory for the support agent
 
-        if Configuration.get('/ovs/framework/support|remote_access') is True:
+        try:
+            remote_access_enabled = Configuration.get(self.LOCATION_REMOTE_ACCESS)
+        except Exception:
+            remote_access_enabled = True
+            self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_REMOTE_ACCESS))
+        if remote_access_enabled is True:
             try:
                 for task in return_data['tasks']:
                     self._process_task(task['code'], task['metadata'])
@@ -237,7 +305,13 @@ class SupportAgent(object):
 
 if __name__ == '__main__':
     logger = Logger('extensions-support')
-    if Configuration.get('/ovs/framework/support|support_agent') is False:
+    try:
+        support_agent_enabled = Configuration.get(SupportAgent.LOCATION_SUPPORT_AGENT)
+    except Exception:
+        support_agent_enabled = True
+        logger.exception(SupportAgent.CONFIGURATION_MESSAGE.format(SupportAgent.LOCATION_SUPPORT_AGENT))
+
+    if support_agent_enabled is False:
         logger.info('Support not enabled')
         sys.exit(0)
 
