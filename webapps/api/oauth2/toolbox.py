@@ -28,6 +28,9 @@ class OAuth2Toolbox(object):
     """
     OAuth2Toolbox
     """
+    EXPIRATION_USER = 60 * 60 * 12
+    EXPIRATION_CLIENT = 60 * 60
+
     @staticmethod
     def generate_tokens(client, generate_access=False, generic_refresh=False, scopes=None):
         """
