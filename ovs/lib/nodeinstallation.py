@@ -731,7 +731,8 @@ class NodeInstallationController(object):
         bootstrap_location = Configuration.CONFIG_STORE_LOCATION
         if not target_client.file_exists(bootstrap_location):
             target_client.file_create(bootstrap_location)
-        target_client.file_write(bootstrap_location, json.dumps({'configuration_store': 'arakoon'}, indent=4))
+        framework_config = {'configuration_store': 'arakoon'}
+        target_client.file_write(bootstrap_location, json.dumps(framework_config, indent=4))
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration Arakoon')
 
@@ -756,6 +757,10 @@ class NodeInstallationController(object):
 
         Configuration.initialize(external_config=external_config, logging_target=logging_target)
         Configuration.initialize_host(machine_id)
+
+        # Write away cluster id to let the support agent read it when Arakoon is down
+        framework_config['cluster_id'] = Configuration.get('/ovs/framework/cluster_id')
+        target_client.file_write(Configuration.CONFIG_STORE_LOCATION, json.dumps(framework_config, indent=4))
 
         if rdma is None:
             rdma = Interactive.ask_yesno(message='Enable RDMA?', default_value=False)

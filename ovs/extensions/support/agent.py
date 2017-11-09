@@ -61,18 +61,20 @@ class SupportAgent(object):
         try:
             # Might fail when Arakoon would be down
             self._cluster_id = Configuration.get(self.LOCATION_CLUSTER_ID).replace(r"'", r"'\''")
-        except:
+        except Exception:
             self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_CLUSTER_ID))
             # Fall back to the config file
             with open(Configuration.CONFIG_STORE_LOCATION, 'r') as config_file:
                 config = json.load(config_file)
-                if 'cluster_id' in config:
-                    self._cluster_id = config['cluster_id']
-                else:
-                    raise
+                self._logger.info(config)
+            if 'cluster_id' in config:
+                self._cluster_id = config['cluster_id']
+            else:
+                raise RuntimeError('Could not find "cluster_id" within {0} or the configuration Arakoon. Stopping...'
+                                   .format(Configuration.CONFIG_STORE_LOCATION))
         try:
             self.interval = Configuration.get(self.LOCATION_INTERVAL, default=self.DEFAULT_INTERVAL)
-        except:
+        except Exception:
             self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_INTERVAL))
             self.interval = self.DEFAULT_INTERVAL
 
@@ -105,7 +107,7 @@ class SupportAgent(object):
         :rtype: NoneType or ovs.extensions.generic.sshclient.SSHClient
         """
         if self._storagerouter is None:
-            logger.exception('Unable to build a local client, no storagerouter was found to use.')
+            logger.error('Unable to build a local client, no storagerouter was found to use.')
             return
         else:
             if self._client is None:
