@@ -728,11 +728,10 @@ class NodeInstallationController(object):
                     Interactive.ask_continue()
                 external_config = True
 
-        bootstrap_location = Configuration.CONFIG_STORE_LOCATION
-        if not target_client.file_exists(bootstrap_location):
-            target_client.file_create(bootstrap_location)
+        if not target_client.file_exists(Configuration.CONFIG_STORE_LOCATION):
+            target_client.file_create(Configuration.CONFIG_STORE_LOCATION)
         framework_config = {'configuration_store': 'arakoon'}
-        target_client.file_write(bootstrap_location, json.dumps(framework_config, indent=4))
+        target_client.file_write(Configuration.CONFIG_STORE_LOCATION, json.dumps(framework_config, indent=4))
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration Arakoon')
 

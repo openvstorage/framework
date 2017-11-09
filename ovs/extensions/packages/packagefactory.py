@@ -27,7 +27,7 @@ class PackageFactory(_PackageFactory):
     """
     Factory class returning specialized classes
     """
-    _logger = Logger('package_factory')
+    _logger = Logger('extensions-packages')
 
     universal_packages = ['arakoon', 'openvstorage', 'openvstorage-backend', 'openvstorage-sdm']
     ose_only_packages = ['alba', 'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']

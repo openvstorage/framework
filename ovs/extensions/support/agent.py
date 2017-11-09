@@ -18,7 +18,6 @@
 Module for the Support Agent
 """
 
-import sys
 import json
 import time
 import base64
@@ -34,18 +33,31 @@ from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 
 
+class ConfigurationNotFoundError(RuntimeError):
+    pass
+
+
 class SupportAgent(object):
     """
     Represents the Support client
     """
-    _logger = Logger('extensions-support')
+    logger = Logger('extensions-support')
 
-    DEFAULT_INTERVAL = 5
+    _MISSING = object()  # Used to check missing properties in function
+
+    DEFAULT_INTERVAL = 60
+    DEFAULT_ERROR_DELAY = 10  # Seconds to wait before rerunning loop on errors
+    DEFAULT_SUPPORT_ENABLED = False
+    DEFAULT_REMOTE_ACCESS_ENABLED = False
+
+    KEY_SUPPORT_AGENT = 'support_agent'
+    KEY_REMOTE_ACCESS = 'remote_access'
+    KEY_INTERVAL = 'interval'
+    FALLBACK_CONFIG = '/opt/OpenvStorage/config/support_agent.json'
     LOCATION_CLUSTER_ID = '/ovs/framework/cluster_id'
-    LOCATION_INTERVAL = '/ovs/framework/support|interval'
-    LOCATION_SUPPORT_AGENT = '/ovs/framework/support|support_agent'
-    LOCATION_REMOTE_ACCESS = '/ovs/framework/support|remote_access'
-    CONFIGURATION_MESSAGE = 'Unable to retrieve "{0}" within the configuration Arakoon. Running support agent with the default.'
+    LOCATION_INTERVAL = '/ovs/framework/support|{0}'.format(KEY_INTERVAL)
+    LOCATION_SUPPORT_AGENT = '/ovs/framework/support|{0}'.format(KEY_SUPPORT_AGENT)
+    LOCATION_REMOTE_ACCESS = '/ovs/framework/support|{0}'.format(KEY_REMOTE_ACCESS)
 
     def __init__(self):
         """
@@ -59,24 +71,10 @@ class SupportAgent(object):
 
         # Potential failing calls
         try:
-            # Might fail when Arakoon would be down
-            self._cluster_id = Configuration.get(self.LOCATION_CLUSTER_ID).replace(r"'", r"'\''")
-        except Exception:
-            self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_CLUSTER_ID))
-            # Fall back to the config file
-            with open(Configuration.CONFIG_STORE_LOCATION, 'r') as config_file:
-                config = json.load(config_file)
-                self._logger.info(config)
-            if 'cluster_id' in config:
-                self._cluster_id = config['cluster_id']
-            else:
-                raise RuntimeError('Could not find "cluster_id" within {0} or the configuration Arakoon. Stopping...'
-                                   .format(Configuration.CONFIG_STORE_LOCATION))
-        try:
-            self.interval = Configuration.get(self.LOCATION_INTERVAL, default=self.DEFAULT_INTERVAL)
-        except Exception:
-            self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_INTERVAL))
-            self.interval = self.DEFAULT_INTERVAL
+            self._cluster_id = self.get_config_key(self.LOCATION_CLUSTER_ID, fallback=[Configuration.CONFIG_STORE_LOCATION, 'cluster_id'])
+        except ConfigurationNotFoundError:
+            raise RuntimeError('Could not determine the id of the cluster. Stopping...')
+        self.interval = self.get_config_key(self.LOCATION_INTERVAL, fallback=[self.FALLBACK_CONFIG, self.KEY_INTERVAL], default=self.DEFAULT_INTERVAL)
 
         self._openvpn_service_name = 'openvpn@ovs_{0}-{1}'.format(self._cluster_id, self._node_id)
 
@@ -85,6 +83,51 @@ class SupportAgent(object):
         self._client = None
         self._set_storagerouter()
         self._set_client()
+
+    @classmethod
+    def get_config_key(cls, key, fallback=_MISSING, default=_MISSING):
+        """
+        Get a certain key from config management
+        When fetching from config management fails, it can fallback to a file on the local filesystem
+        When the fallback also fails (due to the file being missing or invalid or the fallback key is not present) an optional default can be returned
+        :param key: Key to retrieve from the config management
+        :param default: Default value to return
+        :param fallback: List with the fallback location and optionally a different fallback key
+        The fallback location has to be a json file.
+        Example: [/opt/OpenvStorage/config/framework.json] will look for the specified key in the framework.json
+        Example 2: [/opt/OpenvStorage/config/framework.json, cluster_id_fallback] will look for 'cluster_id_fall' in the file
+        Defaults to /opt/OpenvStorage/config/framework.json
+        Pass anything other than a list to disable fallback
+        :raises ConfigurationNotFoundError: When neither options could retrieve a value
+        :return: Value of the requested config
+        :rtype: any
+        """
+        if fallback == cls._MISSING:
+            fallback = [cls.FALLBACK_CONFIG]
+        default_specified = default != cls._MISSING
+        try:
+            return Configuration.get(key)
+        except Exception:
+            cls.logger.error('Unable to retrieve "{0}" within the configuration Arakoon'.format(key))
+            if isinstance(fallback, list) and len(fallback) > 0:
+                fallback_file = fallback[0]
+                fallback_key = fallback[1] if len(fallback) > 1 else None
+                cls.logger.warning('Relying on the fallback: file: {0}, key: {1}'.format(fallback_file, fallback_key))
+                try:
+                    with open(fallback_file, 'r') as the_file:
+                        try:
+                            config = json.load(the_file)
+                            if fallback_key is not None and fallback_key in config:
+                                return config[fallback_key]
+                            cls.logger.warning('Fallback file "{0}" has no setting for "{1}"'.format(fallback_file, fallback_key))
+                        except ValueError:
+                            cls.logger.exception('Fallback file "{0}" is not a valid JSON file'.format(fallback_file))
+                except IOError:
+                    cls.logger.exception('Fallback file "{0}" could not be opened'.format(fallback_file))
+            if default_specified is True:
+                cls.logger.warning('Relying on the default value ({0}) for "{1}"'.format(default, key))
+                return default
+            raise ConfigurationNotFoundError('Could not determine any value for "{0}". Exhausted all options'.format(key))
 
     def _set_storagerouter(self):
         """
@@ -97,7 +140,7 @@ class SupportAgent(object):
                 # Will fail when Arakoon is down
                 self._storagerouter = System.get_my_storagerouter()
             except:
-                self._logger.exception('Unable to set the storagerouter. Heartbeat will be affected.')
+                self.logger.exception('Unable to set the storagerouter. Heartbeat will be affected.')
         return self._storagerouter
 
     def _set_client(self):
@@ -107,11 +150,10 @@ class SupportAgent(object):
         :rtype: NoneType or ovs.extensions.generic.sshclient.SSHClient
         """
         if self._storagerouter is None:
-            logger.error('Unable to build a local client, no storagerouter was found to use.')
+            self.logger.error('Unable to build a local client, no storagerouter was found to use.')
             return
-        else:
-            if self._client is None:
-                self._client = SSHClient(endpoint=self._storagerouter)
+        if self._client is None:
+            self._client = SSHClient(endpoint=self._storagerouter)
         return self._client
 
     def get_heartbeat_data(self):
@@ -168,7 +210,7 @@ class SupportAgent(object):
         Processes a task
         """
         try:
-            SupportAgent._logger.debug('Processing: {0}'.format(task_code))
+            self.logger.debug('Processing: {0}'.format(task_code))
             if task_code == 'OPEN_TUNNEL':
                 self.open_tunnel(metadata)
             elif task_code == 'CLOSE_TUNNEL':
@@ -178,10 +220,10 @@ class SupportAgent(object):
             else:
                 raise RuntimeError('Unknown task')
         except Exception:
-            SupportAgent._logger.exception('Unexpected error while processing task {0} (data: {1})'.format(task_code, json.dumps(metadata)))
+            self.logger.exception('Unexpected error while processing task {0} (data: {1})'.format(task_code, json.dumps(metadata)))
             raise
         finally:
-            SupportAgent._logger.debug('Completed')
+            self.logger.debug('Completed')
 
     def open_tunnel(self, metadata):
         """
@@ -242,9 +284,9 @@ class SupportAgent(object):
     def _send_heartbeat(self):
         """
         Send heart beat to the monitoring server
-        :raises RuntimeError when in valid status code is returned by the api
+        :raises RuntimeError when invalid status code is returned by the api
         :return: Returns the response from the server
-        Example return: {u'tasks': [{'code': 'OPEN_TUNNEL', 'metadata': {'files': {'/etc/openvpn/ovs_ca.crt': 'CERTIFACTECONTENTS'}}}]}
+        Example return: {u'tasks': [{'code': 'OPEN_TUNNEL', 'metadata': {'files': {'/etc/openvpn/ovs_ca.crt': 'CERTIFACTE_CONTENTS'}}}]}
         The tasks returned from the server are classified by a task code which is one of the following: OPEN_TUNNEL, CLOSE_TUNNEL, UPLOAD_LOGFILES
         - OPEN TUNNEL tasks receive metadata which has a files entry. Example: {'metadata': {'files': {...}}}.
           The files dict will contain file names (keys) and their contents (value) Example: {my_file: my_file_contents}
@@ -266,12 +308,12 @@ class SupportAgent(object):
         """
         Executes a call
         """
-        self._logger.debug('Processing heartbeat')
+        self.logger.debug('Processing heartbeat')
         try:
             return_data = self._send_heartbeat()
-            self._logger.debug('Requested return data: {0}'.format(return_data))
+            self.logger.debug('Requested return data: {0}'.format(return_data))
         except Exception:
-            SupportAgent._logger.exception('Unexpected error during support call')
+            self.logger.exception('Unexpected error during support call')
             raise
 
         try:
@@ -281,20 +323,18 @@ class SupportAgent(object):
             self._storagerouter.last_heartbeat = time.time()
             self._storagerouter.save()
         except Exception:
-            self._logger.exception('Could not save last heartbeat timestamp')
+            self.logger.exception('Could not save last heartbeat timestamp')
             # Ignore this error, it's not mandatory for the support agent
 
-        try:
-            remote_access_enabled = Configuration.get(self.LOCATION_REMOTE_ACCESS)
-        except Exception:
-            remote_access_enabled = False
-            self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_REMOTE_ACCESS))
+        remote_access_enabled = self.get_config_key(self.LOCATION_REMOTE_ACCESS,
+                                                    fallback=[self.FALLBACK_CONFIG, self.KEY_REMOTE_ACCESS],
+                                                    default=self.DEFAULT_REMOTE_ACCESS_ENABLED)
         if remote_access_enabled is True:
             try:
                 for task in return_data['tasks']:
                     self._process_task(task['code'], task['metadata'])
             except Exception:
-                self._logger.exception('Unexpected error processing tasks')
+                self.logger.exception('Unexpected error processing tasks')
                 raise
 
         # Currently not returned by the monitoring server
@@ -304,28 +344,33 @@ class SupportAgent(object):
                 self.interval = interval
                 self._update_config('interval', str(interval))
 
+    def main(self):
+        """
+        Runs the Support Agent main loop
+        :return: None
+        :rtype: NoneType
+        """
+        while True:
+            try:
+                # Reconfiguring the settings using the GUI will restart the service but checking the values within to loop to support non-GUI edits
+                support_agent_enabled = SupportAgent.get_config_key(SupportAgent.LOCATION_SUPPORT_AGENT,
+                                                                    fallback=[SupportAgent.FALLBACK_CONFIG, 'support_agent'],
+                                                                    default=SupportAgent.DEFAULT_SUPPORT_ENABLED)
+                if support_agent_enabled is False:
+                    SupportAgent.logger.info('Support not enabled. Checking again in {0} seconds'.format(client.interval))
+                    time.sleep(self.interval)
+                    continue
+                self.run()
+                time.sleep(self.interval)
+            except KeyboardInterrupt:
+                self.logger.info('Stopping (Keyboard interrupt received)')
+                break
+            except Exception:
+                SupportAgent.logger.exception('Unexpected error during run. Retrying in {0} seconds.'.format(self.DEFAULT_ERROR_DELAY))
+                time.sleep(self.DEFAULT_ERROR_DELAY)
+
 
 if __name__ == '__main__':
-    logger = Logger('extensions-support')
-    try:
-        support_agent_enabled = Configuration.get(SupportAgent.LOCATION_SUPPORT_AGENT)
-    except Exception:
-        support_agent_enabled = False
-        logger.exception(SupportAgent.CONFIGURATION_MESSAGE.format(SupportAgent.LOCATION_SUPPORT_AGENT))
-
-    if support_agent_enabled is False:
-        logger.info('Support not enabled')
-        sys.exit(0)
-
-    logger.info('Starting up')
+    SupportAgent.logger.info('Starting up')
     client = SupportAgent()
-    while True:
-        try:
-            client.run()
-            time.sleep(client.interval)
-        except KeyboardInterrupt:
-            logger.info('Stopping (keyboard interrupt)')
-            break
-        except Exception:
-            logger.exception('Unexpected error during run')
-            time.sleep(10)
+    client.main()
