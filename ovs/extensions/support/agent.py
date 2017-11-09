@@ -287,7 +287,7 @@ class SupportAgent(object):
         try:
             remote_access_enabled = Configuration.get(self.LOCATION_REMOTE_ACCESS)
         except Exception:
-            remote_access_enabled = True
+            remote_access_enabled = False
             self._logger.exception(self.CONFIGURATION_MESSAGE.format(self.LOCATION_REMOTE_ACCESS))
         if remote_access_enabled is True:
             try:
@@ -310,7 +310,7 @@ if __name__ == '__main__':
     try:
         support_agent_enabled = Configuration.get(SupportAgent.LOCATION_SUPPORT_AGENT)
     except Exception:
-        support_agent_enabled = True
+        support_agent_enabled = False
         logger.exception(SupportAgent.CONFIGURATION_MESSAGE.format(SupportAgent.LOCATION_SUPPORT_AGENT))
 
     if support_agent_enabled is False:
