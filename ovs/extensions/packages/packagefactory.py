@@ -17,7 +17,9 @@
 """
 Package Factory module
 """
+from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonException
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.packages.packagefactory import PackageFactory as _PackageFactory
 
 
@@ -25,6 +27,8 @@ class PackageFactory(_PackageFactory):
     """
     Factory class returning specialized classes
     """
+    _logger = Logger('extensions-packages')
+
     universal_packages = ['arakoon', 'openvstorage', 'openvstorage-backend', 'openvstorage-sdm']
     ose_only_packages = ['alba', 'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']
     ee_only_packages = ['alba-ee', 'volumedriver-ee-base', 'volumedriver-ee-server']
@@ -35,20 +39,21 @@ class PackageFactory(_PackageFactory):
 
     @classmethod
     def _get_packages(cls):
-        if Configuration.exists('/ovs/framework/edition'):
-            edition = Configuration.get('/ovs/framework/edition')
-            if edition == 'community':
-                package_names = cls.ose_only_packages
-                binaries = cls.ose_only_binaries
-            elif edition == 'enterprise':
-                package_names = cls.ee_only_packages
-                binaries = cls.ee_only_binaries
-            else:
-                raise ValueError('Edition could not be found in configuration')
-        else:
-            package_names = cls.ose_only_packages + cls.ee_only_packages
-            binaries = cls.ose_only_binaries + cls.ee_only_binaries
-
+        package_names = cls.ose_only_packages + cls.ee_only_packages
+        binaries = cls.ose_only_binaries + cls.ee_only_binaries
+        try:
+            if Configuration.exists('/ovs/framework/edition'):
+                edition = Configuration.get('/ovs/framework/edition')
+                if edition == 'community':
+                    package_names = cls.ose_only_packages
+                    binaries = cls.ose_only_binaries
+                elif edition == 'enterprise':
+                    package_names = cls.ee_only_packages
+                    binaries = cls.ee_only_binaries
+                else:
+                    raise ValueError('Edition could not be found in configuration')
+        except ArakoonException:
+            cls._logger.exception('Unable to connect to the configuration Arakoon. Returning all packages/binaries')
         return {'names': package_names + cls.universal_packages,
                 'binaries': binaries + cls.universal_binaries}
 

@@ -19,6 +19,7 @@ MigrationController module
 """
 
 import copy
+import json
 from ovs.extensions.generic.logger import Logger
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
@@ -390,7 +391,6 @@ class MigrationController(object):
             except Exception:
                 MigrationController._logger.exception('Integration of stats monkey failed')
 
-
         ######################################
         # change to edition key
         if Configuration.get(key='/ovs/framework/edition', default=False) not in ['community', 'enterprise']:
@@ -405,4 +405,18 @@ class MigrationController(object):
                         MigrationController._logger.exception('StorageRouter {0} did not yield edition value'.format(sr.name))
             except Exception:
                 MigrationController._logger.exception('Introduction of version key failed')
+
+        ######################################################
+        # Write away cluster id to a file for back-up purposes
+        try:
+            cluster_id = Configuration.get(key='/ovs/framework/cluster_id', default=None)
+            with open(Configuration.CONFIG_STORE_LOCATION, 'r') as config_file:
+                config = json.load(config_file)
+            if cluster_id is not None and config.get('cluster_id', None) is None:
+                config['cluster_id'] = cluster_id
+                with open(Configuration.CONFIG_STORE_LOCATION, 'w') as config_file:
+                    json.dump(config, config_file, indent=4)
+        except Exception:
+            MigrationController._logger.exception('Writing cluster id to a file failed.')
+
         MigrationController._logger.info('Finished out of band migrations')

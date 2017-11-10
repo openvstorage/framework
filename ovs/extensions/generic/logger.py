@@ -17,7 +17,7 @@
 """
 Contains the Logger module
 """
-
+from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonException
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs_extensions.log.logger import Logger as _Logger
 
@@ -43,5 +43,5 @@ class Logger(_Logger):
         """
         try:
             return Configuration.get('/ovs/framework/logging')
-        except (IOError, NotFoundException):
+        except (IOError, NotFoundException, ArakoonException):
             return {}
