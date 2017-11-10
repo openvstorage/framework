@@ -67,13 +67,13 @@ class SupportAgent(object):
         self._node_id = System.get_my_machine_id().replace(r"'", r"'\''")
         self._package_manager = PackageFactory.get_manager()
         self._service_manager = ServiceFactory.get_manager()
+
         self._service_type = ServiceFactory.get_service_type()
+        if self._service_type != 'systemd':
+            raise NotImplementedError('Only Systemd is supported')
 
         # Potential failing calls
-        try:
-            self._cluster_id = self.get_config_key(self.LOCATION_CLUSTER_ID, fallback=[Configuration.CONFIG_STORE_LOCATION, 'cluster_id'])
-        except ConfigurationNotFoundError:
-            raise RuntimeError('Could not determine the id of the cluster. Stopping...')
+        self._cluster_id = self.get_config_key(self.LOCATION_CLUSTER_ID, fallback=[Configuration.CONFIG_STORE_LOCATION, 'cluster_id'])
         self.interval = self.get_config_key(self.LOCATION_INTERVAL, fallback=[self.FALLBACK_CONFIG, self.KEY_INTERVAL], default=self.DEFAULT_INTERVAL)
 
         self._openvpn_service_name = 'openvpn@ovs_{0}-{1}'.format(self._cluster_id, self._node_id)
@@ -242,10 +242,7 @@ class SupportAgent(object):
         for filename, contents in metadata['files'].iteritems():
             with open(filename, 'w') as the_file:
                 the_file.write(base64.b64decode(contents))
-        if self._service_type == 'upstart':
-            check_output('service openvpn start', shell=True)
-        else:
-            check_output("systemctl start '{0}'".format(self._openvpn_service_name), shell=True)
+        check_output("systemctl start '{0}'".format(self._openvpn_service_name), shell=True)
 
     @staticmethod
     def upload_files(metadata):
@@ -268,17 +265,13 @@ class SupportAgent(object):
     def close_tunnel(self, metadata):
         """
         Closes the openvpn tunnel
-        @TODO: only close the ovs remote tunnel on 14.04 (all tunnels are currently closed)
         :param metadata: Metadata for the task (empty dict for close tunnel)
         :type metadata: dict
         :return: None
         :rtype: NoneType
         """
         _ = metadata
-        if self._service_type == 'upstart':
-            check_output('service openvpn stop', shell=True)
-        else:
-            check_output("systemctl stop '{0}'".format(self._openvpn_service_name), shell=True)
+        check_output("systemctl stop '{0}'".format(self._openvpn_service_name), shell=True)
         check_output('rm -f /etc/openvpn/ovs_*', shell=True)
 
     def _send_heartbeat(self):
