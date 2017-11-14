@@ -67,8 +67,6 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
-    WATCHER_VOLDRV = 'watcher-volumedriver'
-
     _logger = Logger('lib')
     _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
     _service_manager = ServiceFactory.get_manager()
@@ -947,9 +945,9 @@ class StorageRouterController(object):
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
 
         try:
-            if not cls._service_manager.has_service(cls.WATCHER_VOLDRV, client=root_client):
-                cls._service_manager.add_service(cls.WATCHER_VOLDRV, client=root_client)
-                cls._service_manager.start_service(cls.WATCHER_VOLDRV, client=root_client)
+            if not cls._service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=root_client):
+                cls._service_manager.add_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=root_client)
+                cls._service_manager.start_service(WATCHER_VOLDRV, client=root_client)
 
             cls._service_manager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
             cls._service_manager.start_service(dtl_service, client=root_client)
@@ -1363,11 +1361,11 @@ class StorageRouterController(object):
                     cls._logger.exception('StorageDriver {0} - Delete voldrv Arakoon cluster failed'.format(storage_driver.guid))
         if len(storage_router.storagedrivers) == 0 and storage_router_online is True:  # ensure client is initialized for storagerouter
             try:
-                if cls._service_manager.has_service(cls.WATCHER_VOLDRV, client=client):
-                    cls._service_manager.stop_service(cls.WATCHER_VOLDRV, client=client)
-                    cls._service_manager.remove_service(cls.WATCHER_VOLDRV, client=client)
+                if cls._service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=client):
+                    cls._service_manager.stop_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=client)
+                    cls._service_manager.remove_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=client)
             except Exception:
-                cls._logger.exception('StorageDriver {0} - {1} deletion failed'.format(storage_driver.guid, cls.WATCHER_VOLDRV))
+                cls._logger.exception('StorageDriver {0} - {1} deletion failed'.format(storage_driver.guid, ServiceFactory.SERVICE_WATCHER_VOLDRV))
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_version_info')
@@ -1677,7 +1675,6 @@ class StorageRouterController(object):
         for partition in disk.partitions:
             if DiskPartition.ROLES.BACKEND in partition.roles:
                 raise RuntimeError('The given Disk is in use by a Backend')
-        print [i.roles for i in disk.partitions]
 
         # Create partition
         if partition_guid is None:
