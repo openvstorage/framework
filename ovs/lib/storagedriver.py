@@ -251,15 +251,15 @@ class StorageDriverController(object):
         :type complete_removal: bool
         :return: None
         """
-        _ = complete_removal
+        from ovs.lib.storagerouter import StorageRouterController  # Import here to prevent from circular references
 
+        _ = complete_removal
         service_manager = ServiceFactory.get_manager()
-        service_name = 'watcher-volumedriver'
         try:
             client = SSHClient(endpoint=cluster_ip, username='root')
-            if service_manager.has_service(name=service_name, client=client):
-                service_manager.stop_service(name=service_name, client=client)
-                service_manager.remove_service(name=service_name, client=client)
+            if service_manager.has_service(name=StorageRouterController.WATCHER_VOLDRV, client=client):
+                service_manager.stop_service(name=StorageRouterController.WATCHER_VOLDRV, client=client)
+                service_manager.remove_service(name=StorageRouterController.WATCHER_VOLDRV, client=client)
         except (UnableToConnectException, NotAuthenticatedException):
             pass
 
