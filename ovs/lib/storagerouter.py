@@ -947,7 +947,7 @@ class StorageRouterController(object):
         try:
             if not cls._service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=root_client):
                 cls._service_manager.add_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=root_client)
-                cls._service_manager.start_service(WATCHER_VOLDRV, client=root_client)
+                cls._service_manager.start_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=root_client)
 
             cls._service_manager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
             cls._service_manager.start_service(dtl_service, client=root_client)
@@ -1359,6 +1359,12 @@ class StorageRouterController(object):
                     installer.delete_cluster()
                 except Exception:
                     cls._logger.exception('StorageDriver {0} - Delete voldrv Arakoon cluster failed'.format(storage_driver.guid))
+                service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON)
+                service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
+                for service in list(service_type.services):
+                    if service.name == service_name:
+                        service.delete()
+
         if len(storage_router.storagedrivers) == 0 and storage_router_online is True:  # ensure client is initialized for storagerouter
             try:
                 if cls._service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=client):
