@@ -95,7 +95,7 @@ class VPoolViewSet(viewsets.ViewSet):
         if not intersection:
             raise HttpNotAcceptableException(error='impossible_request',
                                              error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name))
-        return StorageRouterController.remove_storagedriver.delay(list(intersection)[0])
+        return StorageRouterController.remove_storagedriver.delay(StorageRouterController, list(intersection)[0])
 
     @link()
     @log()

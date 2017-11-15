@@ -356,7 +356,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         call_parameters['config_params'].pop('cache_strategy', None)
 
         # Finally, launching the add_vpool task
-        return StorageRouterController.add_vpool.delay(call_parameters)
+        return StorageRouterController.add_vpool.delay(StorageRouterController, call_parameters)
 
     @link()
     @log()
