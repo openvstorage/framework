@@ -18,15 +18,11 @@
 Module for UpdateController
 """
 
-import copy
 import time
 import inspect
-from distutils.version import LooseVersion
 from subprocess import CalledProcessError
-from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
-from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNoMaster, ArakoonNotFound
+from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex, NoLockAvailableException
 from ovs.extensions.generic.logger import Logger
@@ -51,26 +47,15 @@ class UpdateController(object):
     _logger = Logger(name='update', forced_target_type='file')
     _update_file = '/etc/ready_for_upgrade'
     _update_ongoing_file = '/etc/update_ongoing'
-
-    _packages_core = {'framework': {'arakoon', 'openvstorage', 'openvstorage-extensions'},
-                      'storagedriver': {'alba', 'alba-ee', 'arakoon',
-                                        'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server',
-                                        'volumedriver-ee-base', 'volumedriver-ee-server'}}
-    _packages_core_blocking = _packages_core['framework'].difference(_packages_core['storagedriver'])
-    _packages_mutual_excl = [['volumedriver-ee-server', 'volumedriver-no-dedup-server'],
-                             ['volumedriver-ee-base', 'volumedriver-no-dedup-base'],
-                             ['alba', 'alba-ee']]
-    _packages_matches = [['volumedriver-ee-server', 'volumedriver-ee-base'],
-                         ['volumedriver-no-dedup-server', 'volumedriver-no-dedup-base']]
-
-    packages_core_all = _packages_core['framework'].union(_packages_core['storagedriver'])
+    _package_manager = PackageFactory.get_manager()
+    _service_manager = ServiceFactory.get_manager()
 
     #########
     # HOOKS #
     #########
-    @staticmethod
+    @classmethod
     @add_hooks('update', 'get_package_info_multi')
-    def _get_package_information_core(client, package_info):
+    def _get_package_information_core(cls, client, package_info):
         """
         Called by GenericController.refresh_package_information() every hour
 
@@ -78,14 +63,14 @@ class UpdateController(object):
         Retrieve information about the versions to which each package can potentially be updated
         If installed version is different from candidate version --> store this information in model
 
-        Additionally check the services with a 'run' file
-        Verify whether the running version is up-to-date with the candidate version
+        Additionally if installed version is identical to candidate version, check the services with a 'run' file
+        Verify whether the running version is identical to the candidate version
         If different --> store this information in the model
 
         Result: Every package with updates or which requires services to be restarted is stored in the model
 
         :param client: Client on which to collect the version information
-        :type client: SSHClient
+        :type client: ovs_extensions.generic.sshclient.SSHClient
         :param package_info: Dictionary passed in by the thread calling this function
         :type package_info: dict
         :return: Package information
@@ -95,152 +80,28 @@ class UpdateController(object):
             if client.username != 'root':
                 raise RuntimeError('Only the "root" user can retrieve the package information')
 
-            package_manager = PackageFactory.get_manager()
-            service_manager = ServiceFactory.get_manager()
+            binaries = cls._package_manager.get_binary_versions(client=client)
+            service_info = ServiceFactory.get_services_with_version_files(storagerouter=StorageRouterList.get_by_ip(ip=client.ip))
+            packages_to_update = PackageFactory.get_packages_to_update(client=client)
+            services_to_update = ServiceFactory.get_services_to_update(client=client,
+                                                                       binaries=binaries,
+                                                                       service_info=service_info)
 
-            binaries = package_manager.get_binary_versions(client=client, package_names=UpdateController._packages_core['storagedriver'])
-            installed = package_manager.get_installed_versions(client=client, package_names=UpdateController.packages_core_all)
-            candidate = package_manager.get_candidate_versions(client=client, package_names=UpdateController.packages_core_all)
-            not_installed = set(UpdateController.packages_core_all) - set(installed.keys())
-            candidate_difference = set(UpdateController.packages_core_all) - set(candidate.keys())
-
-            for package_name in not_installed:
-                found = False
-                for entry in UpdateController._packages_mutual_excl:
-                    if package_name in entry:
-                        found = True
-                        if entry[1 - entry.index(package_name)] in not_installed:
-                            raise RuntimeError('Conflicting packages installed: {0}'.format(entry))
-                if found is False:
-                    raise RuntimeError('Missing non-installed package: {0}'.format(package_name))
-                for match in UpdateController._packages_matches:
-                    if package_name in match:
-                        other_package = match[1 - match.index(package_name)]
-                        if other_package not in not_installed:
-                            raise RuntimeError('Unexpected installed package: {0}'.format(other_package))
-                if package_name not in candidate_difference:
-                    raise RuntimeError('Unexpected difference in missing installed/candidates: {0}'.format(package_name))
-                candidate_difference.remove(package_name)
-            if len(candidate_difference) > 0:
-                raise RuntimeError('No candidates available for some packages: {0}'.format(candidate_difference))
-
-            # Retrieve Arakoon information
-            framework_arakoons = []
-            storagedriver_arakoons = []
-            for cluster, arakoon_list in {'cacc': framework_arakoons,
-                                          'ovsdb': framework_arakoons,
-                                          'voldrv': storagedriver_arakoons}.iteritems():
-                cluster_name = ArakoonClusterConfig.get_cluster_name(cluster)
-                if cluster_name is None:
-                    continue
-
-                ip = client.ip if cluster == 'cacc' else None
-                try:
-                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)
-                except ArakoonNoMaster:
-                    raise RuntimeError('Arakoon cluster {0} does not have a master'.format(cluster))
-                except ArakoonNotFound:
-                    raise RuntimeError('Arakoon cluster {0} does not have the required metadata key'.format(cluster))
-
-                if arakoon_metadata['internal'] is True:
-                    arakoon_list.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_metadata['cluster_name']))
-
-            storagerouter = StorageRouterList.get_by_ip(client.ip)
-            alba_proxies = []
-            for service in storagerouter.services:
-                if service.type.name == ServiceType.SERVICE_TYPES.ALBA_PROXY:
-                    alba_proxies.append(service.name)
-
-            storagedriver_services = []
-            for sd in storagerouter.storagedrivers:
-                storagedriver_services.append('dtl_{0}'.format(sd.vpool.name))
-                storagedriver_services.append('volumedriver_{0}'.format(sd.vpool.name))
-
-            alba_package = 'alba' if 'alba' in installed.keys() else 'alba-ee'
-            volumedriver_base_package = 'volumedriver-no-dedup-base' if 'volumedriver-no-dedup-base' in installed.keys() else 'volumedriver-ee-base'
-            volumedriver_server_package = 'volumedriver-no-dedup-server' if 'volumedriver-no-dedup-server' in installed.keys() else 'volumedriver-ee-server'
-
-            version_mapping = {'volumedriver-server': ['volumedriver-no-dedup-server', 'volumedriver-ee-server'],
-                               'volumedriver-no-dedup-server': ['volumedriver-no-dedup-server', 'volumedriver-ee-server'],
-                               'alba': ['alba', 'alba-ee']}
-
-            default_entry = {'candidate': None,
-                             'installed': None,
-                             'services_to_restart': []}
-
-            #                       component:    package_name: services_with_run_file
-            for component, info in {'framework': {'arakoon': framework_arakoons,
-                                                  'openvstorage': [],
-                                                  'openvstorage-extensions': []},
-                                    'storagedriver': {alba_package: alba_proxies,
-                                                      'arakoon': storagedriver_arakoons,
-                                                      volumedriver_base_package: [],
-                                                      volumedriver_server_package: storagedriver_services}}.iteritems():
-                component_info = {}
-                for package, services in info.iteritems():
-                    for service in services:
-                        if not service_manager.has_service(service, client):
-                            # There's no service, so no need to restart it
-                            continue
-                        package_name = package
-                        version_file = '/opt/OpenvStorage/run/{0}.version'.format(service)
-                        if not client.file_exists(version_file):
-                            # The .version file was not found, so we don't know whether to restart it or not. Let's choose the safest option
-                            UpdateController._logger.warning('{0}: Failed to find a version file in /opt/OpenvStorage/run for service {1}'.format(client.ip, service))
-                            if package_name not in binaries:
-                                raise RuntimeError('Binary version for package {0} was not retrieved'.format(package_name))
-                            if package_name not in component_info:
-                                component_info[package_name] = copy.deepcopy(default_entry)
-                            component_info[package_name]['installed'] = '{0}-reboot'.format(binaries[package_name])
-                            component_info[package_name]['candidate'] = str(binaries[package_name])
-                            component_info[package_name]['services_to_restart'].append(service)
-                            continue
-                        # The .version file exists. Base restart requirement on its content
-                        running_versions = client.file_read(version_file).strip()
-                        for version in running_versions.split(';'):
-                            version = version.strip()
-                            running_version = None
-                            if '=' in version:
-                                package_name = version.split('=')[0]
-                                running_version = version.split('=')[1]
-                            elif version:
-                                running_version = version
-
-                            did_check = False
-                            for mapped_package_name in version_mapping.get(package_name, [package_name]):
-                                if mapped_package_name not in UpdateController.packages_core_all:
-                                    raise ValueError('Unknown package dependency found in {0}'.format(version_file))
-                                if mapped_package_name not in binaries or mapped_package_name not in installed:
-                                    continue
-
-                                did_check = True
-                                if running_version is not None and (LooseVersion(running_version) < binaries[mapped_package_name] or '-reboot' in running_version):
-                                    if mapped_package_name not in component_info:
-                                        component_info[mapped_package_name] = copy.deepcopy(default_entry)
-                                    component_info[mapped_package_name]['installed'] = running_version
-                                    component_info[mapped_package_name]['candidate'] = str(binaries[mapped_package_name])
-                                    component_info[mapped_package_name]['services_to_restart'].append(service)
-                                    break
-                            if did_check is False:
-                                raise RuntimeError('Binary version for package {0} was not retrieved'.format(package_name))
-
-                    if installed[package] < candidate[package] and package not in component_info:
-                        component_info[package] = copy.deepcopy(default_entry)
-                        component_info[package]['installed'] = str(installed[package])
-                        component_info[package]['candidate'] = str(candidate[package])
-                if component_info:
-                    if component not in package_info[client.ip]:
-                        package_info[client.ip][component] = {}
-                    package_info[client.ip][component].update(component_info)
+            # First we merge in the services
+            ExtensionsToolbox.merge_dicts(dict1=package_info[client.ip],
+                                          dict2=services_to_update)
+            # Then the packages merge can potentially overrule the installed/candidate version, because these versions need priority over the service versions
+            ExtensionsToolbox.merge_dicts(dict1=package_info[client.ip],
+                                          dict2=packages_to_update)
         except Exception as ex:
             if 'errors' not in package_info[client.ip]:
                 package_info[client.ip]['errors'] = []
             package_info[client.ip]['errors'].append(ex)
         return package_info
 
-    @staticmethod
+    @classmethod
     @add_hooks('update', 'information')
-    def get_update_information_core(information):
+    def get_update_information_core(cls, information):
         """
         Called when the 'Update' button in the GUI is pressed
         This call collects additional information about the packages which can be updated
@@ -250,44 +111,11 @@ class UpdateController(object):
             * Prerequisites that haven't been met
             * Services which will be stopped during update
             * Services which will be restarted after update
+        :param information: Information about all components for the entire cluster. This is passed in by the calling thread and thus also (pre-)populated by other threads
+        :type information: dict
+        :return: All the information collected
+        :rtype: dict
         """
-        # Verify arakoon info
-        arakoon_ovs_info = {'down': False,
-                            'name': None,
-                            'internal': False}
-        arakoon_cacc_info = {'down': False,
-                             'name': None,
-                             'internal': False}
-        arakoon_voldrv_info = {'down': False,
-                               'name': None,
-                               'internal': False}
-        for cluster in ['cacc', 'ovsdb', 'voldrv']:
-            cluster_name = ArakoonClusterConfig.get_cluster_name(cluster)
-            if cluster_name is None:
-                continue
-
-            ip = System.get_my_storagerouter().ip if cluster == 'cacc' else None
-            try:
-                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, ip=ip)
-            except ArakoonNoMaster:
-                raise RuntimeError('Arakoon cluster {0} does not have a master'.format(cluster))
-            except ArakoonNotFound:
-                raise RuntimeError('Arakoon cluster {0} does not have the required metadata key'.format(cluster))
-
-            if arakoon_metadata['internal'] is True:
-                config = ArakoonClusterConfig(cluster_id=cluster_name, source_ip=ip)
-                if cluster == 'ovsdb':
-                    arakoon_ovs_info['down'] = len(config.nodes) < 3
-                    arakoon_ovs_info['name'] = arakoon_metadata['cluster_name']
-                    arakoon_ovs_info['internal'] = True
-                elif cluster == 'voldrv':
-                    arakoon_voldrv_info['down'] = len(config.nodes) < 3
-                    arakoon_voldrv_info['name'] = arakoon_metadata['cluster_name']
-                    arakoon_voldrv_info['internal'] = True
-                else:
-                    arakoon_cacc_info['name'] = arakoon_metadata['cluster_name']
-                    arakoon_cacc_info['internal'] = True
-
         # Verify StorageRouter downtime
         prerequisites = []
         all_storagerouters = StorageRouterList.get_storagerouters()
@@ -297,92 +125,69 @@ class UpdateController(object):
             except UnableToConnectException:
                 prerequisites.append(['node_down', storagerouter.name])
 
-        for key in ['framework', 'storagedriver']:
-            if key not in information:
-                information[key] = {'packages': {},
-                                    'downtime': [],
-                                    'prerequisites': prerequisites,
-                                    'services_stop_start': set(),
-                                    'services_post_update': set()}
+        arakoon_ovs_info = None
+        arakoon_voldrv_info = None
 
-            for storagerouter in all_storagerouters:
-                if key not in storagerouter.package_information:
+        # Combine all information
+        for storagerouter in all_storagerouters:
+            for component, package_names in PackageFactory.get_package_info()['names'].iteritems():
+                if component not in storagerouter.package_information:
                     continue
 
-                # Retrieve ALBA proxy issues
-                alba_services = []
-                alba_downtime = []
-                for service in storagerouter.services:
-                    if service.type.name != ServiceType.SERVICE_TYPES.ALBA_PROXY or service.alba_proxy is None:
-                        continue
-                    alba_services.append(service.name)
-                    alba_downtime.append(['proxy', service.alba_proxy.storagedriver.vpool.name])
+                if component not in information:
+                    information[component] = {'packages': {},
+                                              'downtime': [],
+                                              'prerequisites': [],
+                                              'services_stop_start': {10: set(), 20: set()},  # Lowest get stopped first and started last
+                                              'services_post_update': {10: set(), 20: set()}}  # Lowest get restarted first
+                component_info = information[component]
+                if component == PackageFactory.COMP_FWK:
+                    component_info['prerequisites'].extend(prerequisites)
 
-                # Retrieve StorageDriver issues
-                storagedriver_downtime = []
-                storagedriver_services = []
-                for sd in storagerouter.storagedrivers:
-                    # Order of services is important, first we want to stop all volume-drivers, then DTLs
-                    storagedriver_services.append('volumedriver_{0}'.format(sd.vpool.name))
-                for sd in storagerouter.storagedrivers:
-                    storagedriver_services.append('dtl_{0}'.format(sd.vpool.name))
-                    if len(sd.vdisks_guids) > 0:
-                        storagedriver_downtime.append(['voldrv', sd.vpool.name])
+                # Loop the actual update information
+                for package_name, package_info in storagerouter.package_information[component].iteritems():
+                    if package_name not in package_names:
+                        continue  # Only gather the information for the packages related to the current component
 
-                # Retrieve the actual update information
-                for package_name, package_info in storagerouter.package_information[key].iteritems():
-                    if package_name not in UpdateController.packages_core_all:
-                        continue  # Only gather information for the core packages
+                    # Add the services which require a restart to the post_update services
+                    for importance, services in package_info.pop('services_to_restart', {}).iteritems():
+                        if importance not in component_info['services_post_update']:
+                            component_info['services_post_update'][importance] = set()
+                        component_info['services_post_update'][importance].update(set(services))
+                    # Add the version information for current package
+                    if package_name not in component_info['packages']:
+                        component_info['packages'][package_name] = package_info
 
-                    information[key]['services_post_update'].update(package_info.pop('services_to_restart'))
-                    if package_name not in information[key]['packages']:
-                        information[key]['packages'][package_name] = {}
-                    information[key]['packages'][package_name].update(package_info)
-
-                    if package_name == 'openvstorage':
-                        if ['gui', None] not in information[key]['downtime']:
-                            information[key]['downtime'].append(['gui', None])
-                        if ['api', None] not in information[key]['downtime']:
-                            information[key]['downtime'].append(['api', None])
-                        information[key]['services_stop_start'].update({'watcher-framework', 'memcached'})
-                    elif package_name in ['alba', 'alba-ee']:
-                        for down in alba_downtime:
-                            if down not in information[key]['downtime']:
-                                information[key]['downtime'].append(down)
-                        information[key]['services_post_update'].update(alba_services)
-                    elif package_name in ['volumedriver-no-dedup-base', 'volumedriver-ee-base']:
-                        for down in storagedriver_downtime:
-                            if down not in information[key]['downtime']:
-                                information[key]['downtime'].append(down)
-                        information[key]['services_post_update'].update(storagedriver_services)
-                    elif package_name in ['volumedriver-no-dedup-server', 'volumedriver-ee-server']:
-                        for down in storagedriver_downtime:
-                            if down not in information[key]['downtime']:
-                                information[key]['downtime'].append(down)
-                        information[key]['services_post_update'].update(storagedriver_services)
-                    elif package_name == 'arakoon':
-                        if key == 'framework':
-                            framework_arakoons = set()
-                            if arakoon_ovs_info['internal'] is True:
-                                # noinspection PyTypeChecker
-                                framework_arakoons.add('ovs-{0}'.format(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_ovs_info['name'])))
-                            if arakoon_cacc_info['internal'] is True:
-                                # noinspection PyTypeChecker
-                                framework_arakoons.add('ovs-{0}'.format(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_cacc_info['name'])))
-
-                            information[key]['services_post_update'].update(framework_arakoons)
-                            if arakoon_ovs_info['down'] is True and ['ovsdb', None] not in information[key]['downtime']:
-                                information[key]['downtime'].append(['ovsdb', None])
-                        elif arakoon_voldrv_info['internal'] is True:
-                            # noinspection PyTypeChecker
-                            information[key]['services_post_update'].update({'ovs-{0}'.format(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_voldrv_info['name']))})
-                            if arakoon_voldrv_info['down'] is True and ['voldrv', None] not in information[key]['downtime']:
-                                information[key]['downtime'].append(['voldrv', None])
+                    # Add downtime and additional services for each package
+                    if package_name == PackageFactory.PKG_OVS:
+                        if ['gui', None] not in component_info['downtime']:
+                            component_info['downtime'].append(['gui', None])
+                        if ['api', None] not in component_info['downtime']:
+                            component_info['downtime'].append(['api', None])
+                        component_info['services_stop_start'][10].add('watcher-framework')
+                        component_info['services_stop_start'][20].add('memcached')
+                        component_info['services_post_update'][20].add('support-agent')
+                    elif package_name in [PackageFactory.PKG_VOLDRV_BASE, PackageFactory.PKG_VOLDRV_BASE_EE, PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE]:
+                        for storagedriver in storagerouter.storagedrivers:
+                            vpool_name = storagedriver.vpool.name
+                            if len(storagedriver.vdisks_guids) > 0 and ['voldrv', vpool_name] not in component_info['downtime']:
+                                component_info['downtime'].append(['voldrv', vpool_name])
+                    elif package_name == PackageFactory.PKG_ARAKOON:
+                        if component == PackageFactory.COMP_SD:
+                            if arakoon_voldrv_info is None:
+                                arakoon_voldrv_info = ArakoonInstaller.get_arakoon_update_info(internal_cluster_name='voldrv')
+                            if arakoon_voldrv_info['internal'] is True and arakoon_voldrv_info['downtime'] is True and ['voldrv', None] not in component_info['downtime']:
+                                component_info['downtime'].append(['voldrv', None])
+                        elif component == PackageFactory.COMP_FWK:
+                            if arakoon_ovs_info is None:
+                                arakoon_ovs_info = ArakoonInstaller.get_arakoon_update_info(internal_cluster_name='ovsdb')
+                            if arakoon_ovs_info['internal'] is True and arakoon_ovs_info['downtime'] is True and ['ovsdb', None] not in component_info['downtime']:
+                                component_info['downtime'].append(['ovsdb', None])
         return information
 
-    @staticmethod
+    @classmethod
     @add_hooks('update', 'package_install_multi')
-    def _package_install_core(client, package_info, components):
+    def _package_install_core(cls, client, package_info, components):
         """
         Update the core packages
         :param client: Client on which to execute update the packages
@@ -394,48 +199,22 @@ class UpdateController(object):
         :return: Boolean indicating whether to continue with the update or not
         :rtype: bool
         """
-        abort = False
-        package_manager = PackageFactory.get_manager()
-        currently_installed_versions = package_manager.get_installed_versions(client=client, package_names=UpdateController.packages_core_all)
+        return PackageFactory.update_packages(client=client, packages=package_info, components=components)
 
-        pkg_names_to_install = set()
-        for component in components:
-            for pkg_name in UpdateController._packages_core.get(component, set()):
-                if pkg_name in package_info:
-                    pkg_names_to_install.add(pkg_name)
-
-        for pkg_name in sorted(pkg_names_to_install):
-            try:
-                installed = package_info[pkg_name]['installed']
-                candidate = package_info[pkg_name]['candidate']
-
-                if candidate == str(currently_installed_versions[pkg_name]):
-                    # Package has already been installed by another hook
-                    continue
-
-                UpdateController._logger.info('{0}: Updating package {1} ({2} --> {3})'.format(client.ip, pkg_name, installed, candidate))
-                package_manager.install(package_name=pkg_name, client=client)
-                UpdateController._logger.info('{0}: Updated package {1}'.format(client.ip, pkg_name))
-            except Exception:
-                UpdateController._logger.exception('{0}: Updating package {1} failed'.format(client.ip, pkg_name))
-                if pkg_name in UpdateController._packages_core_blocking:
-                    abort = True
-        return abort
-
-    @staticmethod
+    @classmethod
     @add_hooks('update', 'post_update_single')
-    def _post_update_async_migrator(components=None):
+    def _post_update_async_migrator(cls, components=None):
         _ = components
         try:
             # noinspection PyUnresolvedReferences
             from ovs.lib.migration import MigrationController
             MigrationController.migrate.s().apply_async(countdown=30)
         except ImportError:
-            UpdateController._logger.error('Could not import MigrationController.')
+            cls._logger.error('Could not import MigrationController.')
 
-    @staticmethod
+    @classmethod
     @add_hooks('update', 'post_update_multi')
-    def _post_update_core(client, components):
+    def _post_update_core(cls, client, components, update_information):
         """
         Execute functionality after the openvstorage core packages have been updated
         For framework:
@@ -448,64 +227,52 @@ class UpdateController(object):
         :type client: SSHClient
         :param components: Update components which have been executed
         :type components: list
+        :param update_information: Information required for an update
+        :type update_information: dict
         :return: None
+        :rtype: NoneType
         """
-        if 'framework' not in components and 'storagedriver' not in components:
-            return
+        method_name = inspect.currentframe().f_code.co_name
+        cls._logger.info('{0}: Executing hook {1}'.format(client.ip, method_name))
+        pkg_names_to_check = set()
+        for component, package_names in PackageFactory.get_package_info()['names'].iteritems():
+            if component in components:
+                pkg_names_to_check.update(package_names)
 
-        from ovs_extensions.generic.toolbox import ExtensionsToolbox
+        try:
+            ServiceFactory.remove_services_marked_for_removal(client=client,
+                                                              package_names=pkg_names_to_check)
+        except Exception:
+            cls._logger.exception('{0}: Removing the services marked for removal failed'.format(client.ip))
 
-        service_manager = ServiceFactory.get_manager()
-        # Remove services which have been renamed in the migration code
-        for version_file in client.file_list(directory='/opt/OpenvStorage/run'):
-            if not version_file.endswith('.remove'):
+        other_services = set()
+        arakoon_services = set()
+        for component, update_info in update_information.iteritems():
+            if component not in PackageFactory.SUPPORTED_COMPONENTS:
                 continue
-            packages = set()
-            contents = client.file_read(filename='/opt/OpenvStorage/run/{0}'.format(version_file))
-            for part in contents.split(';'):
-                packages.add(part.split('=')[0])
-            if packages.issubset(UpdateController._packages_core['storagedriver'] | {'volumedriver-server'}) and 'storagedriver' in components:
-                service_name = version_file.replace('.remove', '').replace('.version', '')
-                UpdateController._logger.warning('{0}: Removing service {1}'.format(client.ip, service_name))
-                service_manager.stop_service(name=service_name, client=client)
-                service_manager.remove_service(name=service_name, client=client)
-                client.file_delete(filenames=['/opt/OpenvStorage/run/{0}'.format(version_file)])
+            for restart_order in sorted(update_info['services_post_update']):
+                for service_name in update_info['services_post_update'][restart_order]:
+                    if service_name.startswith('arakoon-'):
+                        arakoon_services.add(service_name)
+                    else:
+                        other_services.add(service_name)
 
-        # Verify whether certain services need to be restarted
-        update_information = UpdateController.get_update_information_core({})
-        services_to_restart = set()
-        if 'storagedriver' in components:
-            services_to_restart.update(update_information.get('storagedriver', {}).get('services_post_update', set()))
-        if 'framework' in components:
-            services_to_restart.update(update_information.get('framework', {}).get('services_post_update', set()))
-            services_to_restart.add('support-agent')
+        UpdateController.change_services_state(services=sorted(other_services), ssh_clients=[client], action='restart')
+        for service_name in sorted(arakoon_services):
+            try:
+                cluster_name = ArakoonInstaller.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'arakoon-'))
+                ip = System.get_my_storagerouter().ip if cluster_name == 'config' else None
+                arakoon_metadata = ArakoonInstaller.get_arakoon_update_info(actual_cluster_name=cluster_name, ip=ip)
+                if arakoon_metadata['internal'] is True:
+                    arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
+                    arakoon_installer.load(ip=ip)
+                    if client.ip in [node.ip for node in arakoon_installer.config.nodes]:
+                        cls._logger.warning('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
+                        arakoon_installer.restart_node(client=client)
+            except Exception:
+                cls._logger.exception('{0}: Restarting service {1} failed'.format(client.ip, service_name))
 
-        # Restart the services
-        if services_to_restart:
-            UpdateController._logger.info('{0}: Executing hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
-            for service_name in sorted(services_to_restart):
-                if not service_name.startswith('arakoon-'):
-                    UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
-                else:
-                    cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'arakoon-'))
-                    master_ip = StorageRouterList.get_masters()[0].ip if cluster_name == 'config' else None
-                    temp_cluster_name = 'cacc' if cluster_name == 'config' else cluster_name
-                    try:
-                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=temp_cluster_name, ip=master_ip)
-                    except ArakoonNoMaster:
-                        UpdateController._logger.warning('Arakoon cluster {0} does not have a master, not restarting related services'.format(cluster_name))
-                        continue
-                    except ArakoonNotFound:
-                        UpdateController._logger.warning('Arakoon cluster {0} does not have the required metadata key, not restarting related services'.format(cluster_name))
-                        continue
-
-                    if arakoon_metadata['internal'] is True:
-                        arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
-                        arakoon_installer.load(ip=master_ip)
-                        if client.ip in [node.ip for node in arakoon_installer.config.nodes]:
-                            UpdateController._logger.warning('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
-                            arakoon_installer.restart_node(client=client)
-            UpdateController._logger.info('{0}: Executed hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
+        cls._logger.info('{0}: Executed hook {1}'.format(client.ip, method_name))
 
     ################
     # CELERY TASKS #
@@ -520,12 +287,8 @@ class UpdateController(object):
         """
         package_info = dict((storagerouter.ip, storagerouter.package_information) for storagerouter in StorageRouterList.get_storagerouters())
         for _function in Toolbox.fetch_hooks('update', 'merge_package_info'):
-            output = _function()
-            for ip in output:
-                if ip in package_info:
-                    package_info[ip].update(output[ip])
-                else:
-                    package_info[ip] = output[ip]
+            package_info = ExtensionsToolbox.merge_dicts(dict1=package_info,
+                                                         dict2=_function())
         return package_info
 
     @staticmethod
@@ -591,10 +354,6 @@ class UpdateController(object):
         information = {}
         for _function in Toolbox.fetch_hooks('update', 'information'):
             _function(information=information)
-
-        for component, info in copy.deepcopy(information).iteritems():
-            if len(info['packages']) == 0:
-                information.pop(component)
         return information
 
     @staticmethod
@@ -619,17 +378,16 @@ class UpdateController(object):
         Update the specified components on all StorageRouters
         This is called upon by 'at'
         :return: None
+        :rtype: NoneType
         """
         abort = False
         filemutex = file_mutex('system_update', wait=2)
         ssh_clients = []
-        services_stop_start = set()
+        services_stop_start = list()
         errors_during_update = False
         try:
             filemutex.acquire()
             UpdateController._logger.info('+++ Starting update +++')
-
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
 
             # Create SSHClients to all nodes
             UpdateController._logger.info('Generating SSH client connections for each storage router')
@@ -639,7 +397,7 @@ class UpdateController(object):
             local_ip = None
             for sr in storage_routers:
                 try:
-                    ssh_clients.append(SSHClient(sr, username='root'))
+                    ssh_clients.append(SSHClient(endpoint=sr, username='root'))
                     if sr == System.get_my_storagerouter():
                         local_ip = sr.ip
                     if sr.node_type == 'MASTER':
@@ -659,7 +417,7 @@ class UpdateController(object):
 
             # Check requirements
             packages_to_update = {}
-            services_post_update = set()
+            services_post_update = list()
             update_information = UpdateController.get_update_information_all()
             for component, component_info in update_information.iteritems():
                 if component in components:
@@ -668,14 +426,16 @@ class UpdateController(object):
                                                    required_params={'downtime': (list, None),
                                                                     'packages': (dict, None),
                                                                     'prerequisites': (list, None),
-                                                                    'services_stop_start': (set, None),
-                                                                    'services_post_update': (set, None)})
+                                                                    'services_stop_start': (dict, None),
+                                                                    'services_post_update': (dict, None)})
                     if len(component_info['prerequisites']) > 0:
                         raise Exception('Update is only allowed when all prerequisites have been met')
 
                     packages_to_update.update(component_info['packages'])
-                    services_stop_start.update(component_info['services_stop_start'])
-                    services_post_update.update(component_info['services_post_update'])
+                    for order in sorted(component_info['services_stop_start']):
+                        services_stop_start.extend(list(component_info['services_stop_start'][order]))
+                    for order in sorted(component_info['services_post_update']):
+                        services_post_update.extend(list(component_info['services_post_update'][order]))
             if len(packages_to_update) > 0:
                 UpdateController._logger.info('Packages to update')
                 for package_to_update in sorted(packages_to_update):
@@ -706,12 +466,11 @@ class UpdateController(object):
                         abort |= _function(client=client, package_info=packages_to_update, components=components)
 
             # Install packages (storage nodes, eg: SDM, iSCSI, ...)
-            if set(components).difference(set(UpdateController._packages_core.keys())):
-                for _function in package_install_single_hooks:
-                    try:
-                        abort |= _function(package_info=None, components=components)
-                    except Exception:
-                        UpdateController._logger.exception('Package installation hook {0} failed'.format(_function.__name__))
+            for _function in package_install_single_hooks:
+                try:
+                    abort |= _function(package_info=None, components=components)
+                except Exception:
+                    UpdateController._logger.exception('Package installation hook {0} failed'.format(_function.__name__))
 
             if abort is True:
                 raise Exception('Installing the packages failed on 1 or more nodes')
@@ -721,7 +480,7 @@ class UpdateController(object):
                 client.file_delete(UpdateController._update_file)
 
             # Migrate extensions
-            if 'framework' in components:
+            if PackageFactory.COMP_FWK in components:
                 failures = []
                 for client in ssh_clients:
                     UpdateController._logger.info('{0}: Starting extensions code migration'.format(client.ip))
@@ -753,7 +512,7 @@ class UpdateController(object):
                 VolatileFactory.store = None
 
             # Migrate DAL
-            if 'framework' in components:
+            if PackageFactory.COMP_FWK in components:
                 UpdateController._logger.info('Starting DAL code migration')
                 try:
                     old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
@@ -774,7 +533,7 @@ class UpdateController(object):
                 with remote(client.ip, [Toolbox]) as rem:
                     for _function in rem.Toolbox.fetch_hooks('update', 'post_update_multi'):
                         try:
-                            _function(client=client, components=components)
+                            _function(client=client, components=components, update_information=update_information)
                         except Exception as ex:
                             UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, _function.__name__, ex))
 
@@ -813,27 +572,25 @@ class UpdateController(object):
             else:
                 UpdateController._logger.info('+++ Finished updating +++')
 
-    @staticmethod
-    def change_services_state(services, ssh_clients, action):
+    @classmethod
+    def change_services_state(cls, services, ssh_clients, action):
         """
         Stop/start services on SSH clients
         If action is start, we ignore errors and try to start other services on other nodes
         """
-        service_manager = ServiceFactory.get_manager()
-        services = list(services)
         if action == 'start':
             services.reverse()  # Start services again in reverse order of stopping
         for service_name in services:
             for ssh_client in ssh_clients:
                 description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
                 try:
-                    if service_manager.has_service(service_name, client=ssh_client):
-                        Toolbox.change_service_state(client=ssh_client,
-                                                     name=service_name,
-                                                     state=action,
-                                                     logger=UpdateController._logger)
+                    if cls._service_manager.has_service(service_name, client=ssh_client):
+                        ServiceFactory.change_service_state(client=ssh_client,
+                                                            name=service_name,
+                                                            state=action,
+                                                            logger=cls._logger)
                 except Exception as exc:
-                    UpdateController._logger.warning('{0}: Something went wrong {1} service {2}: {3}'.format(ssh_client.ip, description, service_name, exc))
+                    cls._logger.warning('{0}: Something went wrong {1} service {2}: {3}'.format(ssh_client.ip, description, service_name, exc))
                     if action == 'stop':
                         return False
         return True

@@ -174,8 +174,8 @@ class NodeInstallationController(object):
                     new_cluster = 'Create a new cluster'
                     discovery_result = {}
                     if NodeTypeController.avahi_installed(client=root_client, logger=NodeInstallationController._logger) is True:
-                        Toolbox.change_service_state(root_client, 'dbus', 'start', NodeInstallationController._logger)
-                        Toolbox.change_service_state(root_client, 'avahi-daemon', 'start', NodeInstallationController._logger)
+                        ServiceFactory.change_service_state(root_client, 'dbus', 'start', NodeInstallationController._logger)
+                        ServiceFactory.change_service_state(root_client, 'avahi-daemon', 'start', NodeInstallationController._logger)
                         for entry in root_client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | egrep "ovs_cl_|ovs_cluster_" || true', allow_insecure=True).splitlines():
                             entry_parts = entry.split(';')
                             if entry_parts[0] == '=' and entry_parts[2] == 'IPv4' and entry_parts[7] not in NodeInstallationController.host_ips:
@@ -594,14 +594,14 @@ class NodeInstallationController(object):
         Toolbox.log(logger=NodeInstallationController._logger, messages='Stopping services')
         for service in ['watcher-framework', 'watcher-config', 'workers', 'support-agent']:
             if service_manager.has_service(service, client=target_client):
-                Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
+                ServiceFactory.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
 
         endpoints = required_info['/ovs/framework/messagequeue|endpoints']
         if len(endpoints) > 0 and unconfigure_rabbitmq is True:
             Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring RabbitMQ')
             try:
                 if service_manager.is_rabbitmq_running(client=target_client)[0] is True:
-                    Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeInstallationController._logger)
+                    ServiceFactory.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeInstallationController._logger)
                 target_client.file_delete('/etc/rabbitmq/rabbitmq.config')
             except Exception as ex:
                 Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to un-configure RabbitMQ', ex], loglevel='exception')
@@ -687,7 +687,7 @@ class NodeInstallationController(object):
             services.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
         for service in services:
             if service_manager.has_service(service, client=target_client):
-                Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
+                ServiceFactory.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
 
         if single_node is True:
             Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configure Arakoon')
@@ -770,7 +770,7 @@ class NodeInstallationController(object):
         if not service_manager.has_service(service, target_client):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Adding service {0}'.format(service))
             service_manager.add_service(service, params={}, client=target_client)
-            Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+            ServiceFactory.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
         arakoon_ports = []
@@ -808,7 +808,7 @@ class NodeInstallationController(object):
         model_services = ['memcached', 'arakoon-ovsdb'] if internal is True else ['memcached']
         for service in model_services:
             if service_manager.has_service(service, client=target_client):
-                Toolbox.change_service_state(target_client, service, 'restart', NodeInstallationController._logger)
+                ServiceFactory.change_service_state(target_client, service, 'restart', NodeInstallationController._logger)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Start model migration')
         from ovs.dal.helpers import Migration
@@ -835,16 +835,16 @@ class NodeInstallationController(object):
         Toolbox.log(logger=NodeInstallationController._logger, messages='Starting services on 1st node')
         for service in model_services + ['rabbitmq-server']:
             if service_manager.has_service(service, client=target_client):
-                Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+                ServiceFactory.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
         # Enable HA for the rabbitMQ queues
         NodeTypeController.check_rabbitmq_and_enable_ha_mode(client=target_client, logger=NodeInstallationController._logger)
 
         for service in ['watcher-framework', 'watcher-config']:
-            Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+            ServiceFactory.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
-        Toolbox.wait_for_service(client=target_client, name='workers', status='active', logger=NodeInstallationController._logger)
+        ServiceFactory.wait_for_service(client=target_client, name='workers', status='active', logger=NodeInstallationController._logger)
 
         Toolbox.run_hooks(component='nodeinstallation',
                           sub_component='firstnode',
@@ -857,7 +857,7 @@ class NodeInstallationController(object):
             service = 'support-agent'
             if not service_manager.has_service(service, target_client):
                 service_manager.add_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+                ServiceFactory.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         if NodeTypeController.avahi_installed(client=target_client, logger=NodeInstallationController._logger) is True:
             NodeTypeController.configure_avahi(client=target_client, node_name=node_name, node_type='master', logger=NodeInstallationController._logger)
@@ -889,7 +889,7 @@ class NodeInstallationController(object):
         if not service_manager.has_service(service, target_client):
             Toolbox.log(logger=NodeInstallationController._logger, messages='Adding service {0}'.format(service))
             service_manager.add_service(service, params={}, client=target_client)
-            Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+            ServiceFactory.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
         NodeTypeController.add_services(client=target_client, node_type='extra', logger=NodeInstallationController._logger)
 
         enabled = Configuration.get('/ovs/framework/support|support_agent')
@@ -897,7 +897,7 @@ class NodeInstallationController(object):
             service = 'support-agent'
             if not service_manager.has_service(service, target_client):
                 service_manager.add_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+                ServiceFactory.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         node_name, _ = target_client.get_hostname()
         NodeInstallationController._finalize_setup(target_client, node_name, 'EXTRA')
@@ -907,15 +907,15 @@ class NodeInstallationController(object):
         Toolbox.log(logger=NodeInstallationController._logger, messages='Starting services')
         for service in ['watcher-framework', 'watcher-config']:
             if service_manager.get_service_status(service, target_client) != 'active':
-                Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+                ServiceFactory.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
-        Toolbox.wait_for_service(client=target_client, name='workers', status='active', logger=NodeInstallationController._logger)
+        ServiceFactory.wait_for_service(client=target_client, name='workers', status='active', logger=NodeInstallationController._logger)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Restarting workers')
         for node_client in ip_client_map.itervalues():
-            Toolbox.change_service_state(node_client, 'workers', 'restart', NodeInstallationController._logger)
+            ServiceFactory.change_service_state(node_client, 'workers', 'restart', NodeInstallationController._logger)
 
         Toolbox.run_hooks(component='nodeinstallation',
                           sub_component='extranode',
@@ -939,7 +939,7 @@ class NodeInstallationController(object):
         client.run(['sed', '-i', 's/^# maxmemory <bytes>.*/maxmemory 128mb/g', '/etc/redis/redis.conf'])
         client.run(['sed', '-i', 's/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/g', '/etc/redis/redis.conf'])
         client.run(['sed', '-i', 's/^bind 127.0.0.1.*/bind {0}/g'.format(cluster_ip), '/etc/redis/redis.conf'])
-        Toolbox.change_service_state(client, 'redis-server', 'restart', NodeInstallationController._logger)
+        ServiceFactory.change_service_state(client, 'redis-server', 'restart', NodeInstallationController._logger)
 
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
         config_file = '/opt/OpenvStorage/webapps/frontend/logging/config.js'
