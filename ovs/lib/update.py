@@ -248,7 +248,7 @@ class UpdateController(object):
         other_services = set()
         arakoon_services = set()
         for component, update_info in update_information.iteritems():
-            if component not in PackageFactory.SUPPORTED_COMPONENTS:
+            if component not in PackageFactory.get_components():
                 continue
             for restart_order in sorted(update_info['services_post_update']):
                 for service_name in update_info['services_post_update'][restart_order]:
