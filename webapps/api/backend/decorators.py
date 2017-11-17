@@ -24,6 +24,7 @@ import json
 import math
 import time
 import inspect
+import operator
 from django.conf import settings
 from django.core.handlers.wsgi import WSGIRequest
 from functools import wraps
@@ -244,11 +245,12 @@ def return_list(object_type, default_sort=None):
         """
         Wrapper function
         """
-
+        # Add metadata that can be used later on
         metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         metadata['returns'] = {'parameters': {'sorting': default_sort,
                                               'paging': None,
-                                              'contents': None},
+                                              'contents': None,
+                                              'filter': None},
                                'returns': ['list', '200'],
                                'object_type': object_type}
         f.ovs_metadata = metadata
@@ -257,6 +259,30 @@ def return_list(object_type, default_sort=None):
         def new_function(*args, **kwargs):
             """
             Wrapped function
+            This function will process the api request an apply:
+             - Paging (only return a subset of all results)
+             - Sorting (sort on properties)
+             - Filtering (filter on properties)
+            Request arguments for paging:
+            Request arguments for sorting:
+            Request arguments for filtering: array of dicts which contain 'field', 'value',  'operator' (optional, defaults to equals), 'chain' (optional, defaults to and)
+            Example: [{'field': 'name', 'value': 'my_name'}, {'field': 'last_name', 'value': 'my_', 'operator': 'startswith', 'chain': 'or'}]
+            Order is crucial to the filtering support. Requesting a filter on name first and then on a different value will result in the name filter being applied first (unless it is chained as 'or')
+            Supported operators:
+             - equals (invertible)
+             - bigger_than
+             - bigger_equals
+             - lesser_than
+             - lesser_equals
+             - starts_with
+             - ends_with
+             All operators can be inverted by supplying prepending 'not_'
+             Chaining: filters can be chained together. By default all fields will chain as and, meaning that filtering on a name and last name will filter on both and not on either
+             To request for either filter, set chain mode to 'or'
+             These chains will be grouped. Example: and or or or and or will result into the or or or being applied only, as the last or has nothing to chain to
+             Supported chain:
+              - and
+              - or
             """
             request = _find_request(args)
             timings = {}
@@ -264,6 +290,7 @@ def return_list(object_type, default_sort=None):
             # 1. Pre-loading request data
             start = time.time()
             sort = request.QUERY_PARAMS.get('sort')
+            filtering = request.QUERY_PARAMS.get('filter')
             if sort is None and default_sort is not None:
                 sort = default_sort
             sort = None if sort is None else [s for s in reversed(sort.split(','))]
@@ -277,6 +304,7 @@ def return_list(object_type, default_sort=None):
             timings['preload'] = [time.time() - start, 'Data preloading']
 
             # 2. Construct hints for decorated function (so it can provide full objects if required)
+            # Not used anywhere at the moment, not sure what action to take
             start = time.time()
             if 'hints' not in kwargs:
                 kwargs['hints'] = {}
@@ -289,6 +317,54 @@ def return_list(object_type, default_sort=None):
             guid_list = isinstance(data_list, list) and len(data_list) > 0 and isinstance(data_list[0], basestring)
             timings['fetch'] = [time.time() - start, 'Fetching data']
 
+            # Filtering data
+            if filtering is not None:
+                start = time.time()
+                # Map the string operators to the operator to use
+                # Also check for types when needed [for example string]
+                operator_table = {'equals': {'operator': operator.is_},
+                                  'greater_than': {'operator': operator.gt},
+                                  'greater_equals': {'operator': operator.ge},
+                                  'lesser_than': {'operator': operator.lt},
+                                  'lesser_equals': {'operator': operator.le},
+                                  'in': {'operator': operator.contains},
+                                  'starts_with': {'operator': lambda a, b: a.startswith(b),
+                                                  'types': [basestring]},
+                                  'ends_with': {'operator': lambda a, b: a.endswith(b),
+                                                'types': [basestring]}}
+                if guid_list is True:
+                    # We need the actual objects to filter on properties
+                    data_list = [object_type(guid) for guid in data_list]
+                    guid_list = False  # The list is converted to objects
+                # Extract the chain mode to see what is to be chained
+                filtering_chain = map(lambda filter_item: filter_item.get('chain', 'and'), filtering)
+                processed_fields = []
+                errors = []
+                def ordinal(number):
+                    suffix = "tsnrhtdd"[(number / 10 % 10 != 1) * (number % 10 < 4) * number % 10::4]
+                    return "{0}{1}".format(number, suffix)
+                for index, filter_item in enumerate(filtering):
+                    if 'value' not in filter_item:
+                        errors.append('A value has to be supplied for filtering. Missing on the {0} filter item'.format(ordinal(index)))
+                        continue
+                    if 'field' not in filter_item:
+                        errors.append('A field has to be supplied for filtering Missing on the {0} filter item'.format(ordinal(index)))
+                        continue
+                    requested_value = filter_item['value']
+                    requested_operator = filter_item.get('operator', 'equals')
+                    requested_chain = filter_item.get('chain', 'and')
+                    requested_field = filter_item['field']
+                    operator_info = operator_table.get(requested_operator)
+                    if operator_info is None:
+                        errors.append('Unsupported operator requested. Supported operators are {0}'.format(', '.join(['\'{0}\''.format(key) for key in operator_table.keys()])))
+                        continue
+                    types = requested_operator.get('types')
+                    if types is not None and not all(isinstance(requested_value, t) for t in types):
+                        errors.append('The filtering value does not match the type for the operator. Supported types for {0} are {1}'.format(requested_operator, ', '.join([str(t) for t in types])))
+                        continue
+
+                timings['filtering'] = [time.time() - start, 'Filtering data']
+
             # 4. Sorting
             if sort is not None:
                 start = time.time()
@@ -296,6 +372,8 @@ def return_list(object_type, default_sort=None):
                     data_list = [object_type(guid) for guid in data_list]
                     guid_list = False  # The list is converted to objects
                 for sort_item in sort:
+                    # @todo support sorting with multiple keys and weights to it
+                    # Example: sort on name and then on ip, so duplicate names will get sorted on ip
                     desc = sort_item[0] == '-'
                     field = sort_item[1 if desc else 0:]
                     data_list.sort(key=lambda e: DalToolbox.extract_key(e, field), reverse=desc)
@@ -336,11 +414,14 @@ def return_list(object_type, default_sort=None):
                     data_list = [object_type(guid) for guid in data_list]
                 data = FullSerializer(object_type, contents=contents, instance=data_list, many=True).data
             else:
+                # There might be an issue here. When sorting is requested, the dynamics and relations are potentially not fetched because contents is ignored
+                # @todo investigate hypothesis
                 if guid_list is False:
                     data_list = [item.guid for item in data_list]
                 data = data_list
             timings['serializing'] = [time.time() - start, 'Serializing']
 
+            # Add timings about dynamics
             if contents is not None and len(data_list) > 0:
                 object_timings = {}
                 for obj in data_list:
