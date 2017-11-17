@@ -214,7 +214,7 @@ class UpdateController(object):
 
     @classmethod
     @add_hooks('update', 'post_update_multi')
-    def _post_update_core(cls, client, components, update_information):
+    def _post_update_core(cls, client, components, update_information=None):
         """
         Execute functionality after the openvstorage core packages have been updated
         For framework:
@@ -227,7 +227,7 @@ class UpdateController(object):
         :type client: SSHClient
         :param components: Update components which have been executed
         :type components: list
-        :param update_information: Information required for an update
+        :param update_information: Information required for an update (defaults to None for backwards compatibility)
         :type update_information: dict
         :return: None
         :rtype: NoneType
@@ -244,6 +244,9 @@ class UpdateController(object):
                                                               package_names=pkg_names_to_check)
         except Exception:
             cls._logger.exception('{0}: Removing the services marked for removal failed'.format(client.ip))
+
+        if update_information is None:
+            update_information = UpdateController.get_update_information_core({})
 
         other_services = set()
         arakoon_services = set()
