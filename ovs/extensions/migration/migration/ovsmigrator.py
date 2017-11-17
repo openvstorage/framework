@@ -25,7 +25,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'  # Used by migrator.py, so don't remove
-    THIS_VERSION = 13
+    THIS_VERSION = 14
 
     def __init__(self):
         """ Init method """
@@ -50,6 +50,7 @@ class OVSMigrator(object):
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         if working_version < OVSMigrator.THIS_VERSION:
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.extensions.generic.configuration import Configuration
             from ovs.extensions.generic.sshclient import SSHClient
@@ -72,5 +73,14 @@ class OVSMigrator(object):
                         Configuration.set(key='{0}/mds_config'.format(vpool_key),
                                           value=current_mds_settings)
                 Configuration.delete(key=mds_safety_key)
+
+            # Introduction of edition key
+            if Configuration.get(key='/ovs/framework/edition', default=None) not in ['community', 'enterprise']:
+                for storagerouter in StorageRouterList.get_storagerouters():
+                    try:
+                        Configuration.set(key='/ovs/framework/edition', value=storagerouter.features['alba']['edition'])
+                        break
+                    except:
+                        continue
 
         return OVSMigrator.THIS_VERSION
