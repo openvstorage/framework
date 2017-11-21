@@ -246,7 +246,7 @@ class UpdateController(object):
             cls._logger.exception('{0}: Removing the services marked for removal failed'.format(client.ip))
 
         if update_information is None:
-            update_information = UpdateController.get_update_information_core({})
+            update_information = {}
 
         other_services = set()
         arakoon_services = set()
