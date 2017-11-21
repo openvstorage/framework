@@ -466,7 +466,7 @@ class MigrationController(object):
                         for entry in ['dtl', 'volumedriver']:
                             service_name = '{0}_{1}'.format(entry, vpool.name)
                             service_template = 'ovs-dtl' if entry == 'dtl' else 'ovs-volumedriver'
-                            config_key = ServiceFactory.SERVICE_CONFIG_KEY.fomat(storagedriver.storagerouter.machine_id, service_name)
+                            config_key = ServiceFactory.SERVICE_CONFIG_KEY.format(storagedriver.storagerouter.machine_id, service_name)
                             if Configuration.exists(key=config_key):
                                 config = Configuration.get(key=config_key)
                                 config['RUN_FILE_DIR'] = ServiceFactory.RUN_FILE_DIR
