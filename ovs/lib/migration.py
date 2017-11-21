@@ -438,6 +438,7 @@ class MigrationController(object):
             if Configuration.get(key='/ovs/framework/migration|alba_proxy_service_update', default=False) is False:
                 alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
                 for service in ServiceTypeList.get_by_name('AlbaProxy').services:
+                    root_client = sr_client_map[service.storagerouter_guid]
                     config_key = ServiceFactory.SERVICE_CONFIG_KEY.format(service.storagerouter.machine_id, service.name)
                     if Configuration.exists(key=config_key):
                         config = Configuration.get(key=config_key)
@@ -445,6 +446,10 @@ class MigrationController(object):
                         config['ALBA_PKG_NAME'] = alba_pkg_name
                         config['ALBA_VERSION_CMD'] = alba_version_cmd
                         Configuration.set(key=config_key, value=config)
+                        service_manager.regenerate_service(name='ovs-albaproxy',
+                                                           client=root_client,
+                                                           target_name='ovs-{0}'.format(service.name))
+
                 # Make sure once this finished, it never runs again by setting this key to True
                 Configuration.set(key='/ovs/framework/migration|alba_proxy_service_update', value=True)
         except Exception:
@@ -457,14 +462,21 @@ class MigrationController(object):
                 sd_pkg_name, sd_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
                 for vpool in VPoolList.get_vpools():
                     for storagedriver in vpool.storagedrivers:
+                        root_client = sr_client_map[storagedriver.storagerouter_guid]
                         for entry in ['dtl', 'volumedriver']:
-                            config_key = ServiceFactory.SERVICE_CONFIG_KEY.format(storagedriver.storagerouter.machine_id, '{0}_{1}'.format(entry, vpool.name))
+                            service_name = '{0}_{1}'.format(entry, vpool.name)
+                            service_template = 'ovs-dtl' if entry == 'dtl' else 'ovs-volumedriver'
+                            config_key = ServiceFactory.SERVICE_CONFIG_KEY.fomat(storagedriver.storagerouter.machine_id, service_name)
                             if Configuration.exists(key=config_key):
                                 config = Configuration.get(key=config_key)
                                 config['RUN_FILE_DIR'] = ServiceFactory.RUN_FILE_DIR
                                 config['VOLDRV_PKG_NAME'] = sd_pkg_name
                                 config['VOLDRV_VERSION_CMD'] = sd_version_cmd
                                 Configuration.set(key=config_key, value=config)
+                                service_manager.regenerate_service(name=service_template,
+                                                                   client=root_client,
+                                                                   target_name='ovs-{0}'.format(service_name))
+
                 # Make sure once this finished, it never runs again by setting this key to True
                 Configuration.set(key='/ovs/framework/migration|voldrv_service_update', value=True)
         except Exception:
