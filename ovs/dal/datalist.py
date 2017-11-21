@@ -64,13 +64,28 @@ class DataList(object):
     NAMESPACE = 'ovs_list'
     CACHELINK = 'ovs_listcache'
 
-    def __init__(self, object_type, query, key=None):
+    def __init__(self, object_type, query=None, key=None, guids=None):
         """
         Initializes a DataList class with a given key (used for optional caching) and a given query
         :param object_type: The type of the objects that have to be queried
-        :param query: The query to execute
+        :param query: The query to execute. Example: {'type': DataList.where_operator.AND, 'items': [('storagedriver_id', DataList.operator.EQUALS, storagedriver_id)]}
+        When query is None, it will default to a query which will not do any filtering
+        :type query: dict or NoneType
         :param key: A key under which the result must be cached
+        :type key: str
+        :param guids: List of guids to use as a base
+        These guids should be guids of objects related to the object_type param. If no object related to the guid could be found, these guids will not be included in the result
+        When guids is None, it will default to querying all items
+        :type guids: list[basestring] or NoneType
         """
+        # Validation
+        self._validate_guids(guids)
+        self._validate_query(query)
+
+        # Defaults
+        if query is None:
+            query = {'type': DataList.where_operator.AND, 'items': []}
+
         super(DataList, self).__init__()
 
         if key is not None:
@@ -90,9 +105,10 @@ class DataList(object):
         self._guids = None
         self._executed = False
         self._shallow_sort = True
-
         self.from_cache = None
         self.from_index = 'none'
+        self._provided_guids = guids
+        self._provided_keys = None  # Conversion of guids to keys, cached for faster lookup
 
     @property
     def guids(self):
@@ -103,16 +119,91 @@ class DataList(object):
             self._execute_query()
         return self._guids
 
+    def set_query(self, query):
+        """
+        Sets the query to apply to a different query
+        :param query: The query to perform. If this query is different from the previous one, the previously cached result will be replaced
+        with results of this query. If the query is identical and the result is cached, it will return the cached result
+        If None is supplied, a default query which does not filter anything will be set
+        :type query: dict or NoneType
+        Definitions:
+        * <query>: Should be a dictionary:
+                   {'type' : DataList.where_operator.XYZ,
+                    'items': <items>}
+        * <filter>: A tuple defining a single expression:
+                    (<field>, DataList.operator.XYZ, <value> [, <ignore_case>])
+                    The field is any property you would also find on the given object. In case of
+                    properties, you can dot as far as you like.
+        * <items>: A list of one or more <query> or <filter> items. This means the query structure is recursive and
+                   complex queries are possible
+        :return: None
+        :rtype: NoneType
+        """
+        if query is None:
+            query = {'type': DataList.where_operator.AND, 'items': []}
+        self._validate_query(query)
+        self._query = query
+        # Reset cache
+        self._volatile.delete(self._key)
+        # Force query to rerun
+        self._executed = False
+
+    def set_guids(self, guids):
+        """
+        Sets up a list of guids to apply the query too
+        :param guids: List of guids to query on or None in case you wish to query all items again
+        :type guids: list[basestring] or NoneType
+        :return: None
+        :rtype: NoneType
+        """
+        if guids is not None:
+            self._validate_guids(guids)
+        self._provided_guids = guids
+        # Reset cache
+        self._provided_keys = None
+        self._volatile.delete(self._key)
+        # Force query to rerun
+        self._executed = False
+
+    @staticmethod
+    def _validate_query(query):
+        """
+        Validates if a query is of the format we'd expect
+        :param query: Query to perform
+        :type query: dict
+        :return: None
+        :rtype: NoneType
+        :raises: ValueError if the query is not valid
+        """
+        if query is not None and not isinstance(query, dict) and not all(k in query for k in ("type", "items")):
+            raise ValueError('Query can be None or a dict containing \'type\' and \'items\'')
+
+    @staticmethod
+    def _validate_guids(guids):
+        """
+        Validates if the supplied guids are valid
+        :param guids: Guids to check for
+        :type guids: list[basestring]
+        :return: None
+        :rtype: NoneType
+        :raises: ValueError if the guids are not valid
+        """
+        if guids is not None and not isinstance(guids, list) and (len(guids) > 0 and isinstance(guids[0], basestring)):
+            raise ValueError('Specified guids should be a list of guids or None')
+
     #######################
     # Query functionality #
     #######################
 
     def _get_keys_from_index(self, indexed_properties, items, where_operator):
         """
-        Builds a generator that only yields data filtered by possible indexes where possible.
+        Builds a set of keys that were retrieved from the indexes.
         :param indexed_properties: A list of all indexed properties
         :param items: The query items
         :param where_operator: The WHERE operator
+        :return: Set of keys or None
+        Returns None when no indexes could be applied, empty set when indexes could be applied but values do not match
+        :rtype: set{basestring} or NoneType
         """
         if not self._can_use_indexes(indexed_properties, items, where_operator):
             raise RuntimeError('A request for loading data from indexes is aborted since the query is not index-safe.')
@@ -127,14 +218,15 @@ class DataList(object):
                     if keys is None:
                         keys = indexed_keys
                     elif where_operator == DataList.where_operator.AND:
-                        keys &= indexed_keys
+                        keys &= indexed_keys  # intersect keys
                     else:
-                        keys |= indexed_keys
+                        keys |= indexed_keys  # Unify keys
                     if self.from_index == 'none':
                         self.from_index = 'full'
                 elif self.from_index == 'full':
                     self.from_index = 'partial'
             else:
+                # Item consists of: ( <field>, <operator>, <value>, <ignore_case>(optional) )
                 if item[0] in indexed_properties:
                     if item[1] == DataList.operator.EQUALS:
                         if item[0] == 'guid':
@@ -211,6 +303,11 @@ class DataList(object):
         :param query_type: The WHERE operator
         :return: A generator that yields key-value pairs for the data to be filtered
         """
+        if self._provided_guids is not None:
+            if self._provided_keys is None:
+                # Build and cache the keys
+                self._provided_keys = set(['{0}{1}'.format(prefix, guid) for guid in self._provided_guids])
+
         indexed_properties = [prop.name for prop in self._object_type._properties if prop.indexed is True] + ['guid']
         use_indexes = self._can_use_indexes(indexed_properties, query_items, query_type)
         if use_indexes is True:
@@ -218,6 +315,11 @@ class DataList(object):
             if keys is not None:
                 if self.from_index == 'none':
                     self.from_index = 'full'
+
+                if self._provided_guids is not None:
+                    # Keys is a set which can contain more keys for objects than requested, thus intersect to query for the requested objects
+                    keys &= self._provided_keys
+
                 keys = list(keys)
 
                 if 'data_generator' in DataList._test_hooks:
@@ -229,8 +331,16 @@ class DataList(object):
             else:
                 use_indexes = False
         if use_indexes is False:
+            if self._provided_guids is not None:
+                entries = list(self._persistent.get_multi(self._provided_keys, must_exist=False))
+                for index, key in enumerate(self._provided_keys):
+                    # Discard keys for which no data could be found
+                    if entries[index] is None:
+                        continue
+                    yield key, entries[index]
             for item in self._persistent.prefix_entries(prefix):
-                yield item
+                # Item is a list with [key, value] so casting to tuple to yield the same as with indexes
+                yield tuple(item)
 
     def _filter(self, instance, items, where_operator):
         """
@@ -317,7 +427,6 @@ class DataList(object):
         """
         Tries to load the result for the given key from the volatile cache, or executes the query
         if not yet available. Afterwards (if a key is given), the result will be (re)cached
-
         Definitions:
         * <query>: Should be a dictionary:
                    {'type' : DataList.where_operator.XYZ,
@@ -423,6 +532,8 @@ class DataList(object):
         :param invalidations: A by-ref dict containing all invalidations for this list
         :param object_type: The object type for this invalidations run
         :param items: The query items that need to be used for building invalidations
+        :return: None. This invalidations is passed by reference and will be updated by reference
+        :rtype: NoneType
         """
         def _add(cname, field):
             if cname not in invalidations:

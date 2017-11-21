@@ -320,48 +320,6 @@ def return_list(object_type, default_sort=None):
             # Filtering data
             if filtering is not None:
                 start = time.time()
-                # Map the string operators to the operator to use
-                # Also check for types when needed [for example string]
-                operator_table = {'equals': {'operator': operator.is_},
-                                  'greater_than': {'operator': operator.gt},
-                                  'greater_equals': {'operator': operator.ge},
-                                  'lesser_than': {'operator': operator.lt},
-                                  'lesser_equals': {'operator': operator.le},
-                                  'in': {'operator': operator.contains},
-                                  'starts_with': {'operator': lambda a, b: a.startswith(b),
-                                                  'types': [basestring]},
-                                  'ends_with': {'operator': lambda a, b: a.endswith(b),
-                                                'types': [basestring]}}
-                if guid_list is True:
-                    # We need the actual objects to filter on properties
-                    data_list = [object_type(guid) for guid in data_list]
-                    guid_list = False  # The list is converted to objects
-                # Extract the chain mode to see what is to be chained
-                filtering_chain = map(lambda filter_item: filter_item.get('chain', 'and'), filtering)
-                processed_fields = []
-                errors = []
-                def ordinal(number):
-                    suffix = "tsnrhtdd"[(number / 10 % 10 != 1) * (number % 10 < 4) * number % 10::4]
-                    return "{0}{1}".format(number, suffix)
-                for index, filter_item in enumerate(filtering):
-                    if 'value' not in filter_item:
-                        errors.append('A value has to be supplied for filtering. Missing on the {0} filter item'.format(ordinal(index)))
-                        continue
-                    if 'field' not in filter_item:
-                        errors.append('A field has to be supplied for filtering Missing on the {0} filter item'.format(ordinal(index)))
-                        continue
-                    requested_value = filter_item['value']
-                    requested_operator = filter_item.get('operator', 'equals')
-                    requested_chain = filter_item.get('chain', 'and')
-                    requested_field = filter_item['field']
-                    operator_info = operator_table.get(requested_operator)
-                    if operator_info is None:
-                        errors.append('Unsupported operator requested. Supported operators are {0}'.format(', '.join(['\'{0}\''.format(key) for key in operator_table.keys()])))
-                        continue
-                    types = requested_operator.get('types')
-                    if types is not None and not all(isinstance(requested_value, t) for t in types):
-                        errors.append('The filtering value does not match the type for the operator. Supported types for {0} are {1}'.format(requested_operator, ', '.join([str(t) for t in types])))
-                        continue
 
                 timings['filtering'] = [time.time() - start, 'Filtering data']
 
@@ -372,8 +330,6 @@ def return_list(object_type, default_sort=None):
                     data_list = [object_type(guid) for guid in data_list]
                     guid_list = False  # The list is converted to objects
                 for sort_item in sort:
-                    # @todo support sorting with multiple keys and weights to it
-                    # Example: sort on name and then on ip, so duplicate names will get sorted on ip
                     desc = sort_item[0] == '-'
                     field = sort_item[1 if desc else 0:]
                     data_list.sort(key=lambda e: DalToolbox.extract_key(e, field), reverse=desc)
@@ -414,8 +370,6 @@ def return_list(object_type, default_sort=None):
                     data_list = [object_type(guid) for guid in data_list]
                 data = FullSerializer(object_type, contents=contents, instance=data_list, many=True).data
             else:
-                # There might be an issue here. When sorting is requested, the dynamics and relations are potentially not fetched because contents is ignored
-                # @todo investigate hypothesis
                 if guid_list is False:
                     data_list = [item.guid for item in data_list]
                 data = data_list

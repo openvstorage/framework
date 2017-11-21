@@ -235,6 +235,7 @@ class Basic(unittest.TestCase):
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
+        disk_guids = []
         for i in xrange(0, 20):
             disk = TestDisk()
             disk.name = 'test_{0}'.format(i)
@@ -244,89 +245,134 @@ class Basic(unittest.TestCase):
             else:
                 disk.storage = machine
             disk.save()
+            disk_guids.append(disk.guid)
+
+        # Test queries on full lists
         self.assertEqual(len(machine.disks), 10, 'query should find added machines')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('size', DataList.operator.EQUALS, 1)]})
-        self.assertEqual(len(dlist), 1, 'list should contain 1')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('size', DataList.operator.EQUALS, 1)]})
-        found_object = dlist[0]
-        self.assertEqual(found_object.name, 'test_1', 'list should contain correct machine')
+        expected_disks = [TestDisk(disk_guids[1])]
+        self.assertEqual(len(dlist), 1, 'List should contain 1')
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disk 1')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('size', DataList.operator.GT, 3),
                                               ('size', DataList.operator.LT, 6)]})
-        self.assertEqual(len(dlist), 2, 'list should contain 2')  # disk 4 and 5
+        expected_disks = [TestDisk(disk_guids[4]), TestDisk(disk_guids[5])]  # Should find disk 4 and 5
+        self.assertEqual(len(dlist), 2, 'List should contain 2')
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 4, 5')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.OR,
                                     'items': [('size', DataList.operator.LT, 3),
                                               ('size', DataList.operator.GT, 6)]})
-        self.assertGreaterEqual(len(dlist), 16, 'list should contain 16')  # at least disk 0, 1, 2, 7, 8, 9, 10-19
+        expected_disks = [TestDisk(disk_guids[0]), TestDisk(disk_guids[1]), TestDisk(disk_guids[2]), TestDisk(disk_guids[7]),
+                          TestDisk(disk_guids[8]), TestDisk(disk_guids[9])] + [TestDisk(disk_guids[i]) for i in xrange(10, 20)]
+        self.assertGreaterEqual(len(dlist), 16, 'List should contain 16')  # At least disk 0, 1, 2, 7, 8, 9, 10-19
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 0, 1, 2, 7, 8, 9, 10-19')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),
                                               {'type': DataList.where_operator.OR,
                                                'items': [('size', DataList.operator.LT, 3),
                                                          ('size', DataList.operator.GT, 6)]}]})
-        self.assertEqual(len(dlist), 6, 'list should contain 6')  # disk 0, 1, 2, 7, 8, 9
+        expected_disks = [TestDisk(disk_guids[0]), TestDisk(disk_guids[1]), TestDisk(disk_guids[2]),
+                          TestDisk(disk_guids[7]), TestDisk(disk_guids[8]), TestDisk(disk_guids[9])]
+        self.assertEqual(len(dlist), 6, 'List should contain 6')  # Disk 0, 1, 2, 7, 8, 9
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 0, 1, 2, 7, 8, 9')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('size', DataList.operator.LT, 3),
                                               ('size', DataList.operator.GT, 6)]})
-        self.assertEqual(len(dlist), 0, 'list should contain 0')  # no disks
+        self.assertEqual(len(dlist), 0, 'list should contain 0')  # No disks
         dlist = DataList(TestDisk, {'type': DataList.where_operator.OR,
                                     'items': [('machine.guid', DataList.operator.EQUALS, '123'),
                                               ('used_size', DataList.operator.EQUALS, -1),
                                               {'type': DataList.where_operator.AND,
                                                'items': [('size', DataList.operator.GT, 3),
                                                          ('size', DataList.operator.LT, 6)]}]})
-        self.assertEqual(len(dlist), 2, 'list should contain 2')  # disk 4 and 5
+        expected_disks = [TestDisk(disk_guids[4]), TestDisk(disk_guids[5])]
+        self.assertEqual(len(dlist), 2, 'List should contain 2')  # Disk 4 and 5
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 4, 5')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('machine.name', DataList.operator.EQUALS, 'machine'),
                                               ('name', DataList.operator.EQUALS, 'test_3')]})
-        self.assertEqual(len(dlist), 1, 'list should contain 1')  # disk 3
+        expected_disks = [TestDisk(disk_guids[3])]
+        self.assertEqual(len(dlist), 1, 'List should contain 1')  # Disk 3
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disk 3')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('size', DataList.operator.GT, 3),
                                               {'type': DataList.where_operator.AND,
                                                'items': [('size', DataList.operator.LT, 6)]}]})
-        self.assertEqual(len(dlist), 2, 'list should contain 2')  # disk 4 and 5
+        expected_disks = [TestDisk(disk_guids[4]), TestDisk(disk_guids[5])]
+        self.assertEqual(len(dlist), 2, 'list should contain 2')  # Disk 4 and 5
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 4, 5')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.OR,
                                     'items': [('size', DataList.operator.LT, 3),
                                               {'type': DataList.where_operator.OR,
                                                'items': [('size', DataList.operator.GT, 6)]}]})
-        self.assertGreaterEqual(len(dlist), 16, 'list should contain 16')  # at least disk 0, 1, 2, 7, 8, 9, 10-19
+        expected_disks = [TestDisk(disk_guids[0]), TestDisk(disk_guids[1]), TestDisk(disk_guids[2]), TestDisk(disk_guids[7]),
+                          TestDisk(disk_guids[8]), TestDisk(disk_guids[9])] + [TestDisk(disk_guids[i]) for i in xrange(10, 20)]
+        self.assertGreaterEqual(len(dlist), 16, 'List should contain 16')  # At least disk 0, 1, 2, 7, 8, 9, 10-19
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 0, 1, 2, 7, 8, 9, 10-19')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('storage.name', DataList.operator.EQUALS, 'machine')]})
-        self.assertEqual(len(dlist), 10, 'list should contain 10')  # disk 10-19
+        expected_disks = [TestDisk(disk_guids[i]) for i in xrange(10, 20)]
+        self.assertEqual(len(dlist), 10, 'List should contain 10')  # Disk 10-19
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 10-19')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.EQUALS, 'test_1')]})
-        self.assertEqual(len(dlist), 1, 'list should contain 1')  # single disk
+        expected_disks = [TestDisk(disk_guids[1])]
+        self.assertEqual(len(dlist), 1, 'List should contain 1')  # Single disk
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disk 1')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.EQUALS, 'tESt_1', False)]})
-        self.assertEqual(len(dlist), 1, 'list should contain 1')  # single disk
+        expected_disks = [TestDisk(disk_guids[1])]
+        self.assertEqual(len(dlist), 1, 'List should contain 1')  # Single disk
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disk 1')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.EQUALS, 'tESt_1')]})
-        self.assertEqual(len(dlist), 0, 'list should contain 0')  # no disk
+        expected_disks = []
+        self.assertEqual(len(dlist), 0, 'List should contain 0')  # No disk
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain no disks')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.EQUALS, 'Test_1')]})
-        self.assertEqual(len(dlist.guids), 0, 'list should contain 0')  # no disk, but executed though guids property
+        expected_disks = []
+        self.assertEqual(len(dlist.guids), 0, 'List should contain 0')  # No disk
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain no disks')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test_1')]})
-        self.assertEqual(len(dlist), 11, 'list should contain 11')  # disk test_1, test_10-19
+        expected_disks = [TestDisk(disk_guids[1])] + [TestDisk(disk_guids[i]) for i in xrange(10, 20)]
+        self.assertEqual(len(dlist), 11, 'List should contain 11')  # Disk test_1, test_10-19
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 1, 10-19')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.IN, ['test_1', 'test_2'])]})
-        self.assertEqual(len(dlist), 2, 'list should contain 2')  # disk test_1, test_2
+        expected_disks = [TestDisk(disk_guids[1]), TestDisk(disk_guids[2])]
+        self.assertEqual(len(dlist), 2, 'List should contain 2')  # Disk test_1, test_2
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 1, 2')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.IN, ['test_1', 'tEst_2'])]})
-        self.assertEqual(len(dlist), 1, 'list should contain 1')  # disk test_1
+        expected_disks = [TestDisk(disk_guids[1])]
+        self.assertEqual(len(dlist), 1, 'List should contain 1')  # Disk test_1
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 1')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.IN, ['test_1', 'tEst_2'], False)]})
-        self.assertEqual(len(dlist), 2, 'list should contain 2')  # disk test_1, test_2
+        expected_disks = [TestDisk(disk_guids[1]), TestDisk(disk_guids[2])]
+        self.assertEqual(len(dlist), 2, 'List should contain 2')  # Disk test_1, test_2
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 1, 2')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.IN, 'foo_test_1_bar')]})
-        self.assertEqual(len(dlist), 1, 'list should contain 1')  # disk test_1
+        expected_disks = [TestDisk(disk_guids[1])]
+        self.assertEqual(len(dlist), 1, 'List should contain 1')  # Disk test_1
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disks 1')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.IN, 'foo_tEst_1_bar')]})
-        self.assertEqual(len(dlist), 0, 'list should contain 0')  # no disk
+        expected_disks = []
+        self.assertEqual(len(dlist), 0, 'List should contain 0')  # No disk
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain no disks')
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.IN, 'foo_tEst_1_bar', False)]})
-        self.assertEqual(len(dlist), 1, 'list should contain 1')  # disk test_1
+        expected_disks = [TestDisk(disk_guids[1])]
+        self.assertEqual(len(dlist), 1, 'List should contain 1')  # disk test_1
+        self.assertItemsEqual(list(dlist), expected_disks, 'List should contain disk 1')
+
+        # Test queries on partial lists
+
 
     def test_invalidpropertyassignment(self):
         """
