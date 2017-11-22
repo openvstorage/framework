@@ -21,12 +21,19 @@ import os
 import imp
 import inspect
 import unittest
+from ovs.extensions.generic.configuration import Configuration
 
 
 class APIConfiguration(unittest.TestCase):
     """
     This test suite will validate whether all APIs are properly decorated
     """
+    def setUp(self):
+        """
+        (Re)Sets the stores on every test
+        """
+        # Some modules rely on this key, which is loaded during imp.load_source in _get_functions()
+        Configuration.set(key='/ovs/framework/edition/', value='enterprise')
 
     def test_return(self):
         """

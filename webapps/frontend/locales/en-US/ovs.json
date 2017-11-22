@@ -1194,7 +1194,6 @@
                 "gui": "GUI",
                 "none": "No components will experience downtime",
                 "ovsdb": "Model",
-                "proxy": "Proxy service for vPool",
                 "voldrv": "Storage Driver Registry"
             },
             "failure": "Update failed to launch: __why__",

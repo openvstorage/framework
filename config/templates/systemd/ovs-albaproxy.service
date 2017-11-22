@@ -11,7 +11,7 @@ Environment=ALBA_FAIL_FAST=true
 Environment=LD_LIBRARY_PATH=/usr/lib/alba
 # Garbage collection for ALBA
 Environment=OCAMLRUNPARAM='b,a=1,s=4096k,O=50'
-ExecStartPre=/bin/bash -c "if [ ! -d /opt/OpenvStorage/run ]; then mkdir /opt/OpenvStorage/run; chown ovs:ovs /opt/OpenvStorage/run; fi; echo alba=`alba version --terse` > /opt/OpenvStorage/run/<SERVICE_NAME>.version"
+ExecStartPre=/bin/bash -c "if [ ! -d <RUN_FILE_DIR> ]; then mkdir <RUN_FILE_DIR>; chown ovs:ovs <RUN_FILE_DIR>; fi; echo <ALBA_PKG_NAME>=`<ALBA_VERSION_CMD>` > <RUN_FILE_DIR>/<SERVICE_NAME>.version"
 ExecStart=/usr/bin/alba proxy-start --config <CONFIG_PATH> --log-sink <LOG_SINK>
 ExecReload=/bin/bash -c "kill -s SIGUSR1 $MAINPID"
 Restart=on-failure

@@ -285,6 +285,9 @@ class StorageRouterController(object):
         if supports_block_cache is False and (block_cache_on_read is True or block_cache_on_write is True):
             raise RuntimeError('Block cache is not a supported feature')
 
+        alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
+        voldrv_pkg_name, voldrv_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
+
         ################
         # CREATE VPOOL #
         ################
@@ -934,12 +937,16 @@ class StorageRouterController(object):
                      'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
                      'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
                      'LOG_SINK': Logger.get_sink_path('storagedriver_{0}'.format(storagedriver.storagedriver_id)),
+                     'VOLDRV_PKG_NAME': voldrv_pkg_name,
+                     'VOLDRV_VERSION_CMD': voldrv_version_cmd,
                      'METADATASTORE_BITS': 5}
         dtl_params = {'DTL_PATH': sdp_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,
                       'DTL_PORT': str(storagedriver.ports['dtl']),
                       'DTL_TRANSPORT': StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport],
-                      'LOG_SINK': Logger.get_sink_path('storagedriver-dtl_{0}'.format(storagedriver.storagedriver_id))}
+                      'LOG_SINK': Logger.get_sink_path('storagedriver-dtl_{0}'.format(storagedriver.storagedriver_id)),
+                      'VOLDRV_PKG_NAME': voldrv_pkg_name,
+                      'VOLDRV_VERSION_CMD': voldrv_version_cmd}
 
         sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
@@ -955,7 +962,9 @@ class StorageRouterController(object):
             for proxy in storagedriver.alba_proxies:
                 alba_proxy_params = {'VPOOL_NAME': vpool_name,
                                      'LOG_SINK': Logger.get_sink_path(proxy.service.name),
-                                     'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid))}
+                                     'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid)),
+                                     'ALBA_PKG_NAME': alba_pkg_name,
+                                     'ALBA_VERSION_CMD': alba_version_cmd}
                 alba_proxy_service = 'ovs-{0}'.format(proxy.service.name)
                 cls._service_manager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
                 cls._service_manager.start_service(alba_proxy_service, client=root_client)

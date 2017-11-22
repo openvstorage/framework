@@ -17,6 +17,7 @@
 """
 GenericTaskController module
 """
+
 import os
 import copy
 import time
@@ -43,6 +44,7 @@ from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
@@ -401,6 +403,8 @@ class GenericController(object):
             error_messages.append('vPool {0} does not have any valid StorageDrivers configured'.format(vpool.name))
             return
 
+        alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
+
         service_manager = ServiceFactory.get_manager()
         client = None
         lock_time = 5 * 60
@@ -434,7 +438,9 @@ class GenericController(object):
 
                     params = {'VPOOL_NAME': vpool.name,
                               'LOG_SINK': Logger.get_sink_path(alba_proxy_service),
-                              'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key)}
+                              'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key),
+                              'ALBA_PKG_NAME': alba_pkg_name,
+                              'ALBA_VERSION_CMD': alba_version_cmd}
                     service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
                     service_manager.start_service(name=alba_proxy_service, client=client)
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
