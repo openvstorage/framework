@@ -158,14 +158,12 @@ class StorageRouter(DataObject):
         :return: Dictionary containing edition and available features per component
         """
         try:
-            enterprise = 'enterprise'
-            community = 'community'
             client = SSHClient(self, username='root')
             enterprise_regex = re.compile('^(?P<edition>ee-)?(?P<version>.*)$')
 
             version = client.run(command=PackageFactory.VERSION_CMD_SD, allow_insecure=True, allow_nonzero=True)
             volumedriver_version = enterprise_regex.match(version).groupdict()
-            volumedriver_edition = enterprise if volumedriver_version['edition'] == 'ee-' else community
+            volumedriver_edition = PackageFactory.EDITION_ENTERPRISE if volumedriver_version['edition'] == 'ee-' else PackageFactory.EDITION_COMMUNITY
             volumedriver_version_lv = LooseVersion(volumedriver_version['version'])
             volumedriver_features = [feature for feature, version
                                      in {'directory_unlink': ('6.15.0', None)}.iteritems()
@@ -174,11 +172,11 @@ class StorageRouter(DataObject):
 
             version = client.run(command=PackageFactory.VERSION_CMD_ALBA, allow_insecure=True, allow_nonzero=True)
             alba_version = enterprise_regex.match(version).groupdict()
-            alba_edition = enterprise if alba_version['edition'] == 'ee-' else community
+            alba_edition = PackageFactory.EDITION_ENTERPRISE if alba_version['edition'] == 'ee-' else PackageFactory.EDITION_COMMUNITY
             alba_version_lv = LooseVersion(alba_version['version'])
             alba_features = [feature for feature, version
-                             in {'cache-quota': ('1.4.4', enterprise),
-                                 'block-cache': ('1.4.0', enterprise)}.iteritems()
+                             in {'cache-quota': ('1.4.4', PackageFactory.EDITION_ENTERPRISE),
+                                 'block-cache': ('1.4.0', PackageFactory.EDITION_ENTERPRISE)}.iteritems()
                              if alba_version_lv >= LooseVersion(version[0])
                              and (version[1] is None or version[1] == alba_edition)]
 

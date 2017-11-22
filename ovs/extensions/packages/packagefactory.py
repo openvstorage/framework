@@ -18,7 +18,6 @@
 Package Factory module
 """
 
-from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonException
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.packages.packagefactory import PackageFactory as _PackageFactory
@@ -69,27 +68,8 @@ class PackageFactory(_PackageFactory):
         :return: A dictionary containing information about the expected packages to be installed
         :rtype: dict
         """
-        edition_key = '/ovs/framework/edition'
-        try:
-            if Configuration.exists(key=edition_key) is False:
-                raise ValueError('Edition configuration key "{0}" does not exist'.format(edition_key))
-            edition = str(Configuration.get(key=edition_key))
-        except ArakoonException:
-            cls._logger.exception('Unable to connect to the configuration Arakoon. Returning all packages/binaries')
-            return {'names': {cls.COMP_FWK: {cls.PKG_ARAKOON, cls.PKG_OVS, cls.PKG_OVS_EXTENSIONS},
-                              cls.COMP_SD: {cls.PKG_ARAKOON, cls.PKG_VOLDRV_BASE, cls.PKG_VOLDRV_SERVER, cls.PKG_VOLDRV_BASE_EE, cls.PKG_VOLDRV_SERVER_EE}},
-                    'edition': '',
-                    'binaries': {cls.COMP_FWK: {cls.PKG_ARAKOON},
-                                 cls.COMP_SD: {cls.PKG_ARAKOON, cls.PKG_VOLDRV_SERVER, cls.PKG_VOLDRV_SERVER_EE}},
-                    'blocking': {cls.PKG_OVS, cls.PKG_OVS_EXTENSIONS},
-                    'version_commands': {cls.PKG_ARAKOON: cls.VERSION_CMD_ARAKOON,
-                                         cls.PKG_VOLDRV_BASE: cls.VERSION_CMD_SD,
-                                         cls.PKG_VOLDRV_SERVER: cls.VERSION_CMD_SD,
-                                         cls.PKG_VOLDRV_BASE_EE: cls.VERSION_CMD_SD,
-                                         cls.PKG_VOLDRV_SERVER_EE: cls.VERSION_CMD_SD},
-                    'mutually_exclusive': set()}
-
-        if edition == 'community':
+        edition = Configuration.get_edition()
+        if edition == cls.EDITION_COMMUNITY:
             return {'names': {cls.COMP_FWK: {cls.PKG_ARAKOON, cls.PKG_OVS, cls.PKG_OVS_EXTENSIONS},
                               cls.COMP_SD: {cls.PKG_ARAKOON, cls.PKG_VOLDRV_BASE, cls.PKG_VOLDRV_SERVER}},
                     'edition': edition,
@@ -100,7 +80,7 @@ class PackageFactory(_PackageFactory):
                                          cls.PKG_VOLDRV_BASE: cls.VERSION_CMD_SD,
                                          cls.PKG_VOLDRV_SERVER: cls.VERSION_CMD_SD},
                     'mutually_exclusive': {cls.PKG_VOLDRV_BASE_EE, cls.PKG_VOLDRV_SERVER_EE}}
-        elif edition == 'enterprise':
+        elif edition == cls.EDITION_ENTERPRISE:
             return {'names': {cls.COMP_FWK: {cls.PKG_ARAKOON, cls.PKG_OVS, cls.PKG_OVS_EXTENSIONS},
                               cls.COMP_SD: {cls.PKG_ARAKOON, cls.PKG_VOLDRV_BASE_EE, cls.PKG_VOLDRV_SERVER_EE}},
                     'edition': edition,
@@ -112,4 +92,4 @@ class PackageFactory(_PackageFactory):
                                          cls.PKG_VOLDRV_SERVER_EE: cls.VERSION_CMD_SD},
                     'mutually_exclusive': {cls.PKG_VOLDRV_BASE, cls.PKG_VOLDRV_SERVER}}
         else:
-            raise ValueError('Unsupported edition found in "{0}"'.format(edition_key))
+            raise ValueError('Unsupported edition found: "{0}"'.format(edition))

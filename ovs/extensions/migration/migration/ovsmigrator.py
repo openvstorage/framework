@@ -82,10 +82,10 @@ class OVSMigrator(object):
                     Configuration.delete(key=mds_safety_key)
 
                 # Introduction of edition key
-                if Configuration.get(key='/ovs/framework/edition', default=None) not in ['community', 'enterprise']:
+                if Configuration.get(key=Configuration.EDITION_KEY, default=None) not in [PackageFactory.EDITION_COMMUNITY, PackageFactory.EDITION_ENTERPRISE]:
                     for storagerouter in StorageRouterList.get_storagerouters():
                         try:
-                            Configuration.set(key='/ovs/framework/edition', value=storagerouter.features['alba']['edition'])
+                            Configuration.set(key=Configuration.EDITION_KEY, value=storagerouter.features['alba']['edition'])
                             break
                         except:
                             continue
