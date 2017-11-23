@@ -67,12 +67,13 @@ requirejs.config({
 });
 
 define([
-    'durandal/system', 'durandal/app', 'durandal/viewLocator', 'durandal/binder', 'jquery', 'i18next',
+    'durandal/system', 'durandal/app', 'durandal/viewLocator', 'durandal/binder', 'jquery', 'i18next', 'plugins/dialog',
     'ovs/shared',
+    'viewmodels/wizards/context',
     'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions', 'ovs/extensions/knockout-extenders',
     'bootstrap',
-    'knockout-dictionary'// Ko plugins
-],  function(system, app, viewLocator, binder, $, i18n, shared) {
+    'knockout-dictionary' // Ko plugins
+],  function(system, app, viewLocator, binder, $, i18n, dialog, shared, wizardContext) {
     "use strict";
     system.debug(true);  // To be changed when building production
     shared.defaultLanguage = shared.language = window.navigator.userLanguage || window.navigator.language || 'en-US';
@@ -110,4 +111,7 @@ define([
             app.setRoot('viewmodels/shell');
         });
     });
+
+    // Override the default context as the Durandal default context is rather sub awesome with bigger modals
+    dialog.addContext('default', wizardContext)
 });
