@@ -24,7 +24,6 @@ import json
 import math
 import time
 import inspect
-import operator
 from django.conf import settings
 from django.core.handlers.wsgi import WSGIRequest
 from functools import wraps
@@ -32,6 +31,7 @@ from rest_framework import status
 from rest_framework.request import Request
 from api.backend.toolbox import ApiToolbox
 from api.helpers import OVSResponse
+from ovs.dal.datalist import DataList
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -264,25 +264,10 @@ def return_list(object_type, default_sort=None):
              - Sorting (sort on properties)
              - Filtering (filter on properties)
             Request arguments for paging:
+            - page: The page number for which the items should be displayed
+            - page_size: The size of the pages
             Request arguments for sorting:
-            Request arguments for filtering: array of dicts which contain 'field', 'value',  'operator' (optional, defaults to equals), 'chain' (optional, defaults to and)
-            Example: [{'field': 'name', 'value': 'my_name'}, {'field': 'last_name', 'value': 'my_', 'operator': 'startswith', 'chain': 'or'}]
-            Order is crucial to the filtering support. Requesting a filter on name first and then on a different value will result in the name filter being applied first (unless it is chained as 'or')
-            Supported operators:
-             - equals (invertible)
-             - bigger_than
-             - bigger_equals
-             - lesser_than
-             - lesser_equals
-             - starts_with
-             - ends_with
-             All operators can be inverted by supplying prepending 'not_'
-             Chaining: filters can be chained together. By default all fields will chain as and, meaning that filtering on a name and last name will filter on both and not on either
-             To request for either filter, set chain mode to 'or'
-             These chains will be grouped. Example: and or or or and or will result into the or or or being applied only, as the last or has nothing to chain to
-             Supported chain:
-              - and
-              - or
+            Request arguments for filtering:
             """
             request = _find_request(args)
             timings = {}
@@ -290,7 +275,7 @@ def return_list(object_type, default_sort=None):
             # 1. Pre-loading request data
             start = time.time()
             sort = request.QUERY_PARAMS.get('sort')
-            filtering = request.QUERY_PARAMS.get('filter')
+            query = request.QUERY_PARAMS.get('query')
             if sort is None and default_sort is not None:
                 sort = default_sort
             sort = None if sort is None else [s for s in reversed(sort.split(','))]
@@ -304,7 +289,6 @@ def return_list(object_type, default_sort=None):
             timings['preload'] = [time.time() - start, 'Data preloading']
 
             # 2. Construct hints for decorated function (so it can provide full objects if required)
-            # Not used anywhere at the moment, not sure what action to take
             start = time.time()
             if 'hints' not in kwargs:
                 kwargs['hints'] = {}
@@ -318,16 +302,24 @@ def return_list(object_type, default_sort=None):
             timings['fetch'] = [time.time() - start, 'Fetching data']
 
             # Filtering data
-            if filtering is not None:
+            if query is not None:
                 start = time.time()
-
-                timings['filtering'] = [time.time() - start, 'Filtering data']
+                if guid_list is True:
+                    guids = data_list
+                    guid_list = False  # The list will be converted to a datalist
+                else:
+                    guids = data_list.guids
+                # Use the guids from the result list as a base to query inside the functions results and apply the query
+                data_list = DataList(object_type, query=query, guids=guids)
+                # Trigger the query
+                _ = data_list.guids
+                timings['querying'] = [time.time() - start, 'Querying data']
 
             # 4. Sorting
             if sort is not None:
                 start = time.time()
                 if guid_list is True:
-                    data_list = [object_type(guid) for guid in data_list]
+                    data_list = DataList(object_type, guids=data_list)
                     guid_list = False  # The list is converted to objects
                 for sort_item in sort:
                     desc = sort_item[0] == '-'
@@ -367,11 +359,11 @@ def return_list(object_type, default_sort=None):
             start = time.time()
             if contents is not None:
                 if guid_list is True:
-                    data_list = [object_type(guid) for guid in data_list]
+                    data_list = DataList(object_type, guids=data_list)
                 data = FullSerializer(object_type, contents=contents, instance=data_list, many=True).data
             else:
                 if guid_list is False:
-                    data_list = [item.guid for item in data_list]
+                    data_list = data_list.guids  # 'data_list' is a ovs.dal.datalist.DataList which has the guids stored
                 data = data_list
             timings['serializing'] = [time.time() - start, 'Serializing']
 
