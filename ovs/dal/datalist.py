@@ -119,6 +119,23 @@ class DataList(object):
             self._execute_query()
         return self._guids
 
+    def _reset_list(self):
+        """
+        Resets everything about the DataList and clears volatile cache
+        :return:
+        """
+        # Reset cache
+        self._volatile.delete(self._key)
+        # Force query to rerun
+        self._executed = False
+        self._guids = None
+        self._data = {}
+        self._objects = {}
+        # Reset index information
+        self.from_index = 'none'
+        # Reset caching info
+        self._can_cache = True
+
     def set_query(self, query):
         """
         Sets the query to apply to a different query
@@ -143,10 +160,7 @@ class DataList(object):
             query = {'type': DataList.where_operator.AND, 'items': []}
         self._validate_query(query)
         self._query = query
-        # Reset cache
-        self._volatile.delete(self._key)
-        # Force query to rerun
-        self._executed = False
+        self._reset_list()
 
     def set_guids(self, guids):
         """
@@ -159,11 +173,8 @@ class DataList(object):
         if guids is not None:
             self._validate_guids(guids)
         self._provided_guids = guids
-        # Reset cache
         self._provided_keys = None
-        self._volatile.delete(self._key)
-        # Force query to rerun
-        self._executed = False
+        self._reset_list()
 
     @staticmethod
     def _validate_query(query):
@@ -338,9 +349,10 @@ class DataList(object):
                     if entries[index] is None:
                         continue
                     yield key, entries[index]
-            for item in self._persistent.prefix_entries(prefix):
-                # Item is a list with [key, value] so casting to tuple to yield the same as with indexes
-                yield tuple(item)
+            else:
+                for item in self._persistent.prefix_entries(prefix):
+                    # Item is a list with [key, value] so casting to tuple to yield the same as with indexes
+                    yield tuple(item)
 
     def _filter(self, instance, items, where_operator):
         """
