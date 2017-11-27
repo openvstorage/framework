@@ -611,6 +611,156 @@ class Basic(unittest.TestCase):
             self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: {0})'.format(key))
             self.assertEqual(len(list_cache), 0, 'List should have no matches (mode: {0})'.format(key))
 
+    def test_cache(self):
+        """
+        Validates whether separate cache cases are covered
+        """
+        # Cache keys change on: query, guids and object type
+        machine_guids = []
+        for i in xrange(0, 10):
+            machine = TestMachine()
+            machine.name = 'machine_{0}'.format(i)
+            machine.save()
+            machine_guids.append(machine.guid)
+
+        ##########
+        # No key #
+        ##########
+        all_list0 = DataList(TestMachine)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list0), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list0, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list0.from_cache, False, 'List should not come from cache')
+
+        all_list1 = DataList(TestMachine)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list1), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list1, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list1.from_cache, True, 'List should come from cache')
+
+        all_list1_same_query = DataList(TestMachine,
+                                        query={'type': DataList.where_operator.AND,
+                                               'items': []})
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list1_same_query), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list1_same_query, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list1_same_query.from_cache, True, 'List should come from cache')
+
+        # Test query
+        all_list1_set_query = all_list1_same_query
+        all_list1_same_query_key = all_list1_same_query._key
+        all_list1_set_query.set_query({'type': DataList.where_operator.AND,
+                                       'items': [('name', DataList.operator.IN, [TestMachine(guid).name for guid in machine_guids[0:5]])]})
+        expected_items = [TestMachine(guid) for guid in machine_guids[0:5]]
+        self.assertItemsEqual(all_list1_set_query, expected_items, 'List should return 5')
+        self.assertEqual(len(all_list1_set_query), len(expected_items), 'List should return machine_0-5')
+        self.assertEqual(all_list1_set_query.from_cache, False, 'List should not come from cache')
+        self.assertNotEqual(all_list1_set_query._key, all_list1_same_query_key, 'Keys should differ')
+
+        # Test guid
+        # Supply a base set of guids to use - should not come from cache now
+        all_list0_guid = DataList(TestMachine, guids=machine_guids)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list0_guid), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list0_guid, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list0_guid.from_cache, False, 'List should not come from cache')
+        self.assertNotEqual(all_list0._key, all_list0_guid._key, 'Keys should differ')
+
+        all_list1_guid = DataList(TestMachine, guids=machine_guids)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list1_guid), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list1_guid, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list1_guid.from_cache, True, 'List should come from cache')
+
+        all_list1_guid_same_query = DataList(TestMachine,
+                                             query={'type': DataList.where_operator.AND,
+                                                    'items': []})
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list1_guid_same_query), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list1_guid_same_query, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list1_guid_same_query.from_cache, True, 'List should come from cache')
+
+        # Set new guids afterwards
+        all_list1_guid_set_guids = all_list1_guid_same_query
+        all_list1_guid_same_query_key = all_list1_guid_same_query._key
+        all_list1_guid_set_guids.set_guids(machine_guids[0:5])
+        expected_items = [TestMachine(guid) for guid in machine_guids[0:5]]
+        self.assertItemsEqual(all_list1_guid_set_guids, expected_items, 'List should return 5')
+        self.assertEqual(len(all_list1_guid_set_guids), len(expected_items), 'List should return machine_0-5')
+        self.assertEqual(all_list1_guid_set_guids.from_cache, False, 'List should not come from cache')
+        self.assertNotEqual(all_list1_guid_set_guids._key, all_list1_guid_same_query_key, 'Keys should differ')
+
+        key = uuid.uuid4()
+        ############
+        # With key #
+        ############
+        all_list0 = DataList(TestMachine, key=key)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list0), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list0, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list0.from_cache, False, 'List should not come from cache')
+
+        all_list1 = DataList(TestMachine, key=key)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list1), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list1, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list1.from_cache, False, 'List should not come from cache')
+
+        all_list1_same_query = DataList(TestMachine,
+                                        query={'type': DataList.where_operator.AND,
+                                               'items': []},
+                                        key=key)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list1_same_query), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list1_same_query, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list1_same_query.from_cache, False, 'List should not come from cache')
+
+        # Test query
+        all_list1_set_query = all_list1_same_query
+        all_list1_same_query_key = all_list1_same_query._key
+        all_list1_set_query.set_query({'type': DataList.where_operator.AND,
+                                       'items': [('name', DataList.operator.IN,
+                                                  [TestMachine(guid).name for guid in machine_guids[0:5]])]})
+        expected_items = [TestMachine(guid) for guid in machine_guids[0:5]]
+        self.assertItemsEqual(all_list1_set_query, expected_items, 'List should return 5')
+        self.assertEqual(len(all_list1_set_query), len(expected_items), 'List should return machine_0-5')
+        self.assertEqual(all_list1_set_query.from_cache, False, 'List should not come from cache')
+        self.assertEqual(all_list1_set_query._key, all_list1_same_query_key, 'Key should be the same')
+
+        # Test guid
+        # Supply a base set of guids to use - should not come from cache now
+        all_list0_guid = DataList(TestMachine, guids=machine_guids, key=key)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list0_guid), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list0_guid, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list0_guid.from_cache, False, 'List should not come from cache')
+        self.assertEqual(all_list0._key, all_list0_guid._key, 'Keys should be equal')
+
+        all_list1_guid = DataList(TestMachine, guids=machine_guids, key=key)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list1_guid), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list1_guid, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list1_guid.from_cache, False, 'List should not come from cache')
+
+        all_list1_guid_same_query = DataList(TestMachine,
+                                             query={'type': DataList.where_operator.AND,
+                                                    'items': []},
+                                             key=key)
+        expected_items = [TestMachine(guid) for guid in machine_guids]
+        self.assertEqual(len(all_list1_guid_same_query), len(expected_items), 'List should return 10')
+        self.assertItemsEqual(all_list1_guid_same_query, expected_items, 'List should return machine_0-9')
+        self.assertEqual(all_list1_guid_same_query.from_cache, False, 'List should not come from cache')
+
+        # Set new guids afterwards
+        all_list1_guid_set_guids = all_list1_guid_same_query
+        all_list1_guid_same_query_key = all_list1_guid_same_query._key
+        all_list1_guid_set_guids.set_guids(machine_guids[0:5])
+        expected_items = [TestMachine(guid) for guid in machine_guids[0:5]]
+        self.assertItemsEqual(all_list1_guid_set_guids, expected_items, 'List should return 5')
+        self.assertEqual(len(all_list1_guid_set_guids), len(expected_items), 'List should return machine_0-5')
+        self.assertEqual(all_list1_guid_set_guids.from_cache, False, 'List should not come from cache')
+        self.assertEqual(all_list1_guid_set_guids._key, all_list1_guid_same_query_key, 'Keys should not differ')
+
     def test_emptyquery(self):
         """
         Validates whether an certain query returns an empty set

@@ -264,10 +264,12 @@ def return_list(object_type, default_sort=None):
              - Sorting (sort on properties)
              - Filtering (filter on properties)
             Request arguments for paging:
-            - page: The page number for which the items should be displayed
-            - page_size: The size of the pages
+            - page: The page number for which the items should be displayed (string/int)
+            - page_size: The size of the pages (string/int)
             Request arguments for sorting:
-            Request arguments for filtering:
+            - sort: Comma separated list of the properties to sort on. Prefix with '-' to use descending order (eg name,-description) (string)
+            Request arguments for filtering: identical to DataList query params
+            - query: The query to perform. See DataList execute_query method for more info
             """
             request = _find_request(args)
             timings = {}
@@ -280,10 +282,9 @@ def return_list(object_type, default_sort=None):
                 sort = default_sort
             sort = None if sort is None else [s for s in reversed(sort.split(','))]
             page = request.QUERY_PARAMS.get('page')
-            page = int(page) if page is not None and page.isdigit() else None
+            page = int(page) if page is not None and (isinstance(page, int) or page.isdigit()) else None
             page_size = request.QUERY_PARAMS.get('page_size')
-            page_size = int(page_size) if page_size is not None and page_size.isdigit() else None
-            page_size = page_size if page_size in [10, 25, 50, 100] else 10
+            page_size = int(page_size) if page_size is not None and (isinstance(page_size, int) or page_size.isdigit()) else None
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
             timings['preload'] = [time.time() - start, 'Data preloading']

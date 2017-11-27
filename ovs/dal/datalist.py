@@ -88,13 +88,6 @@ class DataList(object):
 
         super(DataList, self).__init__()
 
-        if key is not None:
-            self._key = '{0}_{1}'.format(DataList.NAMESPACE, key)
-        else:
-            identifier = copy.deepcopy(query)
-            identifier['object'] = object_type.__name__
-            self._key = '{0}_{1}'.format(DataList.NAMESPACE, hashlib.sha256(json.dumps(identifier)).hexdigest())
-
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._query = query
@@ -109,6 +102,10 @@ class DataList(object):
         self.from_index = 'none'
         self._provided_guids = guids
         self._provided_keys = None  # Conversion of guids to keys, cached for faster lookup
+        self._key = None
+        self._provided_key = False  # Keep track whether a key was explicitly set
+
+        self.set_key(key)
 
     @property
     def guids(self):
@@ -119,13 +116,33 @@ class DataList(object):
             self._execute_query()
         return self._guids
 
+    def set_key(self, key=None):
+        """
+        Sets the caching key
+        Won't override the key when a key was giving on initializing
+        :param key: Key to explicitly use
+        :type key: str
+        :return: None
+        :rtype: NoneType
+        """
+        if key is not None:
+            self._key = '{0}_{1}'.format(DataList.NAMESPACE, key)
+            self._provided_key = True
+            # Unsure whether or not the same query would apply
+            self._volatile.delete(self._key)
+            return
+        elif self._provided_key is False:
+            identifier = copy.deepcopy(self._query)
+            identifier['object'] = self._object_type.__name__
+            identifier['guids'] = 'None' if self._provided_guids is None else ','.join(self._provided_guids)
+            self._key = '{0}_{1}'.format(DataList.NAMESPACE, hashlib.sha256(json.dumps(identifier)).hexdigest())
+
     def _reset_list(self):
         """
-        Resets everything about the DataList and clears volatile cache
-        :return:
+        Resets everything about the DataList
+        :return: None
+        :rtype: NoneType
         """
-        # Reset cache
-        self._volatile.delete(self._key)
         # Force query to rerun
         self._executed = False
         self._guids = None
@@ -160,6 +177,11 @@ class DataList(object):
             query = {'type': DataList.where_operator.AND, 'items': []}
         self._validate_query(query)
         self._query = query
+        if self._provided_key is True:
+            # Cache has to be reset as it is no longer valid
+            self._volatile.delete(self._key)
+        else:
+            self.set_key()
         self._reset_list()
 
     def set_guids(self, guids):
@@ -174,6 +196,11 @@ class DataList(object):
             self._validate_guids(guids)
         self._provided_guids = guids
         self._provided_keys = None
+        if self._provided_key is True:
+            # Cache has to be reset as it is no longer valid
+            self._volatile.delete(self._key)
+        else:
+            self.set_key()
         self._reset_list()
 
     @staticmethod

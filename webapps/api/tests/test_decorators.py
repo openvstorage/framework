@@ -439,7 +439,8 @@ class Decorators(unittest.TestCase):
             """
             output_values['args'] = args
             output_values['kwargs'] = kwargs
-            return data_list_machines[0:2]
+            _data_list_machines = DataList(TestMachine, guids=[guid_table['bb']['aa'], guid_table['aa']['cc']])
+            return _data_list_machines
 
         @return_list(TestMachine)
         def the_function_rl_4(*args, **kwargs):
@@ -448,7 +449,8 @@ class Decorators(unittest.TestCase):
             """
             output_values['args'] = args
             output_values['kwargs'] = kwargs
-            return data_list_machineguids[0:2]
+            _data_list_machines_guid = [guid_table['bb']['aa'], guid_table['aa']['cc']]
+            return _data_list_machines_guid
 
         # Name/description combinations: [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
         output_values = {}
@@ -461,9 +463,11 @@ class Decorators(unittest.TestCase):
             if machine.name not in guid_table:
                 guid_table[machine.name] = {}
             guid_table[machine.name][machine.description] = machine.guid
-        data_list_machineguids = [user.guid for user in data_list_machines]
+        data_list_machineguids = [machine.guid for machine in data_list_machines]
 
         time.sleep(180)
+
+        # Test sorting
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         for fct in [the_function_rl_1, the_function_rl_2]:
             request.QUERY_PARAMS = {}
@@ -519,32 +523,61 @@ class Decorators(unittest.TestCase):
             self.assertIsInstance(response.data['data']['instance'][0], TestMachine)
             self.assertIn(response.data['data']['instance'][0].name, ['aa', 'bb'])
 
+        # Test filtering
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         for fct in [the_function_rl_1, the_function_rl_2, the_function_rl_3, the_function_rl_4]:
             request.QUERY_PARAMS = {}
             # Test querying, not to be tested thoroughly (test_basic handles DataList queries)
             request.QUERY_PARAMS['query'] = {'type': 'AND',
                                              'items': [['description', 'EQUALS', 'aa']]}
-            response = fct(6, request)
+            response = fct(1, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
-            if fct.__name__ in ['the_function_rl_1', 'the_function_rl_2']:
-                expected_items = [guid_table['bb']['aa']]
-            else:
-                expected_items = [guid_table['bb']['aa']]
+            expected_items = [guid_table['bb']['aa']]
             self.assertEqual(len(response.data['data']), len(expected_items))
             self.assertListEqual(response.data['data'], expected_items)
 
             request.QUERY_PARAMS['query'] = {'type': 'AND',
                                              'items': [['description', 'EQUALS', 'dd']]}
-            response = fct(7, request)
+            response = fct(2, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
             if fct.__name__ in ['the_function_rl_1', 'the_function_rl_2']:
                 expected_items = [guid_table['bb']['dd']]
             else:
                 expected_items = []  # Not found in the first two items
-            print response.data['data']
             self.assertEqual(len(response.data['data']), len(expected_items))
             self.assertListEqual(response.data['data'], expected_items)
-            # @todo test paging
+
+        # Test pagination
+        for fct in [the_function_rl_1, the_function_rl_2, the_function_rl_3, the_function_rl_4]:
+            request.QUERY_PARAMS = {}
+
+            for arg_type in [int, str]:
+                request.QUERY_PARAMS['page'] = 1 if arg_type == int else '1'
+                request.QUERY_PARAMS['page_size'] = 2 if arg_type == int else '2'
+                response = fct(3, request)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
+                if fct.__name__ == 'the_function_rl_2':
+                    expected_items = [guid_table['aa']['bb'], guid_table['aa']['cc']]
+                elif fct.__name__ in ['the_function_rl_3', 'the_function_rl_4']:
+                    expected_items = [guid_table['bb']['aa'], guid_table['aa']['cc']]
+                else:
+                    expected_items = [machine.guid for machine in data_list_machines][0:2]
+                self.assertEqual(len(response.data['data']), len(expected_items))
+                self.assertListEqual(response.data['data'], expected_items)
+
+                request.QUERY_PARAMS['page'] = 2
+                request.QUERY_PARAMS['page_size'] = 2
+                response = fct(4, request)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
+                if fct.__name__ == 'the_function_rl_2':
+                    expected_items = [guid_table['bb']['aa'], guid_table['bb']['dd']]
+                elif fct.__name__ in ['the_function_rl_3', 'the_function_rl_4']:
+                    expected_items = [guid_table['bb']['aa'], guid_table['aa']['cc']]  # Same items as page 1 because only 2 items in total
+                else:
+                    expected_items = [machine.guid for machine in data_list_machines][2:4]
+                self.assertEqual(len(response.data['data']), len(expected_items))
+                self.assertListEqual(response.data['data'], expected_items)
