@@ -576,7 +576,9 @@ class Decorators(unittest.TestCase):
                 if fct.__name__ == 'the_function_rl_2':
                     expected_items = [guid_table['bb']['aa'], guid_table['bb']['dd']]
                 elif fct.__name__ in ['the_function_rl_3', 'the_function_rl_4']:
-                    expected_items = [guid_table['bb']['aa'], guid_table['aa']['cc']]  # Same items as page 1 because only 2 items in total
+                    # Same items as page 1 because only 2 items in total and when calling a page higher than max,
+                    #  it will go back to the result for the max page
+                    expected_items = [guid_table['bb']['aa'], guid_table['aa']['cc']]
                 else:
                     expected_items = [machine.guid for machine in data_list_machines][2:4]
                 self.assertEqual(len(response.data['data']), len(expected_items))

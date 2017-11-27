@@ -250,7 +250,7 @@ def return_list(object_type, default_sort=None):
         metadata['returns'] = {'parameters': {'sorting': default_sort,
                                               'paging': None,
                                               'contents': None,
-                                              'filter': None},
+                                              'query': None},
                                'returns': ['list', '200'],
                                'object_type': object_type}
         f.ovs_metadata = metadata
@@ -302,7 +302,7 @@ def return_list(object_type, default_sort=None):
             guid_list = isinstance(data_list, list) and len(data_list) > 0 and isinstance(data_list[0], basestring)
             timings['fetch'] = [time.time() - start, 'Fetching data']
 
-            # Filtering data
+            # 4. Filtering data
             if query is not None:
                 start = time.time()
                 if guid_list is True:
@@ -316,7 +316,7 @@ def return_list(object_type, default_sort=None):
                 _ = data_list.guids
                 timings['querying'] = [time.time() - start, 'Querying data']
 
-            # 4. Sorting
+            # 5. Sorting
             if sort is not None:
                 start = time.time()
                 if guid_list is True:
@@ -328,7 +328,7 @@ def return_list(object_type, default_sort=None):
                     data_list.sort(key=lambda e: DalToolbox.extract_key(e, field), reverse=desc)
                 timings['sort'] = [time.time() - start, 'Sorting data']
 
-            # 5. Paging
+            # 6. Paging
             start = time.time()
             total_items = len(data_list)
             page_metadata = {'total_items': total_items,
@@ -356,7 +356,7 @@ def return_list(object_type, default_sort=None):
                 page_metadata['page_size'] = total_items
             timings['paging'] = [time.time() - start, 'Selecting current page']
 
-            # 6. Serializing
+            # 7. Serializing
             start = time.time()
             if contents is not None:
                 if guid_list is True:
@@ -390,7 +390,7 @@ def return_list(object_type, default_sort=None):
                       '_contents': contents,
                       '_sorting': [s for s in reversed(sort)] if sort else sort}
 
-            # 7. Building response
+            # 8. Building response
             return OVSResponse(result,
                                status=status.HTTP_200_OK,
                                timings=timings)

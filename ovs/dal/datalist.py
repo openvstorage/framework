@@ -98,12 +98,12 @@ class DataList(object):
         self._guids = None
         self._executed = False
         self._shallow_sort = True
-        self.from_cache = None
-        self.from_index = 'none'
         self._provided_guids = guids
         self._provided_keys = None  # Conversion of guids to keys, cached for faster lookup
         self._key = None
         self._provided_key = False  # Keep track whether a key was explicitly set
+        self.from_cache = None
+        self.from_index = 'none'
 
         self.set_key(key)
 
@@ -116,12 +116,14 @@ class DataList(object):
             self._execute_query()
         return self._guids
 
-    def set_key(self, key=None):
+    def set_key(self, key=None, reset=False):
         """
         Sets the caching key
         Won't override the key when a key was giving on initializing
         :param key: Key to explicitly use
         :type key: str
+        :param reset: Reset the key to a default one for this list
+        :type reset: bool
         :return: None
         :rtype: NoneType
         """
@@ -130,11 +132,10 @@ class DataList(object):
             self._provided_key = True
             # Unsure whether or not the same query would apply
             self._volatile.delete(self._key)
-            return
-        elif self._provided_key is False:
+        elif self._provided_key is False or reset is True:
             identifier = copy.deepcopy(self._query)
             identifier['object'] = self._object_type.__name__
-            identifier['guids'] = 'None' if self._provided_guids is None else ','.join(self._provided_guids)
+            identifier['guids'] = 'None' if self._provided_guids is None else ','.join(sorted(self._provided_guids))
             self._key = '{0}_{1}'.format(DataList.NAMESPACE, hashlib.sha256(json.dumps(identifier)).hexdigest())
 
     def _reset_list(self):
@@ -192,8 +193,7 @@ class DataList(object):
         :return: None
         :rtype: NoneType
         """
-        if guids is not None:
-            self._validate_guids(guids)
+        self._validate_guids(guids)
         self._provided_guids = guids
         self._provided_keys = None
         if self._provided_key is True:
@@ -213,8 +213,9 @@ class DataList(object):
         :rtype: NoneType
         :raises: ValueError if the query is not valid
         """
-        if query is not None and not isinstance(query, dict) and not all(k in query for k in ("type", "items")):
-            raise ValueError('Query can be None or a dict containing \'type\' and \'items\'')
+        if query is None or (isinstance(query, dict) and all((k in query for k in ("type", "items")))):
+            return
+        raise ValueError('Query can be None or a dict containing \'type\' and \'items\'')
 
     @staticmethod
     def _validate_guids(guids):
@@ -226,8 +227,9 @@ class DataList(object):
         :rtype: NoneType
         :raises: ValueError if the guids are not valid
         """
-        if guids is not None and not isinstance(guids, list) and (len(guids) > 0 and isinstance(guids[0], basestring)):
-            raise ValueError('Specified guids should be a list of guids or None')
+        if guids is None or (isinstance(guids, list) and (len(guids) > 0 and all((isinstance(guid, basestring) for guid in guids)))):
+            return
+        raise ValueError('Specified guids should be a list of guids or None')
 
     #######################
     # Query functionality #
@@ -648,7 +650,7 @@ class DataList(object):
 
         persistent = PersistentFactory.get_client()
         own_name = own_class.__name__.lower()
-        datalist = DataList(remote_class, {}, '{0}_{1}_{2}'.format(own_name, own_guid, remote_key))
+        datalist = DataList(remote_class, key='{0}_{1}_{2}'.format(own_name, own_guid, remote_key))
 
         reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|'.format(own_name, own_guid, own_key)
         datalist._guids = [guid.replace(reverse_key, '') for guid in persistent.prefix(reverse_key)]
@@ -812,7 +814,7 @@ class DataList(object):
             self._execute_query()
         if other._executed is False and other._guids is None:
             other._execute_query()
-        new_datalist = DataList(self._object_type, {})
+        new_datalist = DataList(self._object_type)
         guids = self._guids[:]
         # noinspection PyTypeChecker
         for guid in other._guids:
@@ -890,7 +892,7 @@ class DataList(object):
 
         if isinstance(item, slice):
             guids = self._guids[item.start:item.stop]
-            new_datalist = DataList(self._object_type, {})
+            new_datalist = DataList(self._object_type)
             new_datalist._guids = guids
             new_datalist._executed = True  # Will always be True at this point, since _execute_query is executed if False
             new_datalist._data = dict((key, copy.deepcopy(value)) for key, value in self._data.iteritems() if key in guids)
