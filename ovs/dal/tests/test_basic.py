@@ -378,7 +378,7 @@ class Basic(unittest.TestCase):
         dlist = DataList(TestDisk, guids=partial_disk_guids)
         expected_disks = [TestDisk(i) for i in partial_disk_guids]  # Disk test_0-5, test_10-14
         self.assertEqual(len(dlist), len(partial_disk_guids), 'List should contain 10')
-        self.assertItemsEqual(dlist, expected_disks, 'List should contain Disk test_0-5, test_10-14')
+        self.assertSequenceEqual(dlist, expected_disks, 'List should contain Disk test_0-5, test_10-14')  # Order matters
         # Apply a query
         dlist = DataList(TestDisk,
                          query={'type': DataList.where_operator.AND,
@@ -386,7 +386,7 @@ class Basic(unittest.TestCase):
                          guids=partial_disk_guids)
         expected_disks = [TestDisk(partial_disk_guids[1])]  # Disk test_1
         self.assertEqual(len(dlist), len(expected_disks), 'List should contain 1')
-        self.assertItemsEqual(dlist, expected_disks, 'List should contain Disk test_1')
+        self.assertSequenceEqual(dlist, expected_disks, 'List should contain Disk test_1')  # Order matters
         # Apply different query which does not contain any items because of the provided guids
         dlist = DataList(TestDisk,
                          query={'type': DataList.where_operator.AND,
@@ -394,29 +394,53 @@ class Basic(unittest.TestCase):
                          guids=partial_disk_guids)
         expected_disks = []  # No disks
         self.assertEqual(len(dlist), len(expected_disks), 'List should contain 0')
-        self.assertItemsEqual(dlist, expected_disks, 'List should contain no disks')
+        self.assertSequenceEqual(dlist, expected_disks, 'List should contain no disks')  # Order matters
         # Apply a new query
         dlist.set_query({'type': DataList.where_operator.AND,
                          'items': [('size', DataList.operator.LT, 10)]})
         # Only expect the first five. The supplied guids should be the base
         expected_disks = [TestDisk(partial_disk_guids[i]) for i in xrange(0, 5)]  # Disk test_0-5
         self.assertEqual(len(dlist), len(expected_disks), 'List should contain 5')
-        self.assertItemsEqual(dlist, expected_disks, 'List should contain Disk test_0-5')
+        self.assertSequenceEqual(dlist, expected_disks, 'List should contain Disk test_0-5')  # Order matters
         # Reset the query
         dlist.set_query(None)
         expected_disks = [TestDisk(i) for i in partial_disk_guids]  # Disk test_0-5, test_10-14
         self.assertEqual(len(dlist), len(expected_disks), 'List should contain 10')
-        self.assertItemsEqual(dlist, expected_disks, 'List should contain Disk test_0-5, test_10-14')
+        self.assertSequenceEqual(dlist, expected_disks, 'List should contain Disk test_0-5, test_10-14')  # Order matters
         # Use new guids
         dlist.set_guids(partial_disk_guids[0:5])
         expected_disks = [TestDisk(i) for i in partial_disk_guids[0:5]]  # Disk test_0-5, test_10-14
         self.assertEqual(len(dlist), len(expected_disks), 'List should contain 5')
-        self.assertItemsEqual(dlist, expected_disks, 'List should contain Disk test_0-5')
+        self.assertSequenceEqual(dlist, expected_disks, 'List should contain Disk test_0-5')  # Order matters
         # Reset the guids
         dlist.set_guids(None)
         expected_disks = [TestDisk(i) for i in disk_guids]  # Disk test_0-20
         self.assertEqual(len(dlist), len(expected_disks), 'List should contain 20')
-        self.assertItemsEqual(dlist, expected_disks, 'List should contain Disk test_0-20')
+        self.assertItemsEqual(dlist, expected_disks, 'List should contain Disk test_0-20')  # Order no longer important
+
+    def test_guid_order(self):
+        """
+        Tests if the order of the supplied guids is respected
+        """
+        disk_guids = []
+        for i in xrange(0, 20):
+            disk = TestDisk()
+            disk.name = 'test_{0}'.format(i)
+            disk.size = i
+            disk.save()
+            disk_guids.append(disk.guid)
+
+        dlist0 = DataList(TestDisk, guids=disk_guids)
+        expected_items = [TestDisk(guid) for guid in disk_guids]
+        self.assertEqual(len(dlist0), len(expected_items), 'Number of items should be identical')
+        # Care about the order
+        self.assertSequenceEqual(dlist0, expected_items, 'Items and order should be identical')
+
+        dlist1 = DataList(TestDisk, guids=list(reversed(disk_guids)))
+        expected_items = [TestDisk(guid) for guid in reversed(disk_guids)]
+        self.assertEqual(len(dlist1), len(expected_items), 'Number of items should be identical')
+        self.assertSequenceEqual(dlist1, expected_items, 'Items and order should be identical')
+        self.assertNotEqual(dlist1._key, dlist0._key, 'Keys should be different')
 
     def test_invalidpropertyassignment(self):
         """
@@ -681,24 +705,24 @@ class Basic(unittest.TestCase):
         all_list0_guid = DataList(TestMachine, guids=machine_guids)
         expected_items = [TestMachine(guid) for guid in machine_guids]
         self.assertEqual(len(all_list0_guid), len(expected_items), 'List should return 10')
-        self.assertItemsEqual(all_list0_guid, expected_items, 'List should return machine_0-9')
+        self.assertSequenceEqual(all_list0_guid, expected_items, 'List should return machine_0-9')  # Order matters
         self.assertEqual(all_list0_guid.from_cache, False, 'List should not come from cache')
         self.assertNotEqual(all_list0._key, all_list0_guid._key, 'Keys should differ')
 
         all_list1_guid = DataList(TestMachine, guids=machine_guids)
         expected_items = [TestMachine(guid) for guid in machine_guids]
         self.assertEqual(len(all_list1_guid), len(expected_items), 'List should return 10')
-        self.assertItemsEqual(all_list1_guid, expected_items, 'List should return machine_0-9')
+        self.assertSequenceEqual(all_list1_guid, expected_items, 'List should return machine_0-9')  # Order matters
         self.assertEqual(all_list1_guid.from_cache, True, 'List should come from cache')
         self.assertEqual(all_list1_guid._key, all_list0_guid._key, 'Keys should be identical')
 
         # Reverse guid order
         all_list2_guid = DataList(TestMachine, guids=list(reversed(machine_guids)))
-        expected_items = [TestMachine(guid) for guid in machine_guids]
+        expected_items = [TestMachine(guid) for guid in reversed(machine_guids)]
         self.assertEqual(len(all_list2_guid), len(expected_items), 'List should return 10')
-        self.assertItemsEqual(all_list2_guid, expected_items, 'List should return machine_0-9')
-        self.assertEqual(all_list2_guid.from_cache, True, 'List should come from cache')
-        self.assertEqual(all_list2_guid._key, all_list0_guid._key, 'Keys should be identical')
+        self.assertSequenceEqual(all_list2_guid, expected_items, 'List should return machine_0-9')  # Order matters
+        self.assertFalse(all_list2_guid.from_cache, 'List should not come from cache (order has reversed)')
+        self.assertNotEqual(all_list2_guid._key, all_list0_guid._key, 'Keys should not be identical')
 
         all_list1_guid_same_query = DataList(TestMachine,
                                              query={'type': DataList.where_operator.AND,
@@ -706,7 +730,7 @@ class Basic(unittest.TestCase):
                                              guids=machine_guids)
         expected_items = [TestMachine(guid) for guid in machine_guids]
         self.assertEqual(len(all_list1_guid_same_query), len(expected_items), 'List should return 10')
-        self.assertItemsEqual(all_list1_guid_same_query, expected_items, 'List should return machine_0-9')
+        self.assertSequenceEqual(all_list1_guid_same_query, expected_items, 'List should return machine_0-9')  # Order matters
         self.assertEqual(all_list1_guid_same_query.from_cache, True, 'List should come from cache')
         self.assertEqual(all_list1_guid_same_query._key, all_list0_guid._key, 'Keys should be identical')
 
@@ -715,7 +739,7 @@ class Basic(unittest.TestCase):
         all_list1_guid_same_query_key = all_list1_guid_same_query._key
         all_list1_guid_set_guids.set_guids(machine_guids[0:5])
         expected_items = [TestMachine(guid) for guid in machine_guids[0:5]]
-        self.assertItemsEqual(all_list1_guid_set_guids, expected_items, 'List should return 5')
+        self.assertSequenceEqual(all_list1_guid_set_guids, expected_items, 'List should return 5')  # Order matters
         self.assertEqual(len(all_list1_guid_set_guids), len(expected_items), 'List should return machine_0-5')
         self.assertEqual(all_list1_guid_set_guids.from_cache, False, 'List should not come from cache')
         self.assertNotEqual(all_list1_guid_set_guids._key, all_list1_guid_same_query_key, 'Keys should differ')
@@ -1092,21 +1116,24 @@ class Basic(unittest.TestCase):
         del DataList._test_hooks['post_query']
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
+        disks._execute_query()
+        self.assertFalse(disks.from_cache)
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
         # Clear the list cache for the next test
-        VolatileFactory.store.delete('ovs_list_6cf5641344cb2ec305c89920407d0def867e1744c88605fdc0f6665a348724a8')
+        disks._volatile.delete(disks._key)
         # Validates object change
         DataList._test_hooks['post_query'] = _inject_update
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
         del DataList._test_hooks['post_query']
-        # @todo Solve the invalidation issue here
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
+        disks._execute_query()
+        self.assertFalse(disks.from_cache)
         self.assertEqual(len(disks), 2, 'Two disk should be found ({0})'.format(len(disks)))
         # Clear the list cache for the next test
-        VolatileFactory.store.delete('ovs_list_6cf5641344cb2ec305c89920407d0def867e1744c88605fdc0f6665a348724a8')
+        disks._volatile.delete(disks._key)
         # Validates object deletion
         DataList._test_hooks['post_query'] = _inject_delete
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
@@ -1115,6 +1142,8 @@ class Basic(unittest.TestCase):
         del DataList._test_hooks['post_query']
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.CONTAINS, 'test')]})
+        disks._execute_query()
+        self.assertFalse(disks.from_cache)
         self.assertEqual(len(disks), 1, 'One disk should be found ({0})'.format(len(disks)))
         _ = disk_z  # Ignore this object not being used
 
@@ -1908,96 +1937,166 @@ class Basic(unittest.TestCase):
         disk4.delete()
         _validate_index({one_hash: 1,
                          two_hash: 2})
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'two')]})
-        self.assertEqual(len(dlist), 2)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'one')]})
-        self.assertEqual(len(dlist), 1)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'one'),
-                                              ('something', DataList.operator.EQUALS, 'two')]})
-        self.assertEqual(len(dlist), 0)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.OR,
-                                    'items': [('something', DataList.operator.EQUALS, 'one'),
-                                              ('something', DataList.operator.EQUALS, 'two')]})
-        self.assertEqual(len(dlist), 3)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'one'),
-                                              ('something', DataList.operator.EQUALS, 'three')]})
-        self.assertEqual(len(dlist), 0)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.OR,
-                                    'items': [('something', DataList.operator.EQUALS, 'one'),
-                                              ('something', DataList.operator.EQUALS, 'three')]})
-        self.assertEqual(len(dlist), 1)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.IN, ['zero'])]})
-        self.assertEqual(len(dlist), 0)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.IN, ['zero', 'one'])]})
-        self.assertEqual(len(dlist), 1)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.IN, ['zero', 'one', 'two'])]})
-        self.assertEqual(len(dlist), 3)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.IN, ['zero', 'two'])]})
-        self.assertEqual(len(dlist), 2)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.IN, ['one', 'two'])]})
-        self.assertEqual(len(dlist), 3)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.CONTAINS, 'foo')]})
-        self.assertEqual(len(dlist), 0)
-        self.assertEqual(dlist.from_index, 'none')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'foo'),
-                                              ('something', DataList.operator.CONTAINS, 'foo')]})
-        self.assertEqual(len(dlist), 0)
-        self.assertEqual(dlist.from_index, 'partial')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'one'),
-                                              {'type': DataList.where_operator.OR,
-                                               'items': [('something', DataList.operator.EQUALS, 'two'),
-                                                         ('name', DataList.operator.EQUALS, 'disk1')]}]})
-        self.assertEqual(len(dlist), 1)
-        self.assertEqual(dlist.from_index, 'none')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'one'),
-                                              {'type': DataList.where_operator.OR,
-                                               'items': [('something', DataList.operator.EQUALS, 'two'),
-                                                         ('name', DataList.operator.EQUALS, 'disk2')]}]})
-        self.assertEqual(len(dlist), 0)
-        self.assertEqual(dlist.from_index, 'none')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'one'),
-                                              ('name', DataList.operator.EQUALS, 'disk1')]})
-        self.assertEqual(len(dlist), 1)
-        self.assertEqual(dlist.from_index, 'partial')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('something', DataList.operator.EQUALS, 'one'),
-                                              {'type': DataList.where_operator.AND,
-                                               'items': [('something', DataList.operator.IN, ['one', 'two']),
-                                                         ('something2', DataList.operator.EQUALS, 'one')]}]})
-        self.assertEqual(len(dlist), 1)
-        self.assertEqual(dlist.from_index, 'full')
-        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [{'type': DataList.where_operator.AND,
-                                               'items': [('something', DataList.operator.IN, ['one', 'two']),
-                                                         ('something2', DataList.operator.EQUALS, 'one')]},
-                                              ('something', DataList.operator.EQUALS, 'one')]})
-        self.assertEqual(len(dlist), 1)
-        self.assertEqual(dlist.from_index, 'full')
+        for guids in [None, [disk1.guid, disk2.guid]]:
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'two')]},
+                             guids=guids)
+            if guids is None:
+                expected_items = [disk2, disk3]
+            else:
+                expected_items = [disk2]
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'one')]},
+                             guids=guids)
+            expected_items = [disk1]  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'one'),
+                                                  ('something', DataList.operator.EQUALS, 'two')]},
+                             guids=guids)
+            expected_items = []  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.OR,
+                                        'items': [('something', DataList.operator.EQUALS, 'one'),
+                                                  ('something', DataList.operator.EQUALS, 'two')]},
+                             guids=guids)
+            if guids is None:
+                expected_items = [disk1, disk2, disk3]
+            else:
+                expected_items = [disk1, disk2]
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'one'),
+                                                  ('something', DataList.operator.EQUALS, 'three')]},
+                             guids=guids)
+            expected_items = []  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.OR,
+                                        'items': [('something', DataList.operator.EQUALS, 'one'),
+                                                  ('something', DataList.operator.EQUALS, 'three')]},
+                             guids=guids)
+            expected_items = [disk1]  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.IN, ['zero'])]},
+                             guids=guids)
+            expected_items = []  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.IN, ['zero', 'one'])]},
+                             guids=guids)
+            expected_items = [disk1]  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.IN, ['zero', 'one', 'two'])]},
+                             guids=guids)
+            if guids is None:
+                expected_items = [disk1, disk2, disk3]
+            else:
+                expected_items = [disk1, disk2]
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.IN, ['zero', 'two'])]},
+                             guids=guids)
+            if guids is None:
+                expected_items = [disk2, disk3]
+            else:
+                expected_items = [disk2]
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.IN, ['one', 'two'])]},
+                             guids=guids)
+            if guids is None:
+                expected_items = [disk1, disk2, disk3]
+            else:
+                expected_items = [disk1, disk2]
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.CONTAINS, 'foo')]},
+                             guids=guids)
+            expected_items = []  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'none')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'foo'),
+                                                  ('something', DataList.operator.CONTAINS, 'foo')]},
+                             guids=guids)
+            expected_items = []  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'partial')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'one'),
+                                                  {'type': DataList.where_operator.OR,
+                                                   'items': [('something', DataList.operator.EQUALS, 'two'),
+                                                             ('name', DataList.operator.EQUALS, 'disk1')]}]},
+                             guids=guids)
+            expected_items = [disk1]  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'none')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'one'),
+                                                  {'type': DataList.where_operator.OR,
+                                                   'items': [('something', DataList.operator.EQUALS, 'two'),
+                                                             ('name', DataList.operator.EQUALS, 'disk2')]}]},
+                             guids=guids)
+            expected_items = []  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'none')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'one'),
+                                                  ('name', DataList.operator.EQUALS, 'disk1')]},
+                             guids=guids)
+            expected_items = [disk1]  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'partial')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, 'one'),
+                                                  {'type': DataList.where_operator.AND,
+                                                   'items': [('something', DataList.operator.IN, ['one', 'two']),
+                                                             ('something2', DataList.operator.EQUALS, 'one')]}]},
+                             guids=guids)
+            expected_items = [disk1]  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [{'type': DataList.where_operator.AND,
+                                                   'items': [('something', DataList.operator.IN, ['one', 'two']),
+                                                             ('something2', DataList.operator.EQUALS, 'one')]},
+                                                  ('something', DataList.operator.EQUALS, 'one')]},
+                             guids=guids)
+            expected_items = [disk1]  # Works for both cases
+            self.assertEqual(len(dlist), len(expected_items))
+            self.assertItemsEqual(dlist, expected_items)
+            self.assertEqual(dlist.from_index, 'full')
 
     def test_index_change_racecondition(self):
         """

@@ -135,7 +135,8 @@ class DataList(object):
         elif self._provided_key is False or reset is True:
             identifier = copy.deepcopy(self._query)
             identifier['object'] = self._object_type.__name__
-            identifier['guids'] = 'None' if self._provided_guids is None else ','.join(sorted(self._provided_guids))
+            # Order matters so keeping order in cache too
+            identifier['guids'] = 'None' if self._provided_guids is None else ','.join(self._provided_guids)
             self._key = '{0}_{1}'.format(DataList.NAMESPACE, hashlib.sha256(json.dumps(identifier)).hexdigest())
 
     def _reset_list(self):
@@ -346,7 +347,7 @@ class DataList(object):
         if self._provided_guids is not None:
             if self._provided_keys is None:
                 # Build and cache the keys
-                self._provided_keys = set(['{0}{1}'.format(prefix, guid) for guid in self._provided_guids])
+                self._provided_keys = ['{0}{1}'.format(prefix, guid) for guid in self._provided_guids]
 
         indexed_properties = [prop.name for prop in self._object_type._properties if prop.indexed is True] + ['guid']
         use_indexes = self._can_use_indexes(indexed_properties, query_items, query_type)
@@ -358,7 +359,10 @@ class DataList(object):
 
                 if self._provided_guids is not None:
                     # Keys is a set which can contain more keys for objects than requested, thus intersect to query for the requested objects
-                    keys &= self._provided_keys
+                    # Set lookups ~=O(1) are faster than list lookups O(n)
+                    # Provided keys is a list to maintain order
+                    # This is a bit slower than set intersection (O(min(len(s), len(t))) to maintain order (now O(n))
+                    keys = [x for x in self._provided_keys if x in keys]
 
                 keys = list(keys)
 

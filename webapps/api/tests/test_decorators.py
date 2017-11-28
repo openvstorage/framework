@@ -439,8 +439,7 @@ class Decorators(unittest.TestCase):
             """
             output_values['args'] = args
             output_values['kwargs'] = kwargs
-            _data_list_machines = DataList(TestMachine, guids=[guid_table['bb']['aa'], guid_table['aa']['cc']])
-            return _data_list_machines
+            return DataList(TestMachine, guids=[guid_table['bb']['aa'], guid_table['aa']['cc']])
 
         @return_list(TestMachine)
         def the_function_rl_4(*args, **kwargs):
@@ -449,8 +448,7 @@ class Decorators(unittest.TestCase):
             """
             output_values['args'] = args
             output_values['kwargs'] = kwargs
-            _data_list_machines_guid = [guid_table['bb']['aa'], guid_table['aa']['cc']]
-            return _data_list_machines_guid
+            return [guid_table['bb']['aa'], guid_table['aa']['cc']]
 
         # Name/description combinations: [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
         output_values = {}
@@ -550,9 +548,9 @@ class Decorators(unittest.TestCase):
             self.assertListEqual(response.data['data'], expected_items)
 
         # Test pagination
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         for fct in [the_function_rl_1, the_function_rl_2, the_function_rl_3, the_function_rl_4]:
             request.QUERY_PARAMS = {}
-
             for arg_type in [int, str]:
                 request.QUERY_PARAMS['page'] = 1 if arg_type == int else '1'
                 request.QUERY_PARAMS['page_size'] = 2 if arg_type == int else '2'
@@ -563,6 +561,7 @@ class Decorators(unittest.TestCase):
                     expected_items = [guid_table['aa']['bb'], guid_table['aa']['cc']]
                 elif fct.__name__ in ['the_function_rl_3', 'the_function_rl_4']:
                     expected_items = [guid_table['bb']['aa'], guid_table['aa']['cc']]
+
                 else:
                     expected_items = [machine.guid for machine in data_list_machines][0:2]
                 self.assertEqual(len(response.data['data']), len(expected_items))
