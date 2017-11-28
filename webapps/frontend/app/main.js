@@ -113,5 +113,7 @@ define([
     });
 
     // Override the default context as the Durandal default context is rather sub awesome with bigger modals
-    dialog.addContext('default', wizardContext)
+    dialog.addContext('default', wizardContext);
+    // Apply modal-dialog for showMessages (missing somehow in Durandal)
+    dialog.MessageBox.setDefaults({ "class": "modal-dialog modal-content" });
 });
