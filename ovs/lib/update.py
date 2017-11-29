@@ -18,9 +18,11 @@
 Module for UpdateController
 """
 
+import copy
 import time
 import inspect
 from subprocess import CalledProcessError
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
@@ -54,50 +56,161 @@ class UpdateController(object):
     # HOOKS #
     #########
     @classmethod
-    @add_hooks('update', 'get_package_info_multi')
-    def _get_package_information_core(cls, client, package_info):
+    @add_hooks('update', 'get_package_info_cluster')
+    def _get_package_information_cluster_fwk(cls, client, package_info):
         """
-        Called by GenericController.refresh_package_information() every hour
-
         Retrieve information about the currently installed versions of the core packages
         Retrieve information about the versions to which each package can potentially be updated
-        If installed version is different from candidate version --> store this information in model
-
-        Additionally if installed version is identical to candidate version, check the services with a 'run' file
-        Verify whether the running version is identical to the candidate version
-        If different --> store this information in the model
-
-        Result: Every package with updates or which requires services to be restarted is stored in the model
+        This information is combined for all plugins and further used in the GenericController.refresh_package_information call
 
         :param client: Client on which to collect the version information
-        :type client: ovs_extensions.generic.sshclient.SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :param package_info: Dictionary passed in by the thread calling this function
         :type package_info: dict
-        :return: Package information
-        :rtype: dict
+        :return: None
+        :rtype: NoneType
         """
+        cls._logger.info('StorageRouter {0}: Refreshing framework package information'.format(client.ip))
         try:
             if client.username != 'root':
                 raise RuntimeError('Only the "root" user can retrieve the package information')
 
-            binaries = cls._package_manager.get_binary_versions(client=client)
-            service_info = ServiceFactory.get_services_with_version_files(storagerouter=StorageRouterList.get_by_ip(ip=client.ip))
+            # This also validates whether the required packages have been installed and unexpected packages have not been installed
             packages_to_update = PackageFactory.get_packages_to_update(client=client)
-            services_to_update = ServiceFactory.get_services_to_update(client=client,
-                                                                       binaries=binaries,
-                                                                       service_info=service_info)
-
-            # First we merge in the services
-            ExtensionsToolbox.merge_dicts(dict1=package_info[client.ip],
-                                          dict2=services_to_update)
-            # Then the packages merge can potentially overrule the installed/candidate version, because these versions need priority over the service versions
-            ExtensionsToolbox.merge_dicts(dict1=package_info[client.ip],
-                                          dict2=packages_to_update)
+            cls._logger.debug('StorageRouter {0}: Framework packages with updates: {1}'.format(client.ip, packages_to_update))
+            for component, pkg_info in packages_to_update.iteritems():
+                if component not in package_info[client.ip]:
+                    package_info[client.ip][component] = pkg_info
+                else:
+                    for package_name, package_versions in pkg_info.iteritems():
+                        package_info[client.ip][component][package_name] = package_versions
+            cls._logger.info('StorageRouter {0}: Refreshed framework package information'.format(client.ip))
         except Exception as ex:
+            cls._logger.exception('StorageRouter {0}: Refreshing framework package information failed'.format(client.ip))
             if 'errors' not in package_info[client.ip]:
                 package_info[client.ip]['errors'] = []
             package_info[client.ip]['errors'].append(ex)
-        return package_info
+
+    @classmethod
+    @add_hooks('update', 'get_update_info_cluster')
+    def _get_update_information_cluster_fwk(cls, client, update_info, package_info):
+        """
+        In this function the services for each component / package combination are defined
+        This service information consists out of:
+            * Services to stop (before update) and start (after update of packages) -> 'services_stop_start'
+            * Services to restart after update (post-update logic)                  -> 'services_post_update'
+            * Down-times which will be caused due to service restarts               -> 'downtime'
+            * Prerequisites that have not been met                                  -> 'prerequisites'
+
+        Verify whether all relevant services have the correct binary active
+        Whether a service has the correct binary version in use, we use the ServiceFactory.verify_restart_required functionality
+        When a service has an older binary version running, we add this information to the 'update_info'
+
+        This combined information is then stored in the 'package_information' of the StorageRouter DAL object
+
+        :param client: SSHClient on which to retrieve the service information required for an update
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param update_info: Dictionary passed in by the thread calling this function used to store all update information
+        :type update_info: dict
+        :param package_info: Dictionary containing the components and packages which have an update available for current SSHClient
+        :type package_info: dict
+        :return: None
+        :rtype: NoneType
+        """
+        cls._logger.info('StorageRouter {0}: Refreshing update information'.format(client.ip))
+        try:
+            binaries = cls._package_manager.get_binary_versions(client=client)
+            storagerouter = StorageRouterList.get_by_ip(ip=client.ip)
+            cls._logger.debug('StorageRouter {0}: Binary versions: {1}'.format(client.ip, binaries))
+
+            for component, package_names in PackageFactory.get_package_info()['names'].iteritems():
+                package_names = sorted(package_names)
+                cls._logger.debug('StorageRouter {0}: Validating component {1} and related packages: {2}'.format(client.ip, component, package_names))
+
+                if component not in update_info[client.ip]:
+                    update_info[client.ip][component] = copy.deepcopy(ServiceFactory.DEFAULT_UPDATE_ENTRY)
+                svc_component_info = update_info[client.ip][component]
+                pkg_component_info = package_info.get(component, {})
+
+                for package_name in package_names:
+                    cls._logger.debug('StorageRouter {0}: Validating package {1}'.format(client.ip, package_name))
+                    if package_name == PackageFactory.PKG_OVS and package_name in pkg_component_info:
+                        if ['gui', None] not in svc_component_info['downtime']:
+                            svc_component_info['downtime'].append(['gui', None])
+                        if ['api', None] not in svc_component_info['downtime']:
+                            svc_component_info['downtime'].append(['api', None])
+                        svc_component_info['services_stop_start'][10].append('ovs-watcher-framework')
+                        svc_component_info['services_stop_start'][20].append('memcached')
+                        svc_component_info['services_post_update'][20].append('ovs-support-agent')
+                        cls._logger.debug('StorageRouter {0}: Added services "ovs-watcher-framework" and "memcached" to stop-start services'.format(client.ip))
+                        cls._logger.debug('StorageRouter {0}: Added ovs-support-agent service to post-update services'.format(client.ip))
+                        cls._logger.debug('StorageRouter {0}: Added GUI and API to down-times'.format(client.ip))
+
+                    elif package_name == PackageFactory.PKG_ARAKOON:
+                        if storagerouter.node_type != 'MASTER' or DiskPartition.ROLES.DB not in storagerouter.partition_config or len(storagerouter.partition_config) == 0:
+                            # Arakoon only needs to be checked for master nodes with a DB role
+                            cls._logger.debug('StorageRouter {0}: This StorageRouter is no MASTER or does not have a {1} role'.format(client.ip, DiskPartition.ROLES.DB))
+                            continue
+
+                        # For Arakoon we retrieve the clusters which have been deployed and verify whether they need a restart
+                        if component == PackageFactory.COMP_FWK:
+                            cluster_names = ['ovsdb', 'config']
+                        elif component == PackageFactory.COMP_SD:
+                            cluster_names = ['voldrv']
+                        else:
+                            continue
+
+                        for internal_cluster_name in cluster_names:
+                            cls._logger.debug('StorageRouter {0}: Validating Arakoon cluster {1}'.format(client.ip, internal_cluster_name))
+                            actual_cluster_name = ArakoonInstaller.get_cluster_name(internal_name=internal_cluster_name)
+                            arakoon_service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=actual_cluster_name)
+                            arakoon_service_version = ServiceFactory.verify_restart_required(client=client, service_name=arakoon_service_name, binary_versions=binaries)
+                            cls._logger.debug('StorageRouter {0}: Arakoon service information for cluster {1}: {2}'.format(client.ip, internal_cluster_name, arakoon_service_version))
+
+                            if package_name in pkg_component_info or arakoon_service_version is not None:
+                                arakoon_update_info = ArakoonInstaller.get_arakoon_update_info(cluster_name=actual_cluster_name,
+                                                                                               ip=StorageRouterList.get_masters()[0].ip if internal_cluster_name == 'config' else None)
+                                if arakoon_update_info['internal'] is False:
+                                    cls._logger.debug('StorageRouter {0}: Arakoon cluster {1} is externally managed'.format(client.ip, internal_cluster_name))
+                                    continue
+
+                                svc_component_info['services_post_update'][10].append('ovs-{0}'.format(arakoon_service_name))
+                                cls._logger.debug('StorageRouter {0}: Added service {1} to post-update services'.format(client.ip, 'ovs-{0}'.format(arakoon_service_name)))
+                                if arakoon_service_version is not None and PackageFactory.PKG_ARAKOON not in svc_component_info['packages']:
+                                    svc_component_info['packages'][PackageFactory.PKG_ARAKOON] = arakoon_service_version
+                                if arakoon_update_info['downtime'] is True and [internal_cluster_name, None] not in svc_component_info['downtime']:
+                                    svc_component_info['downtime'].append([internal_cluster_name, None])
+                                    cls._logger.debug('StorageRouter {0}: Added Arakoon cluster {1} to down-times'.format(client.ip, internal_cluster_name))
+
+                    elif package_name in [PackageFactory.PKG_VOLDRV_BASE, PackageFactory.PKG_VOLDRV_BASE_EE, PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE]:
+                        # For VolumeDriver Server we must check the version files too
+                        for storagedriver in storagerouter.storagedrivers:
+                            vpool_name = storagedriver.vpool.name
+                            cls._logger.debug('StorageRouter {0}: Validating StorageDriver {1} for vPool {2}'.format(client.ip, storagedriver.storagedriver_id, vpool_name))
+                            if package_name in [PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE]:
+                                for prefix, importance in {'dtl': 20, 'volumedriver': 10}.iteritems():
+                                    sd_service_name = '{0}_{1}'.format(prefix, vpool_name)
+                                    sd_service_version = ServiceFactory.verify_restart_required(client=client, service_name=sd_service_name, binary_versions=binaries)
+                                    cls._logger.debug('StorageRouter {0}: Service {1} is running version {2}'.format(client.ip, sd_service_name, sd_service_version))
+                                    if package_name in pkg_component_info or sd_service_version is not None:
+                                        cls._logger.debug('StorageRouter {0}: Added service {1} to post-update services'.format(client.ip, sd_service_name))
+                                        svc_component_info['services_post_update'][importance].append(sd_service_name)
+                            # For VolumeDriver base we must add the downtime
+                            elif package_name in [PackageFactory.PKG_VOLDRV_BASE, PackageFactory.PKG_VOLDRV_BASE_EE] and package_name in pkg_component_info:
+                                if len(storagedriver.vdisks_guids) > 0 and ['voldrv', vpool_name] not in svc_component_info['downtime']:
+                                    svc_component_info['downtime'].append(['voldrv', vpool_name])
+                                    cls._logger.debug('StorageRouter {0}: Added vPool {1} to down-times'.format(client.ip, vpool_name))
+
+                    # Extend the service information with the package information related to this repository for current StorageRouter
+                    if package_name in pkg_component_info and package_name not in svc_component_info['packages']:
+                        cls._logger.debug('StorageRouter {0}: Adding package {1} because it has an update available'.format(client.ip, package_name))
+                        svc_component_info['packages'][package_name] = pkg_component_info[package_name]
+            cls._logger.info('StorageRouter {0}: Refreshed update information'.format(client.ip))
+        except Exception as ex:
+            cls._logger.exception('StorageRouter {0}: Refreshing update information failed'.format(client.ip))
+            if 'errors' not in update_info[client.ip]:
+                update_info[client.ip]['errors'] = []
+            update_info[client.ip]['errors'].append(ex)
 
     @classmethod
     @add_hooks('update', 'information')
@@ -175,12 +288,12 @@ class UpdateController(object):
                     elif package_name == PackageFactory.PKG_ARAKOON:
                         if component == PackageFactory.COMP_SD:
                             if arakoon_voldrv_info is None:
-                                arakoon_voldrv_info = ArakoonInstaller.get_arakoon_update_info(internal_cluster_name='voldrv')
+                                arakoon_voldrv_info = ArakoonInstaller.get_arakoon_update_info(cluster_name='voldrv')
                             if arakoon_voldrv_info['internal'] is True and arakoon_voldrv_info['downtime'] is True and ['voldrv', None] not in component_info['downtime']:
                                 component_info['downtime'].append(['voldrv', None])
                         elif component == PackageFactory.COMP_FWK:
                             if arakoon_ovs_info is None:
-                                arakoon_ovs_info = ArakoonInstaller.get_arakoon_update_info(internal_cluster_name='ovsdb')
+                                arakoon_ovs_info = ArakoonInstaller.get_arakoon_update_info(cluster_name='ovsdb')
                             if arakoon_ovs_info['internal'] is True and arakoon_ovs_info['downtime'] is True and ['ovsdb', None] not in component_info['downtime']:
                                 component_info['downtime'].append(['ovsdb', None])
         return information
@@ -265,7 +378,7 @@ class UpdateController(object):
             try:
                 cluster_name = ArakoonInstaller.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'arakoon-'))
                 ip = System.get_my_storagerouter().ip if cluster_name == 'config' else None
-                arakoon_metadata = ArakoonInstaller.get_arakoon_update_info(actual_cluster_name=cluster_name, ip=ip)
+                arakoon_metadata = ArakoonInstaller.get_arakoon_update_info(cluster_name=cluster_name, ip=ip)
                 if arakoon_metadata['internal'] is True:
                     arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
                     arakoon_installer.load(ip=ip)
