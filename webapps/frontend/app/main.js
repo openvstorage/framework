@@ -100,7 +100,7 @@ define([
         });
         app.configurePlugins({
             widget: {
-                kinds: ['pager', 'lazyloader', 'lazylist', 'footer', 'dropdown', 'accessrights']
+                kinds: ['pager', 'lazyloader', 'lazylist', 'footer', 'dropdown', 'accessrights', 'numberinput', 'searchbar']
             }
         });
         app.start().then(function() {

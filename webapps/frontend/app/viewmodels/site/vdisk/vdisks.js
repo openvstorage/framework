@@ -55,6 +55,7 @@ define([
 
         // Observables
         self.runningVPool = ko.observable(false);
+        self.vdisk_search = ko.observable();
 
         // Functions
         self.addVDisk = function() {

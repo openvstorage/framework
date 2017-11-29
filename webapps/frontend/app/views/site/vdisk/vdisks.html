@@ -16,16 +16,24 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <section>
-    <div>
-        <h2 class="pull-left" data-i18n="ovs:vdisks.title"></h2>
-        <button class="btn btn-default pull-right" id="buttonAddVdisk"
-                data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && runningVPool()"
-                style="margin-top: 20px; margin-bottom: 10px;">
-            <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
-            <span data-i18n="ovs:vdisks.add"></span>
-        </button>
+    <div class="container-fluid">
+        <div class="row row-no-padding">
+            <div class="col-lg-4">
+                <h2 data-i18n="ovs:vdisks.title"></h2>
+            </div>
+            <div class="col-lg-8">
+                <div class="pull-right h2">
+                    <div data-bind="searchbar: { query: vdisk_search, defaultField: 'name', placeholder: 'Search vdisks' }" style="display: inline-block;"></div>
+                    <button class="btn btn-default" id="buttonAddVdisk"
+                        data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && runningVPool()">
+                        <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+                        <span data-i18n="ovs:vdisks.add"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-    <div data-bind="pager: { loadData: loadVDisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true }">
+    <div data-bind="pager: { loadData: loadVDisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true, query: vdisk_search }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
                 <td style="position: relative;">

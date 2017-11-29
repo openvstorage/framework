@@ -50,7 +50,7 @@ define([
         self.preloading      = ko.observable(false);
         self.sorting         = ko.observable({sequence: [], directions: {}});
         self.pageSizes       = ko.observableArray([10, 25, 50, 100]);
-
+        self.query           = ko.observable();
         // Computed
         self.items = ko.computed({
             read: function() {
@@ -211,6 +211,9 @@ define([
             if (self.sortable()) {
                 options.sort = self.sortingKey()
             }
+            if (self.query()) {
+                options.query = self.query()
+            }
             if (self.external()) {
                 self.pageLoading(true);
                 var chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
@@ -321,7 +324,6 @@ define([
             if (!settings.hasOwnProperty('headers')) {
                 throw 'Headers should be specified';
             }
-
             if (settings.hasOwnProperty('items')) {
                 self.external(true);
             }
@@ -340,6 +342,7 @@ define([
             self.progressive(generic.tryGet(settings, 'progressive', undefined));
             self.controls(generic.tryGet(settings, 'controls', true));
             self.sortable(generic.tryGet(settings, 'sortable', false));
+            self.query(generic.tryGet(settings, 'query', ko.observable()));
             if (self.sortable() === true) {
                 var sorting = {sequence: [],
                                directions: {}}, key;
