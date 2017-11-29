@@ -69,7 +69,7 @@ define([
                 if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
                     options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
-                    options.query = JSON.stringify(self.query);
+                    // options.query = JSON.stringify(self.query);
                     self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({

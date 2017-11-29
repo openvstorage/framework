@@ -212,7 +212,7 @@ define([
                 options.sort = self.sortingKey()
             }
             if (self.query()) {
-                options.query = self.query()
+                options.query = JSON.stringify(self.query())
             }
             if (self.external()) {
                 self.pageLoading(true);
@@ -342,7 +342,7 @@ define([
             self.progressive(generic.tryGet(settings, 'progressive', undefined));
             self.controls(generic.tryGet(settings, 'controls', true));
             self.sortable(generic.tryGet(settings, 'sortable', false));
-            self.query(generic.tryGet(settings, 'query', ko.observable()));
+            self.query = generic.tryGet(settings, 'query', ko.observable());
             if (self.sortable() === true) {
                 var sorting = {sequence: [],
                                directions: {}}, key;

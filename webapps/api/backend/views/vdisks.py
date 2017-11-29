@@ -33,6 +33,8 @@ from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
 
+from ovs.extensions.generic.logger import Logger
+
 
 class VDiskViewSet(viewsets.ViewSet):
     """
@@ -42,6 +44,8 @@ class VDiskViewSet(viewsets.ViewSet):
     prefix = r'vdisks'
     base_name = 'vdisks'
     return_exceptions = ['vdisks.create']
+
+    _logger = Logger('api')
 
     @log()
     @required_roles(['read', 'manage'])
@@ -68,9 +72,8 @@ class VDiskViewSet(viewsets.ViewSet):
                                       'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
         else:
             vdisks = VDiskList.get_vdisks()
-        if query is not None:
-            query_vdisk_guids = DataList(VDisk, query).guids
-            vdisks = [vdisk for vdisk in vdisks if vdisk.guid in query_vdisk_guids]
+        VDiskViewSet._logger.warning(vdisks)
+        VDiskViewSet._logger.warning(type(vdisks))
         return vdisks
 
     @log()

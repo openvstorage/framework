@@ -25,19 +25,21 @@ define([
         var operatorMap = {
             '=': 'EQUALS',
             '!=': 'NOT_EQUALS',
-            'IN': 'IN',  // Works for string and array
+            'IN': 'IN',
+            '~': 'CONTAINS',
             '>': 'GT',
             '<': 'LT',
             '>=': ['GT', 'EQUALS'],
             '<=': ['LT', 'EQUALS']
         };
-        var defaultOperator = operatorMap['='];
+        var defaultOperator = operatorMap['~'];
 
         self.fieldMap = {'sr_guid': 'storagerouter_guid'};
         self.defaultField = 'guid';
+        self.defaultQuery = undefined;
 
         // Observables
-        self.search =       ko.observable('');
+        self.search =       ko.observable("");
         self.query =        ko.observable();
         self.placeholder =  ko.observable("");
 
@@ -49,17 +51,22 @@ define([
          * Current behaviour will chain all filters as 'AND'
          */
         self.getData = function() {
-            self.query(buildQuery(self.search(), self.defaultField, self.fieldMap));
-            return self.query()
+            var query = buildQuery(self.search(), self.defaultField, self.fieldMap, self.defaultQuery);
+            self.query(query);
+            return query
         };
 
         /**
          * Build an items entry for a given search entry
          */
-        var buildQuery = function(searchString, defaultField, fieldMap) {
-            var field, operator, value;
-            var queryItems = [];
-            var query = {
+        var buildQuery = function(searchString, defaultField, fieldMap, defaultQuery) {
+            var field, operator, value, query, queryItems;
+            if (defaultQuery === undefined) {
+                queryItems = [];
+            } else {
+                queryItems = defaultQuery.items.slice()
+            }
+            query = {
                 'type': 'AND',
                 'items': queryItems
             };
@@ -114,12 +121,17 @@ define([
             var tests = [['', []],
                 ['test', [['guid', 'EQUALS', 'test']]],
                 ['test:IN"test"', [['test', 'IN', 'test']]],
-                ['"test":!=test', [['test', 'NOT_EQUALS', 'test']]]
+                ['"test":!=test', [['test', 'NOT_EQUALS', 'test']]],
+                ['test', [['test', 'EQUALS', 'test'], ['guid', 'EQUALS', 'test']], {items: [['test', 'EQUALS', 'test']]}]
             ];
             $.each(tests, function(index, testCase){
-                var query = buildQuery(testCase[0], defaultField, fieldMap);
+                var defaultQuery;
+                if (testCase.length === 3) {
+                    defaultQuery = testCase[2]
+                }
+                var query = buildQuery(testCase[0], defaultField, fieldMap, defaultQuery);
                 if (generic.objectEquals(query.items, testCase[1]) === false) {
-                    throw new Error(query.items.toString(), testCase[1].toString())
+                    throw new Error(query.items.toString() + testCase[1].toString())
                 }
             })
         };
@@ -151,11 +163,11 @@ define([
             if (!settings.hasOwnProperty('query')) {
                 throw 'Query should be specified'
             }
+            self.defaultQuery = settings['defaultQuery'];
             self.query = settings['query'];
             self.defaultField = generic.tryGet(settings, 'defaultField', null);
             self.placeholder(generic.tryGet(settings, 'placeholder', ''));
             $.extend(self.fieldMap, generic.tryGet(settings, 'fieldMap', {}));
-
         };
 
     };
