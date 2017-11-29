@@ -379,7 +379,7 @@ class UpdateController(object):
 
     @staticmethod
     @ovs_task(name='ovs.update.merge_downtime_information')
-    def merge_downtime_information(cls):
+    def merge_downtime_information():
         """
         Merge the downtime information and prerequisite information of all StorageRouters and plugins (ALBA, iSCSI, ...)
         This contains information about
