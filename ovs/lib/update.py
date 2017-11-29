@@ -144,7 +144,7 @@ class UpdateController(object):
                         svc_component_info['services_post_update'][20].append('ovs-support-agent')
                         cls._logger.debug('StorageRouter {0}: Added services "ovs-watcher-framework" and "memcached" to stop-start services'.format(client.ip))
                         cls._logger.debug('StorageRouter {0}: Added ovs-support-agent service to post-update services'.format(client.ip))
-                        cls._logger.debug('StorageRouter {0}: Added GUI and API to down-times'.format(client.ip))
+                        cls._logger.debug('StorageRouter {0}: Added GUI and API to downtime'.format(client.ip))
 
                     elif package_name == PackageFactory.PKG_ARAKOON:
                         if storagerouter.node_type != 'MASTER' or DiskPartition.ROLES.DB not in storagerouter.partition_config or len(storagerouter.partition_config) == 0:
@@ -180,7 +180,7 @@ class UpdateController(object):
                                     svc_component_info['packages'][PackageFactory.PKG_ARAKOON] = arakoon_service_version
                                 if arakoon_update_info['downtime'] is True and [internal_cluster_name, None] not in svc_component_info['downtime']:
                                     svc_component_info['downtime'].append([internal_cluster_name, None])
-                                    cls._logger.debug('StorageRouter {0}: Added Arakoon cluster {1} to down-times'.format(client.ip, internal_cluster_name))
+                                    cls._logger.debug('StorageRouter {0}: Added Arakoon cluster {1} to downtime'.format(client.ip, internal_cluster_name))
 
                     elif package_name in [PackageFactory.PKG_VOLDRV_BASE, PackageFactory.PKG_VOLDRV_BASE_EE, PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE]:
                         # For VolumeDriver Server we must check the version files too
@@ -199,7 +199,7 @@ class UpdateController(object):
                             elif package_name in [PackageFactory.PKG_VOLDRV_BASE, PackageFactory.PKG_VOLDRV_BASE_EE] and package_name in pkg_component_info:
                                 if len(storagedriver.vdisks_guids) > 0 and ['voldrv', vpool_name] not in svc_component_info['downtime']:
                                     svc_component_info['downtime'].append(['voldrv', vpool_name])
-                                    cls._logger.debug('StorageRouter {0}: Added vPool {1} to down-times'.format(client.ip, vpool_name))
+                                    cls._logger.debug('StorageRouter {0}: Added vPool {1} to downtime'.format(client.ip, vpool_name))
 
                     # Extend the service information with the package information related to this repository for current StorageRouter
                     if package_name in pkg_component_info and package_name not in svc_component_info['packages']:
@@ -213,90 +213,46 @@ class UpdateController(object):
             update_info[client.ip]['errors'].append(ex)
 
     @classmethod
-    @add_hooks('update', 'information')
-    def get_update_information_core(cls, information):
+    @add_hooks('update', 'merge_package_info')
+    def _merge_package_information_fwk(cls):
         """
-        Called when the 'Update' button in the GUI is pressed
-        This call collects additional information about the packages which can be updated
-        Eg:
-            * Downtime for Arakoons
-            * Downtime for StorageDrivers
-            * Prerequisites that haven't been met
-            * Services which will be stopped during update
-            * Services which will be restarted after update
-        :param information: Information about all components for the entire cluster. This is passed in by the calling thread and thus also (pre-)populated by other threads
-        :type information: dict
-        :return: All the information collected
+        Retrieve the information stored in the 'package_information' property on the StorageRouter DAL object
+        This actually returns all information stored in the 'package_information' property including downtime info, prerequisites, services, ...
+        The caller of this function will strip out and merge the relevant package information
+        :return: Update information for all StorageRouters
         :rtype: dict
         """
-        # Verify StorageRouter downtime
-        prerequisites = []
-        all_storagerouters = StorageRouterList.get_storagerouters()
-        for storagerouter in all_storagerouters:
-            try:
-                SSHClient(endpoint=storagerouter, username='root')
-            except UnableToConnectException:
-                prerequisites.append(['node_down', storagerouter.name])
+        cls._logger.debug('Retrieving package information for framework')
+        update_info = {}
+        for storagerouter in StorageRouterList.get_storagerouters():
+            update_info[storagerouter.ip] = storagerouter.package_information
+        cls._logger.debug('Retrieved package information for framework')
+        return update_info
 
-        arakoon_ovs_info = None
-        arakoon_voldrv_info = None
-
-        # Combine all information
-        for storagerouter in all_storagerouters:
-            for component, package_names in PackageFactory.get_package_info()['names'].iteritems():
-                if component not in storagerouter.package_information:
-                    continue
-
-                if component not in information:
-                    information[component] = {'packages': {},
-                                              'downtime': [],
-                                              'prerequisites': [],
-                                              'services_stop_start': {10: set(), 20: set()},  # Lowest get stopped first and started last
-                                              'services_post_update': {10: set(), 20: set()}}  # Lowest get restarted first
-                component_info = information[component]
-                if component == PackageFactory.COMP_FWK:
-                    component_info['prerequisites'].extend(prerequisites)
-
-                # Loop the actual update information
-                for package_name, package_info in storagerouter.package_information[component].iteritems():
-                    if package_name not in package_names:
-                        continue  # Only gather the information for the packages related to the current component
-
-                    # Add the services which require a restart to the post_update services
-                    for importance, services in package_info.pop('services_to_restart', {}).iteritems():
-                        if importance not in component_info['services_post_update']:
-                            component_info['services_post_update'][importance] = set()
-                        component_info['services_post_update'][importance].update(set(services))
-                    # Add the version information for current package
-                    if package_name not in component_info['packages']:
-                        component_info['packages'][package_name] = package_info
-
-                    # Add downtime and additional services for each package
-                    if package_name == PackageFactory.PKG_OVS:
-                        if ['gui', None] not in component_info['downtime']:
-                            component_info['downtime'].append(['gui', None])
-                        if ['api', None] not in component_info['downtime']:
-                            component_info['downtime'].append(['api', None])
-                        component_info['services_stop_start'][10].add('watcher-framework')
-                        component_info['services_stop_start'][20].add('memcached')
-                        component_info['services_post_update'][20].add('support-agent')
-                    elif package_name in [PackageFactory.PKG_VOLDRV_BASE, PackageFactory.PKG_VOLDRV_BASE_EE, PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE]:
-                        for storagedriver in storagerouter.storagedrivers:
-                            vpool_name = storagedriver.vpool.name
-                            if len(storagedriver.vdisks_guids) > 0 and ['voldrv', vpool_name] not in component_info['downtime']:
-                                component_info['downtime'].append(['voldrv', vpool_name])
-                    elif package_name == PackageFactory.PKG_ARAKOON:
-                        if component == PackageFactory.COMP_SD:
-                            if arakoon_voldrv_info is None:
-                                arakoon_voldrv_info = ArakoonInstaller.get_arakoon_update_info(cluster_name='voldrv')
-                            if arakoon_voldrv_info['internal'] is True and arakoon_voldrv_info['downtime'] is True and ['voldrv', None] not in component_info['downtime']:
-                                component_info['downtime'].append(['voldrv', None])
-                        elif component == PackageFactory.COMP_FWK:
-                            if arakoon_ovs_info is None:
-                                arakoon_ovs_info = ArakoonInstaller.get_arakoon_update_info(cluster_name='ovsdb')
-                            if arakoon_ovs_info['internal'] is True and arakoon_ovs_info['downtime'] is True and ['ovsdb', None] not in component_info['downtime']:
-                                component_info['downtime'].append(['ovsdb', None])
-        return information
+    @classmethod
+    @add_hooks('update', 'merge_downtime_info')
+    def _merge_downtime_information_fwk(cls):
+        """
+        Called when the 'Update' button in the GUI is pressed
+        This call merges the downtime and prerequisite information present in the 'package_information' property for each StorageRouter DAL object
+        :return: Information about prerequisites not met and downtime issues
+        :rtype: dict
+        """
+        cls._logger.debug('Retrieving downtime and prerequisite information for framework')
+        merged_update_info = {}
+        for storagerouter in StorageRouterList.get_storagerouters():
+            for component_name, component_info in storagerouter.package_information.iteritems():
+                if component_name not in merged_update_info:
+                    merged_update_info[component_name] = {'downtime': [],
+                                                          'prerequisites': []}
+                for downtime in component_info['downtime']:
+                    if downtime not in merged_update_info[component_name]['downtime']:
+                        merged_update_info[component_name]['downtime'].append(downtime)
+                for prerequisite in component_info['prerequisites']:
+                    if prerequisite not in merged_update_info[component_name]['prerequisites']:
+                        merged_update_info[component_name]['prerequisites'].append(prerequisite)
+        cls._logger.debug('Retrieved downtime and prerequisite information for framework: {0}'.format(merged_update_info))
+        return merged_update_info
 
     @classmethod
     @add_hooks('update', 'package_install_multi')
@@ -401,11 +357,59 @@ class UpdateController(object):
         :return: Package information for all StorageRouters and ALBA nodes
         :rtype: dict
         """
-        package_info = dict((storagerouter.ip, storagerouter.package_information) for storagerouter in StorageRouterList.get_storagerouters())
-        for _function in Toolbox.fetch_hooks('update', 'merge_package_info'):
-            package_info = ExtensionsToolbox.merge_dicts(dict1=package_info,
-                                                         dict2=_function())
-        return package_info
+        UpdateController._logger.debug('Merging package information')
+        merged_package_info = {}
+        for fct in Toolbox.fetch_hooks(component='update', sub_component='merge_package_info'):
+            package_info = fct()
+            merged_package_info = ExtensionsToolbox.merge_dicts(dict1=merged_package_info,
+                                                                dict2=package_info)
+            UpdateController._logger.debug('Package information for {0} to merge in: {1}'.format(fct.__name__, package_info))
+            UpdateController._logger.debug('Package information after {0} merge: {1}'.format(fct.__name__, merged_package_info))
+
+        # The 'package_information' property actually contains all information required for the update
+        # This includes services to restart, downtime issues, prerequisites, ...
+        # The 'merge_package_information' is called upon when opening the Updates page in the GUI and thus only requires the 'packages' information
+        merged_info = {}
+        for ip, update_info in merged_package_info.iteritems():
+            merged_info[ip] = {}
+            for component_name, component_info in update_info.iteritems():
+                merged_info[ip][component_name] = component_info['packages']
+        UpdateController._logger.debug('Merged package information: {0}'.format(merged_info))
+        return merged_info
+
+    @staticmethod
+    @ovs_task(name='ovs.update.merge_downtime_information')
+    def merge_downtime_information(cls):
+        """
+        Merge the downtime information and prerequisite information of all StorageRouters and plugins (ALBA, iSCSI, ...)
+        This contains information about
+            - downtime of model, GUI, vPools, proxies, Arakoon clusters, ...
+            - prerequisites that have not been met
+        :return: Information about the update
+        :rtype: dict
+        """
+        UpdateController._logger.debug('Merging downtime and prerequisite information')
+        merged_downtime_info = {}
+        for fct in Toolbox.fetch_hooks(component='update', sub_component='merge_downtime_info'):
+            downtime_info = fct()
+            merged_downtime_info = ExtensionsToolbox.merge_dicts(dict1=merged_downtime_info,
+                                                                 dict2=downtime_info)
+            UpdateController._logger.debug('Downtime and prerequisite information for {0} to merge in: {1}'.format(fct.__name__, downtime_info))
+            UpdateController._logger.debug('Downtime and prerequisite information after {0} merge: {1}'.format(fct.__name__, merged_downtime_info))
+
+        # Since every plugin can potentially have common downtime and/or prerequisites, we will filter out the duplicate ones
+        merged_info = {}
+        for component_name, component_info in merged_downtime_info.iteritems():
+            merged_info[component_name] = {'downtime': [],
+                                           'prerequisites': []}
+            for downtime in component_info['downtime']:
+                if downtime not in merged_info[component_name]['downtime']:
+                    merged_info[component_name]['downtime'].append(downtime)
+            for prerequisite in component_info['prerequisites']:
+                if prerequisite not in merged_info[component_name]['prerequisites']:
+                    merged_info[component_name]['prerequisites'].append(prerequisite)
+        UpdateController._logger.debug('Merged downtime and prerequisite information: {0}'.format(merged_info))
+        return merged_info
 
     @staticmethod
     @ovs_task(name='ovs.update.get_update_metadata')
@@ -453,24 +457,6 @@ class UpdateController(object):
         return {'at_ok': at_ok,
                 'reachable': reachable,
                 'update_ongoing': update_ongoing}
-
-    @staticmethod
-    @ovs_task(name='ovs.update.get_update_information')
-    def get_update_information_all():
-        """
-        Retrieve the update information for all StorageRouters
-        This contains information about
-            - downtime of model, GUI, vPools, proxies, ...
-            - services that will be restarted
-            - packages that will be updated
-            - prerequisites that have not been met
-        :return: Information about the update
-        :rtype: dict
-        """
-        information = {}
-        for _function in Toolbox.fetch_hooks('update', 'information'):
-            _function(information=information)
-        return information
 
     @staticmethod
     @ovs_task(name='ovs.update.update_components')

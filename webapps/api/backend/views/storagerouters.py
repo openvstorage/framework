@@ -623,4 +623,4 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
-        return UpdateController.get_update_information_all.delay()
+        return UpdateController.merge_downtime_information.delay()
