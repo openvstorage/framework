@@ -31,6 +31,7 @@ from rest_framework import status
 from rest_framework.request import Request
 from api.backend.toolbox import ApiToolbox
 from api.helpers import OVSResponse
+from ovs.dal.datalist import DataList
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -244,11 +245,12 @@ def return_list(object_type, default_sort=None):
         """
         Wrapper function
         """
-
+        # Add metadata that can be used later on
         metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         metadata['returns'] = {'parameters': {'sorting': default_sort,
                                               'paging': None,
-                                              'contents': None},
+                                              'contents': None,
+                                              'query': None},
                                'returns': ['list', '200'],
                                'object_type': object_type}
         f.ovs_metadata = metadata
@@ -257,6 +259,17 @@ def return_list(object_type, default_sort=None):
         def new_function(*args, **kwargs):
             """
             Wrapped function
+            This function will process the api request an apply:
+             - Paging (only return a subset of all results)
+             - Sorting (sort on properties)
+             - Filtering (filter on properties)
+            Request arguments for paging:
+            - page: The page number for which the items should be displayed (string/int)
+            - page_size: The size of the pages (string/int)
+            Request arguments for sorting:
+            - sort: Comma separated list of the properties to sort on. Prefix with '-' to use descending order (eg name,-description) (string)
+            Request arguments for filtering: identical to DataList query params
+            - query: The query to perform. See DataList execute_query method for more info
             """
             request = _find_request(args)
             timings = {}
@@ -264,14 +277,20 @@ def return_list(object_type, default_sort=None):
             # 1. Pre-loading request data
             start = time.time()
             sort = request.QUERY_PARAMS.get('sort')
+            query = request.QUERY_PARAMS.get('query')
+            if query is not None:
+                try:
+                    query = json.loads(query)
+                    DataList.validate_query(query)
+                except ValueError as ex:
+                    raise ValueError('Query is not valid: \'{0}\''.format(str(ex)))
             if sort is None and default_sort is not None:
                 sort = default_sort
             sort = None if sort is None else [s for s in reversed(sort.split(','))]
             page = request.QUERY_PARAMS.get('page')
-            page = int(page) if page is not None and page.isdigit() else None
+            page = int(page) if page is not None and (isinstance(page, int) or page.isdigit()) else None
             page_size = request.QUERY_PARAMS.get('page_size')
-            page_size = int(page_size) if page_size is not None and page_size.isdigit() else None
-            page_size = page_size if page_size in [10, 25, 50, 100] else 10
+            page_size = int(page_size) if page_size is not None and (isinstance(page_size, int) or page_size.isdigit()) else None
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
             timings['preload'] = [time.time() - start, 'Data preloading']
@@ -289,11 +308,25 @@ def return_list(object_type, default_sort=None):
             guid_list = isinstance(data_list, list) and len(data_list) > 0 and isinstance(data_list[0], basestring)
             timings['fetch'] = [time.time() - start, 'Fetching data']
 
-            # 4. Sorting
+            # 4. Filtering data
+            if query is not None:
+                start = time.time()
+                if guid_list is True:
+                    guids = data_list
+                    guid_list = False  # The list will be converted to a datalist
+                else:
+                    guids = data_list.guids
+                # Use the guids from the result list as a base to query inside the functions results and apply the query
+                data_list = DataList(object_type, query=query, guids=guids)
+                # Trigger the query
+                _ = data_list.guids
+                timings['querying'] = [time.time() - start, 'Querying data']
+
+            # 5. Sorting
             if sort is not None:
                 start = time.time()
                 if guid_list is True:
-                    data_list = [object_type(guid) for guid in data_list]
+                    data_list = DataList(object_type, guids=data_list)
                     guid_list = False  # The list is converted to objects
                 for sort_item in sort:
                     desc = sort_item[0] == '-'
@@ -301,7 +334,7 @@ def return_list(object_type, default_sort=None):
                     data_list.sort(key=lambda e: DalToolbox.extract_key(e, field), reverse=desc)
                 timings['sort'] = [time.time() - start, 'Sorting data']
 
-            # 5. Paging
+            # 6. Paging
             start = time.time()
             total_items = len(data_list)
             page_metadata = {'total_items': total_items,
@@ -329,18 +362,19 @@ def return_list(object_type, default_sort=None):
                 page_metadata['page_size'] = total_items
             timings['paging'] = [time.time() - start, 'Selecting current page']
 
-            # 6. Serializing
+            # 7. Serializing
             start = time.time()
             if contents is not None:
                 if guid_list is True:
-                    data_list = [object_type(guid) for guid in data_list]
+                    data_list = DataList(object_type, guids=data_list)
                 data = FullSerializer(object_type, contents=contents, instance=data_list, many=True).data
             else:
                 if guid_list is False:
-                    data_list = [item.guid for item in data_list]
+                    data_list = data_list.guids  # 'data_list' is a ovs.dal.datalist.DataList which has the guids stored
                 data = data_list
             timings['serializing'] = [time.time() - start, 'Serializing']
 
+            # Add timings about dynamics
             if contents is not None and len(data_list) > 0:
                 object_timings = {}
                 for obj in data_list:
@@ -362,7 +396,7 @@ def return_list(object_type, default_sort=None):
                       '_contents': contents,
                       '_sorting': [s for s in reversed(sort)] if sort else sort}
 
-            # 7. Building response
+            # 8. Building response
             return OVSResponse(result,
                                status=status.HTTP_200_OK,
                                timings=timings)
