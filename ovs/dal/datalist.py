@@ -79,8 +79,8 @@ class DataList(object):
         :type guids: list[basestring] or NoneType
         """
         # Validation
-        self._validate_guids(guids)
-        self._validate_query(query)
+        self.validate_guids(guids)
+        self.validate_query(query)
 
         # Defaults
         if query is None:
@@ -177,7 +177,7 @@ class DataList(object):
         """
         if query is None:
             query = {'type': DataList.where_operator.AND, 'items': []}
-        self._validate_query(query)
+        self.validate_query(query)
         self._query = query
         if self._provided_key is True:
             # Cache has to be reset as it is no longer valid
@@ -194,7 +194,7 @@ class DataList(object):
         :return: None
         :rtype: NoneType
         """
-        self._validate_guids(guids)
+        self.validate_guids(guids)
         self._provided_guids = guids
         self._provided_keys = None
         if self._provided_key is True:
@@ -205,7 +205,7 @@ class DataList(object):
         self._reset_list()
 
     @staticmethod
-    def _validate_query(query):
+    def validate_query(query):
         """
         Validates if a query is of the format we'd expect
         :param query: Query to perform
@@ -219,7 +219,7 @@ class DataList(object):
         raise ValueError('Query can be None or a dict containing \'type\' and \'items\'')
 
     @staticmethod
-    def _validate_guids(guids):
+    def validate_guids(guids):
         """
         Validates if the supplied guids are valid
         :param guids: Guids to check for

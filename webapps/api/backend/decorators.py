@@ -279,7 +279,11 @@ def return_list(object_type, default_sort=None):
             sort = request.QUERY_PARAMS.get('sort')
             query = request.QUERY_PARAMS.get('query')
             if query is not None:
-                query = json.loads(query)
+                try:
+                    query = json.loads(query)
+                    DataList.validate_query(query)
+                except ValueError as ex:
+                    raise ValueError('Query is not valid: \'{0}\''.format(str(ex)))
             if sort is None and default_sort is not None:
                 sort = default_sort
             sort = None if sort is None else [s for s in reversed(sort.split(','))]

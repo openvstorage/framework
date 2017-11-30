@@ -526,8 +526,8 @@ class Decorators(unittest.TestCase):
         for fct in [the_function_rl_1, the_function_rl_2, the_function_rl_3, the_function_rl_4]:
             request.QUERY_PARAMS = {}
             # Test querying, not to be tested thoroughly (test_basic handles DataList queries)
-            request.QUERY_PARAMS['query'] = {'type': 'AND',
-                                             'items': [['description', 'EQUALS', 'aa']]}
+            request.QUERY_PARAMS['query'] = json.dumps({'type': 'AND',
+                                                        'items': [['description', 'EQUALS', 'aa']]})
             response = fct(1, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
@@ -535,8 +535,8 @@ class Decorators(unittest.TestCase):
             self.assertEqual(len(response.data['data']), len(expected_items))
             self.assertListEqual(response.data['data'], expected_items)
 
-            request.QUERY_PARAMS['query'] = {'type': 'AND',
-                                             'items': [['description', 'EQUALS', 'dd']]}
+            request.QUERY_PARAMS['query'] = json.dumps({'type': 'AND',
+                                                        'items': [['description', 'EQUALS', 'dd']]})
             response = fct(2, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
@@ -546,6 +546,11 @@ class Decorators(unittest.TestCase):
                 expected_items = []  # Not found in the first two items
             self.assertEqual(len(response.data['data']), len(expected_items))
             self.assertListEqual(response.data['data'], expected_items)
+
+            request.QUERY_PARAMS['query'] = json.dumps('rawr')
+            with self.assertRaises(ValueError):
+                # Can't capture the response as the exception will be raised in the same context
+                response = fct(1, request)
 
         # Test pagination
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
