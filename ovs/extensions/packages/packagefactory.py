@@ -48,7 +48,7 @@ class PackageFactory(_PackageFactory):
     def get_package_info(cls):
         """
         Retrieve the package information related to the framework
-        This must return a dictionary with keys: 'names', 'edition', 'binaries', 'blocking', 'version_commands' and 'mutually_exclusive'
+        This must return a dictionary with keys: 'names', 'edition', 'binaries', 'version_commands' and 'mutually_exclusive'
             Names: These are the names of the packages split up per component related to this repository (framework)
                 * Framework
                     * PKG_ARAKOON            --> Used for arakoon-config cluster and arakoon-ovsdb cluster
@@ -75,7 +75,6 @@ class PackageFactory(_PackageFactory):
                     'edition': edition,
                     'binaries': {cls.COMP_FWK: {cls.PKG_ARAKOON},
                                  cls.COMP_SD: {cls.PKG_ARAKOON, cls.PKG_VOLDRV_SERVER}},
-                    'blocking': {cls.PKG_OVS, cls.PKG_OVS_EXTENSIONS},
                     'version_commands': {cls.PKG_ARAKOON: cls.VERSION_CMD_ARAKOON,
                                          cls.PKG_VOLDRV_BASE: cls.VERSION_CMD_SD,
                                          cls.PKG_VOLDRV_SERVER: cls.VERSION_CMD_SD},
@@ -86,7 +85,6 @@ class PackageFactory(_PackageFactory):
                     'edition': edition,
                     'binaries': {cls.COMP_FWK: {cls.PKG_ARAKOON},
                                  cls.COMP_SD: {cls.PKG_ARAKOON, cls.PKG_VOLDRV_SERVER_EE}},
-                    'blocking': {cls.PKG_OVS, cls.PKG_OVS_EXTENSIONS},
                     'version_commands': {cls.PKG_ARAKOON: cls.VERSION_CMD_ARAKOON,
                                          cls.PKG_VOLDRV_BASE_EE: cls.VERSION_CMD_SD,
                                          cls.PKG_VOLDRV_SERVER_EE: cls.VERSION_CMD_SD},

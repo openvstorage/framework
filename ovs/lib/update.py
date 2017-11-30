@@ -255,22 +255,6 @@ class UpdateController(object):
         return merged_update_info
 
     @classmethod
-    @add_hooks('update', 'package_install_multi')
-    def _package_install_core(cls, client, package_info, components):
-        """
-        Update the core packages
-        :param client: Client on which to execute update the packages
-        :type client: SSHClient
-        :param package_info: Information about the packages (installed, candidate)
-        :type package_info: dict
-        :param components: Components which have been selected for update
-        :type components: list
-        :return: Boolean indicating whether to continue with the update or not
-        :rtype: bool
-        """
-        return PackageFactory.update_packages(client=client, packages=package_info, components=components)
-
-    @classmethod
     @add_hooks('update', 'post_update_single')
     def _post_update_async_migrator(cls, components=None):
         _ = components
@@ -283,7 +267,7 @@ class UpdateController(object):
 
     @classmethod
     @add_hooks('update', 'post_update_multi')
-    def _post_update_core(cls, client, components, update_information=None):
+    def _post_update_core(cls, client, components):
         """
         Execute functionality after the openvstorage core packages have been updated
         For framework:
@@ -296,53 +280,54 @@ class UpdateController(object):
         :type client: SSHClient
         :param components: Update components which have been executed
         :type components: list
-        :param update_information: Information required for an update (defaults to None for backwards compatibility)
-        :type update_information: dict
         :return: None
         :rtype: NoneType
         """
         method_name = inspect.currentframe().f_code.co_name
         cls._logger.info('{0}: Executing hook {1}'.format(client.ip, method_name))
-        pkg_names_to_check = set()
-        for component, package_names in PackageFactory.get_package_info()['names'].iteritems():
-            if component in components:
-                pkg_names_to_check.update(package_names)
 
-        try:
-            ServiceFactory.remove_services_marked_for_removal(client=client,
-                                                              package_names=pkg_names_to_check)
-        except Exception:
-            cls._logger.exception('{0}: Removing the services marked for removal failed'.format(client.ip))
-
-        if update_information is None:
-            update_information = {}
-
-        other_services = set()
-        arakoon_services = set()
-        for component, update_info in update_information.iteritems():
-            if component not in PackageFactory.get_components():
+        storagerouter = StorageRouterList.get_by_ip(ip=client.ip)
+        for component in components:
+            if component not in storagerouter.package_information:
                 continue
-            for restart_order in sorted(update_info['services_post_update']):
-                for service_name in update_info['services_post_update'][restart_order]:
-                    if service_name.startswith('arakoon-'):
+
+            component_info = storagerouter.package_information[component]
+            if 'packages' not in component_info:
+                # Package_information still has the old format, so refresh update information
+                # This can occur when updating from earlier than 2.11.0 to 2.11.0 and older
+                GenericController.refresh_package_information()
+                storagerouter.discard()
+                component_info = storagerouter.package_information.get(component, {})
+
+            try:
+                ServiceFactory.remove_services_marked_for_removal(client=client,
+                                                                  package_names=component_info.get('packages', {}).keys())
+            except Exception:
+                cls._logger.exception('{0}: Removing the services marked for removal failed'.format(client.ip))
+
+            other_services = set()
+            arakoon_services = set()
+            for restart_order in sorted(component_info.get('services_post_update', {})):
+                for service_name in component_info['services_post_update'][restart_order]:
+                    if service_name.startswith('ovs-arakoon-'):
                         arakoon_services.add(service_name)
                     else:
                         other_services.add(service_name)
 
-        UpdateController.change_services_state(services=sorted(other_services), ssh_clients=[client], action='restart')
-        for service_name in sorted(arakoon_services):
-            try:
-                cluster_name = ArakoonInstaller.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'arakoon-'))
-                ip = System.get_my_storagerouter().ip if cluster_name == 'config' else None
-                arakoon_metadata = ArakoonInstaller.get_arakoon_update_info(cluster_name=cluster_name, ip=ip)
-                if arakoon_metadata['internal'] is True:
-                    arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
-                    arakoon_installer.load(ip=ip)
-                    if client.ip in [node.ip for node in arakoon_installer.config.nodes]:
-                        cls._logger.warning('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
-                        arakoon_installer.restart_node(client=client)
-            except Exception:
-                cls._logger.exception('{0}: Restarting service {1} failed'.format(client.ip, service_name))
+            UpdateController.change_services_state(services=sorted(other_services), ssh_clients=[client], action='restart')
+            for service_name in sorted(arakoon_services):
+                try:
+                    cluster_name = ArakoonInstaller.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'ovs-arakoon-'))
+                    ip = System.get_my_storagerouter().ip if cluster_name == 'config' else None
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_update_info(cluster_name=cluster_name, ip=ip)
+                    if arakoon_metadata['internal'] is True:
+                        arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)
+                        arakoon_installer.load(ip=ip)
+                        if client.ip in [node.ip for node in arakoon_installer.config.nodes]:
+                            cls._logger.warning('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
+                            arakoon_installer.restart_node(client=client)
+                except Exception:
+                    cls._logger.exception('{0}: Restarting service {1} failed'.format(client.ip, service_name))
 
         cls._logger.info('{0}: Executed hook {1}'.format(client.ip, method_name))
 
@@ -353,7 +338,8 @@ class UpdateController(object):
     @ovs_task(name='ovs.update.merge_package_information')
     def merge_package_information():
         """
-        Retrieve the package information from the model for both StorageRouters and ALBA Nodes and merge it
+        This is called upon by the Update overview page, to show all updates grouped by IP, being either a StorageRouter, ALBA Node, iSCSI Node, ...
+        Merge the package information of all StorageRouters and plugins (ALBA, iSCSI, ...) per IP
         :return: Package information for all StorageRouters and ALBA nodes
         :rtype: dict
         """
@@ -381,7 +367,8 @@ class UpdateController(object):
     @ovs_task(name='ovs.update.merge_downtime_information')
     def merge_downtime_information():
         """
-        Merge the downtime information and prerequisite information of all StorageRouters and plugins (ALBA, iSCSI, ...)
+        This is called upon by the Update overview page when clicking the 'Update' button to show the prerequisites which have not been met and downtime issues
+        Merge the downtime information and prerequisite information of all StorageRouters and plugins (ALBA, iSCSI, ...) per component
         This contains information about
             - downtime of model, GUI, vPools, proxies, Arakoon clusters, ...
             - prerequisites that have not been met
@@ -411,6 +398,27 @@ class UpdateController(object):
         UpdateController._logger.debug('Merged downtime and prerequisite information: {0}'.format(merged_info))
         return merged_info
 
+    @classmethod
+    def merge_services_stop_start_information(cls):
+        """
+        This is called upon by the update logic to retrieve all services to stop and start during update itself
+        :return: Service names to stop before update and start after update, stored in dict with keys being the importance of stop order
+        :rtype: dict
+        """
+        UpdateController._logger.debug('Merging services to stop-start information')
+        merged_service_info = {}
+        for fct in Toolbox.fetch_hooks(component='update', sub_component='merge_package_info'):
+            for ip, info in fct().iteritems():
+                for component_info in info.itervalues():
+                    for importance, service_names in component_info['services_stop_start'].iteritems():
+                        importance = int(importance)
+                        if importance not in merged_service_info:
+                            merged_service_info[importance] = []
+                        for service_name in service_names:
+                            if service_name not in merged_service_info[importance]:
+                                merged_service_info[importance].append(service_name)
+        return merged_service_info
+
     @staticmethod
     @ovs_task(name='ovs.update.get_update_metadata')
     def get_update_metadata(storagerouter_ip):
@@ -419,9 +427,9 @@ class UpdateController(object):
           - Checks if 'at' is installed properly
           - Checks if ongoing updates are busy
           - Check if StorageRouter is reachable
-        :param storagerouter_ip: IP of the Storage Router to check the metadata for
+        :param storagerouter_ip: IP of the StorageRouter to check the metadata for
         :type storagerouter_ip: str
-        :return: Update status for specified storage router
+        :return: Update status for specified StorageRouter
         :rtype: dict
         """
         at_ok = True
@@ -474,6 +482,34 @@ class UpdateController(object):
     #############
     # FUNCTIONS #
     #############
+    @classmethod
+    def _package_install_cluster(cls, components):
+        """
+        Update all the packages related to the specified components which have been stored in the 'package_information' property on the StorageRouter DAL objects
+        :param components: Components which have been selected for update
+        :type components: list
+        :return: Boolean indicating whether to continue with the update or not
+        :rtype: bool
+        """
+        cls._logger.info('Updating packages')
+        abort = False
+        for storagerouter in StorageRouterList.get_storagerouters():
+            cls._logger.debug('StorageRouter {0}: Updating packages'.format(storagerouter.ip))
+            try:
+                client = SSHClient(endpoint=storagerouter, username='root')
+            except UnableToConnectException:
+                cls._logger.exception('StorageRouter {0}: Updating packages failed'.format(storagerouter.ip))
+                abort = True
+                continue
+
+            for component in components:
+                packages = storagerouter.package_information.get(component, {}).get('packages', {})
+                if len(packages) > 0:
+                    cls._logger.debug('StorageRouter {0}: Updating packages for component {1}'.format(storagerouter.ip, component))
+                    abort |= PackageFactory.update_packages(client=client, packages=packages)
+        cls._logger.info('Updated packages')
+        return abort
+
     @staticmethod
     def execute_update(components):
         """
@@ -482,32 +518,40 @@ class UpdateController(object):
         :return: None
         :rtype: NoneType
         """
+        UpdateController._logger.info('+++ Starting update +++')
+        GenericController.refresh_package_information()  # Not in try - except, because we don't want to start updating if we can't even refresh the update information
+
+        # These prerequisites are refreshed by 'refresh_package_information' and also check whether all StorageRouters are online
+        for component, info in UpdateController.merge_downtime_information().iteritems():
+            if component in components and len(info['prerequisites']) > 0:
+                raise Exception('Not all prerequisites have been met to update component {0}'.format(component))
+
+        # Order the services to stop before update and start after update according to their importance
+        service_info = UpdateController.merge_services_stop_start_information()
+        services_stop_start = []
+        for importance in sorted(service_info):
+            services_stop_start.extend(service_info[importance])
+
         abort = False
         filemutex = file_mutex('system_update', wait=2)
         ssh_clients = []
-        services_stop_start = list()
         errors_during_update = False
         try:
             filemutex.acquire()
-            UpdateController._logger.info('+++ Starting update +++')
 
             # Create SSHClients to all nodes
-            UpdateController._logger.info('Generating SSH client connections for each storage router')
-            storage_routers = StorageRouterList.get_storagerouters()
-            master_ips = []
-            extra_ips = []
+            UpdateController._logger.info('Generating SSH client connections for each StorageRouter')
             local_ip = None
-            for sr in storage_routers:
-                try:
-                    ssh_clients.append(SSHClient(endpoint=sr, username='root'))
-                    if sr == System.get_my_storagerouter():
-                        local_ip = sr.ip
-                    if sr.node_type == 'MASTER':
-                        master_ips.append(sr.ip)
-                    elif sr.node_type == 'EXTRA':
-                        extra_ips.append(sr.ip)
-                except UnableToConnectException:
-                    raise Exception('Update is only allowed on systems where all nodes are online and fully functional')
+            extra_ips = []
+            master_ips = []
+            for sr in StorageRouterList.get_storagerouters():
+                ssh_clients.append(SSHClient(endpoint=sr, username='root'))
+                if sr == System.get_my_storagerouter():
+                    local_ip = sr.ip
+                if sr.node_type == 'MASTER':
+                    master_ips.append(sr.ip)
+                elif sr.node_type == 'EXTRA':
+                    extra_ips.append(sr.ip)
 
             ssh_clients.sort(key=lambda cl: ExtensionsToolbox.advanced_sort(element=cl.ip, separator='.'))
 
@@ -517,40 +561,6 @@ class UpdateController(object):
                 client.run(['touch', UpdateController._update_file])  # Prevents manual install or update individual packages
                 client.run(['touch', UpdateController._update_ongoing_file])
 
-            # Check requirements
-            packages_to_update = {}
-            services_post_update = list()
-            update_information = UpdateController.get_update_information_all()
-            for component, component_info in update_information.iteritems():
-                if component in components:
-                    UpdateController._logger.info('Verifying update information for component: {0}'.format(component.upper()))
-                    Toolbox.verify_required_params(actual_params=component_info,
-                                                   required_params={'downtime': (list, None),
-                                                                    'packages': (dict, None),
-                                                                    'prerequisites': (list, None),
-                                                                    'services_stop_start': (dict, None),
-                                                                    'services_post_update': (dict, None)})
-                    if len(component_info['prerequisites']) > 0:
-                        raise Exception('Update is only allowed when all prerequisites have been met')
-
-                    packages_to_update.update(component_info['packages'])
-                    for order in sorted(component_info['services_stop_start']):
-                        services_stop_start.extend(list(component_info['services_stop_start'][order]))
-                    for order in sorted(component_info['services_post_update']):
-                        services_post_update.extend(list(component_info['services_post_update'][order]))
-            if len(packages_to_update) > 0:
-                UpdateController._logger.info('Packages to update')
-                for package_to_update in sorted(packages_to_update):
-                    UpdateController._logger.info('    * {0}'.format(package_to_update))
-            if len(services_stop_start) > 0:
-                UpdateController._logger.info('Services to stop BEFORE packages will be updated')
-                for service_to_stop in sorted(services_stop_start):
-                    UpdateController._logger.info('    * {0}'.format(service_to_stop))
-            if len(services_post_update) > 0:
-                UpdateController._logger.info('Services to restart AFTER packages have been updated')
-                for service_to_restart in sorted(services_post_update):
-                    UpdateController._logger.info('    * {0}'.format(service_to_restart))
-
             # Stop services
             if UpdateController.change_services_state(services=services_stop_start,
                                                       ssh_clients=ssh_clients,
@@ -558,19 +568,13 @@ class UpdateController(object):
                 raise Exception('Stopping all services on every node failed, cannot continue')
 
             # Collect the functions to be executed before they get overwritten by updated packages, so on each the same functionality is executed
-            package_install_multi_hooks = Toolbox.fetch_hooks('update', 'package_install_multi')
-            package_install_single_hooks = Toolbox.fetch_hooks('update', 'package_install_single')
+            package_install_plugins = Toolbox.fetch_hooks(component='update', sub_component='package_install_plugin')
+            abort |= UpdateController._package_install_cluster(components=components)  # Install packages on StorageRouters
 
-            # Install packages (cluster nodes)
-            if packages_to_update:
-                for client in ssh_clients:
-                    for _function in package_install_multi_hooks:
-                        abort |= _function(client=client, package_info=packages_to_update, components=components)
-
-            # Install packages (storage nodes, eg: SDM, iSCSI, ...)
-            for _function in package_install_single_hooks:
+            # Install packages on plugins (ALBA, iSCSI, ...)
+            for _function in package_install_plugins:
                 try:
-                    abort |= _function(package_info=None, components=components)
+                    abort |= _function(components=components)
                 except Exception:
                     UpdateController._logger.exception('Package installation hook {0} failed'.format(_function.__name__))
 
@@ -635,7 +639,7 @@ class UpdateController(object):
                 with remote(client.ip, [Toolbox]) as rem:
                     for _function in rem.Toolbox.fetch_hooks('update', 'post_update_multi'):
                         try:
-                            _function(client=client, components=components, update_information=update_information)
+                            _function(client=client, components=components)
                         except Exception as ex:
                             UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, _function.__name__, ex))
 

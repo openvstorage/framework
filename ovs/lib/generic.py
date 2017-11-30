@@ -643,6 +643,14 @@ class GenericController(object):
             for component, info in update_info_copy.iteritems():
                 if len(info['packages']) == 0:
                     update_info.pop(component)
+                else:
+                    # Make sure that the restart order key is an integer
+                    for restart_order in info['services_stop_start']:
+                        if not isinstance(restart_order, int):
+                            update_info[component]['services_stop_start'][int(restart_order)] = info['services_stop_start'].pop(restart_order)
+                    for restart_order in info['services_post_update']:
+                        if not isinstance(restart_order, int):
+                            update_info[component]['services_post_update'][int(restart_order)] = info['services_post_update'].pop(restart_order)
 
             # Store the update information
             storagerouter.package_information = update_info
