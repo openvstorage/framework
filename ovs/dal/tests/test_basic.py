@@ -632,7 +632,7 @@ class Basic(unittest.TestCase):
             if key is None:
                 self.assertTrue(list_cache.from_cache, 'List should be loaded from cache (mode: {0})'.format(key))
             else:
-                self.assertFalse(list_cache.from_cache, 'List should be loaded from cache (mode: {0})'.format(key))
+                self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: {0})'.format(key))
             disk2 = TestDisk()
             disk2.machine = machine
             disk2.name = 'disk2_{0}'.format(key)
