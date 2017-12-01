@@ -63,8 +63,6 @@ class PackageFactory(_PackageFactory):
             Non Blocking: Packages which are potentially not yet available on all releases. These should be removed once every release contains these packages by default
             Version Commands: The commandos used to determine which binary version is currently active
             Mutually Exclusive: Packages which are not allowed to be installed depending on the edition. Eg: ALBA_EE cannot be installed on a 'community' edition
-        :raises ValueError: * When configuration management key 'ovs/framework/edition' does not exists
-                            * When 'ovs/framework/edition' does not contain 'community' or 'enterprise'
         :return: A dictionary containing information about the expected packages to be installed
         :rtype: dict
         """
