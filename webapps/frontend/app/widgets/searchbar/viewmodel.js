@@ -41,6 +41,7 @@ define([
         self.search =       ko.observable("");
         self.query =        ko.observable();
         self.placeholder =  ko.observable("");
+        self.width =        ko.observable("20em");
 
         // Functions
         /**
@@ -182,6 +183,7 @@ define([
             self.query = settings['query'];
             self.defaultField = generic.tryGet(settings, 'defaultField', null);
             self.placeholder(generic.tryGet(settings, 'placeholder', ''));
+            self.width(generic.tryGet(settings, 'width', '20em'));
             $.extend(self.fieldMap, generic.tryGet(settings, 'fieldMap', {}));
         };
 

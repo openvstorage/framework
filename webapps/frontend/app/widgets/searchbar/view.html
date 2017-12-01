@@ -17,9 +17,9 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <form class="form-inline" style="display: inline-block" data-bind="submit: getData">
     <div class="input-group">
-        <input type="text" class="form-control" placeholder="" data-bind="textInput: search, attr: {placeholder: placeholder}">
-        <span class="input-group-addon">
-            <i data-i18n="[html]ovs:icons.search"></i>
-        </span>
+        <input type="text" class="form-control" placeholder="" data-bind="textInput: search, attr: {placeholder: placeholder, style: 'width: '+ width()}">
+        <div class="input-group-addon">
+            <i class="fa" data-i18n="[html]ovs:icons.search"></i>
+        </div>
     </div>
 </form>
