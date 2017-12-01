@@ -27,12 +27,11 @@ define([
             '!=': 'NOT_EQUALS',
             'IN': 'IN',
             '~': 'CONTAINS',
+            '>=': ['GT', 'EQUALS'],  // Order matters as the loop will iterate these options first
+            '<=': ['LT', 'EQUALS'],
             '>': 'GT',
-            '<': 'LT',
-            '>=': ['GT', 'EQUALS'],
-            '<=': ['LT', 'EQUALS']
+            '<': 'LT'
         };
-        var defaultOperator = operatorMap['~'];
 
         self.fieldMap = {'sr_guid': 'storagerouter_guid'};
         self.defaultField = 'guid';
@@ -78,8 +77,13 @@ define([
                 if (split_entry.length === 1) {
                     // Supply default field
                     field = defaultField;
-                    operator = defaultOperator;
                     value = split_entry[0];
+                    if (isNaN(value)) {
+                        operator = operatorMap['~']
+                    } else {
+                        operator = operatorMap['='];
+                        value = parseFloat(value)
+                    }
                 }
                 else {
                     // Potentially has quotes in it
@@ -94,14 +98,25 @@ define([
                         }
                     });
                     if (operator === undefined) {
-                       operator = defaultOperator;
-                        value = cleanQuotes(split_entry[1]);
+                       value = cleanQuotes(split_entry[1]);
+                       if (isNaN(value)) { operator = operatorMap['~'] }
+                        else { operator = operatorMap['='] }
+                    }
+                    if (!isNaN(value)) {
+                        value = parseFloat(value)
                     }
                 }
                 if (operator instanceof Array) {
+                    // Chain these with OR
+                    var orItems = [];
+                    var orQuery = {
+                        'type': 'OR',
+                        'items': orItems
+                    };
                     $.each(operator, function(opIndex, op){
-                        queryItems.push([field, op, value])
+                        orItems.push([field, op, value])
                     });
+                    queryItems.push(orQuery)
                 } else {
                     queryItems.push([field, operator, value])
                 }

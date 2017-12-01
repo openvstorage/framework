@@ -56,18 +56,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'manage'])
     @return_list(StorageRouter, 'name')
     @load()
-    def list(self, query=None):
+    def list(self):
         """
         Overview of all StorageRouters
-        :param query: A query to filter the StorageRouters
-        :type query: DataQuery
         :return: List of StorageRouters
         :rtype: list[ovs.dal.hybrids.storagerouter.StorageRouter]
         """
-        if query is None:
-            return StorageRouterList.get_storagerouters()
-        else:
-            return DataList(StorageRouter, query)
+        return StorageRouterList.get_storagerouters()
 
     @log()
     @required_roles(['read', 'manage'])

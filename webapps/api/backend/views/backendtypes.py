@@ -38,14 +38,10 @@ class BackendTypeViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(BackendType)
     @load()
-    def list(self, query=None):
+    def list(self):
         """
         Overview of all backend types
-        :param query: Optional filter for BackendTypes
-        :type query: DataQuery
         """
-        if query is not None:
-            return DataList(BackendType, query)
         return BackendTypeList.get_backend_types()
 
     @log()

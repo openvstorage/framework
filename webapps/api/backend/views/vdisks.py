@@ -45,21 +45,17 @@ class VDiskViewSet(viewsets.ViewSet):
     base_name = 'vdisks'
     return_exceptions = ['vdisks.create']
 
-    _logger = Logger('api')
-
     @log()
     @required_roles(['read', 'manage'])
     @return_list(VDisk)
     @load()
-    def list(self, vpoolguid=None, storagerouterguid=None, query=None):
+    def list(self, vpoolguid=None, storagerouterguid=None):
         """
         Overview of all vDisks
         :param vpoolguid: Guid of the vPool to retrieve its disks
         :type vpoolguid: str
         :param storagerouterguid: Guid of the StorageRouter to retrieve its disks
         :type storagerouterguid: str
-        :param query: A query to be executed if required
-        :type query: DataQuery
         :return: List of vDisks matching the parameters specified
         :rtype: list[ovs.dal.hybrids.vdisk.VDisk]
         """
@@ -72,8 +68,6 @@ class VDiskViewSet(viewsets.ViewSet):
                                       'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
         else:
             vdisks = VDiskList.get_vdisks()
-        VDiskViewSet._logger.warning(vdisks)
-        VDiskViewSet._logger.warning(type(vdisks))
         return vdisks
 
     @log()
