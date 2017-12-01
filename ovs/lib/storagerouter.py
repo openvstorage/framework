@@ -1359,7 +1359,7 @@ class StorageRouterController(object):
             vpool.save()
         cls._logger.info('StorageDriver {0} - Deleted StorageDriver {1}'.format(storage_driver.guid, storage_driver.name))
         if len(VPoolList.get_vpools()) == 0:
-            cluster_name = ArakoonClusterConfig.get_cluster_name('voldrv')
+            cluster_name = ArakoonInstaller.get_cluster_name('voldrv')
             if ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)['internal'] is True:
                 cls._logger.debug('StorageDriver {0} - Removing Arakoon cluster {1}'.format(storage_driver.guid, cluster_name))
                 try:
