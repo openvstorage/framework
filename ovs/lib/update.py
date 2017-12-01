@@ -24,6 +24,7 @@ import inspect
 from subprocess import CalledProcessError
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex, NoLockAvailableException
@@ -156,7 +157,7 @@ class UpdateController(object):
                         if component == PackageFactory.COMP_FWK:
                             cluster_names = ['ovsdb', 'config']
                         elif component == PackageFactory.COMP_SD:
-                            cluster_names = ['voldrv']
+                            cluster_names = ['voldrv'] if len(VPoolList.get_vpools()) > 0 else []
                         else:
                             continue
 
@@ -165,7 +166,7 @@ class UpdateController(object):
                             actual_cluster_name = ArakoonInstaller.get_cluster_name(internal_name=internal_cluster_name)
                             arakoon_service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=actual_cluster_name)
                             arakoon_service_version = ServiceFactory.verify_restart_required(client=client, service_name=arakoon_service_name, binary_versions=binaries)
-                            cls._logger.debug('StorageRouter {0}: Arakoon service information for cluster {1}: {2}'.format(client.ip, internal_cluster_name, arakoon_service_version))
+                            cls._logger.debug('StorageRouter {0}: Arakoon service information for service {1}: {2}'.format(client.ip, arakoon_service_name, arakoon_service_version))
 
                             if package_name in pkg_component_info or arakoon_service_version is not None:
                                 arakoon_update_info = ArakoonInstaller.get_arakoon_update_info(cluster_name=actual_cluster_name,
@@ -305,17 +306,19 @@ class UpdateController(object):
             except Exception:
                 cls._logger.exception('{0}: Removing the services marked for removal failed'.format(client.ip))
 
-            other_services = set()
-            arakoon_services = set()
-            for restart_order in sorted(component_info.get('services_post_update', {})):
-                for service_name in component_info['services_post_update'][restart_order]:
+            other_services = []
+            arakoon_services = []
+            services_post_update = dict((int(key), value) for key, value in component_info.get('services_post_update', {}).iteritems())
+            for restart_order in sorted(services_post_update):
+                for service_name in services_post_update[restart_order]:
                     if service_name.startswith('ovs-arakoon-'):
-                        arakoon_services.add(service_name)
-                    else:
-                        other_services.add(service_name)
+                        if service_name not in arakoon_services:
+                            arakoon_services.append(service_name)
+                    elif service_name not in other_services:
+                        other_services.append(service_name)
 
-            UpdateController.change_services_state(services=sorted(other_services), ssh_clients=[client], action='restart')
-            for service_name in sorted(arakoon_services):
+            UpdateController.change_services_state(services=other_services, ssh_clients=[client], action='restart')
+            for service_name in arakoon_services:
                 try:
                     cluster_name = ArakoonInstaller.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'ovs-arakoon-'))
                     ip = System.get_my_storagerouter().ip if cluster_name == 'config' else None
@@ -496,7 +499,7 @@ class UpdateController(object):
         for storagerouter in StorageRouterList.get_storagerouters():
             cls._logger.debug('StorageRouter {0}: Updating packages'.format(storagerouter.ip))
             try:
-                client = SSHClient(endpoint=storagerouter, username='root')
+                client = SSHClient(endpoint=storagerouter.ip, username='root')
             except UnableToConnectException:
                 cls._logger.exception('StorageRouter {0}: Updating packages failed'.format(storagerouter.ip))
                 abort = True
@@ -519,9 +522,7 @@ class UpdateController(object):
         :rtype: NoneType
         """
         UpdateController._logger.info('+++ Starting update +++')
-        GenericController.refresh_package_information()  # Not in try - except, because we don't want to start updating if we can't even refresh the update information
 
-        # These prerequisites are refreshed by 'refresh_package_information' and also check whether all StorageRouters are online
         for component, info in UpdateController.merge_downtime_information().iteritems():
             if component in components and len(info['prerequisites']) > 0:
                 raise Exception('Not all prerequisites have been met to update component {0}'.format(component))
@@ -572,11 +573,11 @@ class UpdateController(object):
             abort |= UpdateController._package_install_cluster(components=components)  # Install packages on StorageRouters
 
             # Install packages on plugins (ALBA, iSCSI, ...)
-            for _function in package_install_plugins:
+            for fct in package_install_plugins:
                 try:
-                    abort |= _function(components=components)
+                    abort |= fct(components=components)
                 except Exception:
-                    UpdateController._logger.exception('Package installation hook {0} failed'.format(_function.__name__))
+                    UpdateController._logger.exception('Package installation hook {0} failed'.format(fct.__name__))
 
             if abort is True:
                 raise Exception('Installing the packages failed on 1 or more nodes')
@@ -637,18 +638,18 @@ class UpdateController(object):
             for client in ssh_clients:
                 UpdateController._logger.info('{0}: Executing post-update actions'.format(client.ip))
                 with remote(client.ip, [Toolbox]) as rem:
-                    for _function in rem.Toolbox.fetch_hooks('update', 'post_update_multi'):
+                    for fct in rem.Toolbox.fetch_hooks(component='update', sub_component='post_update_multi'):
                         try:
-                            _function(client=client, components=components)
-                        except Exception as ex:
-                            UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, _function.__name__, ex))
+                            fct(client=client, components=components)
+                        except Exception:
+                            UpdateController._logger.exception('{0}: Post update hook {1} failed'.format(client.ip, fct.__name__))
 
             with remote(local_ip, [Toolbox]) as rem:
-                for _function in rem.Toolbox.fetch_hooks('update', 'post_update_single'):
+                for fct in rem.Toolbox.fetch_hooks(component='update', sub_component='post_update_single'):
                     try:
-                        _function(components=components)
-                    except Exception as ex:
-                        UpdateController._logger.exception('Post update hook {0} failed with error: {1}'.format(_function.__name__, ex))
+                        fct(components=components)
+                    except Exception:
+                        UpdateController._logger.exception('Post update hook {0} failed'.format(fct.__name__))
 
             # Start services
             UpdateController.change_services_state(services=services_stop_start,
