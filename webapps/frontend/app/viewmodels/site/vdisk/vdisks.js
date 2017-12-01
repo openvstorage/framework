@@ -64,47 +64,41 @@ define([
             }));
         };
 
-        self.loadVDisks = function(options) {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
-                    options.sort = 'devicename';
-                    options.contents = '_dynamics,_relations,-snapshots';
-                    // options.query = JSON.stringify(self.query);
-                    self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
-                        .done(function(data) {
-                            deferred.resolve({
-                                data: data,
-                                loader: function(guid) {
-                                    return new VDisk(guid);
-                                },
-                                dependencyLoader: function(item) {
-                                    var sr, pool,
-                                        storageRouterGuid = item.storageRouterGuid(),
-                                        vPoolGuid = item.vpoolGuid();
-                                    if (storageRouterGuid && (item.storageRouter() === undefined || item.storageRouter().guid() !== storageRouterGuid)) {
-                                        if (!self.storageRouterCache.hasOwnProperty(storageRouterGuid)) {
-                                            sr = new StorageRouter(storageRouterGuid);
-                                            sr.load('');
-                                            self.storageRouterCache[storageRouterGuid] = sr;
-                                        }
-                                        item.storageRouter(self.storageRouterCache[storageRouterGuid]);
-                                    }
-                                    if (vPoolGuid && (item.vpool() === undefined || item.vpool().guid() !== vPoolGuid)) {
-                                        if (!self.vPoolCache.hasOwnProperty(vPoolGuid)) {
-                                            pool = new VPool(vPoolGuid);
-                                            pool.load('');
-                                            self.vPoolCache[vPoolGuid] = pool;
-                                        }
-                                        item.vpool(self.vPoolCache[vPoolGuid]);
-                                    }
+        self.pageVdisks = function(options) {
+            options.sort = 'devicename';
+            options.contents = '_dynamics,_relations,-snapshots';
+            // options.query = JSON.stringify(self.query);
+            return api.get('vdisks', { queryparams: options })
+                .then(function(data) {
+                    // Return resolvable data for the pager
+                    return {
+                        data: data,
+                        loader: function(guid) {
+                            return new VDisk(guid);
+                        },
+                        dependencyLoader: function(item) {
+                            var sr, pool,
+                                storageRouterGuid = item.storageRouterGuid(),
+                                vPoolGuid = item.vpoolGuid();
+                            if (storageRouterGuid && (item.storageRouter() === undefined || item.storageRouter().guid() !== storageRouterGuid)) {
+                                if (!self.storageRouterCache.hasOwnProperty(storageRouterGuid)) {
+                                    sr = new StorageRouter(storageRouterGuid);
+                                    sr.load('');
+                                    self.storageRouterCache[storageRouterGuid] = sr;
                                 }
-                            });
-                        })
-                        .fail(function() { deferred.reject(); });
-                } else {
-                    deferred.resolve();
-                }
-            }).promise();
+                                item.storageRouter(self.storageRouterCache[storageRouterGuid]);
+                            }
+                            if (vPoolGuid && (item.vpool() === undefined || item.vpool().guid() !== vPoolGuid)) {
+                                if (!self.vPoolCache.hasOwnProperty(vPoolGuid)) {
+                                    pool = new VPool(vPoolGuid);
+                                    pool.load('');
+                                    self.vPoolCache[vPoolGuid] = pool;
+                                }
+                                item.vpool(self.vPoolCache[vPoolGuid]);
+                            }
+                        }
+                    };
+                })
         };
 
         // Durandal

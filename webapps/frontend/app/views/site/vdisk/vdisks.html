@@ -33,7 +33,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
         </div>
     </div>
-    <div data-bind="pager: { loadData: loadVDisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true, query: vdisk_search }">
+    <div data-bind="pager: { loadData: pageVdisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true, query: vdisk_search }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
                 <td style="position: relative;">
