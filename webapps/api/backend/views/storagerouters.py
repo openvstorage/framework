@@ -24,7 +24,6 @@ from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
 from api.backend.serializers.serializers import FullSerializer
-from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain

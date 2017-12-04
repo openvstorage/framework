@@ -151,27 +151,6 @@ define([
             return field
         };
 
-        var testQueryBuilder = function() {
-            var defaultField = 'guid';
-            var fieldMap = {};
-            var tests = [['', []],
-                ['test', [['guid', 'EQUALS', 'test']]],
-                ['test:IN"test"', [['test', 'IN', 'test']]],
-                ['"test":!=test', [['test', 'NOT_EQUALS', 'test']]],
-                ['test', [['test', 'EQUALS', 'test'], ['guid', 'EQUALS', 'test']], {items: [['test', 'EQUALS', 'test']]}]
-            ];
-            $.each(tests, function(index, testCase){
-                var defaultQuery;
-                if (testCase.length === 3) {
-                    defaultQuery = testCase[2]
-                }
-                var query = buildQuery(testCase[0], defaultField, fieldMap, defaultQuery);
-                if (generic.objectEquals(query.items, testCase[1]) === false) {
-                    throw new Error(query.items.toString() + testCase[1].toString())
-                }
-            })
-        };
-
         var cleanQuotes = function(text) {
             // Slicing is faster than regex :)
             if (text.startsWith("'") || text.startsWith('"')) {
@@ -199,12 +178,16 @@ define([
             if (!settings.hasOwnProperty('query')) {
                 throw 'Query should be specified'
             }
-            self.defaultQuery = settings['defaultQuery'];
             self._query = settings['query'];
+            self.defaultQuery = generic.tryGet(settings, 'defaultQuery', undefined);
             self.defaultField = generic.tryGet(settings, 'defaultField', null);
-            self.placeholder(generic.tryGet(settings, 'placeholder', ''));
             self.width(generic.tryGet(settings, 'width', '20em'));
+
             $.extend(self.fieldMap, generic.tryGet(settings, 'fieldMap', {}));
+
+            if (settings.hasOwnProperty('placeholder')) { self.placeholder($.t(settings.placeholder)) }
+            else { self.placeholder('') }
+
         };
 
     };

@@ -55,7 +55,7 @@ define([
 
         // Observables
         self.runningVPool = ko.observable(false);
-        self.vdisk_search = ko.observable();
+        self.vdiskSearch = ko.observable();
 
         // Functions
         self.addVDisk = function() {
@@ -67,7 +67,6 @@ define([
         self.pageVdisks = function(options) {
             options.sort = 'devicename';
             options.contents = '_dynamics,_relations,-snapshots';
-            // options.query = JSON.stringify(self.query);
             return api.get('vdisks', { queryparams: options })
                 .then(function(data) {
                     // Return resolvable data for the pager

@@ -23,7 +23,6 @@ from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import return_object, return_list, load, required_roles, log
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backendtype import BackendType
-from ovs.dal.datalist import DataList
 
 
 class BackendTypeViewSet(viewsets.ViewSet):

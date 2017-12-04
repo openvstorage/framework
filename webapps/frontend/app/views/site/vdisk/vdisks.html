@@ -23,9 +23,9 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <div class="col-lg-8">
                 <div class="pull-right h2">
-                    <div data-bind="searchbar: { query: vdisk_search, defaultField: 'name', placeholder: 'Search vdisks', defaultQuery: query}" style="display: inline-block;"></div>
+                    <div data-bind="searchbar: { query: vdiskSearch, defaultField: 'name', placeholder: 'ovs:vdisks.search', defaultQuery: query}" style="display: inline-block;"></div>
                     <button class="btn btn-default" id="buttonAddVdisk"
-                        data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && runningVPool()">
+                            data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && runningVPool()">
                         <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
                         <span data-i18n="ovs:vdisks.add"></span>
                     </button>
@@ -33,7 +33,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
         </div>
     </div>
-    <div data-bind="pager: { loadData: pageVdisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true, query: vdisk_search }">
+    <div data-bind="pager: { loadData: pageVdisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true, query: vdiskSearch }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
                 <td style="position: relative;">

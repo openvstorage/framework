@@ -33,8 +33,6 @@ from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
 
-from ovs.extensions.generic.logger import Logger
-
 
 class VDiskViewSet(viewsets.ViewSet):
     """
