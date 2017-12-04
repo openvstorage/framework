@@ -685,6 +685,7 @@
             "success": "Save complete",
             "success_msg": "The configuration details for __what__ are saved."
         },
+        "search": "Search vDisks",
         "set_as_template": {
             "failed_msg": "Converting vDisk __what__ into vTemplate failed: __why__",
             "no": "Close",
