@@ -28,6 +28,7 @@ define([
         self.key                = undefined;
         self.viewportCache      = {};
         self.progressiveTracker = {};
+        self.requests           = {};
         self.querySubscription  = undefined;
 
         // Observables
@@ -272,52 +273,66 @@ define([
                 self._pageFirst(self.viewportCache[page].pageFirst);
                 self._pageLast(self.viewportCache[page].pageLast);
             }
-            // @todo keep track of ajax calls and abort on query changes
-            return self.loadData(options)
-                .then(function (dataset) {
-                    if (dataset !== undefined && (preload || page === self.current())) {
-                        var keys = [], idata = {}, maxPage = dataset.data._paging.max_page;
-                        $.each(dataset.data.data, function (index, item) {
-                            keys.push(item[self.key]);
-                            idata[item[self.key]] = item;
-                        });
-                        if (page > maxPage) {
-                            self.viewportCache = {};
-                            self.internalCurrent(maxPage);
-                            page = maxPage;
-                        }
-                        self.viewportCache[page] = {
-                            keys: keys,
-                            totalItems: dataset.data._paging.total_items,
-                            lastPage: dataset.data._paging.max_page,
-                            pageFirst: dataset.data._paging.start_number,
-                            pageLast: dataset.data._paging.end_number
-                        };
-                        if (!preload) {
-                            self._totalItems(self.viewportCache[page].totalItems);
-                            self._lastPage(self.viewportCache[page].lastPage);
-                            self._pageFirst(self.viewportCache[page].pageFirst);
-                            self._pageLast(self.viewportCache[page].pageLast);
-                            self.viewportKeys(self.viewportCache[page].keys);
-                        }
-                        generic.crossFiller(keys, self.container(), dataset.loader, self.key, false);
-                        $.each(self.container()(), function (index, item) {
-                            if ($.inArray(item[self.key](), keys) !== -1 && (self.skipOn === undefined || !item[self.skipOn]())) {
-                                item.fillData(idata[item[self.key]()]);
-                                if (dataset.dependencyLoader !== undefined) {
-                                    dataset.dependencyLoader(item);
-                                }
+            var request = self.requests[page];
+            var requestChanged = !!(request && !generic.objectEquals(options, request['options']));
+            // Keep a copy of the supplied options as the loadData function might edit them
+            // (should be resolve in the passed loadData function, offload it all to the pager)
+            var suppliedOptions = $.extend({}, options);
+            if (requestChanged || generic.xhrCompleted(request)) {
+                if (requestChanged && !generic.xhrCompleted(request)) {
+                    generic.xhrAbort(request['request'])
+                }
+                request = self.loadData(options)
+                    .then(function (dataset) {
+                        if (dataset !== undefined && (preload || page === self.current())) {
+                            var keys = [], idata = {}, maxPage = dataset.data._paging.max_page;
+                            $.each(dataset.data.data, function (index, item) {
+                                keys.push(item[self.key]);
+                                idata[item[self.key]] = item;
+                            });
+                            if (page > maxPage) {
+                                self.viewportCache = {};
+                                self.internalCurrent(maxPage);
+                                page = maxPage;
                             }
-                            item.loading(false);
-                        });
-                        if (dataset.overviewLoader !== undefined) {
-                            dataset.overviewLoader(keys);
+                            self.viewportCache[page] = {
+                                keys: keys,
+                                totalItems: dataset.data._paging.total_items,
+                                lastPage: dataset.data._paging.max_page,
+                                pageFirst: dataset.data._paging.start_number,
+                                pageLast: dataset.data._paging.end_number
+                            };
+                            if (!preload) {
+                                self._totalItems(self.viewportCache[page].totalItems);
+                                self._lastPage(self.viewportCache[page].lastPage);
+                                self._pageFirst(self.viewportCache[page].pageFirst);
+                                self._pageLast(self.viewportCache[page].pageLast);
+                                self.viewportKeys(self.viewportCache[page].keys);
+                            }
+                            generic.crossFiller(keys, self.container(), dataset.loader, self.key, false);
+                            $.each(self.container()(), function (index, item) {
+                                if ($.inArray(item[self.key](), keys) !== -1 && (self.skipOn === undefined || !item[self.skipOn]())) {
+                                    item.fillData(idata[item[self.key]()]);
+                                    if (dataset.dependencyLoader !== undefined) {
+                                        dataset.dependencyLoader(item);
+                                    }
+                                }
+                                item.loading(false);
+                            });
+                            if (dataset.overviewLoader !== undefined) {
+                                dataset.overviewLoader(keys);
+                            }
                         }
-                    }
-                })
-                .always(function () {
-                    self.pageLoading(false);
-                })
+                    })
+                    .always(function () {
+                        self.pageLoading(false);
+                    });
+                self.requests[page] = {
+                    'request': request,
+                    'options': suppliedOptions
+                };
+            }
+            return self.requests[page]['request'];
         };
         self.sort = function(data, event) {
             if (self.sortable() === false) {
@@ -417,8 +432,10 @@ define([
             self.refresher.start();
 
             // Enable query functionality
-            self.querySubscription = app.on('query:update').then(function(){
-                self.refresher.run();
+            self.querySubscription = app.on('query:update')
+                .then(function(query){
+                    self.query(query);
+                    self.refresher.run();
             });
 
             settings.bindingContext.$root.widgets.push(self);

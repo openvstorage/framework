@@ -163,7 +163,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         return allKeys;
     }
     function xhrAbort(token) {
-        if (token !== undefined && token.state() === 'pending') {
+        if (token !== undefined && token.state && token.state() === 'pending') {
             try {
                 token.abort();
             } catch (error) {
@@ -172,7 +172,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         }
     }
     function xhrCompleted(token) {
-        return !(token !== undefined && token.state() === 'pending');
+        return !(token !== undefined && token.state && token.state() === 'pending');
     }
     function removeElement(array, element) {
         var index = array.indexOf(element);

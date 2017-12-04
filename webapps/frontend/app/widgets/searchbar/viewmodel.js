@@ -15,9 +15,17 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic'
-], function($, ko, generic) {
+    'durandal/app', 'jquery', 'knockout', 'ovs/generic'
+], function(app, $, ko, generic) {
     "use strict";
+
+    /**
+     *  Constructor for a search bar object
+     *  Please note that using this search bar requires some change to the loading functions passed to the pager
+     *  The loading functions need to return an ajax call so aborting can occur
+     *  This search bar will emit an event when the query is updated (event: query:update) and the pager will listen on these events
+     *  See vdisks for an example
+     */
     return function() {
         var self = this;
 
@@ -39,9 +47,21 @@ define([
 
         // Observables
         self.search =       ko.observable("");
-        self.query =        ko.observable();
+        self._query =       ko.observable();
         self.placeholder =  ko.observable("");
         self.width =        ko.observable("20em");
+
+        // Computed
+        self.query = ko.computed({
+            // Computed for easier subscription management
+            read: function() {
+                return self._query()
+            },
+            write: function(query) {
+                self._query(query);
+                app.trigger('query:update', query)  // Notify subscribers
+            }
+        });
 
         // Functions
         /**
@@ -180,7 +200,7 @@ define([
                 throw 'Query should be specified'
             }
             self.defaultQuery = settings['defaultQuery'];
-            self.query = settings['query'];
+            self._query = settings['query'];
             self.defaultField = generic.tryGet(settings, 'defaultField', null);
             self.placeholder(generic.tryGet(settings, 'placeholder', ''));
             self.width(generic.tryGet(settings, 'width', '20em'));
