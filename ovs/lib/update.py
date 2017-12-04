@@ -257,14 +257,22 @@ class UpdateController(object):
 
     @classmethod
     @add_hooks('update', 'post_update_single')
-    def _post_update_async_migrator(cls, components=None):
-        _ = components
+    def _post_update_migrator(cls, components=None):
+        """
+        Execute the migration code for the 'framework' component
+        """
+        if PackageFactory.COMP_FWK not in components:
+            return
+
         try:
             # noinspection PyUnresolvedReferences
             from ovs.lib.migration import MigrationController
-            MigrationController.migrate.s().apply_async(countdown=30)
+            cls._logger.debug('Executing migration code: MigrationController.migrate()')
+            MigrationController.migrate()
         except ImportError:
             cls._logger.error('Could not import MigrationController.')
+        except Exception:
+            cls._logger.exception('Migration code for the framework failed to be executed')
 
     @classmethod
     @add_hooks('update', 'post_update_multi')

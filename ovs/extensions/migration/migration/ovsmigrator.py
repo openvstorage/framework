@@ -90,22 +90,6 @@ class OVSMigrator(object):
                         except:
                             continue
 
-                # Storing actual package name in version files
-                voldrv_pkg_name, _ = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
-                for file_name in local_client.file_list(directory=ServiceFactory.RUN_FILE_DIR):
-                    if not file_name.endswith('.version'):
-                        continue
-                    file_path = '{0}/{1}'.format(ServiceFactory.RUN_FILE_DIR, file_name)
-                    contents = local_client.file_read(filename=file_path)
-                    if voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER:
-                        if 'volumedriver-server' in contents:
-                            contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER)
-                            local_client.file_write(filename=file_path, contents=contents)
-                    elif voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER_EE:
-                        if 'volumedriver-server' in contents or PackageFactory.PKG_VOLDRV_SERVER in contents:
-                            contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER_EE)
-                            contents = contents.replace(PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE)
-                            local_client.file_write(filename=file_path, contents=contents)
             except:
                 OVSMigrator._logger.exception('Error occurred while executing the migration code')
                 # Don't update migration version with latest version, resulting in next migration trying again to execute this code

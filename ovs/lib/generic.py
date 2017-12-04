@@ -583,7 +583,7 @@ class GenericController(object):
                 # We make use of these clients in Threads --> cached = False
                 client_map[storagerouter] = SSHClient(endpoint=storagerouter, username='root', cached=False)
             except (NotAuthenticatedException, UnableToConnectException):
-                GenericController._logger.debug('StorageRouter {0} is inaccessible'.format(storagerouter.ip))
+                GenericController._logger.warning('StorageRouter {0} is inaccessible'.format(storagerouter.ip))
                 prerequisites.append(['node_down', storagerouter.name])
                 package_info_cluster[storagerouter.ip]['errors'] = ['StorageRouter {0} is inaccessible'.format(storagerouter.name)]
 
@@ -635,8 +635,10 @@ class GenericController(object):
             update_info = update_info_cluster.get(storagerouter.ip, {})
 
             # Remove the errors from the update information
-            if 'errors' in update_info:
-                errors.update(['{0}: {1}'.format(storagerouter.ip, error) for error in update_info.pop('errors')])
+            sr_errors = update_info.pop('errors', [])
+            if len(sr_errors) > 0:
+                errors.update(['{0}: {1}'.format(storagerouter.ip, error) for error in sr_errors])
+                update_info = {}  # If any error occurred, we store no update information for this StorageRouter
 
             # Remove the components without updates from the update information
             update_info_copy = copy.deepcopy(update_info)
