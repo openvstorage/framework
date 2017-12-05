@@ -228,7 +228,7 @@ class DataList(object):
         :rtype: NoneType
         :raises: ValueError if the guids are not valid
         """
-        if guids is None or (isinstance(guids, list) and (len(guids) > 0 and all((isinstance(guid, basestring) for guid in guids)))):
+        if guids is None or (isinstance(guids, list) and all((isinstance(guid, basestring) for guid in guids))):
             return
         raise ValueError('Specified guids should be a list of guids or None')
 
