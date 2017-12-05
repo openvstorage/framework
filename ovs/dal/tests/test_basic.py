@@ -584,16 +584,16 @@ class Basic(unittest.TestCase):
         self.assertEqual(disks[2].name, 'disk_5', 'Disk should be properly sorted')
 
     def test_list_init(self):
-        for guid_list in [[], [1], {}, 1, '']:
+        for guid_list in [[1], {}, 1, '']:
             with self.assertRaises(ValueError):
-                dlist = DataList(TestMachine, guids=guid_list)
+                DataList(TestMachine, guids=guid_list)
         for query in [[], [1], {}, 1, '']:
             with self.assertRaises(ValueError):
-                dlist = DataList(TestMachine, query=query)
+                DataList(TestMachine, query=query)
         # Also tests query/query = None
-        dlist = DataList(TestMachine, query={'type': DataList.where_operator.AND,
-                                             'items': [('name', DataList.operator.EQUALS, 'machine')]})
-        dlist = DataList(TestMachine, guids=['123'])
+        DataList(TestMachine, query={'type': DataList.where_operator.AND,
+                                     'items': [('name', DataList.operator.EQUALS, 'machine')]})
+        DataList(TestMachine, guids=['123'])
         dlist = DataList(TestMachine, key='my_key')
         self.assertEqual(dlist._key, 'ovs_list_my_key')
 
