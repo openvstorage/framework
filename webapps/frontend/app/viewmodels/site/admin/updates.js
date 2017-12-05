@@ -196,8 +196,8 @@ define([
                             });
                             self.storageNodes(sdmNodes);
                             // Sort nodes by IP
-                            self.storageNodes.sort(function(sn1, sn2) {
-                                return sn1.ip < sn2.ip ? -1 : 1;
+                            self.storageNodes.sort(function(node1, node2) {
+                                return generic.ipSort(node1.ip, node2.ip);
                             });
                             deferred.resolve();
                         })
