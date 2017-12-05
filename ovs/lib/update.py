@@ -104,7 +104,7 @@ class UpdateController(object):
             * Prerequisites that have not been met                                  -> 'prerequisites'
 
         Verify whether all relevant services have the correct binary active
-        Whether a service has the correct binary version in use, we use the ServiceFactory.verify_restart_required functionality
+        Whether a service has the correct binary version in use, we use the ServiceFactory.get_service_update_versions functionality
         When a service has an older binary version running, we add this information to the 'update_info'
 
         This combined information is then stored in the 'package_information' of the StorageRouter DAL object
@@ -165,7 +165,7 @@ class UpdateController(object):
                             cls._logger.debug('StorageRouter {0}: Validating Arakoon cluster {1}'.format(client.ip, internal_cluster_name))
                             actual_cluster_name = ArakoonInstaller.get_cluster_name(internal_name=internal_cluster_name)
                             arakoon_service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=actual_cluster_name)
-                            arakoon_service_version = ServiceFactory.verify_restart_required(client=client, service_name=arakoon_service_name, binary_versions=binaries)
+                            arakoon_service_version = ServiceFactory.get_service_update_versions(client=client, service_name=arakoon_service_name, binary_versions=binaries)
                             cls._logger.debug('StorageRouter {0}: Arakoon service information for service {1}: {2}'.format(client.ip, arakoon_service_name, arakoon_service_version))
 
                             if package_name in pkg_component_info or arakoon_service_version is not None:
@@ -191,7 +191,7 @@ class UpdateController(object):
                             if package_name in [PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE]:
                                 for prefix, importance in {'dtl': 20, 'volumedriver': 10}.iteritems():
                                     sd_service_name = '{0}_{1}'.format(prefix, vpool_name)
-                                    sd_service_version = ServiceFactory.verify_restart_required(client=client, service_name=sd_service_name, binary_versions=binaries)
+                                    sd_service_version = ServiceFactory.get_service_update_versions(client=client, service_name=sd_service_name, binary_versions=binaries)
                                     cls._logger.debug('StorageRouter {0}: Service {1} is running version {2}'.format(client.ip, sd_service_name, sd_service_version))
                                     if package_name in pkg_component_info or sd_service_version is not None:
                                         cls._logger.debug('StorageRouter {0}: Added service {1} to post-update services'.format(client.ip, sd_service_name))
