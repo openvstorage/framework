@@ -17,9 +17,10 @@
 """
 StorageDriver module
 """
-import time
+
 import copy
 import json
+import time
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -37,14 +38,14 @@ from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInst
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
-from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
-from ovs.lib.helpers.toolbox import Toolbox
+from ovs.extensions.generic.system import System
+from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
-from ovs.extensions.generic.system import System
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
-from ovs.lib.helpers.toolbox import Schedule
+from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vpool import VPoolController
 from volumedriver.storagerouter import VolumeDriverEvents_pb2
@@ -912,6 +913,9 @@ class StorageDriverController(object):
         root_client = SSHClient(storagerouter, username='root')
         client = SSHClient(storagerouter)
 
+        alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
+        voldrv_pkg_name, voldrv_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
+
         storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
         storagedriver_partition_dtl = next(StorageDriverController.get_partitions_by_role(storagedriver_guid, DiskPartition.ROLES.DTL))
         # Configurations are already in place at this point
@@ -925,12 +929,16 @@ class StorageDriverController(object):
                      'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
                      'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
                      'LOG_SINK': Logger.get_sink_path('storagedriver_{0}'.format(storagedriver.storagedriver_id)),
+                     'VOLDRV_PKG_NAME': voldrv_pkg_name,
+                     'VOLDRV_VERSION_CMD': voldrv_version_cmd,
                      'METADATASTORE_BITS': 5}
         dtl_params = {'DTL_PATH': storagedriver_partition_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,
                       'DTL_PORT': str(storagedriver.ports['dtl']),
                       'DTL_TRANSPORT': StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport],
-                      'LOG_SINK': Logger.get_sink_path('storagedriver-dtl_{0}'.format(storagedriver.storagedriver_id))}
+                      'LOG_SINK': Logger.get_sink_path('storagedriver-dtl_{0}'.format(storagedriver.storagedriver_id)),
+                      'VOLDRV_PKG_NAME': voldrv_pkg_name,
+                      'VOLDRV_VERSION_CMD': voldrv_version_cmd}
 
         sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
@@ -948,7 +956,9 @@ class StorageDriverController(object):
             for proxy in storagedriver.alba_proxies:
                 alba_proxy_params = {'VPOOL_NAME': vpool.name,
                                      'LOG_SINK': Logger.get_sink_path(proxy.service.name),
-                                     'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid))}
+                                     'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid)),
+                                     'ALBA_PKG_NAME': alba_pkg_name,
+                                     'ALBA_VERSION_CMD': alba_version_cmd}
                 alba_proxy_service = 'ovs-{0}'.format(proxy.service.name)
                 service_manager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client,
                                             target_name=alba_proxy_service)

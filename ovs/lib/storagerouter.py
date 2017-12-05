@@ -34,7 +34,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient
-from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.logger import Logger
@@ -481,9 +481,6 @@ class StorageRouterController(object):
         supports_block_cache = 'block-cache' in features['alba']['features']
         if supports_block_cache is False and (block_cache_on_read is True or block_cache_on_write is True):
             raise RuntimeError('Block cache is not a supported feature')
-
-        alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
-        voldrv_pkg_name, voldrv_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
 
         ################
         # CREATE VPOOL #
