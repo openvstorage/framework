@@ -25,6 +25,7 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.packages.packagefactory import PackageFactory
 
 
 class StorageRouter(DataObject):
@@ -162,7 +163,7 @@ class StorageRouter(DataObject):
             client = SSHClient(self, username='root')
             enterprise_regex = re.compile('^(?P<edition>ee-)?(?P<version>.*)$')
 
-            version = client.run("volumedriver_fs --version | grep version: | awk '{print $2}'", allow_insecure=True, allow_nonzero=True)
+            version = client.run(command=PackageFactory.VERSION_CMD_SD, allow_insecure=True, allow_nonzero=True)
             volumedriver_version = enterprise_regex.match(version).groupdict()
             volumedriver_edition = enterprise if volumedriver_version['edition'] == 'ee-' else community
             volumedriver_version_lv = LooseVersion(volumedriver_version['version'])
@@ -171,7 +172,7 @@ class StorageRouter(DataObject):
                                      if volumedriver_version_lv >= LooseVersion(version[0])
                                      and (version[1] is None or version[1] == volumedriver_edition)]
 
-            version = client.run("alba version --terse", allow_insecure=True, allow_nonzero=True)
+            version = client.run(command=PackageFactory.VERSION_CMD_ALBA, allow_insecure=True, allow_nonzero=True)
             alba_version = enterprise_regex.match(version).groupdict()
             alba_edition = enterprise if alba_version['edition'] == 'ee-' else community
             alba_version_lv = LooseVersion(alba_version['version'])

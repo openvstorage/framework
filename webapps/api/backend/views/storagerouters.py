@@ -24,7 +24,6 @@ from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
 from api.backend.serializers.serializers import FullSerializer
-from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
@@ -56,18 +55,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'manage'])
     @return_list(StorageRouter, 'name')
     @load()
-    def list(self, query=None):
+    def list(self):
         """
         Overview of all StorageRouters
-        :param query: A query to filter the StorageRouters
-        :type query: DataQuery
         :return: List of StorageRouters
         :rtype: list[ovs.dal.hybrids.storagerouter.StorageRouter]
         """
-        if query is None:
-            return StorageRouterList.get_storagerouters()
-        else:
-            return DataList(StorageRouter, query)
+        return StorageRouterList.get_storagerouters()
 
     @log()
     @required_roles(['read', 'manage'])
@@ -358,7 +352,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         call_parameters['config_params'].pop('cache_strategy', None)
 
         # Finally, launching the add_vpool task
-        return StorageRouterController.add_vpool.delay(call_parameters)
+        return StorageRouterController.add_vpool.delay(StorageRouterController, call_parameters)
 
     @link()
     @log()

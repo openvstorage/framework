@@ -287,6 +287,7 @@ class Authentication(unittest.TestCase):
         self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'unauthorized_client', HttpBadRequestException)
 
         time.sleep(180)
+        # Test default expiration
         data.update({'username': 'admin',
                      'password': 'admin'})
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
@@ -294,9 +295,23 @@ class Authentication(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         response_content = json.loads(response.content)
         self.assertIn('access_token', response_content)
+
         result = {'access_token': response_content['access_token'],
                   'token_type': 'bearer',
-                  'expires_in': 86400}
+                  'expires_in': OAuth2Toolbox.EXPIRATION_USER}
+        self.assertDictEqual(response_content, result)
+
+        # Test config changed expiration
+        week_expiration = 60 * 60 * 24 * 7
+        Configuration.set('ovs/framework/api/oauth|expiration_user', week_expiration)
+        request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
+        response = OAuth2TokenView.as_view()(request)
+        self.assertEqual(response.status_code, 200)
+        response_content = json.loads(response.content)
+        self.assertIn('access_token', response_content)
+        result = {'access_token': response_content['access_token'],
+                  'token_type': 'bearer',
+                  'expires_in': week_expiration}
         self.assertDictEqual(response_content, result)
 
     def test_client_credentials(self):
@@ -346,6 +361,7 @@ class Authentication(unittest.TestCase):
         self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'invalid_client', HttpBadRequestException)
 
         time.sleep(180)
+        # Test default expiration
         header = 'Basic {0}'.format(base64.encodestring('{0}:{1}'.format(admin_client.guid, admin_client.client_secret)))
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.6', HTTP_AUTHORIZATION=header)
         response = OAuth2TokenView.as_view()(request)
@@ -354,7 +370,20 @@ class Authentication(unittest.TestCase):
         self.assertIn('access_token', response_content)
         result = {'access_token': response_content['access_token'],
                   'token_type': 'bearer',
-                  'expires_in': 3600}
+                  'expires_in': OAuth2Toolbox.EXPIRATION_CLIENT}
+        self.assertDictEqual(response_content, result)
+
+        # Test config expiration
+        day_expiration = 60 * 60 * 24 * 1
+        Configuration.set('ovs/framework/api/oauth|expiration_client', day_expiration)
+        request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.6', HTTP_AUTHORIZATION=header)
+        response = OAuth2TokenView.as_view()(request)
+        self.assertEqual(response.status_code, 200)
+        response_content = json.loads(response.content)
+        self.assertIn('access_token', response_content)
+        result = {'access_token': response_content['access_token'],
+                  'token_type': 'bearer',
+                  'expires_in': day_expiration}
         self.assertDictEqual(response_content, result)
 
     def test_specify_scopes(self):

@@ -703,6 +703,7 @@
             "title": "Scrub vDisk __vdisk__",
             "title_message": "Are you sure you want to scrub vDisk __vdisk__?"
         },
+        "search": "Search vDisks",
         "set_as_template": {
             "failed_msg": "Converting vDisk __what__ into vTemplate failed: __why__",
             "no": "Close",
@@ -1285,7 +1286,6 @@
                 "gui": "GUI",
                 "none": "No components will experience downtime",
                 "ovsdb": "Model",
-                "proxy": "Proxy service for vPool",
                 "voldrv": "Storage Driver Registry"
             },
             "failure": "Update failed to launch: __why__",

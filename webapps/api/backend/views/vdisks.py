@@ -47,15 +47,13 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'manage'])
     @return_list(VDisk)
     @load()
-    def list(self, vpoolguid=None, storagerouterguid=None, query=None):
+    def list(self, vpoolguid=None, storagerouterguid=None):
         """
         Overview of all vDisks
         :param vpoolguid: Guid of the vPool to retrieve its disks
         :type vpoolguid: str
         :param storagerouterguid: Guid of the StorageRouter to retrieve its disks
         :type storagerouterguid: str
-        :param query: A query to be executed if required
-        :type query: DataQuery
         :return: List of vDisks matching the parameters specified
         :rtype: list[ovs.dal.hybrids.vdisk.VDisk]
         """
@@ -68,9 +66,6 @@ class VDiskViewSet(viewsets.ViewSet):
                                       'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
         else:
             vdisks = VDiskList.get_vdisks()
-        if query is not None:
-            query_vdisk_guids = DataList(VDisk, query).guids
-            vdisks = [vdisk for vdisk in vdisks if vdisk.guid in query_vdisk_guids]
         return vdisks
 
     @log()

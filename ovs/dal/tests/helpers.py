@@ -132,6 +132,8 @@ class DalHelper(object):
                  'storagerouter_domains': []}  # (<id>, <storagerouter_id>, <domain_id>)
             )
         """
+        Configuration.set(key='/ovs/framework/edition/', value='enterprise')
+
         if previous_structure is None:
             previous_structure = {}
         vdisks = previous_structure.get('vdisks', {})

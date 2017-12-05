@@ -34,8 +34,8 @@ class SSHClient(_SSHClient):
     def __init__(self, endpoint, username='ovs', password=None, cached=True, timeout=None):
         """
         Initializes an SSHClient
-        :param endpoint: Ip address to connect to / storagerouter
-        :type endpoint: basestring | ovs.dal.hybrids.storagerouter.StorageRouter
+        :param endpoint: Ip address to connect to / storagerouter object
+        :type endpoint: basestring / ovs.dal.hybrids.storagerouter.StorageRouter
         :param username: Name of the user to connect as
         :type username: str
         :param password: Password to authenticate the user as. Can be None when ssh keys are in place.

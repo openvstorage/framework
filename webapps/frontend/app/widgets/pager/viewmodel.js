@@ -15,9 +15,9 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout',
+    'durandal/app', 'jquery', 'knockout',
     'ovs/generic', 'ovs/refresher'
-], function($, ko, generic, Refresher) {
+], function(app, $, ko, generic, Refresher) {
     "use strict";
     return function() {
         var self = this;
@@ -28,28 +28,32 @@ define([
         self.key                = undefined;
         self.viewportCache      = {};
         self.progressiveTracker = {};
+        self.requests           = {};
+        self.querySubscription  = undefined;
 
         // Observables
-        self.container       = ko.observable(ko.observableArray([]));
-        self.external        = ko.observable(false);
-        self.internalCurrent = ko.observable(1);
         self._totalItems     = ko.observable(0);
         self._lastPage       = ko.observable(1);
         self._pageFirst      = ko.observable(0);
         self._pageLast       = ko.observable(0);
         self._pageSize       = ko.observable(10);
-        self.headers         = ko.observableArray([]);
-        self.settings        = ko.observable({});
-        self.padding         = ko.observable(2);
-        self.progressive     = ko.observable();
+
+        self.container       = ko.observable(ko.observableArray([]));
         self.controls        = ko.observable(true);
-        self.viewportKeys    = ko.observableArray([]);
-        self.viewportItems   = ko.observableArray([]);
+        self.external        = ko.observable(false);
+        self.headers         = ko.observableArray([]);
+        self.internalCurrent = ko.observable(1);
+        self.padding         = ko.observable(2);
         self.pageLoading     = ko.observable(false);
-        self.sortable        = ko.observable(false);
-        self.preloading      = ko.observable(false);
-        self.sorting         = ko.observable({sequence: [], directions: {}});
         self.pageSizes       = ko.observableArray([10, 25, 50, 100]);
+        self.preloading      = ko.observable(false);
+        self.progressive     = ko.observable();
+        self.query           = ko.observable();
+        self.settings        = ko.observable({});
+        self.sortable        = ko.observable(false);
+        self.sorting         = ko.observable({sequence: [], directions: {}});
+        self.viewportItems   = ko.observableArray([]);
+        self.viewportKeys    = ko.observableArray([]);
 
         // Computed
         self.items = ko.computed({
@@ -179,6 +183,10 @@ define([
         });
 
         // Functions
+        /**
+         * Step to the next page
+         * @param next: Page number of the next step
+         */
         self.step = function(next) {
             if (next) {
                 if (self.hasNext()) {
@@ -190,9 +198,20 @@ define([
                 }
             }
         };
+        /**
+         * Load a certain page and handles progression
+         * @param page: Page to load
+         * @param preload: Is the page to load a pre-load (different from the current page)
+         * This is a parameter as the page could change during the computing of whether or not the fetched page is different to the current one
+         * @param progressive: Should the page be loaded progressively. The use for progression is the change the contents whether or not the load
+         * should be progressive. For example: fetching property 'x' of an object takes a minute, but all other properties are instantaneous,
+         * one would fire up a non-progressive load without the property 'x' to display some data at least and afterwards fetch property x
+         * The other properties would already be cached at that point resulting in just computing 'x'
+         * @return {*}
+         */
         self.load = function(page, preload, progressive) {
             if (progressive === true) {
-                if (self.progressive() === 'always' || (self.progressive() === 'initial' && self.progressiveTracker[page] !== true)) {
+                if (['always', 'initial'].contains(self.progressive() && self.progressiveTracker[page] !== true)) {
                     self.progressiveTracker[page] = true;
                     return self._load(page, preload, true)
                         .then(function () {
@@ -202,6 +221,19 @@ define([
             }
             return self._load(page, preload, false)
         };
+        /**
+         * Load the page data
+         * @param page: Page to load
+         * @param preload: Is the page to load a pre-load (different from the current page)
+         * This is a parameter as the page could change during the computing of whether or not the fetched page is different to the current one
+         * @param progressive: Should the page be loaded progressively. The use for progression is the change the contents whether or not the load
+         * should be progressive. For example: fetching property 'x' of an object takes a minute, but all other properties are instantaneous,
+         * one would fire up a non-progressive load without the property 'x' to display some data at least and afterwards fetch property x
+         * The other properties would already be cached at that point resulting in just computing 'x'
+         * This property will be added to the query_params and can be used to determine contents in the loading function
+         * @return {*}
+         * @private
+         */
         self._load = function(page, preload, progressive) {
             var options = {
                 page: page,
@@ -211,30 +243,46 @@ define([
             if (self.sortable()) {
                 options.sort = self.sortingKey()
             }
+            if (self.query()) {
+                options.query = JSON.stringify(self.query())
+            }
             if (self.external()) {
+                // Not using the pagers container
                 self.pageLoading(true);
+                // Create a new chain, the loadData function might not return a promise
                 var chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
-                chainDeferred.resolve();
+                chainDeferred.resolve();  // Kick of the chain
                 chainPromise
-                    .then(function() {
+                    .then(function () {
                         return self.loadData(options);
                     })
-                    .always(function() {
+                    .always(function () {
                         self.pageLoading(false);
                     });
-            } else {
-                self.pageLoading(true);
-                $.each(self.viewportItems(), function (index, item) {
-                    item.loading(true);
-                });
-                if (!preload && self.viewportCache.hasOwnProperty(page)) {
-                    self.viewportKeys(self.viewportCache[page].keys);
-                    self._totalItems(self.viewportCache[page].totalItems);
-                    self._lastPage(self.viewportCache[page].lastPage);
-                    self._pageFirst(self.viewportCache[page].pageFirst);
-                    self._pageLast(self.viewportCache[page].pageLast);
+                return chainDeferred;
+            }
+            // Use the pagers container
+            self.pageLoading(true);
+            $.each(self.viewportItems(), function (index, item) {
+                item.loading(true);
+            });
+            if (!preload && self.viewportCache.hasOwnProperty(page)) {
+                self.viewportKeys(self.viewportCache[page].keys);
+                self._totalItems(self.viewportCache[page].totalItems);
+                self._lastPage(self.viewportCache[page].lastPage);
+                self._pageFirst(self.viewportCache[page].pageFirst);
+                self._pageLast(self.viewportCache[page].pageLast);
+            }
+            var request = self.requests[page];
+            var requestChanged = !!(request && !generic.objectEquals(options, request['options']));
+            // Keep a copy of the supplied options as the loadData function might edit them
+            // (should be resolve in the passed loadData function, offload it all to the pager)
+            var suppliedOptions = $.extend({}, options);
+            if (requestChanged || generic.xhrCompleted(request)) {
+                if (requestChanged && !generic.xhrCompleted(request)) {
+                    generic.xhrAbort(request['request'])
                 }
-                return self.loadData(options)
+                request = self.loadData(options)
                     .then(function (dataset) {
                         if (dataset !== undefined && (preload || page === self.current())) {
                             var keys = [], idata = {}, maxPage = dataset.data._paging.max_page;
@@ -275,12 +323,16 @@ define([
                                 dataset.overviewLoader(keys);
                             }
                         }
-                        self.pageLoading(false);
                     })
-                    .fail(function() {
+                    .always(function () {
                         self.pageLoading(false);
                     });
+                self.requests[page] = {
+                    'request': request,
+                    'options': suppliedOptions
+                };
             }
+            return self.requests[page]['request'];
         };
         self.sort = function(data, event) {
             if (self.sortable() === false) {
@@ -322,24 +374,21 @@ define([
                 throw 'Headers should be specified';
             }
 
-            if (settings.hasOwnProperty('items')) {
-                self.external(true);
-            }
-            if (settings.hasOwnProperty('container')) {
-                self.container(settings.container);
-            } else {
-                self.container(ko.observableArray([]));
-            }
-            self.loadData = generic.tryGet(settings, 'loadData', function() {});
-            self.refresh = parseInt(generic.tryGet(settings, 'refreshInterval', '5000'), 10);
-            self.key = generic.tryGet(settings, 'key', 'guid');
-            self.skipOn = generic.tryGet(settings, 'skipon', undefined);
+            if (settings.hasOwnProperty('items')) { self.external(true); }
+            if (settings.hasOwnProperty('container')) { self.container(settings.container); }
+            else { self.container(ko.observableArray([])); }
             self.settings(settings);
             self.headers(settings.headers);
-            self.preloading(generic.tryGet(settings, 'preloading', false));
-            self.progressive(generic.tryGet(settings, 'progressive', undefined));
+            self.key = generic.tryGet(settings, 'key', 'guid');
             self.controls(generic.tryGet(settings, 'controls', true));
             self.sortable(generic.tryGet(settings, 'sortable', false));
+            self.skipOn = generic.tryGet(settings, 'skipon', undefined);
+            self.preloading(generic.tryGet(settings, 'preloading', false));
+            self.loadData = generic.tryGet(settings, 'loadData', function() {});
+            self.progressive(generic.tryGet(settings, 'progressive', undefined));
+            self.refresh = parseInt(generic.tryGet(settings, 'refreshInterval', '5000'), 10);
+
+            self.query = generic.tryGet(settings, 'query', ko.observable());
             if (self.sortable() === true) {
                 var sorting = {sequence: [],
                                directions: {}}, key;
@@ -366,9 +415,11 @@ define([
                 if (self.preloading()) {
                     self.preloadPage += 1;
                     if (self.preloadPage === self.current()) {
+                        // Preload the next page
                         self.preloadPage += 1;
                     }
                     if (self.preloadPage > self.lastPage()) {
+                        // Preload the first page again
                         self.preloadPage = 1;
                     }
                     if (self.preloadPage !== self.current()) {
@@ -376,11 +427,21 @@ define([
                     }
                 }
             }, self.refresh);
+
             self.refresher.run();
             self.refresher.start();
+
+            // Enable query functionality
+            self.querySubscription = app.on('query:update')
+                .then(function(query){
+                    self.query(query);
+                    self.refresher.run();
+            });
+
             settings.bindingContext.$root.widgets.push(self);
         };
         self.deactivate = function() {
+            if (self.querySubscription) { self.querySubscription.off(); }
             self.refresher.stop();
         };
     };
