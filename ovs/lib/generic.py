@@ -602,17 +602,15 @@ class GenericController(object):
 
         # Retrieve the related downtime / service restart information
         GenericController._logger.debug('Retrieving update information for the cluster')
-        threads = []
         update_info_cluster = {}
         for storagerouter, client in client_map.iteritems():
             update_info_cluster[storagerouter.ip] = {'errors': package_info_cluster[storagerouter.ip].get('errors', [])}
             for fct in Toolbox.fetch_hooks(component='update', sub_component='get_update_info_cluster'):
-                thread = Thread(target=fct, args=(client, update_info_cluster, package_info_cluster[storagerouter.ip]))
-                thread.start()
-                threads.append(thread)
+                fct(client, update_info_cluster, package_info_cluster[storagerouter.ip])
 
         # Retrieve the update information for plugins (eg: ALBA, iSCSI)
         GenericController._logger.debug('Retrieving package and update information for the plugins')
+        threads = []
         update_info_plugin = {}
         for fct in Toolbox.fetch_hooks('update', 'get_update_info_plugin'):
             thread = Thread(target=fct, args=(update_info_plugin, ))
@@ -656,7 +654,7 @@ class GenericController(object):
                 errors.update(['{0}: {1}'.format(ip, error) for error in plugin_errors])
 
         if len(errors) > 0:
-            raise Exception(' - {0}'.format('\n - '.join(errors)))
+            raise Exception('\n - {0}'.format('\n - '.join(errors)))
         GenericController._logger.info('Finished updating package information')
 
     @staticmethod
