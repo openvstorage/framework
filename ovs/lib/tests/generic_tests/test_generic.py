@@ -811,27 +811,28 @@ class Generic(unittest.TestCase):
         """
         Test the refresh package information functionality
         """
-        def _multi_1(client, information):
-            information[client.ip]['component1'] = {'package1': {'candidate': 'version2',
-                                                                 'installed': 'version1',
-                                                                 'services_to_restart': []}}
+        def _update_info_cluster_1(client, update_info, package_info):
+            _ = package_info
+            update_info[client.ip]['framework'] = {'packages': {'package1': {'candidate': 'version2',
+                                                                              'installed': 'version1'}},
+                                                   'prerequisites': []}
 
-        def _multi_2(client, information):
-            information[client.ip]['component2'] = {'package2': {'candidate': 'version2',
-                                                                 'installed': 'version1',
-                                                                 'services_to_restart': []}}
+        def _update_info_cluster_2(client, update_info, package_info):
+            _ = package_info
+            update_info[client.ip]['component2'] = {'packages': {'package2': {'candidate': 'version2',
+                                                                              'installed': 'version1'}},
+                                                    'prerequisites': []}
             if client.ip == storagerouter_3.ip:
-                information[client.ip]['errors'] = ['Unexpected error occurred for StorageRouter {0}'.format(storagerouter_3.name)]
+                update_info[client.ip]['errors'] = ['Unexpected error occurred for StorageRouter {0}'.format(storagerouter_3.name)]
 
-        def _single_1(information):
-            _ = information  # get_package_info_single is used for Alba nodes, so not testing here
+        def _update_info_plugin_1(error_information):
+            _ = error_information  # get_update_info_plugin is used for Alba nodes, so not testing here
 
-        expected_package_info = {'component1': {'package1': {'candidate': 'version2',
-                                                             'installed': 'version1',
-                                                             'services_to_restart': []}},
-                                 'component2': {'package2': {'candidate': 'version2',
-                                                             'installed': 'version1',
-                                                             'services_to_restart': []}}}
+        expected_package_info = {'framework': {'packages': {'package1': {'candidate': 'version2', 'installed': 'version1'}},
+                                               'prerequisites': [['node_down', '2']]},
+                                 'component2': {'packages': {'package2': {'candidate': 'version2', 'installed': 'version1'}},
+                                                'prerequisites': []}}
+
 
         # StorageRouter 1 successfully updates its package info
         # StorageRouter 2 is inaccessible
@@ -840,8 +841,8 @@ class Generic(unittest.TestCase):
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
         storagerouter_3 = structure['storagerouters'][3]
-        Toolbox._function_pointers['update-get_package_info_multi'] = [_multi_1, _multi_2]
-        Toolbox._function_pointers['update-get_package_info_single'] = [_single_1]
+        Toolbox._function_pointers['update-get_update_info_cluster'] = [_update_info_cluster_1, _update_info_cluster_2]
+        Toolbox._function_pointers['update-get_update_info_plugin'] = [_update_info_plugin_1]
 
         SSHClient._raise_exceptions[storagerouter_2.ip] = {'users': ['root'],
                                                            'exception': UnableToConnectException('No route to host')}
@@ -850,6 +851,8 @@ class Generic(unittest.TestCase):
             GenericController.refresh_package_information()
 
         storagerouter_1.discard()
+        storagerouter_2.discard()
+        storagerouter_3.discard()
         self.assertDictEqual(d1=expected_package_info,
                              d2=storagerouter_1.package_information,
                              msg='Incorrect package information found for StorageRouter 1'.format(storagerouter_1.name))
@@ -859,9 +862,6 @@ class Generic(unittest.TestCase):
         self.assertDictEqual(d1={},
                              d2=storagerouter_3.package_information,
                              msg='Incorrect package information found for StorageRouter {0}'.format(storagerouter_3.name))
-        self.assertIn(member='StorageRouter {0} is inaccessible'.format(storagerouter_2.name),
-                      container=raise_info.exception.message,
-                      msg='Expected to find log message about StorageRouter {0} being inaccessible'.format(storagerouter_2.name))
         self.assertIn(member='Unexpected error occurred for StorageRouter {0}'.format(storagerouter_3.name),
                       container=raise_info.exception.message,
                       msg='Expected to find log message about unexpected error for StorageRouter {0}'.format(storagerouter_3.name))

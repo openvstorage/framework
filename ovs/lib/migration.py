@@ -52,7 +52,7 @@ class MigrationController(object):
         from ovs.dal.lists.vpoollist import VPoolList
         from ovs.extensions.db.arakooninstaller import ArakoonInstaller
         from ovs.extensions.generic.configuration import Configuration
-        from ovs.extensions.generic.sshclient import SSHClient
+        from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
         from ovs_extensions.generic.toolbox import ExtensionsToolbox
         from ovs.extensions.migration.migration.ovsmigrator import OVSMigrator
         from ovs.extensions.packages.packagefactory import PackageFactory
@@ -482,5 +482,33 @@ class MigrationController(object):
         except Exception:
             MigrationController._logger.exception('Updating the string formatting for the Arakoon services failed')
 
+        #######################################################
+        # Storing actual package name in version files (2.11.0) (https://github.com/openvstorage/framework/issues/1876)
+        if Configuration.get(key='/ovs/framework/migration|actual_package_name_in_version_file', default=False) is False:
+            try:
+                voldrv_pkg_name, _ = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
+                for storagerouter in StorageRouterList.get_storagerouters():
+                    try:
+                        client = SSHClient(endpoint=storagerouter, username='root')
+                    except UnableToConnectException:
+                        continue
+
+                    for file_name in client.file_list(directory=ServiceFactory.RUN_FILE_DIR):
+                        if not file_name.endswith('.version'):
+                            continue
+                        file_path = '{0}/{1}'.format(ServiceFactory.RUN_FILE_DIR, file_name)
+                        contents = client.file_read(filename=file_path)
+                        if voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER:
+                            if 'volumedriver-server' in contents:
+                                contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER)
+                                client.file_write(filename=file_path, contents=contents)
+                        elif voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER_EE:
+                            if 'volumedriver-server' in contents or PackageFactory.PKG_VOLDRV_SERVER in contents:
+                                contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER_EE)
+                                contents = contents.replace(PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE)
+                                client.file_write(filename=file_path, contents=contents)
+                Configuration.set(key='/ovs/framework/migration|actual_package_name_in_version_file', value=True)
+            except Exception:
+                MigrationController._logger.exception('Updating actual package name for version files failed')
 
         MigrationController._logger.info('Finished out of band migrations')
