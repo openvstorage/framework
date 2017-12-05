@@ -517,7 +517,7 @@ class UpdateController(object):
                 packages = storagerouter.package_information.get(component, {}).get('packages', {})
                 if len(packages) > 0:
                     cls._logger.debug('StorageRouter {0}: Updating packages for component {1}'.format(storagerouter.ip, component))
-                    abort |= PackageFactory.update_packages(client=client, packages=packages)
+                    abort |= PackageFactory.update_packages(client=client, packages=packages, logger=cls._logger)
         cls._logger.info('Updated packages')
         return abort
 
