@@ -49,14 +49,10 @@ class Migrator(object):
                 mod = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(mod, predicate=inspect.isclass):
                     if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        migrators.append((member[1].identifier, member[1].migrate))
+                        migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
 
-        end_version = 0
-        for identifier, method in migrators:
-            base_version = data[identifier] if identifier in data else 0
-            version = method(base_version, master_ips, extra_ips)
-            if version > end_version:
-                end_version = version
-            data[identifier] = end_version
-
+        for identifier, method, end_version in migrators:
+            start_version = data.get(identifier, 0)
+            if end_version > start_version:
+                data[identifier] = method(start_version, master_ips, extra_ips)
         Configuration.set(key, data)
