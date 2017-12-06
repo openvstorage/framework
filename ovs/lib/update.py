@@ -256,25 +256,6 @@ class UpdateController(object):
         return merged_update_info
 
     @classmethod
-    @add_hooks('update', 'post_update_single')
-    def _post_update_migrator(cls, components=None):
-        """
-        Execute the migration code for the 'framework' component
-        """
-        if PackageFactory.COMP_FWK not in components:
-            return
-
-        try:
-            # noinspection PyUnresolvedReferences
-            from ovs.lib.migration import MigrationController
-            cls._logger.debug('Executing migration code: MigrationController.migrate()')
-            MigrationController.migrate()
-        except ImportError:
-            cls._logger.error('Could not import MigrationController.')
-        except Exception:
-            cls._logger.exception('Migration code for the framework failed to be executed')
-
-    @classmethod
     @add_hooks('update', 'post_update_multi')
     def _post_update_core(cls, client, components):
         """
@@ -295,6 +276,18 @@ class UpdateController(object):
         method_name = inspect.currentframe().f_code.co_name
         cls._logger.info('{0}: Executing hook {1}'.format(client.ip, method_name))
 
+        # First run post-update migrations to update services, config mgmt, ... and restart services afterwards
+        if PackageFactory.COMP_FWK in components:
+            try:
+                # noinspection PyUnresolvedReferences
+                from ovs.lib.migration import MigrationController
+                cls._logger.debug('Executing migration code: MigrationController.migrate()')
+                MigrationController.migrate()
+            except ImportError:
+                cls._logger.error('Could not import MigrationController.')
+            except Exception:
+                cls._logger.exception('Migration code for the framework failed to be executed')
+
         storagerouter = StorageRouterList.get_by_ip(ip=client.ip)
         for component in components:
             if component not in storagerouter.package_information:
@@ -304,7 +297,11 @@ class UpdateController(object):
             if 'packages' not in component_info:
                 # Package_information still has the old format, so refresh update information
                 # This can occur when updating from earlier than 2.11.0 to 2.11.0 and older
-                GenericController.refresh_package_information()
+                try:
+                    GenericController.refresh_package_information()
+                except:
+                    cls._logger.exception('{0}: Refreshing package information failed'.format(client.ip))
+
                 storagerouter.discard()
                 component_info = storagerouter.package_information.get(component, {})
 
