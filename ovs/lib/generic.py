@@ -564,7 +564,7 @@ class GenericController(object):
         GenericController._logger.info('Arakoon collapse finished')
 
     @staticmethod
-    @ovs_task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'), ensure_single_info={'mode': 'DEDUPED'})
+    @ovs_task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'), ensure_single_info={'mode': 'DEFAULT'})
     def refresh_package_information():
         """
         Retrieve and store the package information of all StorageRouters
