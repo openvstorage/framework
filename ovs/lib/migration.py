@@ -52,7 +52,7 @@ class MigrationController(object):
         from ovs.dal.lists.vpoollist import VPoolList
         from ovs.extensions.db.arakooninstaller import ArakoonInstaller
         from ovs.extensions.generic.configuration import Configuration
-        from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+        from ovs.extensions.generic.sshclient import SSHClient
         from ovs_extensions.generic.toolbox import ExtensionsToolbox
         from ovs.extensions.migration.migration.ovsmigrator import OVSMigrator
         from ovs.extensions.packages.packagefactory import PackageFactory
@@ -65,7 +65,7 @@ class MigrationController(object):
 
         sr_client_map = {}
         for storagerouter in StorageRouterList.get_storagerouters():
-            sr_client_map[storagerouter.guid] = SSHClient(endpoint=storagerouter,
+            sr_client_map[storagerouter.guid] = SSHClient(endpoint=storagerouter.ip,  # Is triggered during post-update code too during which the ovs-watcher-framework service is still down and thus not refreshing the heartbeat --> use IP i/o StorageRouter
                                                           username='root')
 
         #########################################################
@@ -488,9 +488,8 @@ class MigrationController(object):
             try:
                 voldrv_pkg_name, _ = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
                 for storagerouter in StorageRouterList.get_storagerouters():
-                    try:
-                        client = SSHClient(endpoint=storagerouter, username='root')
-                    except UnableToConnectException:
+                    client = sr_client_map.get(storagerouter.guid)
+                    if client is None:
                         continue
 
                     for file_name in client.file_list(directory=ServiceFactory.RUN_FILE_DIR):
