@@ -434,6 +434,7 @@ class MigrationController(object):
 
         ############################################################
         # Additional string formatting in ALBA proxy services (2.11)
+        changed_clients = set()
         try:
             if Configuration.get(key='/ovs/framework/migration|alba_proxy_service_update', default=False) is False:
                 alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
@@ -449,6 +450,7 @@ class MigrationController(object):
                         service_manager.regenerate_service(name='ovs-albaproxy',
                                                            client=root_client,
                                                            target_name='ovs-{0}'.format(service.name))
+                        changed_clients.add(root_client)
 
                 # Make sure once this finished, it never runs again by setting this key to True
                 Configuration.set(key='/ovs/framework/migration|alba_proxy_service_update', value=True)
@@ -476,6 +478,7 @@ class MigrationController(object):
                                 service_manager.regenerate_service(name=service_template,
                                                                    client=root_client,
                                                                    target_name='ovs-{0}'.format(service_name))
+                                changed_clients.add(root_client)
 
                 # Make sure once this finished, it never runs again by setting this key to True
                 Configuration.set(key='/ovs/framework/migration|voldrv_service_update', value=True)
@@ -488,26 +491,41 @@ class MigrationController(object):
             try:
                 voldrv_pkg_name, _ = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
                 for storagerouter in StorageRouterList.get_storagerouters():
-                    client = sr_client_map.get(storagerouter.guid)
-                    if client is None:
+                    root_client = sr_client_map.get(storagerouter.guid)
+                    if root_client is None:
                         continue
 
-                    for file_name in client.file_list(directory=ServiceFactory.RUN_FILE_DIR):
+                    for file_name in root_client.file_list(directory=ServiceFactory.RUN_FILE_DIR):
                         if not file_name.endswith('.version'):
                             continue
                         file_path = '{0}/{1}'.format(ServiceFactory.RUN_FILE_DIR, file_name)
-                        contents = client.file_read(filename=file_path)
+                        contents = root_client.file_read(filename=file_path)
+                        regenerate = False
                         if voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER:
                             if 'volumedriver-server' in contents:
+                                regenerate = True
                                 contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER)
-                                client.file_write(filename=file_path, contents=contents)
+                                root_client.file_write(filename=file_path, contents=contents)
                         elif voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER_EE:
                             if 'volumedriver-server' in contents or PackageFactory.PKG_VOLDRV_SERVER in contents:
+                                regenerate = True
                                 contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER_EE)
                                 contents = contents.replace(PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE)
-                                client.file_write(filename=file_path, contents=contents)
+                                root_client.file_write(filename=file_path, contents=contents)
+
+                        if regenerate is True:
+                            service_manager.regenerate_service(name='ovs-dtl' if file_name.startswith('dtl') else 'ovs-volumedriver',
+                                                               client=root_client,
+                                                               target_name='ovs-{0}'.format(file_name.split('.')[0]))  # Leave out .version
+                            changed_clients.add(root_client)
                 Configuration.set(key='/ovs/framework/migration|actual_package_name_in_version_file', value=True)
             except Exception:
                 MigrationController._logger.exception('Updating actual package name for version files failed')
+
+        for root_client in changed_clients:
+            try:
+                root_client.run(['systemctl', 'daemon-reload'])
+            except Exception:
+                MigrationController._logger.exception('Executing command "systemctl daemon-reload" failed')
 
         MigrationController._logger.info('Finished out of band migrations')
