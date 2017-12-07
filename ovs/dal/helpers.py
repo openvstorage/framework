@@ -320,16 +320,6 @@ class Migration(object):
         Executes all migrations. It keeps track of an internal "migration version" which is
         a always increasing by one
         """
-
-        def execute(fct, start, end):
-            """
-            Executes a single migration, syncing versions
-            """
-            version = fct(start)
-            if version > end:
-                end = version
-            return end
-
         key = 'ovs_model_version'
         persistent = PersistentFactory.get_client()
         if persistent.exists(key):
@@ -345,11 +335,12 @@ class Migration(object):
                 mod = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(mod, predicate=inspect.isclass):
                     if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        migrators.append((member[1].identifier, member[1].migrate))
-        for identifier, method in migrators:
-            base_version = data[identifier] if identifier in data else 0
-            new_version = execute(method, base_version, 0)
-            data[identifier] = new_version
+                        migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
+
+        for identifier, method, end_version in migrators:
+            start_version = data.get(identifier, 0)
+            if end_version > start_version:
+                data[identifier] = method(start_version)
 
         persistent.set(key, data)
 
