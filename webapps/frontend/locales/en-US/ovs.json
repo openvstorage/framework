@@ -566,6 +566,10 @@
     },
     "title": "Open vStorage",
     "updates": {
+        "additional_info": {
+            "migrations": "Migration code needs to run",
+            "service_restart": "Services need to be restarted"
+        },
         "button": "Update",
         "collective_updates_at_broke": "Update functionality depends on 'at' to be running properly. This appears not to be the case on all StorageRouters",
         "collective_updates_checking": "Checking if any updates are in progress",

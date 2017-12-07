@@ -19,14 +19,14 @@ OVS migration module
 """
 
 from ovs.extensions.generic.logger import Logger
+from ovs.extensions.packages.packagefactory import PackageFactory
 
 
-class OVSMigrator(object):
+class ExtensionMigrator(object):
     """
     Handles all model related migrations
     """
-
-    identifier = 'ovs'  # Used by migrator.py, so don't remove
+    identifier = PackageFactory.COMP_MIGRATION_FWK
     THIS_VERSION = 14
 
     _logger = Logger('extensions')
@@ -53,12 +53,11 @@ class OVSMigrator(object):
         working_version = previous_version
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
-        if working_version < OVSMigrator.THIS_VERSION:
+        if working_version < ExtensionMigrator.THIS_VERSION:
             try:
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.dal.lists.vpoollist import VPoolList
                 from ovs.extensions.generic.configuration import Configuration
-                from ovs.extensions.packages.packagefactory import PackageFactory
                 from ovs.extensions.services.servicefactory import ServiceFactory
                 from ovs.extensions.generic.sshclient import SSHClient
                 from ovs.extensions.generic.system import System
@@ -91,8 +90,8 @@ class OVSMigrator(object):
                             continue
 
             except:
-                OVSMigrator._logger.exception('Error occurred while executing the migration code')
+                ExtensionMigrator._logger.exception('Error occurred while executing the migration code')
                 # Don't update migration version with latest version, resulting in next migration trying again to execute this code
-                return OVSMigrator.THIS_VERSION - 1
+                return ExtensionMigrator.THIS_VERSION - 1
 
-        return OVSMigrator.THIS_VERSION
+        return ExtensionMigrator.THIS_VERSION

@@ -61,6 +61,8 @@ class Configuration(_Configuration):
         :type port_info: dict
         :return: None
         """
+        from ovs.extensions.migration.migration.ovsmigrator import ExtensionMigrator  # Import here to prevent from circular references
+
         if cls.exists('/ovs/framework/hosts/{0}/setupcompleted'.format(host_id)):
             return
         if port_info is None:
@@ -74,7 +76,7 @@ class Configuration(_Configuration):
                                  'mds': [mds_port_range],
                                  'arakoon': [arakoon_start_port]},
                        'setupcompleted': False,
-                       'versions': {'ovs': 9},
+                       'versions': {'ovs': ExtensionMigrator.THIS_VERSION},
                        'type': 'UNCONFIGURED'}
         for key, value in host_config.iteritems():
             cls.set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
