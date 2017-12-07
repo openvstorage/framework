@@ -228,8 +228,8 @@ class UpdateController(object):
 
                     # DAL migration check
                     if migrations_detected is False:
-                        pf_client = PersistentFactory.get_client()
-                        old_version = pf_client.get('ovs_model_version').get(PackageFactory.COMP_MIGRATION_FWK) if pf_client.exists('ovs_model_version') else None
+                        persistent_client = PersistentFactory.get_client()
+                        old_version = persistent_client.get('ovs_model_version').get(PackageFactory.COMP_MIGRATION_FWK) if persistent_client.exists('ovs_model_version') else None
                         if old_version is not None:
                             cls._logger.debug('StorageRouter {0}: Current running version for {1} DAL migrations: {2}'.format(client.ip, PackageFactory.COMP_FWK, old_version))
                             with remote(client.ip, [DALMigrator]) as rem:
@@ -659,13 +659,13 @@ class UpdateController(object):
             if PackageFactory.COMP_FWK in components:
                 UpdateController._logger.info('Starting DAL code migration')
                 try:
-                    pf_client = PersistentFactory.get_client()
-                    old_versions = pf_client.get('ovs_model_version') if pf_client.exists('ovs_model_version') else {}
+                    persistent_client = PersistentFactory.get_client()
+                    old_versions = persistent_client.get('ovs_model_version') if persistent_client.exists('ovs_model_version') else {}
                     from ovs.dal.helpers import Migration
                     with remote(ssh_clients[0].ip, [Migration]) as rem:
                         rem.Migration.migrate()
 
-                    new_versions = pf_client.get('ovs_model_version') if pf_client.exists('ovs_model_version') else {}
+                    new_versions = persistent_client.get('ovs_model_version') if persistent_client.exists('ovs_model_version') else {}
                     if old_versions != new_versions:
                         UpdateController._logger.info('Finished DAL code migration. Old versions: {0} --> New versions: {1}'.format(old_versions, new_versions))
                 except Exception:
