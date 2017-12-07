@@ -20,14 +20,15 @@ OVS migration module
 import random
 import string
 import hashlib
+from ovs_extensions.packages.packagefactory import PackageFactory
 
 
-class OVSMigrator(object):
+class DALMigrator(object):
     """
     Handles all model related migrations
     """
 
-    identifier = 'ovs'
+    identifier = PackageFactory.COMP_MIGRATION_FWK
     THIS_VERSION = 15
 
     def __init__(self):
@@ -152,7 +153,7 @@ class OVSMigrator(object):
             slate.save()
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
-        elif working_version < OVSMigrator.THIS_VERSION:
+        elif working_version < DALMigrator.THIS_VERSION:
             from ovs.dal.helpers import HybridRunner, Descriptor
             from ovs.dal.hybrids.diskpartition import DiskPartition
             from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -229,4 +230,4 @@ class OVSMigrator(object):
                                 junction_partition.partition.roles.append(DiskPartition.ROLES.DTL)
                                 junction_partition.partition.save()
 
-        return OVSMigrator.THIS_VERSION
+        return DALMigrator.THIS_VERSION

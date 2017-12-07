@@ -25,6 +25,7 @@ from subprocess import CalledProcessError
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.dal.migration.ovsmigrator import DALMigrator
 from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex, NoLockAvailableException
@@ -34,6 +35,7 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.migration.migrator import Migrator
+from ovs.extensions.migration.migration.ovsmigrator import ExtensionMigrator
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -206,6 +208,36 @@ class UpdateController(object):
                     if package_name in pkg_component_info and package_name not in svc_component_info['packages']:
                         cls._logger.debug('StorageRouter {0}: Adding package {1} because it has an update available'.format(client.ip, package_name))
                         svc_component_info['packages'][package_name] = pkg_component_info[package_name]
+
+                # Verify whether migration (DAL and extension) code needs to be executed (only if no packages have an update available so far)
+                if component == PackageFactory.COMP_FWK and PackageFactory.PKG_OVS not in svc_component_info['packages']:
+                    cls._logger.debug('StorageRouter {0}: No updates detected, checking for required migrations'.format(client.ip))
+                    # Extension migration check
+                    key = '/ovs/framework/hosts/{0}/versions'.format(System.get_my_machine_id(client=client))
+                    old_version = Configuration.get(key, default={}).get(PackageFactory.COMP_MIGRATION_FWK)
+                    installed_version = str(cls._package_manager.get_installed_versions(client=client, package_names=[PackageFactory.PKG_OVS])[PackageFactory.PKG_OVS])
+                    migrations_detected = False
+                    if old_version is not None:
+                        cls._logger.debug('StorageRouter {0}: Current running version for {1} extension migrations: {2}'.format(client.ip, PackageFactory.COMP_FWK, old_version))
+                        with remote(client.ip, [ExtensionMigrator]) as rem:
+                            cls._logger.debug('StorageRouter {0}: Available version for {1} extension migrations: {2}'.format(client.ip, PackageFactory.COMP_FWK, rem.ExtensionMigrator.THIS_VERSION))
+                            if rem.ExtensionMigrator.THIS_VERSION > old_version:
+                                migrations_detected = True
+                                svc_component_info['packages'][PackageFactory.PKG_OVS] = {'installed': 'migrations',
+                                                                                          'candidate': installed_version}
+
+                    # DAL migration check
+                    if migrations_detected is False:
+                        persistent_client = PersistentFactory.get_client()
+                        old_version = persistent_client.get('ovs_model_version').get(PackageFactory.COMP_MIGRATION_FWK) if persistent_client.exists('ovs_model_version') else None
+                        if old_version is not None:
+                            cls._logger.debug('StorageRouter {0}: Current running version for {1} DAL migrations: {2}'.format(client.ip, PackageFactory.COMP_FWK, old_version))
+                            with remote(client.ip, [DALMigrator]) as rem:
+                                cls._logger.debug('StorageRouter {0}: Available version for {1} DAL migrations: {2}'.format(client.ip, PackageFactory.COMP_FWK, rem.DALMigrator.THIS_VERSION))
+                                if rem.DALMigrator.THIS_VERSION > old_version:
+                                    svc_component_info['packages'][PackageFactory.PKG_OVS] = {'installed': 'migrations',
+                                                                                              'candidate': installed_version}
+
             cls._logger.info('StorageRouter {0}: Refreshed update information'.format(client.ip))
         except Exception as ex:
             cls._logger.exception('StorageRouter {0}: Refreshing update information failed'.format(client.ip))
@@ -627,12 +659,13 @@ class UpdateController(object):
             if PackageFactory.COMP_FWK in components:
                 UpdateController._logger.info('Starting DAL code migration')
                 try:
-                    old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+                    persistent_client = PersistentFactory.get_client()
+                    old_versions = persistent_client.get('ovs_model_version') if persistent_client.exists('ovs_model_version') else {}
                     from ovs.dal.helpers import Migration
                     with remote(ssh_clients[0].ip, [Migration]) as rem:
                         rem.Migration.migrate()
 
-                    new_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+                    new_versions = persistent_client.get('ovs_model_version') if persistent_client.exists('ovs_model_version') else {}
                     if old_versions != new_versions:
                         UpdateController._logger.info('Finished DAL code migration. Old versions: {0} --> New versions: {1}'.format(old_versions, new_versions))
                 except Exception:

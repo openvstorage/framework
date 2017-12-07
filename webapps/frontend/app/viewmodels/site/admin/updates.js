@@ -73,6 +73,20 @@ define([
                 }
             }).promise();
         };
+        self.getInstalledVersion = function(packageInfo) {
+            if (['migrations', 'service_restart'].contains(packageInfo.installed)) {
+                return packageInfo.candidate;
+            }
+            return packageInfo.installed.replace('-reboot', '');
+        };
+        self.getTooltip = function(packageInfo) {
+            if (packageInfo.installed === 'migrations') {
+                return $.t('ovs:updates.additional_info.migrations');
+            }
+            else if (packageInfo.installed === 'service_restart') {
+                return $.t('ovs:updates.additional_info.service_restart');
+            }
+        };
         self.mergePackageInformation = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.mergePackageInfo)) {
@@ -89,8 +103,9 @@ define([
                                         $.each(srData.framework, function(packageName, packageInfo) {
                                             var pkg = {};
                                             pkg.name = packageName;
+                                            pkg.tooltip = self.getTooltip(packageInfo);
                                             pkg.candidate = packageInfo.candidate;
-                                            pkg.installed = packageInfo.installed.replace('-reboot', '');
+                                            pkg.installed = self.getInstalledVersion(packageInfo);
                                             packages.push(pkg);
                                         });
                                         packages.sort(function(pkg1, pkg2) {
@@ -109,8 +124,9 @@ define([
                                         $.each(srData.storagedriver, function(packageName, packageInfo) {
                                             var pkg = {};
                                             pkg.name = packageName;
+                                            pkg.tooltip = self.getTooltip(packageInfo);
                                             pkg.candidate = packageInfo.candidate;
-                                            pkg.installed = packageInfo.installed.replace('-reboot', '');
+                                            pkg.installed = self.getInstalledVersion(packageInfo);
                                             packages.push(pkg);
                                         });
                                         packages.sort(function(pkg1, pkg2) {
@@ -130,8 +146,9 @@ define([
                                         $.each(pluginInfo, function(packageName, packageInfo) {
                                             var pkg = {};
                                             pkg.name = packageName;
+                                            pkg.tooltip = self.getTooltip(packageInfo);
                                             pkg.candidate = packageInfo.candidate;
-                                            pkg.installed = packageInfo.installed.replace('-reboot', '');
+                                            pkg.installed = self.getInstalledVersion(packageInfo);
                                             packages.push(pkg);
                                         });
                                         packages.sort(function(pkg1, pkg2) {

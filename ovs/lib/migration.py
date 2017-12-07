@@ -54,7 +54,7 @@ class MigrationController(object):
         from ovs.extensions.generic.configuration import Configuration
         from ovs.extensions.generic.sshclient import SSHClient
         from ovs_extensions.generic.toolbox import ExtensionsToolbox
-        from ovs.extensions.migration.migration.ovsmigrator import OVSMigrator
+        from ovs.extensions.migration.migration.ovsmigrator import ExtensionMigrator
         from ovs.extensions.packages.packagefactory import PackageFactory
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
@@ -270,7 +270,7 @@ class MigrationController(object):
                     except:
                         _config = Configuration.get(new_path, raw=True)
                         Configuration.set(new_path, _config, raw=True)
-        if OVSMigrator.THIS_VERSION <= 13:  # There is no way of checking whether this new indentation logic has been applied, so we only perform this for version 13 and lower
+        if ExtensionMigrator.THIS_VERSION <= 13:  # There is no way of checking whether this new indentation logic has been applied, so we only perform this for version 13 and lower
             MigrationController._logger.info('Re-saving every configuration setting with new indentation rules')
             _resave_all_config_entries()
 
