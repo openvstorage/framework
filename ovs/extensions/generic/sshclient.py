@@ -30,6 +30,7 @@ class SSHClient(_SSHClient):
     """
     Remote/local client
     """
+    HEARTBEAT_TIMEOUT = 300
 
     def __init__(self, endpoint, username='ovs', password=None, cached=True, timeout=None):
         """
@@ -55,14 +56,31 @@ class SSHClient(_SSHClient):
         unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
 
         if storagerouter is not None and unittest_mode is False:
-            process_heartbeat = storagerouter.heartbeats.get('process')
-            if process_heartbeat is not None:
-                if time.time() - process_heartbeat > 300:
-                    message = 'StorageRouter {0} process heartbeat > 300s'.format(storagerouter.ip)
-                    raise UnableToConnectException(message)
+            self._check_storagerouter(storagerouter, True)
 
         super(SSHClient, self).__init__(endpoint=endpoint,
                                         username=username,
                                         password=password,
                                         cached=cached,
                                         timeout=timeout)
+
+    @classmethod
+    def _check_storagerouter(cls, storagerouter, refresh=True):
+        """
+        Checks the heartbeat data of the storagerouter
+        :param storagerouter: Storagerouter object
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: None
+        :rtype: NoneType
+        """
+        process_heartbeat = storagerouter.heartbeats.get('process')
+        if process_heartbeat is not None:
+            if time.time() - process_heartbeat > cls.HEARTBEAT_TIMEOUT:
+                if refresh is True:
+                    from ovs.dal.hybrids.storagerouter import StorageRouter
+                    # Check with a fresher instance of the storagerouter
+                    # (not using discard as the callee might have done some other stuff to this object)
+                    storagerouter = StorageRouter(storagerouter.guid)
+                    return cls._check_storagerouter(storagerouter, False)
+                message = 'StorageRouter {0} process heartbeat > {1}s'.format(storagerouter.ip, cls.HEARTBEAT_TIMEOUT)
+                raise UnableToConnectException(message)
