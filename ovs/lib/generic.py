@@ -41,8 +41,9 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -563,56 +564,98 @@ class GenericController(object):
         GenericController._logger.info('Arakoon collapse finished')
 
     @staticmethod
-    @ovs_task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'), ensure_single_info={'mode': 'DEDUPED'})
+    @ovs_task(name='ovs.generic.refresh_package_information', schedule=Schedule(minute='10', hour='*'), ensure_single_info={'mode': 'DEFAULT'})
     def refresh_package_information():
         """
         Retrieve and store the package information of all StorageRouters
         :return: None
         """
         GenericController._logger.info('Updating package information')
-        threads = []
-        information = {}
+
+        client_map = {}
+        prerequisites = []
+        package_info_cluster = {}
         all_storagerouters = StorageRouterList.get_storagerouters()
+        all_storagerouters.sort(key=lambda sr: ExtensionsToolbox.advanced_sort(element=sr.ip, separator='.'))
         for storagerouter in all_storagerouters:
-            information[storagerouter.ip] = {}
-            for fct in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
-                try:
-                    # We make use of these clients in Threads --> cached = False
-                    client = SSHClient(endpoint=storagerouter, username='root', cached=False)
-                except UnableToConnectException:
-                    information[storagerouter.ip]['errors'] = ['StorageRouter {0} is inaccessible'.format(storagerouter.name)]
-                    break
-                thread = Thread(target=fct,
-                                args=(client, information))
+            package_info_cluster[storagerouter.ip] = {}
+            try:
+                # We make use of these clients in Threads --> cached = False
+                client_map[storagerouter] = SSHClient(endpoint=storagerouter, username='root', cached=False)
+            except (NotAuthenticatedException, UnableToConnectException):
+                GenericController._logger.warning('StorageRouter {0} is inaccessible'.format(storagerouter.ip))
+                prerequisites.append(['node_down', storagerouter.name])
+                package_info_cluster[storagerouter.ip]['errors'] = ['StorageRouter {0} is inaccessible'.format(storagerouter.name)]
+
+        # Retrieve for each StorageRouter in the cluster the installed and candidate versions of related packages
+        # This also validates whether all required packages have been installed
+        GenericController._logger.debug('Retrieving package information for the cluster')
+        threads = []
+        for storagerouter, client in client_map.iteritems():
+            for fct in Toolbox.fetch_hooks(component='update', sub_component='get_package_info_cluster'):
+                thread = Thread(target=fct, args=(client, package_info_cluster))
                 thread.start()
                 threads.append(thread)
 
-        for fct in Toolbox.fetch_hooks('update', 'get_package_info_single'):
-            thread = Thread(target=fct,
-                            args=(information,))
+        for thread in threads:
+            thread.join()
+
+        # Retrieve the related downtime / service restart information
+        GenericController._logger.debug('Retrieving update information for the cluster')
+        update_info_cluster = {}
+        for storagerouter, client in client_map.iteritems():
+            update_info_cluster[storagerouter.ip] = {'errors': package_info_cluster[storagerouter.ip].get('errors', [])}
+            for fct in Toolbox.fetch_hooks(component='update', sub_component='get_update_info_cluster'):
+                fct(client, update_info_cluster, package_info_cluster[storagerouter.ip])
+
+        # Retrieve the update information for plugins (eg: ALBA, iSCSI)
+        GenericController._logger.debug('Retrieving package and update information for the plugins')
+        threads = []
+        update_info_plugin = {}
+        for fct in Toolbox.fetch_hooks('update', 'get_update_info_plugin'):
+            thread = Thread(target=fct, args=(update_info_plugin, ))
             thread.start()
             threads.append(thread)
 
         for thread in threads:
             thread.join()
 
-        errors = []
-        copy_information = copy.deepcopy(information)
-        for ip, info in information.iteritems():
-            if len(info.get('errors', [])) > 0:
-                errors.extend(['{0}: {1}'.format(ip, error) for error in info['errors']])
-                copy_information.pop(ip)
+        # Add the prerequisites
+        if len(prerequisites) > 0:
+            for ip, component_info in update_info_cluster.iteritems():
+                if PackageFactory.COMP_FWK in component_info:
+                    component_info[PackageFactory.COMP_FWK]['prerequisites'].extend(prerequisites)
 
+        # Store information in model and collect errors for OVS cluster
+        errors = set()
         for storagerouter in all_storagerouters:
-            info = copy_information.get(storagerouter.ip, {})
-            if 'errors' in info:
-                info.pop('errors')
-            storagerouter.package_information = info
+            GenericController._logger.debug('Storing update information for StorageRouter {0}'.format(storagerouter.ip))
+            update_info = update_info_cluster.get(storagerouter.ip, {})
+
+            # Remove the errors from the update information
+            sr_errors = update_info.pop('errors', [])
+            if len(sr_errors) > 0:
+                errors.update(['{0}: {1}'.format(storagerouter.ip, error) for error in sr_errors])
+                update_info = {}  # If any error occurred, we store no update information for this StorageRouter
+
+            # Remove the components without updates from the update information
+            update_info_copy = copy.deepcopy(update_info)
+            for component, info in update_info_copy.iteritems():
+                if len(info['packages']) == 0:
+                    update_info.pop(component)
+
+            # Store the update information
+            storagerouter.package_information = update_info
             storagerouter.save()
 
+        # Collect errors for plugins
+        for ip, plugin_errors in update_info_plugin.iteritems():
+            if len(plugin_errors) > 0:
+                errors.update(['{0}: {1}'.format(ip, error) for error in plugin_errors])
+
         if len(errors) > 0:
-            errors = [str(error) for error in set(errors)]
-            raise Exception(' - {0}'.format('\n - '.join(errors)))
+            raise Exception('\n - {0}'.format('\n - '.join(errors)))
+        GenericController._logger.info('Finished updating package information')
 
     @staticmethod
     @ovs_task(name='ovs.generic.run_backend_domain_hooks')

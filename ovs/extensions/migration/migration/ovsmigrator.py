@@ -19,14 +19,14 @@ OVS migration module
 """
 
 from ovs.extensions.generic.logger import Logger
+from ovs.extensions.packages.packagefactory import PackageFactory
 
 
-class OVSMigrator(object):
+class ExtensionMigrator(object):
     """
     Handles all model related migrations
     """
-
-    identifier = 'ovs'  # Used by migrator.py, so don't remove
+    identifier = PackageFactory.COMP_MIGRATION_FWK
     THIS_VERSION = 14
 
     _logger = Logger('extensions')
@@ -53,12 +53,11 @@ class OVSMigrator(object):
         working_version = previous_version
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
-        if working_version < OVSMigrator.THIS_VERSION:
+        if working_version < ExtensionMigrator.THIS_VERSION:
             try:
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.dal.lists.vpoollist import VPoolList
                 from ovs.extensions.generic.configuration import Configuration
-                from ovs.extensions.packages.packagefactory import PackageFactory
                 from ovs.extensions.services.servicefactory import ServiceFactory
                 from ovs.extensions.generic.sshclient import SSHClient
                 from ovs.extensions.generic.system import System
@@ -82,33 +81,17 @@ class OVSMigrator(object):
                     Configuration.delete(key=mds_safety_key)
 
                 # Introduction of edition key
-                if Configuration.get(key='/ovs/framework/edition', default=None) not in ['community', 'enterprise']:
+                if Configuration.get(key=Configuration.EDITION_KEY, default=None) not in [PackageFactory.EDITION_COMMUNITY, PackageFactory.EDITION_ENTERPRISE]:
                     for storagerouter in StorageRouterList.get_storagerouters():
                         try:
-                            Configuration.set(key='/ovs/framework/edition', value=storagerouter.features['alba']['edition'])
+                            Configuration.set(key=Configuration.EDITION_KEY, value=storagerouter.features['alba']['edition'])
                             break
                         except:
                             continue
 
-                # Storing actual package name in version files
-                voldrv_pkg_name, _ = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
-                for file_name in local_client.file_list(directory=ServiceFactory.RUN_FILE_DIR):
-                    if not file_name.endswith('.version'):
-                        continue
-                    file_path = '{0}/{1}'.format(ServiceFactory.RUN_FILE_DIR, file_name)
-                    contents = local_client.file_read(filename=file_path)
-                    if voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER:
-                        if 'volumedriver-server' in contents:
-                            contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER)
-                            local_client.file_write(filename=file_path, contents=contents)
-                    elif voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER_EE:
-                        if 'volumedriver-server' in contents or PackageFactory.PKG_VOLDRV_SERVER in contents:
-                            contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER_EE)
-                            contents = contents.replace(PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE)
-                            local_client.file_write(filename=file_path, contents=contents)
             except:
-                OVSMigrator._logger.exception('Error occurred while executing the migration code')
+                ExtensionMigrator._logger.exception('Error occurred while executing the migration code')
                 # Don't update migration version with latest version, resulting in next migration trying again to execute this code
-                return OVSMigrator.THIS_VERSION - 1
+                return ExtensionMigrator.THIS_VERSION - 1
 
-        return OVSMigrator.THIS_VERSION
+        return ExtensionMigrator.THIS_VERSION

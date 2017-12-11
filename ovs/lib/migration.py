@@ -54,7 +54,7 @@ class MigrationController(object):
         from ovs.extensions.generic.configuration import Configuration
         from ovs.extensions.generic.sshclient import SSHClient
         from ovs_extensions.generic.toolbox import ExtensionsToolbox
-        from ovs.extensions.migration.migration.ovsmigrator import OVSMigrator
+        from ovs.extensions.migration.migration.ovsmigrator import ExtensionMigrator
         from ovs.extensions.packages.packagefactory import PackageFactory
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
@@ -65,7 +65,7 @@ class MigrationController(object):
 
         sr_client_map = {}
         for storagerouter in StorageRouterList.get_storagerouters():
-            sr_client_map[storagerouter.guid] = SSHClient(endpoint=storagerouter,
+            sr_client_map[storagerouter.guid] = SSHClient(endpoint=storagerouter.ip,  # Is triggered during post-update code too during which the ovs-watcher-framework service is still down and thus not refreshing the heartbeat --> use IP i/o StorageRouter
                                                           username='root')
 
         #########################################################
@@ -336,7 +336,7 @@ class MigrationController(object):
                     except:
                         _config = Configuration.get(new_path, raw=True)
                         Configuration.set(new_path, _config, raw=True)
-        if OVSMigrator.THIS_VERSION <= 13:  # There is no way of checking whether this new indentation logic has been applied, so we only perform this for version 13 and lower
+        if ExtensionMigrator.THIS_VERSION <= 13:  # There is no way of checking whether this new indentation logic has been applied, so we only perform this for version 13 and lower
             MigrationController._logger.info('Re-saving every configuration setting with new indentation rules')
             _resave_all_config_entries()
 
@@ -500,6 +500,7 @@ class MigrationController(object):
 
         ############################################################
         # Additional string formatting in ALBA proxy services (2.11)
+        changed_clients = set()
         try:
             if Configuration.get(key='/ovs/framework/migration|alba_proxy_service_update', default=False) is False:
                 alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
@@ -515,6 +516,7 @@ class MigrationController(object):
                         service_manager.regenerate_service(name='ovs-albaproxy',
                                                            client=root_client,
                                                            target_name='ovs-{0}'.format(service.name))
+                        changed_clients.add(root_client)
 
                 # Make sure once this finished, it never runs again by setting this key to True
                 Configuration.set(key='/ovs/framework/migration|alba_proxy_service_update', value=True)
@@ -542,25 +544,54 @@ class MigrationController(object):
                                 service_manager.regenerate_service(name=service_template,
                                                                    client=root_client,
                                                                    target_name='ovs-{0}'.format(service_name))
+                                changed_clients.add(root_client)
 
                 # Make sure once this finished, it never runs again by setting this key to True
                 Configuration.set(key='/ovs/framework/migration|voldrv_service_update', value=True)
         except Exception:
             MigrationController._logger.exception('Updating the string formatting for the Arakoon services failed')
 
-        ######################################
-        # Change to edition key
-        if Configuration.get(key='/ovs/framework/edition', default=False) not in ['community', 'enterprise']:
+        #######################################################
+        # Storing actual package name in version files (2.11.0) (https://github.com/openvstorage/framework/issues/1876)
+        if Configuration.get(key='/ovs/framework/migration|actual_package_name_in_version_file', default=False) is False:
             try:
-                storagerouters = StorageRouterList.get_storagerouters()
-                for sr in storagerouters:
-                    try:
-                        val = sr.features['alba']['edition']
-                        Configuration.set('/ovs/framework/edition', val)
-                        break
-                    except:
-                        MigrationController._logger.exception('StorageRouter {0} did not yield edition value'.format(sr.name))
+                voldrv_pkg_name, _ = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_SD)
+                for storagerouter in StorageRouterList.get_storagerouters():
+                    root_client = sr_client_map.get(storagerouter.guid)
+                    if root_client is None:
+                        continue
+
+                    for file_name in root_client.file_list(directory=ServiceFactory.RUN_FILE_DIR):
+                        if not file_name.endswith('.version'):
+                            continue
+                        file_path = '{0}/{1}'.format(ServiceFactory.RUN_FILE_DIR, file_name)
+                        contents = root_client.file_read(filename=file_path)
+                        regenerate = False
+                        if voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER:
+                            if 'volumedriver-server' in contents:
+                                regenerate = True
+                                contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER)
+                                root_client.file_write(filename=file_path, contents=contents)
+                        elif voldrv_pkg_name == PackageFactory.PKG_VOLDRV_SERVER_EE:
+                            if 'volumedriver-server' in contents or PackageFactory.PKG_VOLDRV_SERVER in contents:
+                                regenerate = True
+                                contents = contents.replace('volumedriver-server', PackageFactory.PKG_VOLDRV_SERVER_EE)
+                                contents = contents.replace(PackageFactory.PKG_VOLDRV_SERVER, PackageFactory.PKG_VOLDRV_SERVER_EE)
+                                root_client.file_write(filename=file_path, contents=contents)
+
+                        if regenerate is True:
+                            service_manager.regenerate_service(name='ovs-dtl' if file_name.startswith('dtl') else 'ovs-volumedriver',
+                                                               client=root_client,
+                                                               target_name='ovs-{0}'.format(file_name.split('.')[0]))  # Leave out .version
+                            changed_clients.add(root_client)
+                Configuration.set(key='/ovs/framework/migration|actual_package_name_in_version_file', value=True)
             except Exception:
-                MigrationController._logger.exception('Introduction of edition key failed')
+                MigrationController._logger.exception('Updating actual package name for version files failed')
+
+        for root_client in changed_clients:
+            try:
+                root_client.run(['systemctl', 'daemon-reload'])
+            except Exception:
+                MigrationController._logger.exception('Executing command "systemctl daemon-reload" failed')
 
         MigrationController._logger.info('Finished out of band migrations')

@@ -22,6 +22,7 @@ import imp
 import inspect
 import unittest
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.packages.packagefactory import PackageFactory
 
 
 class APIConfiguration(unittest.TestCase):
@@ -33,7 +34,7 @@ class APIConfiguration(unittest.TestCase):
         (Re)Sets the stores on every test
         """
         # Some modules rely on this key, which is loaded during imp.load_source in _get_functions()
-        Configuration.set(key='/ovs/framework/edition/', value='enterprise')
+        Configuration.set(key=Configuration.EDITION_KEY, value=PackageFactory.EDITION_ENTERPRISE)
 
     def test_return(self):
         """
