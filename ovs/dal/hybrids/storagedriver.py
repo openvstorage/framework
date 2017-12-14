@@ -26,7 +26,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.logger import Logger
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 
 
 class StorageDriver(DataObject):
@@ -127,14 +127,14 @@ class StorageDriver(DataObject):
         from ovs.lib.storagedriver import StorageDriverController
         global_write_buffer = StorageDriverController.calculate_global_write_buffer(self.guid)
         vpool_backend_info = {'backend': copy.deepcopy(self.vpool.metadata['backend']),
-                              'caching_info': {'fragment_cache': {'read': False,
-                                                                  'write': False,
-                                                                  'quota': None,
-                                                                  'backend_info': None},  # Will contain connection info if it wouldn't be None
-                                               'block_cache': {'read': False,
-                                                               'write': False,
-                                                               'quota': None,
-                                                               'backend_info': None}}}
+                              'caching_info': {StorageDriverConfiguration.CACHE_BLOCK: {'read': False,
+                                                                                        'write': False,
+                                                                                        'quota': None,
+                                                                                        'backend_info': None},  # Will contain connection info if it wouldn't be None
+                                               StorageDriverConfiguration.CACHE_FRAGMENT: {'read': False,
+                                                                                           'write': False,
+                                                                                           'quota': None,
+                                                                                           'backend_info': None}}}
         if 'caching_info' not in self.vpool.metadata:
             self._logger.critical('Metadata structure has not been updated yet')
             return vpool_backend_info

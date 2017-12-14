@@ -29,11 +29,11 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.exceptions import HttpNotAcceptableException
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.generic import GenericController
-from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.update import UpdateController
@@ -196,8 +196,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :rtype: celery.result.AsyncResult
         """
         _ = storagerouter
-        Toolbox.verify_required_params(actual_params=parameters,
-                                       required_params={'vpool_guid': (str, Toolbox.regex_guid)})
+        ExtensionsToolbox.verify_required_params(actual_params=parameters, required_params={'vpool_guid': (str, ExtensionsToolbox.regex_guid)})
         return VPoolController.create_hprm_config_files.delay(parameters=parameters,
                                                               vpool_guid=parameters['vpool_guid'],
                                                               local_storagerouter_guid=local_storagerouter.guid)
@@ -304,6 +303,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
             _connection_info['port'] = 443
             _connection_info['local'] = True
             return _connection_info
+
         # API backwards compatibility
         if 'backend_connection_info' in call_parameters:
             raise HttpNotAcceptableException(error='invalid_data',
@@ -341,10 +341,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 connection_info_bc = get_default_connection_info(client, connection_info_bc)
                 call_parameters['connection_info_bc'] = connection_info_bc
 
-        if 'block_cache_on_read' not in call_parameters:
-            call_parameters['block_cache_on_read'] = False
-        if 'block_cache_on_write' not in call_parameters:
-            call_parameters['block_cache_on_write'] = False
+        if 'caching_info' not in call_parameters:
+            call_parameters['caching_info'] = {'cache_quota_bc': call_parameters.pop('cache_quota_bc', False),
+                                               'cache_quota_fc': call_parameters.pop('cache_quota_fc', False),
+                                               'block_cache_on_read': call_parameters.pop('block_cache_on_read', False),
+                                               'block_cache_on_write': call_parameters.pop('block_cache_on_write', False),
+                                               'fragment_cache_on_read': call_parameters.pop('fragment_cache_on_read', False),
+                                               'fragment_cache_on_write': call_parameters.pop('fragment_cache_on_write', False)}
 
         call_parameters.pop('type', None)
         call_parameters.pop('readcache_size', None)

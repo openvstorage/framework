@@ -25,6 +25,7 @@ from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 
@@ -71,8 +72,8 @@ class MonitoringController(object):
         """
         MonitoringController._logger.info('Starting vDisk caching quota verification...')
         alba_guid_size_map = {}
-        vdisk_cache_quota_mapping = {'fragment_cache': 'fragment',
-                                     'block_cache': 'block'}
+        vdisk_cache_quota_mapping = {StorageDriverConfiguration.CACHE_BLOCK: 'block',
+                                     StorageDriverConfiguration.CACHE_FRAGMENT: 'fragment'}
         for storagedriver in StorageDriverList.get_storagedrivers():
             storagedriver.invalidate_dynamics(['vpool_backend_info', 'vdisks_guids'])
             for cache_type, cache_type_data in storagedriver.vpool_backend_info['caching_info'].iteritems():
@@ -86,11 +87,7 @@ class MonitoringController(object):
                 alba_backend_host = connection_info['host']
                 alba_backend_guid = backend_info['alba_backend_guid']
                 if alba_backend_guid not in alba_guid_size_map:
-                    ovs_client = OVSClient(ip=alba_backend_host,
-                                           port=connection_info['port'],
-                                           credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                           version=6,
-                                           cache_store=VolatileFactory.get_client())
+                    ovs_client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
                     try:
                         alba_guid_size_map[alba_backend_guid] = {'name': alba_backend_name,
                                                                  'backend_ip': alba_backend_host,

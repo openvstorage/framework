@@ -68,14 +68,16 @@ define([
                         proxies: self.data.storageDriverParams.proxyAmount()
                     },
                     // Cache related
-                    // Fragment Cache - Backend data will be added later
-                    fragment_cache_on_read: fragmentCacheData.read(),
-                    fragment_cache_on_write: fragmentCacheData.write(),
-                    cache_quota_fc: cacheQuotaFC !== undefined ? Math.round(cacheQuotaFC * Math.pow(1024, 3)) : undefined,
-                    // Block Cache - Backend data will be added later
-                    block_cache_on_read: blockCacheData.read(),
-                    block_cache_on_write: blockCacheData.write(),
-                    cache_quota_bc: cacheQuotaBC !== undefined ? Math.round(cacheQuotaBC * Math.pow(1024, 3)) : undefined
+                    caching_info: {
+                        // Fragment Cache - Backend data will be added later
+                        fragment_cache_on_read: fragmentCacheData.read(),
+                        fragment_cache_on_write: fragmentCacheData.write(),
+                        cache_quota_fc: cacheQuotaFC !== undefined ? Math.round(cacheQuotaFC * Math.pow(1024, 3)) : undefined,
+                        // Block Cache - Backend data will be added later
+                        block_cache_on_read: blockCacheData.read(),
+                        block_cache_on_write: blockCacheData.write(),
+                        cache_quota_bc: cacheQuotaBC !== undefined ? Math.round(cacheQuotaBC * Math.pow(1024, 3)) : undefined
+                    }
                 }
             };
             // Add caching backend data where needed

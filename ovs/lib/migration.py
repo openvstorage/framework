@@ -159,14 +159,14 @@ class MigrationController(object):
                 proxy_config_key = '/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)
                 proxy_config = None if Configuration.exists(key=proxy_config_key) is False else Configuration.get(proxy_config_key)
                 if proxy_config is not None:
-                    fragment_cache = proxy_config.get('fragment_cache', ['none', {}])
+                    fragment_cache = proxy_config.get(StorageDriverConfiguration.CACHE_FRAGMENT, ['none', {}])
                     if fragment_cache[0] == 'alba' and fragment_cache[1].get('cache_on_write') is True:  # Accelerated ALBA configured
                         fragment_cache_scrub_info = copy.deepcopy(fragment_cache)
                         fragment_cache_scrub_info[1]['cache_on_read'] = False
                         proxy_scrub_config_key = '/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid)
                         proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
-                        if proxy_scrub_config is not None and proxy_scrub_config['fragment_cache'] == ['none']:
-                            proxy_scrub_config['fragment_cache'] = fragment_cache_scrub_info
+                        if proxy_scrub_config is not None and proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] == ['none']:
+                            proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] = fragment_cache_scrub_info
                             Configuration.set(key=proxy_scrub_config_key, value=proxy_scrub_config)
 
             # Update 'backend_connection_manager' section
@@ -271,14 +271,14 @@ class MigrationController(object):
                                                                     'port': None,
                                                                     'local': None}}
                                }
-            structure_map = {'fragment_cache': {'read': 'fragment_cache_on_read',
-                                                'write': 'fragment_cache_on_write',
-                                                'quota': 'quota_fc',
-                                                'backend_prefix': 'backend_aa_{0}'},
-                             'block_cache': {'read': 'block_cache_on_read',
-                                             'write': 'block_cache_on_write',
-                                             'quota': 'quota_bc',
-                                             'backend_prefix': 'backend_bc_{0}'}}
+            structure_map = {StorageDriverConfiguration.CACHE_BLOCK: {'read': 'block_cache_on_read',
+                                                                      'write': 'block_cache_on_write',
+                                                                      'quota': 'quota_bc',
+                                                                      'backend_prefix': 'backend_bc_{0}'},
+                             StorageDriverConfiguration.CACHE_FRAGMENT: {'read': 'fragment_cache_on_read',
+                                                                         'write': 'fragment_cache_on_write',
+                                                                         'quota': 'quota_fc',
+                                                                         'backend_prefix': 'backend_aa_{0}'}}
             if 'arakoon_config' in metadata['backend']:  # Arakoon config should be placed under the backend info
                 metadata['backend']['backend_info']['arakoon_config'] = metadata['backend'].pop('arakoon_config')
             if 'connection_info' in metadata['backend']:  # Connection info sohuld be placed under the backend info
@@ -347,7 +347,7 @@ class MigrationController(object):
             manifest_cache_size = 500 * 1024 * 1024
             if Configuration.exists(key=_proxy_config_key):
                 _proxy_config = Configuration.get(key=_proxy_config_key)
-                for cache_type in ['block_cache', 'fragment_cache']:
+                for cache_type in [StorageDriverConfiguration.CACHE_BLOCK, StorageDriverConfiguration.CACHE_FRAGMENT]:
                     if cache_type in _proxy_config and _proxy_config[cache_type][0] == 'alba':
                         if _proxy_config[cache_type][1]['manifest_cache_size'] != manifest_cache_size:
                             updated = True
