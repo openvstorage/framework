@@ -22,20 +22,36 @@ VpoolInstaller class responsible for adding/removing vPools
 import re
 import copy
 import json
+import time
+from subprocess import CalledProcessError
+from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient
-from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs_extensions.generic.remote import remote
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
+from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
+from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import log
 from ovs.lib.helpers.decorators import ovs_task
+from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.storagedriver import StorageDriverController, StorageDriverInstaller
+from ovs.lib.storagerouter import StorageRouterController, StorageRouterInstaller
+from ovs.lib.vdisk import VDiskController
 
 
 class VPoolInstaller(object):
@@ -388,6 +404,548 @@ class VPoolController(object):
     Contains all BLL related to VPools
     """
     _logger = Logger('lib')
+    _service_manager = ServiceFactory.get_manager()
+
+    @classmethod
+    @ovs_task(name='ovs.storagerouter.add_vpool')
+    def add_vpool(cls, parameters):
+        """
+        Add a vPool to the machine this task is running on
+        :param parameters: Parameters for vPool creation
+        :type parameters: dict
+        :return: None
+        :rtype: NoneType
+        """
+        # VALIDATIONS
+        if not isinstance(parameters, dict):
+            raise ValueError('Parameters passed to create a vPool should be of type dict')
+
+        # Check StorageRouter existence
+        storagerouter = StorageRouterList.get_by_ip(ip=parameters.get('storagerouter_ip'))
+        if storagerouter is None:
+            raise RuntimeError('Could not find StorageRouter')
+
+        # Validate requested vPool configurations
+        vp_installer = VPoolInstaller(name=parameters.get('vpool_name'))
+        vp_installer.validate(storagerouter=storagerouter)
+
+        # Validate requested StorageDriver configurations
+        cls._logger.info('vPool {0}: Validating StorageDriver configurations'.format(vp_installer.name))
+        sd_installer = StorageDriverInstaller(storage_ip=parameters.get('storage_ip'),
+                                              vp_installer=vp_installer,
+                                              caching_info=parameters.get('caching_info'),
+                                              backend_info={'main': parameters.get('backend_info'),
+                                                            StorageDriverConfiguration.CACHE_BLOCK: parameters.get('backend_info_bc'),
+                                                            StorageDriverConfiguration.CACHE_FRAGMENT: parameters.get('backend_info_fc')},
+                                              connection_info={'main': parameters.get('connection_info'),
+                                                               StorageDriverConfiguration.CACHE_BLOCK: parameters.get('connection_info_bc'),
+                                                               StorageDriverConfiguration.CACHE_FRAGMENT: parameters.get('connection_info_fc')},
+                                              sd_configuration=parameters.get('config_params'))
+
+        partitions_mutex = volatile_mutex('add_vpool_partitions_{0}'.format(storagerouter.guid))
+        try:
+            # VPOOL CREATION
+            # Create the vPool as soon as possible in the process to be displayed in the GUI (INSTALLING/EXTENDING state)
+            if vp_installer.is_new is True:
+                vp_installer.create(rdma_enabled=sd_installer.rdma_enabled)
+                vp_installer.configure_mds(config=parameters.get('mds_config_params'))
+            else:
+                vp_installer.update_status(status=VPool.STATUSES.EXTENDING)
+
+            # ADDITIONAL VALIDATIONS
+            # Check StorageRouter connectivity
+            cls._logger.info('vPool {0}: Validating StorageRouter connectivity'.format(vp_installer.name))
+            linked_storagerouters = [storagerouter]
+            if vp_installer.is_new is False:
+                linked_storagerouters += [sd.storagerouter for sd in vp_installer.vpool.storagedrivers]
+
+            ip_client_map = {}
+            offline_nodes = []
+            for sr in linked_storagerouters:
+                try:
+                    ip_client_map[sr.ip] = {'ovs': SSHClient(endpoint=sr.ip, username='ovs'),
+                                            'root': SSHClient(endpoint=sr.ip, username='root')}
+                except UnableToConnectException:
+                    if sr == storagerouter:
+                        raise RuntimeError('Node on which the vPool is being {0} is not reachable'.format('created' if vp_installer.is_new is True else 'extended'))
+                    offline_nodes.append(sr)  # We currently want to allow offline nodes while setting up or extend a vPool
+
+            sr_installer = StorageRouterInstaller(root_client=ip_client_map[storagerouter.ip]['root'],
+                                                  sd_installer=sd_installer,
+                                                  vp_installer=vp_installer,
+                                                  storagerouter=storagerouter)
+            sd_installer.sr_installer = sr_installer
+            vp_installer.sr_installer = sr_installer
+            vp_installer.sd_installer = sd_installer
+
+            # When 2 or more jobs simultaneously run on the same StorageRouter, we need to check and create the StorageDriver partitions in locked context
+            partitions_mutex.acquire(wait=60)
+            sr_installer.partition_info = StorageRouterController.get_partition_info(storagerouter_guid=storagerouter.guid)
+            sr_installer.validate_vpool_extendable()
+            sr_installer.validate_global_write_buffer(requested_size=parameters.get('writecache_size', 0))
+            sr_installer.validate_local_cache_size(requested_proxies=parameters.get('parallelism', {}).get('proxies', 2))
+
+            # MODEL STORAGEDRIVER AND PARTITION JUNCTIONS
+            sd_installer.create()
+            sd_installer.create_partitions()
+        except Exception:
+            cls._logger.exception('Something went wrong during the validation or modeling of vPool {0} on StorageRouter {1}'.format(vp_installer.name, storagerouter.name))
+            vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
+            raise
+        finally:
+            partitions_mutex.release()
+
+        cls._logger.info('vPool {0}: Refreshing metadata'.format(vp_installer.name))
+        try:
+            vp_installer.refresh_metadata()
+        except Exception:
+            # At this point still nothing irreversible has changed, so revert to RUNNING
+            cls._logger.exception('vPool {0}: Refreshing metadata failed'.format(vp_installer.name))
+            vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
+            raise
+
+        # Arakoon setup
+        counter = 0
+        while counter < 300:
+            try:
+                if StorageDriverController.manual_voldrv_arakoon_checkup() is True:
+                    break
+            except Exception:
+                cls._logger.exception('Arakoon checkup for voldrv cluster failed')
+                vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
+                raise
+            counter += 1
+            time.sleep(1)
+            if counter == 300:
+                vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
+                raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
+
+        # Cluster registry
+        vp_installer.configure_cluster_registry()
+        try:
+            vp_installer.configure_cluster_registry()
+        except:
+            cls._logger.exception('vPool {0}: Cluster registry configuration failed'.format(vp_installer.name))
+            if vp_installer.is_new is True:
+                vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
+            else:
+                vp_installer.revert_vpool(status=VPool.STATUSES.FAILURE)
+            raise
+
+        # Configurations
+        try:
+            # Configure regular proxies and scrub proxies
+            sd_installer.setup_proxy_configs()
+
+            # Configure the StorageDriver service
+            sd_installer.configure_storagedriver_service()
+
+            DiskController.sync_with_reality(storagerouter.guid)
+            MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vp_installer.vpool)
+
+            # Update the MDS safety if changed via API (vpool.configuration will be available at this point also for the newly added StorageDriver)
+            vp_installer.vpool.invalidate_dynamics('configuration')
+            if vp_installer.mds_safety is not None and vp_installer.vpool.configuration['mds_config']['mds_safety'] != vp_installer.mds_safety:
+                Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vp_installer.vpool.guid), value=vp_installer.mds_safety)
+        except:
+            # From here on out we don't want to revert the vPool anymore, since it might break stuff even more, instead we just put it in FAILURE
+            cls._logger.exception('vPool {0}: Configuration failed'.format(vp_installer.name))
+            vp_installer.update_status(status=VPool.STATUSES.FAILURE)
+            raise
+
+        # Create and start watcher volumedriver, DTL, proxies and StorageDriver services
+        try:
+            sd_installer.start_services()
+        except Exception:
+            cls._logger.exception('vPool {0}: Creating and starting all services failed'.format(vp_installer.name))
+            vp_installer.update_status(status=VPool.STATUSES.FAILURE)
+            raise
+
+        # Post creation/extension checkups
+        try:
+            mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vp_installer.vpool, offline_nodes=offline_nodes)
+            for sr, clients in ip_client_map.iteritems():
+                for current_storagedriver in [sd for sd in sr.storagedrivers if sd.vpool_guid == vp_installer.vpool.guid]:
+                    storagedriver_config = StorageDriverConfiguration(vpool_guid=vp_installer.vpool.guid, storagedriver_id=current_storagedriver.storagedriver_id)
+                    if storagedriver_config.config_missing is False:
+                        # Filesystem section in StorageDriver configuration are all parameters used for vDisks created directly on the filesystem
+                        # So when a vDisk gets created on the filesystem, these MDSes will be assigned to them
+                        storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
+                        storagedriver_config.save(client=clients['ovs'])
+
+            # Everything's reconfigured, refresh new cluster configuration
+            for current_storagedriver in vp_installer.vpool.storagedrivers:
+                if current_storagedriver.storagerouter.ip not in ip_client_map:
+                    continue
+                vp_installer.vpool.storagedriver_client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id), req_timeout_secs=10)
+        except Exception:
+            cls._logger.exception('vPool {0}: Updating the MDS node configuration or cluster node config failed'.format(vp_installer.name))
+            vp_installer.update_status(status=VPool.STATUSES.FAILURE)
+            raise
+
+        # When a node is offline, we can run into errors, but also when 1 or more volumes are not running
+        # Scheduled tasks below, so don't really care whether they succeed or not
+        try:
+            VDiskController.dtl_checkup(vpool_guid=vp_installer.vpool.guid, ensure_single_timeout=600)
+        except:
+            pass
+        for vdisk in vp_installer.vpool.vdisks:
+            try:
+                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
+            except:
+                pass
+        vp_installer.update_status(status=VPool.STATUSES.RUNNING)
+        cls._logger.info('Add vPool {0} ended successfully'.format(vp_installer.name))
+
+    @classmethod
+    @ovs_task(name='ovs.storagerouter.remove_storagedriver')
+    def remove_storagedriver(cls, storagedriver_guid, offline_storage_router_guids=list()):
+        """
+        Removes a StorageDriver (if its the last StorageDriver for a vPool, the vPool is removed as well)
+        :param storagedriver_guid: Guid of the StorageDriver to remove
+        :type storagedriver_guid: str
+        :param offline_storage_router_guids: Guids of StorageRouters which are offline and will be removed from cluster.
+                                             WHETHER VPOOL WILL BE DELETED DEPENDS ON THIS
+        :type offline_storage_router_guids: list
+        :return: None
+        :rtype: NoneType
+        """
+        storage_driver = StorageDriver(storagedriver_guid)
+        cls._logger.info('StorageDriver {0} - Deleting StorageDriver {1}'.format(storage_driver.guid, storage_driver.name))
+
+        #############
+        # Validations
+        vpool = storage_driver.vpool
+        if vpool.status != VPool.STATUSES.RUNNING:
+            raise ValueError('VPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
+
+        # Sync with reality to have a clear vision of vDisks
+        VDiskController.sync_with_reality(storage_driver.vpool_guid)
+        storage_driver.invalidate_dynamics('vdisks_guids')
+        if len(storage_driver.vdisks_guids) > 0:
+            raise RuntimeError('There are still vDisks served from the given StorageDriver')
+
+        storage_router = storage_driver.storagerouter
+        mds_services_to_remove = [mds_service for mds_service in vpool.mds_services if mds_service.service.storagerouter_guid == storage_router.guid]
+        for mds_service in mds_services_to_remove:
+            if len(mds_service.storagedriver_partitions) == 0 or mds_service.storagedriver_partitions[0].storagedriver is None:
+                raise RuntimeError('Failed to retrieve the linked StorageDriver to this MDS Service {0}'.format(mds_service.service.name))
+
+        cls._logger.info('StorageDriver {0} - Checking availability of related StorageRouters'.format(storage_driver.guid, storage_driver.name))
+        client = None
+        errors_found = False
+        storage_drivers_left = False
+        storage_router_online = True
+        available_storage_drivers = []
+        for sd in vpool.storagedrivers:
+            sr = sd.storagerouter
+            if sr != storage_router:
+                storage_drivers_left = True
+            try:
+                temp_client = SSHClient(sr, username='root')
+                if sr.guid in offline_storage_router_guids:
+                    raise Exception('StorageRouter "{0}" passed as "offline StorageRouter" appears to be reachable'.format(sr.name))
+                if sr == storage_router:
+                    mtpt_pids = temp_client.run("lsof -t +D '/mnt/{0}' || true".format(vpool.name.replace(r"'", r"'\''")), allow_insecure=True).splitlines()
+                    if len(mtpt_pids) > 0:
+                        raise RuntimeError('vPool cannot be deleted. Following processes keep the vPool mount point occupied: {0}'.format(', '.join(mtpt_pids)))
+                with remote(temp_client.ip, [LocalStorageRouterClient]) as rem:
+                    sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
+                    if Configuration.exists(sd_key) is True:
+                        try:
+                            path = Configuration.get_configuration_path(sd_key)
+                            lsrc = rem.LocalStorageRouterClient(path)
+                            lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
+                            cls._logger.info('StorageDriver {0} - Available StorageDriver for migration - {1}'.format(storage_driver.guid, sd.name))
+                            available_storage_drivers.append(sd)
+                        except Exception as ex:
+                            if 'ClusterNotReachableException' not in str(ex):
+                                raise
+                client = temp_client
+                cls._logger.info('StorageDriver {0} - StorageRouter {1} with IP {2} is online'.format(storage_driver.guid, sr.name, sr.ip))
+            except UnableToConnectException:
+                if sr == storage_router or sr.guid in offline_storage_router_guids:
+                    cls._logger.warning('StorageDriver {0} - StorageRouter {1} with IP {2} is offline'.format(storage_driver.guid, sr.name, sr.ip))
+                    if sr == storage_router:
+                        storage_router_online = False
+                else:
+                    raise RuntimeError('Not all StorageRouters are reachable')
+
+        if client is None:
+            raise RuntimeError('Could not find any responsive node in the cluster')
+
+        ###############
+        # Start removal
+        if storage_drivers_left is True:
+            vpool.status = VPool.STATUSES.SHRINKING
+        else:
+            vpool.status = VPool.STATUSES.DELETING
+        vpool.save()
+
+        available_sr_names = [sd.storagerouter.name for sd in available_storage_drivers]
+        unavailable_sr_names = [sd.storagerouter.name for sd in vpool.storagedrivers if sd not in available_storage_drivers]
+        cls._logger.info('StorageDriver {0} - StorageRouters on which an available StorageDriver runs: {1}'.format(storage_driver.guid, ', '.join(available_sr_names)))
+        if unavailable_sr_names:
+            cls._logger.warning('StorageDriver {0} - StorageRouters on which a StorageDriver is unavailable: {1}'.format(storage_driver.guid, ', '.join(unavailable_sr_names)))
+
+        # Remove stale vDisks
+        voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
+        voldrv_vdisk_guids = VDiskList.get_in_volume_ids(voldrv_vdisks).guids
+        for vdisk_guid in set(vpool.vdisks_guids).difference(set(voldrv_vdisk_guids)):
+            cls._logger.warning('vDisk with guid {0} does no longer exist on any StorageDriver linked to vPool {1}, deleting...'.format(vdisk_guid, vpool.name))
+            VDiskController.clean_vdisk_from_model(vdisk=VDisk(vdisk_guid))
+
+        # Un-configure or reconfigure the MDSes
+        cls._logger.info('StorageDriver {0} - Reconfiguring MDSes'.format(storage_driver.guid))
+        vdisks = []
+        for mds in mds_services_to_remove:
+            for junction in mds.vdisks:
+                vdisk = junction.vdisk
+                if vdisk in vdisks:
+                    continue
+                vdisks.append(vdisk)
+                vdisk.invalidate_dynamics(['info', 'storagedriver_id'])
+                if vdisk.storagedriver_id:
+                    try:
+                        cls._logger.debug('StorageDriver {0} - vDisk {1} {2} - Ensuring MDS safety'.format(storage_driver.guid, vdisk.guid, vdisk.name))
+                        MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid,
+                                                           excluded_storagerouter_guids=[storage_router.guid] + offline_storage_router_guids)
+                    except Exception:
+                        cls._logger.exception('StorageDriver {0} - vDisk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
+
+        # Validate that all MDSes on current StorageRouter have been moved away
+        # Ensure safety does not always throw an error, that's why we perform this check here instead of in the Exception clause of above code
+        vdisks = []
+        for mds in mds_services_to_remove:
+            for junction in mds.vdisks:
+                vdisk = junction.vdisk
+                if vdisk in vdisks:
+                    continue
+                vdisks.append(vdisk)
+                cls._logger.critical('StorageDriver {0} - vDisk {1} {2} - MDS Services have not been migrated away'.format(storage_driver.guid, vdisk.guid, vdisk.name))
+        if len(vdisks) > 0:
+            # Put back in RUNNING, so it can be used again. Errors keep on displaying in GUI now anyway
+            vpool.status = VPool.STATUSES.RUNNING
+            vpool.save()
+            raise RuntimeError('Not all MDS Services have been successfully migrated away')
+
+        # Disable and stop DTL, voldrv and albaproxy services
+        if storage_router_online is True:
+            dtl_service = 'dtl_{0}'.format(vpool.name)
+            voldrv_service = 'volumedriver_{0}'.format(vpool.name)
+            client = SSHClient(storage_router, username='root')
+
+            for service in [voldrv_service, dtl_service]:
+                try:
+                    if cls._service_manager.has_service(service, client=client):
+                        cls._logger.debug('StorageDriver {0} - Stopping service {1}'.format(storage_driver.guid, service))
+                        cls._service_manager.stop_service(service, client=client)
+                        cls._logger.debug('StorageDriver {0} - Removing service {1}'.format(storage_driver.guid, service))
+                        cls._service_manager.remove_service(service, client=client)
+                except Exception:
+                    cls._logger.exception('StorageDriver {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service))
+                    errors_found = True
+
+            sd_config_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+            if storage_drivers_left is False and Configuration.exists(sd_config_key):
+                try:
+                    for proxy in storage_driver.alba_proxies:
+                        if cls._service_manager.has_service(proxy.service.name, client=client):
+                            cls._logger.debug('StorageDriver {0} - Starting proxy {1}'.format(storage_driver.guid, proxy.service.name))
+                            cls._service_manager.start_service(proxy.service.name, client=client)
+                            tries = 10
+                            running = False
+                            port = proxy.service.ports[0]
+                            while running is False and tries > 0:
+                                cls._logger.debug('StorageDriver {0} - Waiting for the proxy {1} to start up'.format(storage_driver.guid, proxy.service.name))
+                                tries -= 1
+                                time.sleep(10 - tries)
+                                try:
+                                    client.run(['alba', 'proxy-statistics', '--host', storage_driver.storage_ip, '--port', str(port)])
+                                    running = True
+                                except CalledProcessError as ex:
+                                    cls._logger.error('StorageDriver {0} - Fetching alba proxy-statistics failed with error (but ignoring): {1}'.format(storage_driver.guid, ex))
+                            if running is False:
+                                raise RuntimeError('Alba proxy {0} failed to start'.format(proxy.service.name))
+                            cls._logger.debug('StorageDriver {0} - Alba proxy {0} running'.format(storage_driver.guid, proxy.service.name))
+
+                    cls._logger.debug('StorageDriver {0} - Destroying filesystem and erasing node configs'.format(storage_driver.guid))
+                    with remote(client.ip, [LocalStorageRouterClient], username='root') as rem:
+                        path = Configuration.get_configuration_path(sd_config_key)
+                        storagedriver_client = rem.LocalStorageRouterClient(path)
+                        try:
+                            storagedriver_client.destroy_filesystem()
+                        except RuntimeError as rte:
+                            # If backend has already been deleted, we cannot delete the filesystem anymore --> storage leak!!!
+                            if 'MasterLookupResult.Error' not in rte.message:
+                                raise
+
+                    # noinspection PyArgumentList
+                    vpool.clusterregistry_client.erase_node_configs()
+                except RuntimeError:
+                    cls._logger.exception('StorageDriver {0} - Destroying filesystem and erasing node configs failed'.format(storage_driver.guid))
+                    errors_found = True
+
+            for proxy in storage_driver.alba_proxies:
+                service_name = proxy.service.name
+                try:
+                    if cls._service_manager.has_service(service_name, client=client):
+                        cls._logger.debug('StorageDriver {0} - Stopping service {1}'.format(storage_driver.guid, service_name))
+                        cls._service_manager.stop_service(service_name, client=client)
+                        cls._logger.debug('StorageDriver {0} - Removing service {1}'.format(storage_driver.guid, service_name))
+                        cls._service_manager.remove_service(service_name, client=client)
+                except Exception:
+                    cls._logger.exception('StorageDriver {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
+                    errors_found = True
+
+        # Reconfigure cluster node configs
+        if storage_drivers_left is True:
+            try:
+                cls._logger.info('StorageDriver {0} - Reconfiguring cluster node configs'.format(storage_driver.guid))
+                node_configs = []
+                for sd in vpool.storagedrivers:
+                    if sd != storage_driver:
+                        sd.invalidate_dynamics(['cluster_node_config'])
+                        config = sd.cluster_node_config
+                        if storage_driver.storagedriver_id in config['node_distance_map']:
+                            del config['node_distance_map'][storage_driver.storagedriver_id]
+                        node_configs.append(ClusterNodeConfig(**config))
+                cls._logger.debug('StorageDriver {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
+                vpool.clusterregistry_client.set_node_configs(node_configs)
+                for sd in available_storage_drivers:
+                    if sd != storage_driver:
+                        cls._logger.debug('StorageDriver {0} - StorageDriver {1} {2} - Updating cluster node configs'.format(storage_driver.guid, sd.guid, sd.name))
+                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
+            except Exception:
+                cls._logger.exception('StorageDriver {0} - Reconfiguring cluster node configs failed'.format(storage_driver.guid))
+                errors_found = True
+
+        # Removing MDS services
+        cls._logger.info('StorageDriver {0} - Removing MDS services'.format(storage_driver.guid))
+        for mds_service in mds_services_to_remove:
+            # All MDSServiceVDisk object should have been deleted above
+            try:
+                cls._logger.debug('StorageDriver {0} - Remove MDS service (number {1}) for StorageRouter with IP {2}'.format(storage_driver.guid, mds_service.number, storage_router.ip))
+                MDSServiceController.remove_mds_service(mds_service=mds_service,
+                                                        reconfigure=False,
+                                                        allow_offline=not storage_router_online)
+            except Exception:
+                cls._logger.exception('StorageDriver {0} - Removing MDS service failed'.format(storage_driver.guid))
+                errors_found = True
+
+        # Clean up directories and files
+        dirs_to_remove = [storage_driver.mountpoint]
+        for sd_partition in storage_driver.partitions[:]:
+            dirs_to_remove.append(sd_partition.path)
+            sd_partition.delete()
+
+        for proxy in storage_driver.alba_proxies:
+            config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(vpool.guid, proxy.guid)
+            Configuration.delete(config_tree)
+
+        if storage_router_online is True:
+            # Cleanup directories/files
+            cls._logger.info('StorageDriver {0} - Deleting vPool related directories and files'.format(storage_driver.guid))
+            try:
+                mountpoints = StorageRouterController.get_mountpoints(client)
+                for dir_name in dirs_to_remove:
+                    if dir_name and client.dir_exists(dir_name) and dir_name not in mountpoints and dir_name != '/':
+                        client.dir_delete(dir_name)
+            except Exception:
+                cls._logger.exception('StorageDriver {0} - Failed to retrieve mount point information or delete directories'.format(storage_driver.guid))
+                cls._logger.warning('StorageDriver {0} - Following directories should be checked why deletion was prevented: {1}'.format(storage_driver.guid, ', '.join(dirs_to_remove)))
+                errors_found = True
+
+            cls._logger.debug('StorageDriver {0} - Synchronizing disks with reality'.format(storage_driver.guid))
+            try:
+                DiskController.sync_with_reality(storage_router.guid)
+            except Exception:
+                cls._logger.exception('StorageDriver {0} - Synchronizing disks with reality failed'.format(storage_driver.guid))
+                errors_found = True
+
+        Configuration.delete('/ovs/vpools/{0}/hosts/{1}'.format(vpool.guid, storage_driver.storagedriver_id))
+
+        # Model cleanup
+        cls._logger.info('StorageDriver {0} - Cleaning up model'.format(storage_driver.guid))
+        for proxy in storage_driver.alba_proxies:
+            cls._logger.debug('StorageDriver {0} - Removing alba proxy service {1} from model'.format(storage_driver.guid, proxy.service.name))
+            service = proxy.service
+            proxy.delete()
+            service.delete()
+
+        sd_can_be_deleted = True
+        if storage_drivers_left is False:
+            for relation in ['mds_services', 'storagedrivers', 'vdisks']:
+                expected_amount = 1 if relation == 'storagedrivers' else 0
+                if len(getattr(vpool, relation)) > expected_amount:
+                    sd_can_be_deleted = False
+                    break
+        else:
+            metadata_key = 'backend_aa_{0}'.format(storage_router.guid)
+            if metadata_key in vpool.metadata:
+                vpool.metadata.pop(metadata_key)
+                vpool.save()
+            metadata_key = 'backend_bc_{0}'.format(storage_router.guid)
+            if metadata_key in vpool.metadata:
+                vpool.metadata.pop(metadata_key)
+                vpool.save()
+            cls._logger.debug('StorageDriver {0} - Checking DTL for all vDisks in vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
+            try:
+                VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
+            except Exception:
+                cls._logger.exception('StorageDriver {0} - DTL checkup failed for vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
+
+        if sd_can_be_deleted is True:
+            storage_driver.delete()
+            if storage_drivers_left is False:
+                cls._logger.info('StorageDriver {0} - Removing vPool from model'.format(storage_driver.guid))
+                vpool.delete()
+                Configuration.delete('/ovs/vpools/{0}'.format(vpool.guid))
+        else:
+            try:
+                vpool.delete()  # Try to delete the vPool to invoke a proper stacktrace to see why it can't be deleted
+            except Exception:
+                errors_found = True
+                cls._logger.exception('StorageDriver {0} - Cleaning up vPool from the model failed'.format(storage_driver.guid))
+
+        cls._logger.info('StorageDriver {0} - Running MDS checkup'.format(storage_driver.guid))
+        try:
+            MDSServiceController.mds_checkup()
+        except Exception:
+            cls._logger.exception('StorageDriver {0} - MDS checkup failed'.format(storage_driver.guid))
+
+        if errors_found is True:
+            if storage_drivers_left is True:
+                vpool.status = VPool.STATUSES.FAILURE
+                vpool.save()
+            raise RuntimeError('1 or more errors occurred while trying to remove the StorageDriver. Please check the logs for more information')
+        if storage_drivers_left is True:
+            vpool.status = VPool.STATUSES.RUNNING
+            vpool.save()
+        cls._logger.info('StorageDriver {0} - Deleted StorageDriver {1}'.format(storage_driver.guid, storage_driver.name))
+        if len(VPoolList.get_vpools()) == 0:
+            cluster_name = ArakoonInstaller.get_cluster_name('voldrv')
+            if ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)['internal'] is True:
+                cls._logger.debug('StorageDriver {0} - Removing Arakoon cluster {1}'.format(storage_driver.guid, cluster_name))
+                try:
+                    installer = ArakoonInstaller(cluster_name=cluster_name)
+                    installer.load()
+                    installer.delete_cluster()
+                except Exception:
+                    cls._logger.exception('StorageDriver {0} - Delete voldrv Arakoon cluster failed'.format(storage_driver.guid))
+                service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON)
+                service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
+                for service in list(service_type.services):
+                    if service.name == service_name:
+                        service.delete()
+
+        if len(storage_router.storagedrivers) == 0 and storage_router_online is True:  # ensure client is initialized for StorageRouter
+            try:
+                if cls._service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=client):
+                    cls._service_manager.stop_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=client)
+                    cls._service_manager.remove_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=client)
+            except Exception:
+                cls._logger.exception('StorageDriver {0} - {1} deletion failed'.format(storage_driver.guid, ServiceFactory.SERVICE_WATCHER_VOLDRV))
 
     @staticmethod
     @ovs_task(name='ovs.vpool.up_and_running')
