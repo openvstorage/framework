@@ -29,6 +29,5 @@ ADD . /opt/OpenvStorage
 # Further tweaks to run our tests
 RUN cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/ \
     && chmod 777 /usr/bin/ovs \
-    && export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/dist-packages \
-    && cd /opt/OpenvStorage/webapps/api; export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput \
+    && cd /opt/OpenvStorage/webapps/api; python manage.py syncdb --noinput \
     && echo '{"configuration_store":"arakoon"}' > /opt/OpenvStorage/config/framework.json

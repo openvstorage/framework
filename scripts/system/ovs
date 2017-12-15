@@ -16,7 +16,6 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 cd /opt/OpenvStorage
-export PYTHONPATH="/opt/OpenvStorage:/opt/OpenvStorage/webapps:${PYTHONPATH}"
 export DISPLAY=:0
 export OVS_LOGTYPE_OVERRIDE=file
 

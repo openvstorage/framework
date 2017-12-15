@@ -536,7 +536,7 @@ class NodeInstallationController(object):
 
             # Try to trigger setups from possibly installed other packages
             if root_client.run(['which', 'asd-manager'], allow_nonzero=True) != '':
-                sys.path.append('/opt/asd-manager/')
+                sys.path.append('/opt/asd-manager')
                 from source.asdmanager import setup
                 Toolbox.log(logger=NodeInstallationController._logger, messages='\nA local ASD Manager was detected for which the setup will now be launched.\n')
                 setup()

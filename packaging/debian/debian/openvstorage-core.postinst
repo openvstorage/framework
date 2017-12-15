@@ -1,3 +1,7 @@
 #!/usr/bin/env bash
 
 python /opt/OpenvStorage/scripts/install/openvstorage-core.postinst.py "__NEW_VERSION__" "$@"
+
+# create new .pth file with our path
+echo "/opt/OpenvStorage/" > "/usr/lib/python2.7/dist-packages/ovs_framework.pth"
+echo "/opt/OpenvStorage/webapps/" >> "/usr/lib/python2.7/dist-packages/ovs_framework.pth"
