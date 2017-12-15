@@ -29,7 +29,6 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.generic import GenericController
-from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vpool import VPoolController
 
@@ -95,7 +94,7 @@ class VPoolViewSet(viewsets.ViewSet):
         if not intersection:
             raise HttpNotAcceptableException(error='impossible_request',
                                              error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name))
-        return StorageRouterController.remove_storagedriver.delay(StorageRouterController, list(intersection)[0])
+        return VPoolController.shrink_vpool.delay(VPoolController, list(intersection)[0])
 
     @link()
     @log()

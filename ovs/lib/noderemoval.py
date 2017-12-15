@@ -48,9 +48,9 @@ class NodeRemovalController(object):
         :type silent: str
         :return: None
         """
-        from ovs.lib.storagedriver import StorageDriverController
-        from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.lists.storagerouterlist import StorageRouterList
+        from ovs.lib.storagedriver import StorageDriverController
+        from ovs.lib.vpool import VPoolController
 
         Toolbox.log(logger=NodeRemovalController._logger, messages='Remove node', boxed=True)
         Toolbox.log(logger=NodeRemovalController._logger, messages='WARNING: Some of these steps may take a very long time, please check the logs for more information\n\n')
@@ -207,8 +207,8 @@ class NodeRemovalController(object):
             storage_routers_offline_guids = [sr.guid for sr in storage_routers_offline if sr.guid != storage_router_to_remove.guid]
             for storage_driver in storage_router_to_remove.storagedrivers:
                 Toolbox.log(logger=NodeRemovalController._logger, messages='    Removing vPool {0} from node'.format(storage_driver.vpool.name))
-                StorageRouterController.remove_storagedriver(storagedriver_guid=storage_driver.guid,
-                                                             offline_storage_router_guids=storage_routers_offline_guids)
+                VPoolController.shrink_vpool(storagedriver_guid=storage_driver.guid,
+                                             offline_storage_router_guids=storage_routers_offline_guids)
 
             # Demote if MASTER
             if storage_router_to_remove.node_type == 'MASTER':

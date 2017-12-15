@@ -59,6 +59,7 @@ class MigrationController(object):
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+        from ovs.lib.storagedriver import StorageDriverInstaller
 
         MigrationController._logger.info('Start out of band migrations...')
         service_manager = ServiceFactory.get_manager()
@@ -83,7 +84,7 @@ class MigrationController(object):
                         continue
 
                     try:
-                        service_manager.regenerate_service(name='ovs-albaproxy', client=root_client, target_name=service_name)
+                        service_manager.regenerate_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY, client=root_client, target_name=service_name)
                         changed_clients.add(root_client)
                     except:
                         MigrationController._logger.exception('Error rebuilding service {0}'.format(service_name))
@@ -150,7 +151,7 @@ class MigrationController(object):
                                                     new_run_file='{0}/{1}.version'.format(ServiceFactory.RUN_FILE_DIR, new_service_name))
 
                 # Register new service and remove old service
-                service_manager.add_service(name='ovs-albaproxy',
+                service_manager.add_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY,
                                             client=root_client,
                                             params=Configuration.get(old_configuration_key),
                                             target_name='ovs-{0}'.format(new_service_name))
@@ -425,7 +426,7 @@ class MigrationController(object):
                     continue
 
                 try:
-                    service_manager.regenerate_service(name='ovs-albaproxy', client=root_client, target_name=service_name)
+                    service_manager.regenerate_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY, client=root_client, target_name=service_name)
                     changed_clients.add(root_client)
                     ExtensionsToolbox.edit_version_file(client=root_client,
                                                         package_name='alba',
@@ -513,7 +514,7 @@ class MigrationController(object):
                         config['ALBA_PKG_NAME'] = alba_pkg_name
                         config['ALBA_VERSION_CMD'] = alba_version_cmd
                         Configuration.set(key=config_key, value=config)
-                        service_manager.regenerate_service(name='ovs-albaproxy',
+                        service_manager.regenerate_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY,
                                                            client=root_client,
                                                            target_name='ovs-{0}'.format(service.name))
                         changed_clients.add(root_client)
@@ -533,7 +534,7 @@ class MigrationController(object):
                         root_client = sr_client_map[storagedriver.storagerouter_guid]
                         for entry in ['dtl', 'volumedriver']:
                             service_name = '{0}_{1}'.format(entry, vpool.name)
-                            service_template = 'ovs-dtl' if entry == 'dtl' else 'ovs-volumedriver'
+                            service_template = StorageDriverInstaller.SERVICE_TEMPLATE_DTL if entry == 'dtl' else StorageDriverInstaller.SERVICE_TEMPLATE_SD
                             config_key = ServiceFactory.SERVICE_CONFIG_KEY.format(storagedriver.storagerouter.machine_id, service_name)
                             if Configuration.exists(key=config_key):
                                 config = Configuration.get(key=config_key)
@@ -580,7 +581,7 @@ class MigrationController(object):
                                 root_client.file_write(filename=file_path, contents=contents)
 
                         if regenerate is True:
-                            service_manager.regenerate_service(name='ovs-dtl' if file_name.startswith('dtl') else 'ovs-volumedriver',
+                            service_manager.regenerate_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_DTL if file_name.startswith('dtl') else StorageDriverInstaller.SERVICE_TEMPLATE_SD,
                                                                client=root_client,
                                                                target_name='ovs-{0}'.format(file_name.split('.')[0]))  # Leave out .version
                             changed_clients.add(root_client)

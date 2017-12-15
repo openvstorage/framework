@@ -99,6 +99,21 @@ class VDiskController(object):
         vdisk.delete()
 
     @staticmethod
+    def remove_stale_vdisks(vpool):
+        """
+        Remove vDisks related to the specified vPool from the model
+        :param vpool: vPool to clean stale vDisks from
+        :type vpool: ovs.dal.hybrids.vpool.VPool
+        :return: None
+        :rtype: NoneType
+        """
+        voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
+        voldrv_vdisk_guids = VDiskList.get_in_volume_ids(voldrv_vdisks).guids
+        for vdisk_guid in set(vpool.vdisks_guids).difference(set(voldrv_vdisk_guids)):
+            VDiskController._logger.warning('vDisk with guid {0} does no longer exist on any StorageDriver linked to vPool {1}, deleting...'.format(vdisk_guid, vpool.name))
+            VDiskController.clean_vdisk_from_model(vdisk=VDisk(vdisk_guid))
+
+    @staticmethod
     def vdisk_checkup(vdisk):
         """
         Triggers a few (async) tasks to make sure the vDisk is in a healthy state.

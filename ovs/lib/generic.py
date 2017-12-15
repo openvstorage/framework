@@ -51,6 +51,7 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.storagedriver import StorageDriverInstaller
 from ovs.lib.vdisk import VDiskController
 
 
@@ -442,7 +443,7 @@ class GenericController(object):
                               'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key),
                               'ALBA_PKG_NAME': alba_pkg_name,
                               'ALBA_VERSION_CMD': alba_version_cmd}
-                    service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
+                    service_manager.add_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY, params=params, client=client, target_name=alba_proxy_service)
                     service_manager.start_service(name=alba_proxy_service, client=client)
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
 
