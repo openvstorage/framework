@@ -99,7 +99,7 @@ class StorageDriverInstaller(object):
             connection_info = configurations.get('connection_info')
             sd_configuration = configurations.get('sd_configuration')
 
-            if not re.match(pattern=storage_ip, string=ExtensionsToolbox.regex_ip):
+            if not re.match(pattern=ExtensionsToolbox.regex_ip, string=storage_ip):
                 raise ValueError('Incorrect storage IP provided')
 
             ExtensionsToolbox.verify_required_params(actual_params=caching_info,
@@ -138,7 +138,7 @@ class StorageDriverInstaller(object):
             self.write_caches = []
             self.backend_info = backend_info['main']
             self.cache_size_local = None
-            self.vp_installer.connection_info = connection_info['main']
+            self.connection_info = connection_info['main']
             self.storagedriver_partition_dtl = None
             self.storagedriver_partition_tlogs = None
             self.storagedriver_partitions_caches = []
@@ -294,6 +294,7 @@ class StorageDriverInstaller(object):
             self.write_caches.append({'path': storagedriver_partition_write.path,
                                       'size': '{0}KiB'.format(w_size)})
             self.sr_installer.created_dirs.append(storagedriver_partition_write.path)
+            self._logger.debug('Smallest partition: {}'.format(self.sr_installer.smallest_write_partition_size))
             if self.sr_installer.smallest_write_partition_size == 0 or (w_size * 1024) < self.sr_installer.smallest_write_partition_size:
                 self.sr_installer.smallest_write_partition_size = w_size * 1024
 
@@ -384,7 +385,6 @@ class StorageDriverInstaller(object):
                 proxy_config['block_cache'] = block_cache_main_proxy if proxy_type == 'main' else block_cache_scrub_proxy
             return proxy_config
 
-
         vpool = self.vp_installer.vpool
         read_preferences = self.vp_installer.calculate_read_preferences()
         manifest_cache_size = 500 * 1024 ** 2
@@ -467,7 +467,6 @@ class StorageDriverInstaller(object):
                                       'alba_connection_rora_timeout_msecs': 50,
                                       'backend_type': 'ALBA'}
             return config
-
 
         if self.sr_installer is None:
             raise RuntimeError('No StorageRouterInstaller instance found')

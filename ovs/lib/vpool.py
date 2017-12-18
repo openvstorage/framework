@@ -78,7 +78,7 @@ class VPoolInstaller(object):
             - StorageDriver configuration settings
             - The storage IP address
         """
-        if not re.match(pattern=name, string=ExtensionsToolbox.regex_vpool):
+        if not re.match(pattern=ExtensionsToolbox.regex_vpool, string=name):
             raise ValueError('Incorrect vPool name provided')
 
         self.name = name
@@ -311,7 +311,6 @@ class VPoolInstaller(object):
                     'total_size': float(backend_dict['usages']['size']),
                     'backend_guid': backend_dict['backend_guid']}
 
-
         if self.sr_installer is None or self.sd_installer is None:
             raise RuntimeError('No StorageRouterInstaller or StorageDriverInstaller instance found')
 
@@ -339,7 +338,7 @@ class VPoolInstaller(object):
             new_metadata['caching_info'][sr_guid] = caching_info
         else:
             # Create new metadata object for new vPool
-            new_metadata = {'backend': {'backend_info': {self.sd_installer.backend_info}},
+            new_metadata = {'backend': {'backend_info': self.sd_installer.backend_info},
                             'caching_info': {sr_guid: caching_info}}
 
         # Add arakoon information and backend metadata to the new caching information for current StorageRouter
@@ -363,16 +362,23 @@ class VPoolInstaller(object):
         self.vpool.metadata = new_metadata
         self.vpool.save()
 
-    def configure_cluster_registry(self, exclude=list(), apply_on=list()):
+    def configure_cluster_registry(self, exclude=None, apply_on=None, allow_raise=False):
         """
         Retrieve the cluster node configurations for the StorageDrivers related to the vPool without the excluded StorageDrivers
         :param exclude: List of StorageDrivers to exclude from the node configurations
         :type exclude: list
         :param apply_on: Apply the updated cluster configurations on these StorageDrivers (or all but current if none provided)
         :type apply_on: list[ovs.dal.hybrids.storagedriver.StorageDriver]
+        :param allow_raise: Allow the function to raise an exception instead of returning True when an exception occurred (Defaults to False)
+        :type allow_raise: bool
+        :raises Exception: When allow_raises is True and and updating the configuration would have failed
         :return: A boolean indication whether something failed
         :rtype: bool
         """
+        if exclude is None:
+            exclude = []
+        if apply_on is None:
+            apply_on = []
         try:
             node_configs = []
             for sd in self.vpool.storagedrivers:
@@ -390,6 +396,8 @@ class VPoolInstaller(object):
             return False
         except Exception:
             self._logger.exception('Updating the cluster node configurations failed')
+            if allow_raise is True:
+                raise
             return True
 
     def calculate_read_preferences(self):
@@ -400,8 +408,9 @@ class VPoolInstaller(object):
         """
         backends_to_check = {}
         local_backend_info = self.sd_installer.backend_info
+        local_connection_info = self.sd_installer.connection_info
         local_alba_backend_guid = local_backend_info['alba_backend_guid']
-        if local_backend_info['connection_info'].get('local') is True and local_backend_info['scaling'] == 'GLOBAL' and local_alba_backend_guid in self.complete_backend_info:
+        if local_connection_info.get('local') is True and local_backend_info['scaling'] == 'GLOBAL' and local_alba_backend_guid in self.complete_backend_info:
             backends_to_check[local_alba_backend_guid] = self.complete_backend_info[local_alba_backend_guid]
 
         for sr_guid, caching_info in self.vpool.metadata['caching_info'].iteritems():
@@ -478,6 +487,7 @@ class VPoolController(object):
         :rtype: NoneType
         """
         # TODO: Add logging
+        cls._logger.debug('Adding vpool. Parameters: {}'.format(parameters))
         # VALIDATIONS
         if not isinstance(parameters, dict):
             raise ValueError('Parameters passed to create a vPool should be of type dict')
@@ -570,7 +580,9 @@ class VPoolController(object):
                 raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
 
         # Cluster registry
-        if vp_installer.configure_cluster_registry() is False:
+        try:
+            vp_installer.configure_cluster_registry(allow_raise=True)
+        except Exception:
             if vp_installer.is_new is True:
                 vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
             else:

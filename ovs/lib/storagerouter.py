@@ -53,6 +53,9 @@ class StorageRouterInstaller(object):
         - validate_local_cache_size: Validate if fragment or block cache is local, whether enough size is available for the caching
         - validate_vpool_extendable: Validate whether the StorageRouter is eligible to have a/another vPool on it
     """
+
+    _logger = Logger('lib')
+
     def __init__(self, root_client, storagerouter, vp_installer, sd_installer):
         """
         Initialize a StorageRouterInstaller class instance containing information about:
@@ -105,10 +108,11 @@ class StorageRouterInstaller(object):
         self.write_partitions = usable_partitions
         self.global_write_buffer_available_size = available_size
         self.global_write_buffer_requested_size = requested_size
+        self._logger.debug('Global write buffer has been validated. Available size: {0}, requested size: {1}, write_partitions: {2}'.format(available_size, requested_size, usable_partitions))
 
     def validate_local_cache_size(self, requested_proxies):
         """
-        Validate whether the requested amount of proxies can be deployed on local StorageRouter partitions having the WRITE role IF either local fragment cache or local block cache is used
+        Validate whether the requested amount of proxies can be deployed on local StorageRouter partitions having the WRITE role
         :param requested_proxies: Amount of proxies that have been requested for deployment
         :type requested_proxies: int
         :return: None
@@ -116,10 +120,6 @@ class StorageRouterInstaller(object):
         """
         if not 1 <= requested_proxies <= 16:
             raise RuntimeError('The requested amount of proxies to deploy should be a value between 1 and 16')
-
-        if self.sd_installer.block_cache_local is False and self.sd_installer.fragment_cache_local is False:
-            # Only verify whether we have enough available space to deploy the requested amount of proxies when fragment or block caching is done locally
-            return
 
         if len(self.write_partitions) == 0 or self.global_write_buffer_requested_size is None or self.global_write_buffer_available_size is None:
             raise RuntimeError('Global write buffer calculation has not been done yet')
@@ -147,11 +147,13 @@ class StorageRouterInstaller(object):
         if self.sd_installer.fragment_cache_local is True:
             self.requested_local_proxies += requested_proxies
 
-        proportion = float(largest_ssd_size or largest_sata_size) / self.global_write_buffer_available_size
-        available_size = proportion * self.global_write_buffer_requested_size * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
-        available_size_gib = available_size / 1024.0 ** 3
-        if available_size / self.requested_local_proxies < 1024 ** 3:
-            raise RuntimeError('Not enough space available ({0}GiB) on largest local WRITE partition to deploy {1} prox{2}'.format(available_size_gib, requested_proxies, 'y' if requested_proxies == 1 else 'ies'))
+        if self.requested_local_proxies > 0:
+            proportion = float(largest_ssd_size or largest_sata_size) / self.global_write_buffer_available_size
+            available_size = proportion * self.global_write_buffer_requested_size * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
+            available_size_gib = available_size / 1024.0 ** 3
+            if available_size / self.requested_local_proxies < 1024 ** 3:
+                raise RuntimeError('Not enough space available ({0}GiB) on largest local WRITE partition to deploy {1} prox{2}'.format(available_size_gib, requested_proxies, 'y' if requested_proxies == 1 else 'ies'))
+        self._logger.debug('Local cache size validated. Requested vpool proxies: {0}, requested cache proxies: {1}, Largest write partition: {1}'.format(self.requested_proxies, self.requested_local_proxies, str(self.largest_write_partition)))
 
     def validate_vpool_extendable(self):
         """
