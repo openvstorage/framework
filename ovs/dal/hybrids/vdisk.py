@@ -29,8 +29,8 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient,\
-                                                       SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
+from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient, \
+    SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
 from volumedriver.storagerouter.storagerouterclient import ClusterNotReachableException
 
 
@@ -238,8 +238,7 @@ class VDisk(DataObject):
                 if isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
                     vdisk_state = VDisk.STATUSES.UNKNOWN
                 else:
-                   pass
-
+                    pass
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
