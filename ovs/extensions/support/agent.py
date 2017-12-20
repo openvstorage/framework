@@ -34,7 +34,49 @@ from ovs.extensions.services.servicefactory import ServiceFactory
 
 
 class ConfigurationNotFoundError(RuntimeError):
+    """
+    Raised if the config key could not be found
+    """
     pass
+
+
+class SupportAgentCache(object):
+    """
+    This function tries to refresh the cashed output of a function.
+    Refreshing occurs when the cache its timestamp is older then the cache refresh time
+    The cache object should look like this:
+        CACHE = {'object_name': {'time': 15136942,
+                                 'content': 'xyz'}}
+    """
+    # @TODO Think about clearing the cache when an update has been issued
+
+    logger = Logger('extensions-support')
+
+    CACHE_REFRESH_TIME = 60 * 5
+
+    def __init__(self, support_agent):
+        self.cache = {}
+        self.support_agent = support_agent
+
+    def try_refresh_object(self, object_name, refresh_time=CACHE_REFRESH_TIME):
+        """
+        :param object_name: name of the function in SupportAgent to call
+        :type object_name: str
+        :param refresh_time: time after which the content should be refreshed
+        :type refresh_time: int
+        :return: cache object[object_name]['content']
+        :raises AttributeError function 'object_name' is no function of the SupportAgent
+        """
+        if object_name not in self.cache:
+            self.cache[object_name] = {'time': 0,
+                                       'content': None}
+        if time.time() - self.cache[object_name]['time'] >= refresh_time:
+            self.cache[object_name]['content'] = getattr(self.support_agent, object_name)()
+            self.cache[object_name]['time'] = time.time()
+            self.logger.debug('Refreshing caching for function {0}. Timestamp {1}'.format(object_name, self.cache[object_name]['time']))
+        else:
+            self.logger.debug('Returned cached results for function {0}. Timestamp {1}'.format(object_name, self.cache[object_name]['time']))
+        return self.cache[object_name]['content']
 
 
 class SupportAgent(object):
@@ -75,7 +117,6 @@ class SupportAgent(object):
         # Potential failing calls
         self._cluster_id = self.get_config_key(self.LOCATION_CLUSTER_ID, fallback=[Configuration.CONFIG_STORE_LOCATION, 'cluster_id'])
         self.interval = self.get_config_key(self.LOCATION_INTERVAL, fallback=[self.FALLBACK_CONFIG, self.KEY_INTERVAL], default=self.DEFAULT_INTERVAL)
-
         self._openvpn_service_name = 'openvpn@ovs_{0}-{1}'.format(self._cluster_id, self._node_id)
 
         # Calls to look out for. These could still be None when using them
@@ -83,6 +124,9 @@ class SupportAgent(object):
         self._client = None
         self._set_storagerouter()
         self._set_client()
+
+        # Safe call, start caching
+        self.caching = SupportAgentCache(self)
 
     @classmethod
     def get_config_key(cls, key, fallback=_MISSING, default=_MISSING):
@@ -139,30 +183,45 @@ class SupportAgent(object):
             try:
                 # Will fail when Arakoon is down
                 self._storagerouter = System.get_my_storagerouter()
-            except:
+            except Exception:
                 self.logger.exception('Unable to set the storagerouter. Heartbeat will be affected.')
         return self._storagerouter
 
     def _set_client(self):
         """
-        Sets the clients SSHClient if the storagerouter is not None.
+        Sets the clients SSHClient
         :return: Value for client (either None or the SSHClient object)
         :rtype: NoneType or ovs.extensions.generic.sshclient.SSHClient
         """
-        if self._storagerouter is None:
-            self.logger.error('Unable to build a local client, no storagerouter was found to use.')
-            return
         if self._client is None:
-            self._client = SSHClient(endpoint=self._storagerouter)
+            try:
+                self._client = SSHClient(endpoint='127.0.0.1')
+            except Exception:
+                self.logger.exception('Could not instantiate a local client')
         return self._client
+
+    def _get_package_information(self):
+        versions_dict = collections.OrderedDict()
+        for pkg_name, version in self._package_manager.get_installed_versions(client=self._client).iteritems():
+            versions_dict[pkg_name] = str(version)
+        return versions_dict
+
+    def _get_version_information(self):
+        services = collections.OrderedDict()
+        for service_info in sorted(self._service_manager.list_services(client=self._client, add_status_info=True)):
+            if not service_info.startswith('ovs-'):
+                continue
+            service_name = service_info.split()[0].strip()
+            services[service_name] = ' '.join(service_info.split()[1:])
+        return services
 
     def get_heartbeat_data(self):
         """
         Returns heartbeat data
         """
         errors = []
-        versions = collections.OrderedDict()
-        services = collections.OrderedDict()
+        version_info = collections.OrderedDict()
+        service_info = collections.OrderedDict()
 
         # Check for the existence of the client
         if self._client is None and self._set_client() is None:
@@ -170,25 +229,19 @@ class SupportAgent(object):
         else:
             # Versions
             try:
-                for pkg_name, version in self._package_manager.get_installed_versions(client=self._client).iteritems():
-                    versions[pkg_name] = str(version)
+                version_info = self.caching.try_refresh_object('_get_package_information')
             except Exception as ex:
                 errors.append(str(ex))
-
             # Services
             try:
-                for service_info in sorted(self._service_manager.list_services(client=self._client, add_status_info=True)):
-                    if not service_info.startswith('ovs-'):
-                        continue
-                    service_name = service_info.split()[0].strip()
-                    services[service_name] = ' '.join(service_info.split()[1:])
+                service_info = self.caching.try_refresh_object('_get_version_information')
             except Exception as ex:
                 errors.append(str(ex))
 
         data = {'cid': self._cluster_id,
                 'nid': self._node_id,
-                'metadata': {'versions': versions,
-                             'services': services}}
+                'metadata': {'versions': version_info,
+                             'services': service_info}}
         if len(errors) > 0:
             data['errors'] = errors
         return data
