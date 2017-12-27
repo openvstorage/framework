@@ -556,7 +556,7 @@ class UpdateController(object):
         Update the specified components on all StorageRouters
         This is called upon by 'at'
         :param components: list of the components to update
-        :type components: []
+        :type components: list
         :return: None
         :rtype: NoneType
         """
@@ -724,6 +724,14 @@ class UpdateController(object):
         """
         Stop/start services on SSH clients
         If action is start, we ignore errors and try to start other services on other nodes
+        :param services: list of service names
+        :type services: list
+        :param client: list of SSHClients on which to execute the service action
+        :type client: list
+        :param action: describes which action should be executed on the service
+        :type action: str
+        :return: None
+        :rtype: bool
         """
         if action == 'start':
             services.reverse()  # Start services again in reverse order of stopping
