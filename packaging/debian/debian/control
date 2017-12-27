@@ -11,7 +11,7 @@ Pre-Depends: python (>= 2.7.2)
 Depends: alba, aptdaemon, arakoon (>= 1.9.0), arakoon (<< 1.10), at,
  devscripts, ipython, libev4 (>= 1:4.11-1), lsscsi (>= 0.27-2),
  memcached (>= 1.4.7), openssh-server, openvstorage-extensions (>= 0.2.0),
- python-billiard (>= 3.3.0.20), python-billiard (<< 3.3.1),
+ procps, python-billiard (>= 3.3.0.20), python-billiard (<< 3.3.1),
  python-boto, python-celery (= 3.1.23-5), python-celery-common (= 3.1.23-5),
  python-datadiff, python-dev (>= 2.7.5), python-influxdb, python-kombu (>= 3.0.7), python-kombu (<< 3.1),
  python-librabbitmq (>= 1.5.2), python-memcache (>= 1.47-2), python-paramiko,
