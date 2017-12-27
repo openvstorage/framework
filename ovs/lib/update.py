@@ -555,6 +555,8 @@ class UpdateController(object):
         """
         Update the specified components on all StorageRouters
         This is called upon by 'at'
+        :param components: list of the components to update
+        :type components: []
         :return: None
         :rtype: NoneType
         """
