@@ -730,7 +730,7 @@ class UpdateController(object):
         :type client: list
         :param action: describes which action should be executed on the service
         :type action: str
-        :return: None
+        :return: True if all services their states have been succesfully changed
         :rtype: bool
         """
         if action == 'start':
