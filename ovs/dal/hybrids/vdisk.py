@@ -223,7 +223,7 @@ class VDisk(DataObject):
         Fetches the info (see Volume Driver API) for the vDisk.
         """
         vdiskinfo = StorageDriverClient.EMPTY_INFO()
-        vdisk_state = None
+        vdisk_state = VDisk.STATUSES.RUNNING
         if self.volume_id and self.vpool:
             try:
                 try:
@@ -253,10 +253,10 @@ class VDisk(DataObject):
                         for nodeconfig in objectvalue.node_configs():
                             vdiskinfodict[key].append({'ip': nodeconfig.address(),
                                                        'port': nodeconfig.port()})
+                elif key == 'halted':
+                    vdisk_state = VDisk.STATUSES.HALTED
                 else:
                     vdiskinfodict[key] = objectvalue
-        if vdisk_state is None:
-            vdisk_state = VDisk.STATUSES.RUNNING if vdiskinfodict['halted'] is False else VDisk.STATUSES.HALTED
         vdiskinfodict['live_status'] = vdisk_state
         return vdiskinfodict
 
