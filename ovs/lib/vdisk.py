@@ -414,7 +414,7 @@ class VDiskController(object):
             except RuntimeError:
                 try:
                     VDiskController.delete_snapshot(vdisk_guid=vdisk_guid, snapshot_id=snapshot_id)
-                except:
+                except Exception:
                     pass
                 raise RuntimeError('Could not find created snapshot in time')
 
@@ -638,6 +638,46 @@ class VDiskController(object):
         vdisk.invalidate_dynamics(['is_vtemplate', 'info', 'snapshots', 'snapshot_ids'])
 
     @staticmethod
+    def _move(vdisk_guid, target_storagerouter_guid, force=False):
+        try:
+            vdisk = VDisk(vdisk_guid)
+        except ObjectNotFoundException:
+            VDiskController._logger.exception('No valid VDisk has been found with provided guid {0}'.format(vdisk_guid))
+            raise
+        storagedriver = None
+        try:
+            storagerouter = StorageRouter(target_storagerouter_guid)
+        except ObjectNotFoundException:
+            VDiskController._logger.exception('No valid StorageRouter has been found with provided guid {0}'.format(target_storagerouter_guid))
+            raise
+
+        for sd in storagerouter.storagedrivers:
+            if sd.vpool == vdisk.vpool:
+                storagedriver = sd
+                break
+
+        if storagedriver is None:
+            err_msg = 'Failed to find the matching StorageDriver for vdisk {0}'.format(vdisk.name)
+            VDiskController._logger.exception(err_msg)
+            raise RuntimeError(err_msg)
+
+        VDiskController._logger.info('Starting moval of VDisk {0}'.format(vdisk_guid))
+        try:
+            vdisk.storagedriver_client.migrate(object_id=str(vdisk.volume_id),
+                                               node_id=str(storagedriver.storagedriver_id),
+                                               force_restart=force)
+        except Exception:
+            err_msg = 'Failed to move vDisk {0}'.format(vdisk.name)
+            VDiskController._logger.exception(err_msg)
+            raise Exception(err_msg)
+
+        try:
+            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
+            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
+        except Exception:
+            VDiskController._logger.exception('Executing post-migrate actions failed for vDisk {0}'.format(vdisk.name))
+
+    @staticmethod
     @ovs_task(name='ovs.vdisk.move')
     def move(vdisk_guid, target_storagerouter_guid, force=False):
         """
@@ -650,31 +690,23 @@ class VDiskController(object):
         :type force: bool
         :return: None
         """
-        vdisk = VDisk(vdisk_guid)
-        storagedriver = None
-        storagerouter = StorageRouter(target_storagerouter_guid)
+        VDiskController._move(vdisk_guid, target_storagerouter_guid, force=force)
 
-        for sd in storagerouter.storagedrivers:
-            if sd.vpool == vdisk.vpool:
-                storagedriver = sd
-                break
-
-        if storagedriver is None:
-            raise RuntimeError('Failed to find the matching StorageDriver')
-
-        try:
-            vdisk.storagedriver_client.migrate(object_id=str(vdisk.volume_id),
-                                               node_id=str(storagedriver.storagedriver_id),
-                                               force_restart=force)
-        except Exception:
-            VDiskController._logger.exception('Failed to move vDisk {0}'.format(vdisk.name))
-            raise Exception('Moving vDisk {0} failed'.format(vdisk.name))
-
-        try:
-            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
-            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
-        except:
-            VDiskController._logger.exception('Executing post-migrate actions failed for vDisk {0}'.format(vdisk.name))
+    @staticmethod
+    @ovs_task(name='ovs.vdisk.move_multiple')
+    def move_multiple(vdisk_guids, target_storagerouter_guid, force=False):
+        """
+        Move list of vDisks to the specified StorageRouter
+        :param vdisk_guids: Guids of the vDisk to move
+        :type vdisk_guids: list
+        :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
+        :type target_storagerouter_guid: str
+        :param force: Indicates whether to force the migration or not (forcing can lead to data loss)
+        :type force: bool
+        :return: None
+        """
+        for vdisk_guid in vdisk_guids:
+            VDiskController._move(vdisk_guid, target_storagerouter_guid, force)
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.rollback')
