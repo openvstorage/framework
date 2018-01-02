@@ -251,3 +251,24 @@ class VPoolViewSet(viewsets.ViewSet):
         return VPoolController.create_hprm_config_files.delay(parameters=parameters,
                                                               vpool_guid=vpool.guid,
                                                               local_storagerouter_guid=local_storagerouter.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VPool)
+    def move_multiple(self, vdisks, target_storagerouter_guid, force=False):
+        """
+        Moves a vDisk
+        :param vdisks: Guids of the virtual disk to move
+        :type vdisks: list
+        :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisks to
+        :type target_storagerouter_guid: str
+        :param force: Indicate whether to force the migration (forcing the migration might cause data loss)
+        :type force: bool
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
+        """
+        return VDiskController.move_multiple.delay(vdisk_guids=vdisks,
+                                                   target_storagerouter_guid=target_storagerouter_guid,
+                                                   force=force)

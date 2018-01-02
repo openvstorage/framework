@@ -222,27 +222,6 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def move_multiple(self, vdisk, target_storagerouter_guid, force=False):
-        """
-        Moves a vDisk
-        :param vdisk: Guids of the virtual disk to move
-        :type vdisk: list
-        :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisks to
-        :type target_storagerouter_guid: str
-        :param force: Indicate whether to force the migration (forcing the migration might cause data loss)
-        :type force: bool
-        :return: Asynchronous result of a CeleryTask
-        :rtype: celery.result.AsyncResult
-        """
-        return VDiskController.move.delay(vdisk_guid=vdisk.guid,
-                                          target_storagerouter_guid=target_storagerouter_guid,
-                                          force=force)
-
-    @action()
-    @log()
-    @required_roles(['read', 'write'])
-    @return_task()
-    @load(VDisk)
     def remove_snapshot(self, vdisk, snapshot_id):
         """
         Remove a snapshot from a VDisk
