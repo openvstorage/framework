@@ -661,6 +661,7 @@ class VDiskController(object):
             VDiskController._logger.exception(err_msg)
             raise RuntimeError(err_msg)
 
+        VDiskController._logger.info('Starting moval of VDisk {0}'.format(vdisk_guid))
         try:
             vdisk.storagedriver_client.migrate(object_id=str(vdisk.volume_id),
                                                node_id=str(storagedriver.storagedriver_id),
@@ -692,7 +693,7 @@ class VDiskController(object):
         VDiskController._move(vdisk_guid, target_storagerouter_guid, force=force)
 
     @staticmethod
-    #todo ovs.task
+    @ovs_task(name='ovs.vdisk.move_multiple')
     def move_multiple(vdisk_guids, target_storagerouter_guid, force=False):
         """
         Move list of vDisks to the specified StorageRouter
