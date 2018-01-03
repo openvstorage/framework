@@ -201,7 +201,7 @@ class UnitTest(object):
                 elif test in short_names:
                     for sorted_test in sorted_tests:
                         filename = os.path.split(sorted_test)[1]
-                        if test.startswith(filename):
+                        if test.startswith(filename) or filename.startswith(test):
                             tests_to_execute.append(sorted_test)
                             found_tests = True
                 else:
