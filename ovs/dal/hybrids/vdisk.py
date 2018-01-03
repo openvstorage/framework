@@ -236,9 +236,11 @@ class VDisk(DataObject):
             # @todo replace RuntimeError with NodeNotReachableException
             except (ClusterNotReachableException, RuntimeError) as exception:
                 if isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
+                    Logger.debug('VDisk {0} status has been set to UNKNOWN'.format(self.name))
                     vdisk_state = VDisk.STATUSES.UNKNOWN
-                else:
-                    pass
+            except Exception as ex:
+                Logger.debug('Uncaught exception occurred when requesting the volume info for vDisk {0}: {1}'.format(self.name, ex))
+
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
             if type(value) is property:
@@ -253,7 +255,7 @@ class VDisk(DataObject):
                             vdiskinfodict[key].append({'ip': nodeconfig.address(),
                                                        'port': nodeconfig.port()})
                     elif key == 'halted' and objectvalue is True:
-                        print 'halted'
+                        Logger.debug('VDisk {0} status has been set to HALTED'.format(self.name))
                         vdisk_state = VDisk.STATUSES.HALTED
                 else:
                     vdiskinfodict[key] = objectvalue
