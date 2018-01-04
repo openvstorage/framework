@@ -9,7 +9,7 @@ Environment=METADATASTORE_BITS=<METADATASTORE_BITS>
 ExecStartPre=/bin/bash -c "if [ ! -d <RUN_FILE_DIR> ]; then mkdir <RUN_FILE_DIR>; chown ovs:ovs <RUN_FILE_DIR>; fi; touch <RUN_FILE_DIR>/storagedriver_<VPOOL_NAME>.lock; echo <VOLDRV_PKG_NAME>=`<VOLDRV_VERSION_CMD>` > <RUN_FILE_DIR>/<SERVICE_NAME>.version"
 ExecStart=/usr/bin/volumedriver_fs.sh -f --config <CONFIG_PATH> --lock-file <RUN_FILE_DIR>/storagedriver_<VPOOL_NAME>.lock --logrotation --mountpoint <VPOOL_MOUNTPOINT> --logsink <LOG_SINK> -o big_writes -o sync_read -o allow_other -o use_ino -o default_permissions -o uid=<OVS_UID> -o gid=<OVS_GID> -o umask=0002
 ExecStop=/bin/bash -c "if mount | grep <VPOOL_MOUNTPOINT>; then fusermount -u <VPOOL_MOUNTPOINT>; fi "
-ExecStopPost=/bin/bash -c "for i in `seq 0 9`; do if mount | grep <VPOOL_MOUNTPOINT>; then sleep 10s; else break; fi; done; if mount | grep <VPOOL_MOUNTPOINT>; then umount -l <VPOOL_MOUNTPOINT>; ps xa |grep volumedriver_fs |grep -v grep |awk '{print $1}' |xargs kill; fi; rm <RUN_FILE_DIR>/storagedriver_<VPOOL_NAME>.lock"
+ExecStopPost=/bin/bash -c "for i in `seq 0 9`; do if mount | grep 'on <VPOOL_MOUNTPOINT> type '; then sleep 10s; else break; fi; done; if mount | grep 'on <VPOOL_MOUNTPOINT> type '; then umount -l <VPOOL_MOUNTPOINT>; pkill -f -- 'volumedriver_fs .*--mountpoint <VPOOL_MOUNTPOINT>'; fi; rm <RUN_FILE_DIR>/storagedriver_<VPOOL_NAME>.lock"
 Restart=on-failure
 RestartSec=360
 TimeoutStopSec=<KILL_TIMEOUT>

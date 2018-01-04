@@ -205,7 +205,7 @@ class GenericController(object):
 
     @staticmethod
     @ovs_task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), ensure_single_info={'mode': 'DEDUPED'})
-    def execute_scrub(vpool_guids=list(), vdisk_guids=list(), storagerouter_guid=None, manual=False):
+    def execute_scrub(vpool_guids=None, vdisk_guids=None, storagerouter_guid=None, manual=False):
         """
         Divide the scrub work among all StorageRouters with a SCRUB partition
         :param vpool_guids: Guids of the vPools that need to be scrubbed completely
@@ -219,6 +219,10 @@ class GenericController(object):
         :return: None
         :rtype: NoneType
         """
+        if vdisk_guids is None:
+            vdisk_guids = []
+        if vpool_guids is None:
+            vpool_guids = []
         if not isinstance(vpool_guids, list):
             raise ValueError('vpool_guids should be a list')
         if not isinstance(vdisk_guids, list):

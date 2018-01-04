@@ -177,7 +177,9 @@ class StorageRouterController(object):
             if size < largest_write_cache * 5 / 100 or size < 1024 ** 3:
                 partitions[DiskPartition.ROLES.WRITE][index]['usable'] = False
 
-        return partitions
+        return {'partitions': partitions,
+                'ipaddresses': OSFactory.get_manager().get_ip_addresses(client=client),
+                'scrub_available': StorageRouterController._check_scrub_partition_present()}
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_version_info')
