@@ -50,8 +50,8 @@ from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
+from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.storagedriver import StorageDriverInstaller
 from ovs.lib.vdisk import VDiskController
 
 
