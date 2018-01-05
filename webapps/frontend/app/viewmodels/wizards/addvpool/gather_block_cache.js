@@ -138,6 +138,17 @@ define([
                 }
             }
         });
+        self.reUsableStorageRouters = ko.pureComputed(function() {
+            var mapping = self.data.vPool().getCacheConnectionInfoMapping();
+            var storagerouters = [];
+            $.each(self.data.storageRoutersUsed(), function(index, storagerouter) {
+                if (storagerouter.guid() in mapping.block_cache) {
+                    storagerouters.push(storagerouter)
+                }
+            });
+            storagerouters.unshift(undefined);  // Insert undefined as element 0
+            return storagerouters;
+        });
 
         // Functions
         self.loadBackends = function() {

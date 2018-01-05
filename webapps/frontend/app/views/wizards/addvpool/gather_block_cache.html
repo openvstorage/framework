@@ -66,7 +66,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <!-- ko with: backend_info.connection_info -->
             <p data-i18n="ovs:wizards.add_vpool.gather_block_cache.backend_info"></p>
-            <div>
+            <div data-bind=>
                 <div class="form-group">
                     <div class="col-lg-3"></div>
                     <div class="col-lg-7">
@@ -76,6 +76,25 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
             <div data-bind="visible: !isLocalBackend()">
+                <div class="form-group">
+                    <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.re_use_connection_info"></label>
+                    <div class="col-lg-7">
+                        <span data-bind="dropdown: {
+                                             key: 'guid',
+                                             keyisfunction: true,
+                                             items: $root.reUsableStorageRouters,
+                                             target: $root.reUsedStorageRouter,
+                                             text: function(item) {
+                                                 if (item !== undefined) {
+                                                     return item.name();
+                                                 } else {
+                                                     return '-';
+                                                 }
+                                             }
+                                         }">
+                        </span>
+                    </div>
+                </div>
                 <div data-bind="css: { 'has-error': $root.canContinue().fields.contains('invalid_alba_info') }">
                     <div class="form-group">
                         <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_block_cache.host"></label>
