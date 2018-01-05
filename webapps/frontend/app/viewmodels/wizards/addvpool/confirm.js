@@ -109,38 +109,34 @@ define([
                 generic.alertInfo($.t('ovs:wizards.extend_vpool.confirm.started_title'),
                     $.t('ovs:wizards.extend_vpool.confirm.started_message', {what: vpool.name()}));
             }
-            return $.Deferred(function(deferred) {
-                // Wrap within a deferred to let the build close to modal but handle the code async
-                api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', {data: postData})
-                    .then(self.shared.tasks.wait)
-                    // Using then instead of deferred to chain the returned promise
-                    .then(function () {
-                        // Success
-                        if (self.data.isExtend() === false) {
-                            generic.alertSuccess($.t('ovs:wizards.add_vpool.confirm.success_title'),
-                                $.t('ovs:wizards.add_vpool.confirm.success_message', {what: vpool.name()}));
-                        } else {
-                            generic.alertSuccess($.t('ovs:wizards.extend_vpool.confirm.success_title'),
-                                $.t('ovs:wizards.extend_vpool.confirm.success_message', {what: vpool.name()}));
-                        }
-                        self.data.completed.resolve()
-                    }, function (error) {
-                        // fail
-                        error = generic.extractErrorMessage(error);
-                        if (self.data.isExtend() === false) {
-                            generic.alertError($.t('ovs:wizards.add_vpool.confirm.failure_title'),
-                                $.t('ovs:wizards.add_vpool.confirm.failure_message', {what: vpool.name(), why: error}));
-                        } else {
-                            generic.alertError($.t('ovs:wizards.extend_vpool.confirm.failure_title'),
-                                $.t('ovs:wizards.extend_vpool.confirm.failure_message', {
-                                    what: vpool.name(),
-                                    why: error
-                                }));
-                        }
-                        self.data.completed.reject()
-                    });
-                deferred.resolve()
-            });
+            return api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', {data: postData})
+                .then(self.shared.tasks.wait)
+                // Using then instead of deferred to chain the returned promise
+                .then(function (data) {
+                    // Success
+                    if (self.data.isExtend() === false) {
+                        generic.alertSuccess($.t('ovs:wizards.add_vpool.confirm.success_title'),
+                            $.t('ovs:wizards.add_vpool.confirm.success_message', {what: vpool.name()}));
+                    } else {
+                        generic.alertSuccess($.t('ovs:wizards.extend_vpool.confirm.success_title'),
+                            $.t('ovs:wizards.extend_vpool.confirm.success_message', {what: vpool.name()}));
+                    }
+                    return data;
+                }, function (error) {
+                    // fail
+                    error = generic.extractErrorMessage(error);
+                    if (self.data.isExtend() === false) {
+                        generic.alertError($.t('ovs:wizards.add_vpool.confirm.failure_title'),
+                            $.t('ovs:wizards.add_vpool.confirm.failure_message', {what: vpool.name(), why: error}));
+                    } else {
+                        generic.alertError($.t('ovs:wizards.extend_vpool.confirm.failure_title'),
+                            $.t('ovs:wizards.extend_vpool.confirm.failure_message', {
+                                what: vpool.name(),
+                                why: error
+                            }));
+                    }
+                    return error;
+                });
         };
 
         // Durandal

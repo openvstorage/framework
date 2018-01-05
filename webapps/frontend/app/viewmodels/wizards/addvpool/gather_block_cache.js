@@ -69,12 +69,6 @@ define([
                 return backends;
             }
         });
-        self.localBackendsAvailable = ko.pureComputed(function() {
-            var connectionInfo = self.data.cachingData.block_cache.backend_info.connection_info;
-            var useLocalBackend = !!ko.utils.unwrapObservable(connectionInfo.isLocalBackend);
-            var localBackendsRequiredAmount = useLocalBackend === true ? 2 : 1;
-            return self.data.filterBackendsByLocationKey('local').length >= localBackendsRequiredAmount;
-        });
         self.enhancedPresets = ko.pureComputed(function() {
             var presets = self.blockCacheBackend() === undefined ? [] : self.blockCacheBackend().presets;
             return backendService.parsePresets(presets)
@@ -164,7 +158,13 @@ define([
             // return its value and the backend computed would fetch the old values, causing a mismatch
             var backendInfo = self.data.cachingData.block_cache.backend_info;
             var connectionInfo = backendInfo.connection_info;
-            return self.data.filterBackendsByLocationKey(self.data.buildLocationKey(connectionInfo));
+            // Filter out the chosen backend for the vpool
+            var backends = self.data.filterBackendsByLocationKey(self.data.buildLocationKey(connectionInfo));
+            backends = backends.filter(function(backend) {
+                // Working with alba backend objects, so guid == alba_backend_guid
+                if (backend.guid !== self.data.backendData.backend_info.alba_backend_guid()) { return backend }
+            });
+            return backends;
         };
 
         // Durandal

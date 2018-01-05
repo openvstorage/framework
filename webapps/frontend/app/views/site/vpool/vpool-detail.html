@@ -296,8 +296,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                             data-bind="click: $root.addStorageRouter,
                                                                        tooltip: 'ovs:vpools.detail.extend',
                                                                        enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
-                                                                       attr: { id: 'button_add_' + guid()},
-                                                                       visible: !$root.updatingStorageRouters()">
+                                                                       attr: { id: 'button_add_' + $parent.guid(), disabled: ($root.updatingStorageRouters() === true || $root.vPool().status() !== 'RUNNING') }">
                                                         <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
                                                     </button>
                                                     </td>

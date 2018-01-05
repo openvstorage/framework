@@ -21,16 +21,13 @@ define(['jquery', 'knockout',
 ],function($, ko, generic, api, shared, errors, StorageRouter, VPool, StorageDriverParams, backendService, storageRouterService, vpoolService){
     "use strict";
     // This data is not a singleton but a constructor
-    return function(storageRouter, vPool, completed) {
+    return function(storageRouter, vPool) {
         // Default values
         var isExtend = (vPool !== undefined);
         vPool = isExtend ? vPool : new VPool();
         storageRouter = storageRouter === undefined? new StorageRouter() : storageRouter;
-        completed = (completed === undefined)? $.Deferred() : completed;
 
         var self = this;
-        // Properties
-        self.completed                          = completed;
         // General vPool changes
         self.configParams                       = undefined;  // Params related to general configs (sco size, dtl ...) Undefined as a viewmodel will be set
         self.backendData                        = undefined;  // Params related to the backend. Undefined as a viewmodel will be set

@@ -214,26 +214,24 @@ define([
         self.addStorageRouter = function(sr) {
             self.updatingStorageRouters(true);
             if (self.vPool().extensible()) {
-                var deferred = $.Deferred(),
-                    wizard = new ExtendVPool({
-                        modal: true,
-                        completed: deferred,
-                        vPool: self.vPool(),
-                        storageRouter: sr
-                    });
+                var wizard = new ExtendVPool({
+                    modal: true,
+                    vPool: self.vPool(),
+                    storageRouter: sr});
+                // Setup listener for when the Modal is closed
                 wizard.closing.always(function() {
-                    deferred.resolve();
-                });
-                dialog.show(wizard);
-                deferred.always(function() {
                     self.updatingStorageRouters(false);
                 });
+                wizard.completed.always(function() {
+                    self.updatingStorageRouters(false);
+                });
+                dialog.show(wizard);
             } else {
                 var reasons = self.vPool().notExtensibleReasons(),
                     message = $.t('ovs:wizards.extend_vpool.prohibited.message', {name: self.vPool().name(), multi: reasons.length === 1 ? '' : 's'});
                 $.each(reasons, function(index, reason) {
                     message += '<li>' + $.t('ovs:wizards.extend_vpool.prohibited.reasons.' + reason) + '</li>';
-                }) ;
+                });
                 message += '</ul>';
                 app.showMessage(
                     message,

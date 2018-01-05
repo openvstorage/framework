@@ -34,8 +34,9 @@ define([
         self.id          = ko.observable(generic.getHash());
 
         // Deferreds
-        self.closing   = $.Deferred();
-        self.finishing = $.Deferred();
+        self.closing   = $.Deferred();  // Track if the wizard is closing
+        self.finishing = $.Deferred();  // Track if the wizard is finishing
+        self.completed = $.Deferred();  // Track if the final steps finish has been completed
 
         // Builded variable
         self.activeStep = activator.create();
@@ -177,7 +178,11 @@ define([
          *  Finish and close the wizard
          *  Before proceeding:
          *  - Calls the preValidate function (if the step has one) and waits for the deferred to resolve
-         *  - Calls the finish function and waits for the deferred to resolve
+         *  - Calls the finish function and track the result of the finish within the completed deferred
+         *  The wizard can wait for the finish to completely resolve. To enable this behaviour, the finish step should
+         *  return [promise, true]. The first item is the promise, the second item is a bool whether to wait or not
+         *  Not waiting for the result of the given promise means that the finish will never be unsuccessfully closed, regardless of the result
+         *  The result can still be fetched from the completed property
          */
         self.finish = function() {
             self.running(true);
@@ -187,13 +192,53 @@ define([
             if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
                 chainPromise.then(function() {
                     // Return the pre-validate promise which will resolve or reject itself and mutate the data to use in our finish
-                    return step.preValidate().then(function(data) { return data }, function(error) { return { abort: true, data: undefined }})
+                    return step.preValidate()
+                        .then(function(data) {
+                            return data
+                        }, function(error) {
+                            return {
+                                abort: true,
+                                data: error
+                            }
+                        })
                 });
             }
+            // Track finishing of the step into the 'completed' deferred as the wizard should close asap
+            var finish_result = step.finish();
+            var finish_wait = undefined;
+            var finish_promise = undefined;
+            // Determine what we are dealing with
+            if(Array.isArray(finish_result)){
+                // var [finish_promise, finish_wait] = finish_result in ES6 :(
+                finish_promise = finish_result[0];
+                finish_wait = finish_result[1];
+            } else{
+                finish_promise = finish_result;
+                finish_wait = false;
+            }
+            // Add a handler to the promise to update our completed promise
+            // Since the callbacks to a deferred respect the order in which they were added, the registers on the self.completed will fire once resolve would be called
+            // This is why resolve is called with the data from the returned function
+            finish_promise.then(function(data) {
+                self.completed.resolve(data)
+            }, function(error) {
+                self.completed.reject(error)
+            });
             // Add the step finish to the chain
             chainPromise.then(function() {
-                    return step.finish().then(function(data) { return data }, function(error) {return { abort: false, data: error }})
-                })
+                if (finish_wait === true) {
+                    return finish_promise.then(function(data) {
+                        return data
+                    }, function(error) {
+                        return {
+                            abort:false,
+                            data: error
+                        }
+                    })
+                }
+                // No need to wait, returning empty promise to the chain
+                return $.when();
+            })
                 // Handle finishing of the chain
                 .done(function(data) {
                     dialog.close(self, {
