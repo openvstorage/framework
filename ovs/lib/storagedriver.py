@@ -427,7 +427,7 @@ class StorageDriverController(object):
     @staticmethod
     def calculate_update_impact(storagedriver_guid, requested_config):
         """
-        Calculate the impact of the update for a storagedriver with a given config
+        Calculate the impact of the update for a StorageDriver with a given config
         :param storagedriver_guid: Guid of the storage driver
         :type storagedriver_guid: str
         :param requested_config: requested configuration
@@ -435,23 +435,7 @@ class StorageDriverController(object):
         :return: dict indicating what will be needed to be done
         :rtype: dict
         """
-        # TODO: Chuffie, dit is hier voor uw edit vPool i guess?
+        # TODO: Implement for reconfiguring purposes
         storagedriver = StorageDriver(storagedriver_guid)
         # Get a difference between the current config and the requested one
-
         return {}
-
-    @staticmethod
-    def calculate_global_write_buffer(storagedriver_guid):
-        """
-        Calculate the global write buffer for a given Storagedriver
-        :param storagedriver_guid: Guid of the Storagedriver
-        :return: Calculated global write buffer
-        :rtype: int
-        """
-        storagedriver = StorageDriver(storagedriver_guid)
-        global_write_buffer = 0
-        for partition in storagedriver.partitions:
-            if partition.role == DiskPartition.ROLES.WRITE and partition.sub_role == StorageDriverPartition.SUBROLE.SCO:
-                global_write_buffer += partition.size
-        return global_write_buffer

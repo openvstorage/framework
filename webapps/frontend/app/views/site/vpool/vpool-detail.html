@@ -306,14 +306,14 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <!-- Binding context of the StorageDriver. The parent is the StorageRouter, root is the vpool_detail -->
                                                     <td>
                                                         <span class="label label-success pointer"
-                                                              data-bind="tooltip: localSummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.ok'),
-                                                                        text: localSummary() === undefined ? 0 : localSummary().proxies.green"></span>&nbsp;
+                                                              data-bind="tooltip: proxySummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.ok'),
+                                                                        text: proxySummary() === undefined ? 0 : proxySummary().proxies.green"></span>&nbsp;
                                                         <span class="label label-warning pointer"
-                                                              data-bind="tooltip: localSummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.warning'),
-                                                                        text: localSummary() === undefined ? 0 : localSummary().proxies.orange"></span>&nbsp;
+                                                              data-bind="tooltip: proxySummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.warning'),
+                                                                        text: proxySummary() === undefined ? 0 : proxySummary().proxies.orange"></span>&nbsp;
                                                         <span class="label label-danger pointer"
-                                                              data-bind="tooltip: localSummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.error'),
-                                                                        text: localSummary() === undefined ? 0 : localSummary().proxies.red"></span>&nbsp;
+                                                              data-bind="tooltip: proxySummary() === undefined ? '' : $.t('ovs:generic.states.storagedriver.proxies.error'),
+                                                                        text: proxySummary() === undefined ? 0 : proxySummary().proxies.red"></span>&nbsp;
                                                     </td>
 
                                                     <td>

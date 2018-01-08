@@ -24,8 +24,11 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.logger import Logger
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 
 
@@ -51,9 +54,10 @@ class StorageDriver(DataObject):
                   Dynamic('statistics', dict, 4),
                   Dynamic('edge_clients', list, 30),
                   Dynamic('vdisks_guids', list, 15),
-                  Dynamic('local_summary', dict, 15),
+                  Dynamic('proxy_summary', dict, 15),
                   Dynamic('vpool_backend_info', dict, 60),
-                  Dynamic('cluster_node_config', dict, 3600)]
+                  Dynamic('cluster_node_config', dict, 3600),
+                  Dynamic('global_write_buffer', int, 60)]
 
     def _status(self):
         """
@@ -124,8 +128,6 @@ class StorageDriver(DataObject):
         :return: Information about vPool and accelerated Backend
         :rtype: dict
         """
-        from ovs.lib.storagedriver import StorageDriverController
-        global_write_buffer = StorageDriverController.calculate_global_write_buffer(self.guid)
         vpool_backend_info = {'backend': copy.deepcopy(self.vpool.metadata['backend']),
                               'caching_info': {StorageDriverConfiguration.CACHE_BLOCK: {'read': False,
                                                                                         'write': False,
@@ -149,7 +151,7 @@ class StorageDriver(DataObject):
             if caching_info['is_backend'] is False:
                 cache_data['backend_info'] = None
         # Add global write buffer
-        vpool_backend_info['global_write_buffer'] = global_write_buffer
+        vpool_backend_info['global_write_buffer'] = self.global_write_buffer
         return vpool_backend_info
 
     def _cluster_node_config(self):
@@ -193,24 +195,51 @@ class StorageDriver(DataObject):
                                                              self.ports['edge']),
                 'node_distance_map': distance_map}
 
-    def _local_summary(self):
+    def _proxy_summary(self):
         """
-        Returns a summary of the proxies of this storagedriver
+        Returns a summary of the proxies of this StorageDriver
         :return: summary of the proxies
         :rtype: dict
         """
-        from ovs.extensions.generic.sshclient import SSHClient
-        from ovs.extensions.services.servicefactory import ServiceFactory
-        service_manager = ServiceFactory.get_manager()
-        client = SSHClient(self.storagerouter)
         proxy_info = {'red': 0,
                       'orange': 0,
                       'green': 0}
         summary = {'proxies': proxy_info}
-        for alba_proxy in self.alba_proxies:
-            service_status = service_manager.get_service_status(alba_proxy.service.name, client)
-            if service_status == 'active':
-                proxy_info['green'] += 1
-            elif service_status == 'inactive':
-                proxy_info['inactive'] += 1
-        return summary
+
+        try:
+            service_manager = ServiceFactory.get_manager()
+            client = SSHClient(self.storagerouter)
+        except Exception:
+            self._logger.exception('Unable to retrieve necessary clients')
+        else:
+            for alba_proxy in self.alba_proxies:
+                try:
+                    service_status = service_manager.get_service_status(alba_proxy.service.name, client)
+                except Exception:
+                    # A ValueError can occur when the services are still being deployed (the model will be updated before the actual deployment)
+                    self._logger.exception('Unable to retrieve the service status for service {0} of StorageDriver {1}'.format(alba_proxy.service.name, self.guid))
+                    proxy_info['red'] += 1
+                    continue
+                if service_status == 'active':
+                    proxy_info['green'] += 1
+                elif service_status == 'inactive':
+                    proxy_info['orange'] += 1
+                else:
+                    proxy_info['red'] += 1
+        finally:
+            return summary
+
+    def _global_write_buffer(self):
+        """
+        Return the global write buffer for available for a StorageDriver
+        :return: Calculated global write buffer
+        :rtype: int
+        """
+        # Avoid circular import
+        from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+
+        global_write_buffer = 0
+        for partition in self.partitions:
+            if partition.role == DiskPartition.ROLES.WRITE and partition.sub_role == StorageDriverPartition.SUBROLE.SCO:
+                global_write_buffer += partition.size
+        return global_write_buffer

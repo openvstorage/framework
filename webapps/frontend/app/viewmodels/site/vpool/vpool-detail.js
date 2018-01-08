@@ -151,7 +151,7 @@ define([
                     self.loadStorageDriversHandle = api.get('storagedrivers', {
                         queryparams: {
                             vpool_guid: self.vPool().guid(),
-                            contents: 'storagerouter,vpool_backend_info,vdisks_guids,alba_proxies,local_summary'
+                            contents: 'storagerouter,vpool_backend_info,vdisks_guids,alba_proxies,proxy_summary'
                         }
                     })
                     .done(function(data) {

@@ -59,7 +59,7 @@ class MigrationController(object):
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-        from ovs.lib.storagedriver import StorageDriverInstaller
+        from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
 
         MigrationController._logger.info('Start out of band migrations...')
         service_manager = ServiceFactory.get_manager()
@@ -260,7 +260,7 @@ class MigrationController(object):
                                'write': False,
                                'is_backend': False,
                                'quota': None,
-                               'backend_info': {'name': None,  # Will be filled in when isBackend is true
+                               'backend_info': {'name': None,  # Will be filled in when is_backend is true
                                                 'backend_guid': None,
                                                 'alba_backend_guid': None,
                                                 'policies': None,
@@ -314,9 +314,12 @@ class MigrationController(object):
 
         vpools = VPoolList.get_vpools()
         for vpool in vpools:
-            new_metadata = _update_metadata_structure(vpool.metadata)
-            vpool.metadata = new_metadata
-            vpool.save()
+            try:
+                new_metadata = _update_metadata_structure(vpool.metadata)
+                vpool.metadata = new_metadata
+                vpool.save()
+            except KeyError:
+                MigrationController._logger.exception('Exceptions occurred when updating the metadata for vPool {0}'.format(vpool.name))
 
         ##############################################
         # Always use indent=4 during Configuration set
