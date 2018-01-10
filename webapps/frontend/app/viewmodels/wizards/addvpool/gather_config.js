@@ -15,8 +15,8 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic'
-], function ($, ko, generic, data) {
+    'jquery', 'knockout'
+], function ($, ko) {
     "use strict";
     return function (options) {
         var self = this;
@@ -84,7 +84,7 @@ define([
                 if (useLocalFC || useLocalBC) {
                     var proxies = useLocalFC && useLocalBC ? amount_of_proxies * 2 : amount_of_proxies;
                     var proportion = (largest_ssd || largest_sata) * 100.0 / total_available ;
-                    var available = proportion * self.data.storageDriverParams.globalWriteBuffer() / 100 * 0.10;  // Only 10% is used on the largest WRITE partition for fragment caching
+                    var available = proportion * self.data.storageDriverParams.globalWriteBuffer() * Math.pow(1024, 3) / 100 * 0.10;  // Only 10% is used on the largest WRITE partition for fragment caching
                     var fragment_size = available / proxies;
                     if (fragment_size < Math.pow(1024, 3)) {
                         while (maximum > 0) {
