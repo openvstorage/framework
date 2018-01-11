@@ -294,10 +294,11 @@ define([
                 .attr('transform', 'translate(' + (size + 20) + ',0)'); // Move the center of the legend next to the pie chart
         },
         update: function(element, valueAccessor) {
-            var size=200;
-            var data = valueAccessor();
+            // Default color range
             var color = d3.scale.ordinal().range(['#e6e6e6', '#b2b2b2', '#808080','#377eb8', '#4daf4a', '#984ea3',
                 '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999']);
+            var size=200;
+            var data = valueAccessor();
             var id = $($(element).children()[0]).attr('id');
             var arc = d3.svg.arc()  // This will create <path> elements for us using arc data
                 .outerRadius(size / 2)
@@ -318,7 +319,9 @@ define([
                 .data(pie, function(d) { return d.data.name; })
                 // Set the background color of all the selected elements
                 .style('fill', function(d) {
-                    console.log(color(d.data.name));return color(d.data.name);
+                    var data = d.data;
+                    if (data.hasOwnProperty('color')) { return data.color }
+                    else { return color(data.name); }
                 })
                 .transition()  // Start a transition
                 .duration(250)  // Set the transition duration (milliseconds)
@@ -340,23 +343,27 @@ define([
                 .selectAll('path')
                 .data(pie, function(d) { return d.data.name; })
                 .enter()  // This will create <g> elements for every "extra" data element that should be associated with a selection. The result is creating a <g> for every object in the data array
-                .append('path')  // Create a <path> element for the slice
-                    .style('fill', function(d) {
-                        return color(d.data.name);
-                    })
-                    .attr('d', arc)  // This creates the actual SVG path using the associated data (pie) with the arc drawing function
-                .each(function(d) {  // Store the angles within the element
-                    // Invokes the specified function for each element in the current selection,
-                    // passing in the current datum d and index i, with the this context of the current DOM element (function(d, i))
-                    this._current = d;
-                });
+                    // The following functions apply to the newly created items only
+                    .append('path')  // Create a <path> element for the slice
+                        .style('fill', function(d) {
+                            var data = d.data;
+                            if (data.hasOwnProperty('color')) { return data.color }
+                            else { return color(data.name); }
+                        })
+                        .attr('d', arc)  // This creates the actual SVG path using the associated data (pie) with the arc drawing function
+                    .each(function(d) {  // Store the angles within the element
+                        // Invokes the specified function for each element in the current selection,
+                        // passing in the current datum d and index i, with the this context of the current DOM element (function(d, i))
+                        this._current = d;
+                    });
             // Remove obsolete arcs of the pie chart
             g.datum(data)
                 .selectAll('path')
                 .data(pie, function(d) { return d.data.name; })
                 .exit()  // Returns the exit selection: existing DOM elements in the current selection for which no new data element was found.
-                .remove();  // Removes the elements in the current selection from the current document
+                    .remove();  // Removes the elements in the current selection from the current document
 
+            // Build the legend
             var legend = d3.select('#' + id).select('.legendcontainer');
             legend.selectAll('g')
                 .data(data, function(d) { return d.name; })
@@ -369,21 +376,29 @@ define([
                     text += ')';
                     return text;
                 });
-            var entry = legend.selectAll('g')
-                .data(data, function(d) { return d.name; })
+            // Create containers for the legend
+            var entries = legend.selectAll('g')
+                .data(data, function(d) {
+                    return d.name;
+                })
                 .enter()
-                .append('g')
-                .attr('class', 'legend')
-                .attr('transform', function(d, i) {
-                    var height = 25;
-                    var vert = i * height;
-                    return 'translate(0,' + vert + ')';
-                });
-            entry.append('rect')
+                    .append('g')
+                    .attr('class', 'legend')
+                    .attr('transform', function(d, i) {
+                        var height = 25;
+                        var vert = i * height;
+                        return 'translate(0,' + vert + ')';
+                    });
+            // Add rectangle with color
+            entries.append('rect')
                 .attr('width', 16)
                 .attr('height', 16)
-                .style('fill', function(d) { return color(d.name); });
-            entry.append('text')
+                .style('fill', function(d) {
+                    if (d.hasOwnProperty('color')) { return d.color }
+                    else { return color(d.name); }
+                });
+            // Add text
+            entries.append('text')
                 .attr('x', 20)
                 .attr('y', 14)
                 .text(function(d) {
@@ -394,9 +409,13 @@ define([
                     text += ')';
                     return text;
                 });
+            // Remove obsolete entries of the legend
             legend.selectAll('g')
-                .data(data, function(d) { return d.name; })
-                .exit().remove();
+                .data(data, function(d) {
+                    return d.name;
+                })
+                .exit()
+                    .remove();
         }
     };
 });
