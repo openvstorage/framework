@@ -276,60 +276,88 @@ define([
     ko.virtualElements.allowedBindings['let'] = true;
     ko.bindingHandlers.pie = {
         init: function(element) {
-            var id = 'id_' + generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10), size = 200, svg;
+            var id = 'id_' + generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10);
+            var size = 200;
             $(element).html('<div></div>');
             $($(element).children()[0]).attr('id', id);
-            svg = d3.select('#' + id).append('svg')
-                .attr('class', 'svg')
-                .attr('width', size * 2.5)
-                .attr('height', size);
-            svg.append('g')
-                .attr('class', 'container')
-                .attr('transform', 'translate(' + size / 2 + ',' + size / 2 + ')');
-            svg.append('g')
+            // Create new Scalable Vector Graphics (SVG) container and attach it to the bound element
+            var svg = d3.select('#' + id)
+                .append('svg')
+                    .attr('class', 'svg')
+                    .attr('width', size * 2.5)  // Set the width and height of our visualization (these will be attributes of the <svg> tag
+                    .attr('height', size);
+            svg.append('g')  // Make a group to hold the pie chart
+                .attr('class', 'container')  //
+                .attr('transform', 'translate(' + size / 2 + ',' + size / 2 + ')');  // Move the center of the pie chart from 0, 0 to radius, radius
+            svg.append('g')  // Make a group to hold the legend
                 .attr('class', 'legendcontainer')
-                .attr('transform', 'translate(' + (size + 20) + ',0)');
+                .attr('transform', 'translate(' + (size + 20) + ',0)'); // Move the center of the legend next to the pie chart
         },
         update: function(element, valueAccessor) {
-            var id, g, pie, path, arc, legend, entry, size = 200, data = valueAccessor(),
-                color = d3.scale.ordinal().range([
-                    '#e6e6e6', '#b2b2b2', '#808080',
-                    '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'
-                ]);
-
-            arc = d3.svg.arc()
+            var size=200;
+            var data = valueAccessor();
+            var color = d3.scale.ordinal().range(['#e6e6e6', '#b2b2b2', '#808080','#377eb8', '#4daf4a', '#984ea3',
+                '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999']);
+            var id = $($(element).children()[0]).attr('id');
+            var arc = d3.svg.arc()  // This will create <path> elements for us using arc data
                 .outerRadius(size / 2)
                 .innerRadius(0);
-            pie = d3.layout.pie()
+            var pie = d3.layout.pie()  // This will create arc data for us given a list of values
                 .sort(null)
-                .value(function(d) { return Math.round(d.percentage * 100) / 100; });
+                .value(function(d) {  // We must tell it to access the 'percentage' of each element in our data array
+                    return Math.round(d.percentage * 100) / 100;
+                });
 
-            id = $($(element).children()[0]).attr('id');
-
-            g = d3.select('#' + id).select('.container');
-            g.datum(data).selectAll('path')
+            // Build the pie chart
+            var g = d3.select('#' + id).select('.container');  // The g element is the element with .container of our svg (which is identified by the id)
+            // Register animation when updates occur
+            g.datum(data)  // Set the bound data for the element
+                .selectAll('path')  // This selects all <path> elements
+                // Associate the generated pie data (an array of arcs, each having startAngle, endAngle and value properties)
+                // The datum data is bound within the data key of this object ({data: DATUM_DATA_OBJECT, value: 1, startAngle: 0, endAngle: 6.283185307179586, padAngle: 0})
                 .data(pie, function(d) { return d.data.name; })
-                .style('fill', function(d) { return color(d.data.name); })
-                .transition()
-                .duration(250)
-                .attrTween('d', function(a) {
-                    var i = d3.interpolate(this._current, a);
+                // Set the background color of all the selected elements
+                .style('fill', function(d) {
+                    console.log(color(d.data.name));return color(d.data.name);
+                })
+                .transition()  // Start a transition
+                .duration(250)  // Set the transition duration (milliseconds)
+                // Transition the value of the attribute with the specified name (here 'd') according to the specified function.
+                // The starting and ending value of the transition are determined by tween; the tween function is invoked
+                // when the transition starts on each element, being passed the current datum d, the current index i and
+                // the current attribute value a (function tween(d, i, a)), with the this context as the current DOM element.
+                .attrTween('d', function(d) {
+                    // interpolate from _current (the _current holds the previous angles) to the new angles.
+                    // During the transition, _current is updated in-place by d3.interpolate.
+                    var i = d3.interpolate(this._current, d);
                     this._current = i(0);
                     return function(t) {
                         return arc(i(t));
                     };
                 });
-            g.datum(data).selectAll('path')
+            // Bind the data into the pie chart
+            g.datum(data)
+                .selectAll('path')
                 .data(pie, function(d) { return d.data.name; })
-                .enter().append('path')
-                .style('fill', function(d) { return color(d.data.name); })
-                .attr('d', arc)
-                .each(function(d) { this._current = d; });
-            g.datum(data).selectAll('path')
+                .enter()  // This will create <g> elements for every "extra" data element that should be associated with a selection. The result is creating a <g> for every object in the data array
+                .append('path')  // Create a <path> element for the slice
+                    .style('fill', function(d) {
+                        return color(d.data.name);
+                    })
+                    .attr('d', arc)  // This creates the actual SVG path using the associated data (pie) with the arc drawing function
+                .each(function(d) {  // Store the angles within the element
+                    // Invokes the specified function for each element in the current selection,
+                    // passing in the current datum d and index i, with the this context of the current DOM element (function(d, i))
+                    this._current = d;
+                });
+            // Remove obsolete arcs of the pie chart
+            g.datum(data)
+                .selectAll('path')
                 .data(pie, function(d) { return d.data.name; })
-                .exit().remove();
+                .exit()  // Returns the exit selection: existing DOM elements in the current selection for which no new data element was found.
+                .remove();  // Removes the elements in the current selection from the current document
 
-            legend = d3.select('#' + id).select('.legendcontainer');
+            var legend = d3.select('#' + id).select('.legendcontainer');
             legend.selectAll('g')
                 .data(data, function(d) { return d.name; })
                 .select('text')
@@ -341,14 +369,14 @@ define([
                     text += ')';
                     return text;
                 });
-            entry = legend.selectAll('g')
+            var entry = legend.selectAll('g')
                 .data(data, function(d) { return d.name; })
                 .enter()
                 .append('g')
                 .attr('class', 'legend')
                 .attr('transform', function(d, i) {
-                    var height = 25,
-                        vert = i * height;
+                    var height = 25;
+                    var vert = i * height;
                     return 'translate(0,' + vert + ')';
                 });
             entry.append('rect')
