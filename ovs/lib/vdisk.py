@@ -1589,9 +1589,9 @@ class VDiskController(object):
         :return: A cleaned device name
         :rtype: str
         """
-        if not isinstance(name, str):
+        if not isinstance(name, basestring):
             raise TypeError('Given name "{0}" could not be converted to a clean device name, str required'.format(name))
-        name = str(name).strip('/').replace(' ', '_')
+        name = name.strip('/').replace(' ', '_')
         while '//' in name:
             name = name.replace('//', '/')
         name = re.compile('[^/\w\-.]+').sub('', name)
