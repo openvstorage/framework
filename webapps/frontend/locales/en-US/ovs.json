@@ -270,7 +270,8 @@
             "vdisk": {
                 "HALTED": "Halted",
                 "NON-RUNNING": "Warning",
-                "RUNNING": "Running"
+                "RUNNING": "Running",
+                "UNKNOWN": "Unknown"
             },
             "vpool": {
                 "DELETING": "Deleting",

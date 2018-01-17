@@ -198,6 +198,68 @@ define([
             });
             return clients.join(', ')
         });
+        // GUI logic
+        self.liveStatusColorBinding = ko.pureComputed(function(){
+            // @TODO Leverage these things of to computed instead the status bindinghandler (see lib/ovs/bindinghandlers)
+            return {
+                colors: {
+                    green: self.liveStatus() === 'RUNNING',
+                    orange: self.liveStatus() === 'NON-RUNNING',
+                    red: self.liveStatus() === 'HALTED',
+                    grey: self.liveStatus() === 'UNKNOWN'
+                },
+                defaultColor: 'lightgrey'
+            }
+        });
+        self.dtlStatusColorBinding = ko.pureComputed(function(){
+            // @TODO Leverage these things of to computed instead the status bindinghandler (see lib/ovs/bindinghandlers)
+           return {
+               colors: {
+                   green: ['ok_standalone', 'ok_sync'].contains(self.dtlStatus()),
+                   orange: ['catch_up', 'checkup_required'].contains(self.dtlStatus()),
+                   red: self.dtlStatus() === 'degraded',
+                   grey: self.dtlStatus() === 'disabled'
+               },
+               defaultColor: 'lightgrey'
+           }
+        });
+        self.storedDataDisplay = ko.pureComputed(function(){
+            if (self.liveStatus() === 'RUNNING') {
+                return self.storedData()
+            }
+            return '-'
+
+        });
+        self.iopsDisplay = ko.pureComputed(function(){
+            if (self.liveStatus() === 'RUNNING') {
+                return self.iops()
+            }
+            return '-'
+        });
+        self.readSpeedDisplay = ko.pureComputed(function(){
+            if (self.liveStatus() === 'RUNNING') {
+                return self.readSpeed()
+            }
+            return '-'
+        });
+        self.writeSpeedDisplay = ko.pureComputed(function(){
+            if (self.liveStatus() === 'RUNNING') {
+                return self.writeSpeed()
+            }
+            return '-'
+        });
+        self.snapshotsDisplay = ko.pureComputed(function(){
+            if (self.liveStatus() === 'RUNNING') {
+                return self.snapshots().length
+            }
+            return '-'
+        });
+        self.namespaceDisplay = ko.pureComputed(function(){
+            if (self.liveStatus() === 'RUNNING') {
+                return self.namespace()
+            }
+            return '-'
+        });
 
         // Functions
         self.fillData = function(data) {
