@@ -256,6 +256,11 @@ code {
 }
 
 .label-missing {
+    background-color: #343434;
+
+}
+
+.label-unavailable {
     background-color: buttonface;
 }
 
