@@ -841,6 +841,7 @@ class VDiskController(object):
         # Validations
         storagedriver = StorageDriver(storagedriver_guid)
         devicename = VDiskController.clean_devicename(volume_name)
+        volume_name = str(volume_name)
         vpool = storagedriver.vpool
         if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
             raise RuntimeError('A vDisk with this name already exists on vPool {0}'.format(vpool.name))
@@ -1588,7 +1589,7 @@ class VDiskController(object):
         :return: A cleaned device name
         :rtype: str
         """
-        name = name.strip('/').replace(' ', '_')
+        name = str(name).strip('/').replace(' ', '_')
         while '//' in name:
             name = name.replace('//', '/')
         name = re.compile('[^/\w\-.]+').sub('', name)

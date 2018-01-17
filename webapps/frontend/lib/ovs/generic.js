@@ -20,6 +20,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
     var ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
     var hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
     var nameRegex = /^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$/;
+    var vdiskNameRegex = /^[0-9a-zA-Z][\-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$/;
 
     function getTimestamp() {
         return new Date().getTime();
@@ -628,6 +629,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         ipRegex: ipRegex,
         hostRegex: hostRegex,
         nameRegex: nameRegex,
+        vdiskNameRegex: vdiskNameRegex,
         // Functions
         alert: alert,
         alertError: alertError,
