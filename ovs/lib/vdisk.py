@@ -841,8 +841,6 @@ class VDiskController(object):
         # Validations
         storagedriver = StorageDriver(storagedriver_guid)
         volume_name = str(volume_name)
-        if not re.match(VDisk.VDISK_NAME_REGEX, volume_name):
-            raise ValueError('Provided name did not match with the vDisk name regex')
         devicename = VDiskController.clean_devicename(volume_name)
         vpool = storagedriver.vpool
         if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
