@@ -17,6 +17,7 @@
 """
 VDisk module
 """
+import re
 import time
 from rest_framework import viewsets
 from rest_framework.decorators import action, link
@@ -276,6 +277,9 @@ class VDiskViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
+        if not re.match(VDisk.VDISK_NAME_REGEX, name):
+            raise HttpNotAcceptableException(error_description='Provided name did not match with the vDisk name regex', error='invalid_data')
+
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
             if storagedriver.vpool_guid == vpool_guid:
