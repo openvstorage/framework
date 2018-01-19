@@ -678,6 +678,7 @@ class Generic(unittest.TestCase):
                 counter += 1
         self.assertEqual(first=4,  # Log entry for each combination of 2 vPools and 2 StorageRouters
                          second=counter)
+        # @todo create scrubbing tests which test concurrency
 
     def test_arakoon_collapse(self):
         """
