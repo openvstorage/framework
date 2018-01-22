@@ -1829,7 +1829,7 @@ class StorageRouterController(object):
         """
         returns a set with the roles present on the storagerouter
         :param ip: string with ip of the storagerouter
-        :return: set()
+        :return: Dict
         """
         sr = StorageRouterList.get_by_ip(ip)
         roles_on_sr = {}
