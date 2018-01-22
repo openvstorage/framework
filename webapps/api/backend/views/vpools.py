@@ -104,7 +104,7 @@ class VPoolViewSet(viewsets.ViewSet):
                     return True
             except IndexError:
                 pass
-            raise RuntimeError('Policy is not satisfied to shrink vPool {0} according to preset {1}'.format(vpool.name, preset_name))
+            raise RuntimeError('Policy is currently not satisfied: cannot shrink vPool {0} according to preset {1}'.format(vpool.name, preset_name))
 
         preset_name = vpool.metadata['backend']['backend_info']['preset']
         check_statisfiable_policy(vpool, preset_name=preset_name)
