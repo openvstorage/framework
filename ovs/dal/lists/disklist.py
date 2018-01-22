@@ -33,3 +33,22 @@ class DiskList(object):
         """
         return DataList(Disk, {'type': DataList.where_operator.AND,
                                'items': []})
+
+    @staticmethod
+    def get_disk_by_name_and_ip(name, ip):
+        """
+        Returns a Disk on given StorageRouter with given name
+        :param name: name of the disk
+        :type name: str
+        :param ip: IP of the StorageRouter
+        :type ip: str
+        :return: Disk
+        """
+        disk = DataList(Disk, {'type': DataList.where_operator.AND,
+                               'items':[('storagerouter.ip', DataList.operator.EQUALS, ip),
+                                        ('name', DataList.operator.EQUALS, name)]})
+        if len(disk) == 0:
+            return None
+        if len(disk) == 1:
+            return disk[0]
+        raise RuntimeError('Only one disk should be present with name {0} on storagerouter with ip {1}'.format(name, ip))
