@@ -1694,10 +1694,10 @@ class StorageRouterController(object):
             if DiskPartition.ROLES.BACKEND in partition.roles:
                 raise RuntimeError('The given Disk is in use by a Backend')
 
-        if len({'DB', 'DTL'}.intersection(set(roles))) > 0:
+        if len({DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL}.intersection(set(roles))) > 0:
             roles_on_sr = StorageRouterController._get_roles_on_storagerouter(storagerouter.ip)
-            for role in ['DB', 'DTL']:
-                if role in roles_on_sr and role in roles and roles_on_sr[role][0] != disk.name: #DB and DTL roles still have to be unassignable
+            for role in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL]:
+                if role in roles_on_sr and role in roles and roles_on_sr[role][0] != disk.name:  # DB and DTL roles still have to be unassignable
                     raise RoleDuplicationException('Disk {0} cannot have the {1} role due to presence on disk {2}'.format(disk.name, role, roles_on_sr[role][0]))
 
         # Create partition
