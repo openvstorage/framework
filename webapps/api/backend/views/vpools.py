@@ -27,6 +27,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.api.client import OVSClient
 from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.generic import GenericController
 from ovs.lib.storagerouter import StorageRouterController
@@ -90,6 +91,24 @@ class VPoolViewSet(viewsets.ViewSet):
         :param storagerouter_guid: Guid of the Storage Router
         :type storagerouter_guid: str
         """
+
+        def check_statisfiable_policy(vpool, preset_name):
+            alba_backend_guid = vpool.metadata['backend']['backend_info']['alba_backend_guid']
+            api_url = 'alba/backends/{0}'.format(alba_backend_guid)
+            connection_info = vpool.metadata['backend']['connection_info']
+            api_client = OVSClient(connection_info['host'], connection_info['port'], (connection_info['client_id'], connection_info['client_secret']))
+            _presets = api_client.get(api_url, params={'contents': 'presets'})['presets']
+            try:
+                _preset = filter(lambda p: p['name'] == preset_name, _presets)[0]
+                if _preset['is_available'] is True:
+                    return True
+            except IndexError:
+                pass
+            raise RuntimeError('Policy is not satisfied to shrink vPool {0} according to preset {1}'.format(vpool.name, preset_name))
+
+        preset_name = vpool.metadata['backend']['backend_info']['preset']
+        check_statisfiable_policy(vpool, preset_name=preset_name)
+        #raise if not satisfied
         sr = StorageRouter(storagerouter_guid)
         intersection = set(vpool.storagedrivers_guids).intersection(set(sr.storagedrivers_guids))
         if not intersection:
