@@ -17,7 +17,7 @@
 """
 Arakoon ResultBackend Module
 """
-
+import time
 from celery.backends.base import KeyValueStoreBackend
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.storage.exceptions import KeyNotFoundException
@@ -29,9 +29,8 @@ class ArakoonResultBackend(KeyValueStoreBackend):
     Class to use Arakoon as a result backend for Celery
     """
     _NAMESPACE_PREFIX = 'ovs_tasks_'
-    # @TODO handle expiration
-    servers = None
-    supports_autoexpire = True
+    # Arakoon does not expire of itself. This will enable enable celery beat to add a clean up job every CELERY_TASK_RESULT_EXPIRES seconds (default 1 day)
+    supports_autoexpire = False
     supports_native_join = True
     implements_incr = True
 
@@ -52,17 +51,13 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         self._client = PersistentFactory.get_client()
 
     def get(self, key):
-        try:
-            return self._client.get(key)
-        except KeyNotFoundException:
-            return None
+        return self._extract_data(key)
 
     def mget(self, keys):
-        return self._client.get_multi(keys)
+        return self._extract_data_multi(keys)
 
     def set(self, key, value):
-        # raise RuntimeError('REMOVE')
-        return self._client.set(key, value)
+        return self._set_data(key, value)
 
     def delete(self, key):
         return self._client.delete(key)
@@ -102,14 +97,60 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         """
         return '{0}{1}'.format(self._NAMESPACE_PREFIX, key)
 
+    def _extract_data(self, key=None, data=None):
+        """
+        The entries given in the backend are json by default with expiration information
+        :param key: Key to extract data from
+        :param data: Data to extract data from
+        :return: Extract data or full data
+        """
+        if key is None and data is None:
+            raise ValueError('Either key or data need to be supplied')
+        if data is None:
+            try:
+                data = self._client.get(key)
+            except KeyNotFoundException:
+                data = None
+        if isinstance(data, dict) and 'data' in data:
+            return data['data']
+        return data
+
+    def _extract_data_multi(self, keys):
+        return (self._extract_data(data=data) for data in self._client.get_multi(keys))
+
+    def _set_data(self, key, value):
+        """
+        Wraps the data to save to support expiration
+        :param key: Key to store under
+        :param value: Value to store
+        :return: True if successful, false if not
+        """
+        return self._client.set(key, {'data': value, 'time_set': time.time()})
+
     def get_key_for_task(self, *args, **kwargs):
-        """Get the cache key for a task by id."""
+        """
+        Get the cache key for a task by id.
+        """
         return self._get_full_key(super(ArakoonResultBackend, self).get_key_for_task(*args, **kwargs))
 
     def get_key_for_group(self, *args, **kwargs):
-        """Get the cache key for a group by id."""
+        """
+        Get the cache key for a group by id.
+        """
         return self._get_full_key(super(ArakoonResultBackend, self).get_key_for_group(*args, **kwargs))
 
     def get_key_for_chord(self, *args, **kwargs):
-        """Get the cache key for the chord waiting on group with given id."""
+        """
+        Get the cache key for the chord waiting on group with given id.
+        """
         return self._get_full_key(super(ArakoonResultBackend, self).get_key_for_chord(*args, **kwargs))
+
+    def cleanup(self):
+        """
+        Delete expired metadata.
+        """
+        for key, value in self._client.prefix_entries(self._NAMESPACE_PREFIX):
+            if isinstance(value, dict) and 'time_set' in value:
+                if time.time() - value['time_set'] > self.expires:
+                    self._logger.debug('Removing {0} as it has expired'.format(key))
+                    self._client.delete(key, must_exist=False)
