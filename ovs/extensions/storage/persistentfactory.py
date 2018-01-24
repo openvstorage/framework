@@ -28,7 +28,7 @@ class PersistentFactory(_PersistentFactory):
 
     @classmethod
     def _get_store_info(cls):
-        client_type = Configuration.get('/ovs/framework/stores|persistent')
+        client_type = cls._get_client_type()
         if client_type not in ['pyrakoon', 'arakoon']:
             raise RuntimeError('Configured client type {0} is not implemented'.format(client_type))
         cluster = Configuration.get('/ovs/framework/arakoon_clusters|ovsdb')

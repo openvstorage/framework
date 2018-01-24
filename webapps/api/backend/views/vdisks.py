@@ -17,6 +17,7 @@
 """
 VDisk module
 """
+import re
 import time
 from rest_framework import viewsets
 from rest_framework.decorators import action, link
@@ -47,15 +48,13 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'manage'])
     @return_list(VDisk)
     @load()
-    def list(self, vpoolguid=None, storagerouterguid=None, query=None):
+    def list(self, vpoolguid=None, storagerouterguid=None):
         """
         Overview of all vDisks
         :param vpoolguid: Guid of the vPool to retrieve its disks
         :type vpoolguid: str
         :param storagerouterguid: Guid of the StorageRouter to retrieve its disks
         :type storagerouterguid: str
-        :param query: A query to be executed if required
-        :type query: DataQuery
         :return: List of vDisks matching the parameters specified
         :rtype: list[ovs.dal.hybrids.vdisk.VDisk]
         """
@@ -68,9 +67,6 @@ class VDiskViewSet(viewsets.ViewSet):
                                       'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
         else:
             vdisks = VDiskList.get_vdisks()
-        if query is not None:
-            query_vdisk_guids = DataList(VDisk, query).guids
-            vdisks = [vdisk for vdisk in vdisks if vdisk.guid in query_vdisk_guids]
         return vdisks
 
     @log()
@@ -281,6 +277,9 @@ class VDiskViewSet(viewsets.ViewSet):
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
+        if not re.match(VDisk.VDISK_NAME_REGEX, name):
+            raise HttpNotAcceptableException(error_description='Provided name did not match with the vDisk name regex', error='invalid_data')
+
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
             if storagedriver.vpool_guid == vpool_guid:

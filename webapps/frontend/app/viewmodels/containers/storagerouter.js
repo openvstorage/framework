@@ -50,7 +50,7 @@ define([
         self.disksLoaded         = ko.observable(false);
         self.domainGuids         = ko.observableArray([]);
         self.downLoadingLogs     = ko.observable(false);
-        self.downloadLogState    = ko.observable($.t('ovs:support.download_logs'));
+        self.downloadLogState    = ko.observable($.t('ovs:support.information.download_logs'));
         self.edit                = ko.observable(false);
         self.expanded            = ko.observable(true);
         self.features            = ko.observable(undefined);
@@ -169,7 +169,7 @@ define([
             }
             if (generic.xhrCompleted(self.loadLogFiles)) {
                 self.downLoadingLogs(true);
-                self.downloadLogState($.t('ovs:support.downloading_logs'));
+                self.downloadLogState($.t('ovs:support.information.downloading_logs'));
                 self.loadLogFiles = api.get('storagerouters/' + self.guid() + '/get_logfiles')
                     .then(self.shared.tasks.wait)
                     .done(function (data) {
@@ -177,7 +177,7 @@ define([
                     })
                     .always(function () {
                         self.downLoadingLogs(false);
-                        self.downloadLogState($.t('ovs:support.download_logs'));
+                        self.downloadLogState($.t('ovs:support.information.download_logs'));
                     });
             }
         };

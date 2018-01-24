@@ -29,9 +29,12 @@ class ServiceFactory(_ServiceFactory):
     Service Factory for the OVS Framework
     """
     RUN_FILE_DIR = '/opt/OpenvStorage/run'
-    SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
     CONFIG_TEMPLATE_DIR = '/opt/OpenvStorage/config/templates/{0}'
     MONITOR_PREFIXES = ['ovs-']
+    SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
+    SERVICE_WATCHER_VOLDRV = 'watcher-volumedriver'
+
+    _logger = Logger('extensions')
 
     def __init__(self):
         """Init method"""
@@ -47,4 +50,4 @@ class ServiceFactory(_ServiceFactory):
 
     @classmethod
     def _get_logger_instance(cls):
-        return Logger('extensions')
+        return cls._logger

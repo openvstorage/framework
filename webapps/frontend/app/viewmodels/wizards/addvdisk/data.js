@@ -14,11 +14,11 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['jquery', 'knockout'], function($, ko){
+define(['jquery', 'knockout', 'ovs/generic'], function($, ko, generic){
     "use strict";
     var singleton = function() {
         var wizardData = {
-            name:                  ko.observable(''),
+            name:                  ko.observable('').extend({ regex: generic.vdiskNameRegex }),
             sizeEntry:             ko.observable(0).extend({ numeric: { min: 1, max: 65535 } }),
             storageRouter:         ko.observable(),
             storageRouters:        ko.observableArray([]),

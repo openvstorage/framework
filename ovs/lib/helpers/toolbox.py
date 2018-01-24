@@ -17,6 +17,7 @@
 """
 Module containing certain helper classes providing various logic
 """
+
 import os
 import re
 import imp
@@ -32,7 +33,6 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.interactive import Interactive
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.servicefactory import ServiceFactory
 
 
 class Toolbox(object):
@@ -68,10 +68,8 @@ class Toolbox(object):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                    if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
                         for submember in inspect.getmembers(member[1]):
                             if hasattr(submember[1], 'hooks') \
                                     and isinstance(submember[1].hooks, dict) \
@@ -170,7 +168,7 @@ class Toolbox(object):
                 elif DalToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
                     error_messages.append('{0} param "{1}" with value "{2}" does not match regex "{3}"'.format(mandatory_or_optional, required_key, actual_value, expected_value.pattern))
         if error_messages:
-            raise RuntimeError('\n' + '\n'.join(error_messages))
+            raise RuntimeError('Invalid parameters detected\n' + '\n'.join(error_messages))
 
     @staticmethod
     def get_hash(length=16):
@@ -203,68 +201,6 @@ class Toolbox(object):
                 retry += 1
         if cpe:
             raise cpe
-
-    @staticmethod
-    def change_service_state(client, name, state, logger=None):
-        """
-        Starts/stops/restarts a service
-        :param client: SSHClient on which to connect and change service state
-        :param name: Name of the service
-        :param state: State to put the service in
-        :param logger: Logger Object
-        """
-        service_manager = ServiceFactory.get_manager()
-        action = None
-        status = service_manager.get_service_status(name, client=client)
-        if status != 'active' and state in ['start', 'restart']:
-            if logger is not None:
-                logger.info('{0}: Starting service {1}'.format(client.ip, name))
-            service_manager.start_service(name, client=client)
-            action = 'Started'
-        elif status == 'active' and state == 'stop':
-            if logger is not None:
-                logger.info('{0}: Stopping service {1}'.format(client.ip, name))
-            service_manager.stop_service(name, client=client)
-            action = 'Stopped'
-        elif status == 'active' and state == 'restart':
-            if logger is not None:
-                logger.info('{0}: Restarting service {1}'.format(client.ip, name))
-            service_manager.restart_service(name, client=client)
-            action = 'Restarted'
-
-        if action is None:
-            print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status == 'active' else 'halted')
-        else:
-            if logger is not None:
-                logger.info('{0}: {1} service {2}'.format(client.ip, action, name))
-            print '  [{0}] {1} {2}'.format(client.ip, name, action.lower())
-
-    @staticmethod
-    def wait_for_service(client, name, status, logger):
-        """
-        Wait for service to enter status
-        :param client: SSHClient to run commands
-        :type client: ovs_extensions.generic.sshclient.SSHClient
-        :param name: Name of service
-        :type name: str
-        :param status: 'active' if running, 'inactive' if halted
-        :type status: str
-        :param logger: Logger object
-        :type logger: ovs.extensions.generic.logger.Logger
-        :return: None
-        :rtype: NoneType
-        """
-        tries = 10
-        service_manager = ServiceFactory.get_manager()
-        service_status = service_manager.get_service_status(name, client)
-        while tries > 0:
-            if service_status == status:
-                return
-            logger.debug('... waiting for service {0}'.format(name))
-            tries -= 1
-            time.sleep(10 - tries)
-            service_status = service_manager.get_service_status(name, client)
-        raise RuntimeError('Service {0} does not have expected status: Expected: {1} - Actual: {2}'.format(name, status, service_status))
 
     @staticmethod
     def log(logger, messages, title=False, boxed=False, loglevel='info', silent=False):

@@ -16,16 +16,24 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <section>
-    <div>
-        <h2 class="pull-left" data-i18n="ovs:vdisks.title"></h2>
-        <button class="btn btn-default pull-right" id="buttonAddVdisk"
-                data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && runningVPool()"
-                style="margin-top: 20px; margin-bottom: 10px;">
-            <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
-            <span data-i18n="ovs:vdisks.add"></span>
-        </button>
+    <div class="container-fluid">
+        <div class="row row-no-padding">
+            <div class="col-lg-4">
+                <h2 data-i18n="ovs:vdisks.title"></h2>
+            </div>
+            <div class="col-lg-8">
+                <div class="pull-right h2">
+                    <div data-bind="searchbar: { query: vdiskSearch, defaultField: 'name', placeholder: 'ovs:vdisks.search', defaultQuery: query}" style="display: inline-block;"></div>
+                    <button class="btn btn-default" id="buttonAddVdisk"
+                            data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && runningVPool()">
+                        <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+                        <span data-i18n="ovs:vdisks.add"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-    <div data-bind="pager: { loadData: loadVDisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true }">
+    <div data-bind="pager: { loadData: pageVdisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true, query: vdiskSearch }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
                 <td style="position: relative;">
@@ -33,14 +41,7 @@ but WITHOUT ANY WARRANTY of any kind.
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
                     <div data-bind="tooltip: 'ovs:generic.states.vdisk.' + liveStatus(),
-                                    status: {
-                                        colors: {
-                                            green: liveStatus() === 'RUNNING',
-                                            orange: liveStatus() === 'NON-RUNNING',
-                                            red: liveStatus() === 'HALTED'
-                                        },
-                                        defaultColor: 'lightgrey'
-                                    }"
+                                    status: liveStatusColorBinding()"
                          style="width: 14px; height: 14px; margin-top: 1px;">
                     </div>
                 </td>
@@ -72,20 +73,13 @@ but WITHOUT ANY WARRANTY of any kind.
                     </span>
                 </td>
                 <td><span data-bind="text: size"></span></td>
-                <td><span data-bind="text: liveStatus() === 'RUNNING' ? storedData : '-'"></span></td>
-                <td><span data-bind="text: liveStatus() === 'RUNNING' ? iops : '-'"></span></td>
-                <td><span data-bind="text: liveStatus() === 'RUNNING' ? readSpeed : '-'"></span></td>
-                <td><span data-bind="text: liveStatus() === 'RUNNING' ? writeSpeed : '-'"></span></td>
+                <td><span data-bind="text: storedDataDisplay"></span></td>
+                <td><span data-bind="text: iopsDisplay"></span></td>
+                <td><span data-bind="text: readSpeedDisplay"></span></td>
+                <td><span data-bind="text: writeSpeedDisplay"></span></td>
                 <td>
-                    <div data-bind="status: {
-                                        colors: {
-                                            green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
-                                            orange: ['catch_up', 'checkup_required'].contains(dtlStatus()),
-                                            red: dtlStatus() === 'degraded',
-                                            grey: dtlStatus() === 'disabled'
-                                        },
-                                        defaultColor: 'lightgrey'
-                                    }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
+                    <div data-bind="status: dtlStatusColorBinding(),
+                                    tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
                          style="width: 14px; height: 14px;">
                     </div>
                 </td>

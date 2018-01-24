@@ -305,7 +305,7 @@ class NodeTypeController(object):
             time.sleep(5)
 
             # Enable HA for the rabbitMQ queues
-            Toolbox.change_service_state(target_client, 'rabbitmq-server', 'start', NodeTypeController._logger)
+            ServiceFactory.change_service_state(target_client, 'rabbitmq-server', 'start', NodeTypeController._logger)
             NodeTypeController.check_rabbitmq_and_enable_ha_mode(client=target_client, logger=NodeTypeController._logger)
 
         NodeTypeController._configure_amqp_to_volumedriver()
@@ -316,7 +316,7 @@ class NodeTypeController(object):
             services.remove('arakoon-ovsdb')
         for service in services:
             if service_manager.has_service(service, client=target_client):
-                Toolbox.change_service_state(target_client, service, 'start', NodeTypeController._logger)
+                ServiceFactory.change_service_state(target_client, service, 'start', NodeTypeController._logger)
 
         Toolbox.log(logger=NodeTypeController._logger, messages='Restarting services')
         NodeTypeController.restart_framework_and_memcache_services(clients=ip_client_map, logger=NodeTypeController._logger)
@@ -437,7 +437,7 @@ class NodeTypeController(object):
                 Toolbox.log(logger=NodeTypeController._logger, messages='Removing/unconfiguring RabbitMQ')
                 try:
                     if service_manager.has_service('rabbitmq-server', client=target_client):
-                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeTypeController._logger)
+                        ServiceFactory.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeTypeController._logger)
                         target_client.run(['rabbitmq-server', '-detached'])
                         time.sleep(5)
                         target_client.run(['rabbitmqctl', 'stop_app'])
@@ -447,7 +447,7 @@ class NodeTypeController(object):
                         target_client.run(['rabbitmqctl', 'stop'])
                         time.sleep(5)
                         target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
-                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeTypeController._logger)  # To be sure
+                        ServiceFactory.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeTypeController._logger)  # To be sure
                 except Exception as ex:
                     Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to remove/unconfigure RabbitMQ', ex], loglevel='exception')
 
@@ -461,7 +461,7 @@ class NodeTypeController(object):
                 if service_manager.has_service(service, client=target_client):
                     Toolbox.log(logger=NodeTypeController._logger, messages='Stopping service {0}'.format(service))
                     try:
-                        Toolbox.change_service_state(target_client, service, 'stop', NodeTypeController._logger)
+                        ServiceFactory.change_service_state(target_client, service, 'stop', NodeTypeController._logger)
                     except Exception as ex:
                         Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to stop service'.format(service), ex], loglevel='exception')
 
@@ -471,7 +471,7 @@ class NodeTypeController(object):
                 if service_manager.has_service(service, client=target_client):
                     Toolbox.log(logger=NodeTypeController._logger, messages='Removing service {0}'.format(service))
                     try:
-                        Toolbox.change_service_state(target_client, service, 'stop', NodeTypeController._logger)
+                        ServiceFactory.change_service_state(target_client, service, 'stop', NodeTypeController._logger)
                         service_manager.remove_service(service, client=target_client)
                     except Exception as ex:
                         Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to remove service'.format(service), ex], loglevel='exception')
@@ -534,16 +534,16 @@ class NodeTypeController(object):
         for ip in master_ips + slave_ips:
             if ip not in offline_node_ips:
                 if service_manager.has_service(watcher, clients[ip]):
-                    Toolbox.change_service_state(clients[ip], watcher, 'stop', logger)
+                    ServiceFactory.change_service_state(clients[ip], watcher, 'stop', logger)
         for ip in master_ips:
             if ip not in offline_node_ips:
-                Toolbox.change_service_state(clients[ip], memcached, 'restart', logger)
+                ServiceFactory.change_service_state(clients[ip], memcached, 'restart', logger)
         for ip in master_ips + slave_ips:
             if ip not in offline_node_ips:
                 if service_manager.has_service(watcher, clients[ip]):
-                    Toolbox.change_service_state(clients[ip], watcher, 'start', logger)
+                    ServiceFactory.change_service_state(clients[ip], watcher, 'start', logger)
                 if service_manager.has_service(support_agent, clients[ip]):
-                    Toolbox.change_service_state(clients[ip], support_agent, 'restart', logger)
+                    ServiceFactory.change_service_state(clients[ip], support_agent, 'restart', logger)
         VolatileFactory.store = None
 
     @staticmethod
@@ -581,6 +581,7 @@ class NodeTypeController(object):
    {{rabbit, [{{tcp_listeners, [{0}]}},
               {{default_user, <<"{1}">>}},
               {{default_pass, <<"{2}">>}},
+              {{cluster_partition_handling, autoheal}},
               {{log_levels, [{{connection, warning}}]}},
               {{vm_memory_high_watermark, 0.2}}]}}
 ].""".format(rabbitmq_port, rabbitmq_login, rabbitmq_password))
@@ -596,7 +597,7 @@ class NodeTypeController(object):
             if 'ovs' in users:
                 Toolbox.log(logger=logger, messages='Already configured RabbitMQ')
                 return
-            Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', logger)
+            ServiceFactory.change_service_state(client, 'rabbitmq-server', 'stop', logger)
 
         client.run(['rabbitmq-server', '-detached'])
         time.sleep(5)
@@ -641,7 +642,7 @@ class NodeTypeController(object):
             raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
         rabbitmq_running, same_process = service_manager.is_rabbitmq_running(client=client)
         if rabbitmq_running is False or same_process is False:
-            Toolbox.change_service_state(client, 'rabbitmq-server', 'restart', logger)
+            ServiceFactory.change_service_state(client, 'rabbitmq-server', 'restart', logger)
 
         time.sleep(5)
         client.run(['rabbitmqctl', 'set_policy', 'ha-all', '^(volumerouter|ovs_.*)$', '{"ha-mode":"all"}'])
@@ -717,7 +718,7 @@ class NodeTypeController(object):
         <port>443</port>
     </service>
 </service-group>""".format(valid_avahi[1], node_type))
-        Toolbox.change_service_state(client, 'avahi-daemon', 'restart', NodeTypeController._logger)
+        ServiceFactory.change_service_state(client, 'avahi-daemon', 'restart', NodeTypeController._logger)
 
     @staticmethod
     def add_services(client, node_type, logger):

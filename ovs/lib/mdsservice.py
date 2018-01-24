@@ -347,7 +347,7 @@ class MDSServiceController(object):
                             MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Failed to remove'.format(vpool.name, storagerouter.name, number, port))
                         mds_services.remove(mds_service)
                     else:
-                        _, next_load = MDSServiceController._get_mds_load(mds_service=mds_service)
+                        _, next_load = MDSServiceController.get_mds_load(mds_service=mds_service)
                         if next_load == float('inf'):
                             total_load = sys.maxint * -1  # Cast to lowest possible value if any MDS service capacity is set to infinity
                         else:
@@ -419,7 +419,7 @@ class MDSServiceController(object):
     # noinspection PyUnresolvedReferences
     @staticmethod
     @ovs_task(name='ovs.mds.ensure_safety', ensure_single_info={'mode': 'CHAINED'})
-    def ensure_safety(vdisk_guid, excluded_storagerouter_guids=list()):
+    def ensure_safety(vdisk_guid, excluded_storagerouter_guids=None):
         """
         Ensures (or tries to ensure) the safety of a given vDisk.
         Assumptions:
@@ -450,7 +450,12 @@ class MDSServiceController(object):
         :rtype: NoneType
         """
         # noinspection PyUnresolvedReferences
-        def _add_suitable_nodes(local_importance, local_safety, services_to_recycle=list()):
+        if excluded_storagerouter_guids is None:
+            excluded_storagerouter_guids = []
+
+        def _add_suitable_nodes(local_importance, local_safety, services_to_recycle=None):
+            if services_to_recycle is None:
+                services_to_recycle = []
             if local_importance == 'primary':
                 local_services = new_primary_services
             else:
@@ -594,7 +599,7 @@ class MDSServiceController(object):
                 importance = 'secondary'
 
             # If MDS already in use, take current load, else take next load
-            loads = MDSServiceController._get_mds_load(mds_service=service.mds_service)
+            loads = MDSServiceController.get_mds_load(mds_service=service.mds_service)
             if service == master_service or service in slave_services:  # Service is still in use
                 load = loads[0]
                 if importance is not None:
@@ -941,13 +946,13 @@ class MDSServiceController(object):
         mds_info = (None, float('inf'))
         for mds_service in vpool.mds_services:
             if mds_service.service.storagerouter_guid == storagerouter.guid:
-                load = MDSServiceController._get_mds_load(mds_service=mds_service)[0]
+                load = MDSServiceController.get_mds_load(mds_service=mds_service)[0]
                 if mds_info[0] is None or load < mds_info[1]:
                     mds_info = (mds_service, load)
         return mds_info
 
     @staticmethod
-    def get_mds_storagedriver_config_set(vpool, offline_nodes=list()):
+    def get_mds_storagedriver_config_set(vpool, offline_nodes=None):
         """
         Builds a configuration for all StorageRouters from a given vPool with following goals:
             * Primary MDS is the local one
@@ -966,6 +971,8 @@ class MDSServiceController(object):
         :return: MDS configuration for a vPool
         :rtype: dict[list]
         """
+        if offline_nodes is None:
+            offline_nodes = []
         mds_per_storagerouter = {}
         mds_per_load = {}
         for storagedriver in vpool.storagedrivers:
@@ -1035,7 +1042,7 @@ class MDSServiceController(object):
                                 capacity = mds_service.capacity
                                 if capacity == -1:
                                     capacity = 'infinite'
-                                load, _ = MDSServiceController._get_mds_load(mds_service)
+                                load, _ = MDSServiceController.get_mds_load(mds_service)
                                 if load == float('inf'):
                                     load = 'infinite'
                                 else:
@@ -1131,7 +1138,7 @@ class MDSServiceController(object):
         MDSServiceController._logger.info('vDisk {0} - {1}: Synced to reality'.format(vdisk.guid, vdisk.name))
 
     @staticmethod
-    def _get_mds_load(mds_service):
+    def get_mds_load(mds_service):
         """
         Gets a 'load' for an MDS service based on its capacity and the amount of assigned vDisks
         :param mds_service: MDS service the get current load for

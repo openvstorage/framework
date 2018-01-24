@@ -110,10 +110,8 @@ class UnitTest(object):
                             UnitTest._invalid_test_modules.append(filepath)
                             continue
                         filepath = filepath.replace('.py', '')
-                        for member in inspect.getmembers(mod):
-                            if inspect.isclass(member[1]) and \
-                               member[1].__module__ == name and \
-                               'TestCase' in [base.__name__ for base in member[1].__bases__]:
+                        for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                            if member[1].__module__ == name and 'TestCase' in [base.__name__ for base in member[1].__bases__]:
                                     class_name = member[0]
                                     class_cl = member[1]
                                     full_class_path = '{0}.{1}'.format(filepath, class_name)
@@ -181,8 +179,10 @@ class UnitTest(object):
         :rtype: NoneType
         """
         failed_modules = []
+        all_tests = UnitTest.list_tests()
+        short_names = [os.path.split(name)[1] for name in all_tests]
         if tests is None:  # Put all test files and their classes in custom dict
-            tests_to_execute = UnitTest.list_tests()
+            tests_to_execute = all_tests
             failed_modules = UnitTest._invalid_test_modules
         else:  # Validate the specified tests
             UnitTest._gather_test_info(silent_invalid_modules=True)
@@ -191,7 +191,6 @@ class UnitTest(object):
                 tests = tests.split(',')
             if not isinstance(tests, list):
                 raise ValueError('Tests should be a list')
-
             sorted_tests = sorted(UnitTest._test_info.keys())
             tests_to_execute = []
             for test in tests:
@@ -199,6 +198,12 @@ class UnitTest(object):
                 if test in sorted_tests:
                     found_tests = True
                     tests_to_execute.append(test)
+                elif test in short_names:
+                    for sorted_test in sorted_tests:
+                        filename = os.path.split(sorted_test)[1]
+                        if test.startswith(filename) or filename.startswith(test):
+                            tests_to_execute.append(sorted_test)
+                            found_tests = True
                 else:
                     for sorted_test in sorted_tests:
                         if '.' in sorted_test:

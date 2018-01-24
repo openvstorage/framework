@@ -352,10 +352,8 @@ class OpenAPIView(View):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
+                for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                    if member[1].__module__ == name and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
                         cls = member[1]
                         if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
                             continue
@@ -382,8 +380,7 @@ class OpenAPIView(View):
                                 if current_path not in paths:
                                     paths[current_path] = {}
                                 paths[current_path].update(route)
-                        funs = [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod)
-                                if fun[0] not in base_calls.keys()]
+                        funs = [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod) if fun[0] not in base_calls.keys()]
                         for fun in funs:
                             if hasattr(fun, 'bind_to_methods'):
                                 routes = {}

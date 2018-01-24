@@ -38,10 +38,8 @@ def build_router_urls():
         if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
             name = filename.replace('.py', '')
             mod = imp.load_source(name, '/'.join([path, filename]))
-            for member in inspect.getmembers(mod):
-                if inspect.isclass(member[1]) \
-                        and member[1].__module__ == name \
-                        and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
+            for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                if member[1].__module__ == name and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
                     routes.append({'prefix': member[1].prefix,
                                    'viewset': member[1],
                                    'base_name': member[1].base_name})

@@ -29,15 +29,18 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient,\
-                                                       SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
+from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient, \
+    SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
+from volumedriver.storagerouter.storagerouterclient import ClusterNotReachableException
 
 
 class VDisk(DataObject):
     """
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     """
-    STATUSES = DataObject.enumerator('Status', ['HALTED', 'NON_RUNNING', 'RUNNING'])
+    STATUSES = DataObject.enumerator('Status', ['HALTED', 'NON_RUNNING', 'RUNNING', 'UNKNOWN'])
+
+    VDISK_NAME_REGEX = '^[0-9a-zA-Z][\-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$'
 
     _logger = Logger('hybrids')
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
@@ -222,7 +225,7 @@ class VDisk(DataObject):
         Fetches the info (see Volume Driver API) for the vDisk.
         """
         vdiskinfo = StorageDriverClient.EMPTY_INFO()
-        max_redirects = False
+        vdisk_state = VDisk.STATUSES.RUNNING
         if self.volume_id and self.vpool:
             try:
                 try:
@@ -231,9 +234,14 @@ class VDisk(DataObject):
                     time.sleep(0.5)
                     vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
             except MaxRedirectsExceededException:
-                max_redirects = True
-            except:
-                pass
+                vdisk_state = VDisk.STATUSES.NON_RUNNING
+            # @todo replace RuntimeError with NodeNotReachableException
+            except (ClusterNotReachableException, RuntimeError) as exception:
+                if isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
+                    self._logger.debug('VDisk {0} status has been set to UNKNOWN'.format(self.name))
+                    vdisk_state = VDisk.STATUSES.UNKNOWN
+            except Exception as ex:
+                self._logger.debug('Uncaught exception occurred when requesting the volume info for vDisk {0}: {1}'.format(self.name, ex))
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
@@ -248,9 +256,12 @@ class VDisk(DataObject):
                         for nodeconfig in objectvalue.node_configs():
                             vdiskinfodict[key].append({'ip': nodeconfig.address(),
                                                        'port': nodeconfig.port()})
+                    elif key == 'halted' and objectvalue is True:
+                        self._logger.debug('VDisk {0} status has been set to HALTED'.format(self.name))
+                        vdisk_state = VDisk.STATUSES.HALTED
                 else:
                     vdiskinfodict[key] = objectvalue
-        vdiskinfodict['live_status'] = VDisk.STATUSES.NON_RUNNING if max_redirects is True else (VDisk.STATUSES.RUNNING if vdiskinfodict['halted'] is False else VDisk.STATUSES.HALTED)
+        vdiskinfodict['live_status'] = vdisk_state
         return vdiskinfodict
 
     def _statistics(self, dynamic):

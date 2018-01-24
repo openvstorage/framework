@@ -27,6 +27,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.api.client import OVSClient
 from ovs_extensions.api.exceptions import HttpNotAcceptableException
 from ovs.lib.generic import GenericController
 from ovs.lib.storagerouter import StorageRouterController
@@ -90,12 +91,30 @@ class VPoolViewSet(viewsets.ViewSet):
         :param storagerouter_guid: Guid of the Storage Router
         :type storagerouter_guid: str
         """
+
+        def check_statisfiable_policy(vpool, preset_name):
+            alba_backend_guid = vpool.metadata['backend']['backend_info']['alba_backend_guid']
+            api_url = 'alba/backends/{0}'.format(alba_backend_guid)
+            connection_info = vpool.metadata['backend']['connection_info']
+            api_client = OVSClient(connection_info['host'], connection_info['port'], (connection_info['client_id'], connection_info['client_secret']))
+            _presets = api_client.get(api_url, params={'contents': 'presets'})['presets']
+            try:
+                _preset = filter(lambda p: p['name'] == preset_name, _presets)[0]
+                if _preset['is_available'] is True:
+                    return True
+            except IndexError:
+                pass
+            raise RuntimeError('Policy is currently not satisfied: cannot shrink vPool {0} according to preset {1}'.format(vpool.name, preset_name))
+
+        preset_name = vpool.metadata['backend']['backend_info']['preset']
+        check_statisfiable_policy(vpool, preset_name=preset_name)
+        #raise if not satisfied
         sr = StorageRouter(storagerouter_guid)
         intersection = set(vpool.storagedrivers_guids).intersection(set(sr.storagedrivers_guids))
         if not intersection:
             raise HttpNotAcceptableException(error='impossible_request',
                                              error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name))
-        return StorageRouterController.remove_storagedriver.delay(list(intersection)[0])
+        return StorageRouterController.remove_storagedriver.delay(StorageRouterController, list(intersection)[0])
 
     @link()
     @log()
@@ -200,7 +219,7 @@ class VPoolViewSet(viewsets.ViewSet):
     @load(VPool)
     def scrub_multiple_vdisks(self, vpool, vdisk_guids=None):
         """
-        Scrubs the specified vDisks or all vDisks of the vPool is no guids are passed in
+        Scrubs the specified vDisks or all vDisks of the vPool if no guids are passed in
         :param vpool: The vPool to which the vDisks belong to scrub
         :type vpool: ovs.dal.hybrids.vpool.VPool
         :param vdisk_guids: The guids of the vDisks to scrub
@@ -251,3 +270,27 @@ class VPoolViewSet(viewsets.ViewSet):
         return VPoolController.create_hprm_config_files.delay(parameters=parameters,
                                                               vpool_guid=vpool.guid,
                                                               local_storagerouter_guid=local_storagerouter.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VPool)
+    def move_multiple_vdisks(self, vpool, vdisk_guids, target_storagerouter_guid, force=False):
+        """
+        Moves multiple vDisks within a vPool
+        :param vpool: VPool to move vDisks to
+        :type vpool: ovs.dal.hybrids.vpool.VPool
+        :param vdisk_guids: Guids of the virtual disk to move
+        :type vdisk_guids: list
+        :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisks to
+        :type target_storagerouter_guid: str
+        :param force: Indicate whether to force the migration (forcing the migration might cause data loss)
+        :type force: bool
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
+        """
+        _ = vpool
+        return VDiskController.move_multiple.delay(vdisk_guids=vdisk_guids,
+                                                   target_storagerouter_guid=target_storagerouter_guid,
+                                                   force=force)

@@ -32,6 +32,7 @@ from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
 from ovs_extensions.api.exceptions import HttpBadRequestException
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 
 
@@ -39,6 +40,7 @@ class OAuth2TokenView(View):
     """
     Implements OAuth 2 token views
     """
+    logger = Logger('api')
 
     @log()
     @auto_response()
@@ -47,7 +49,8 @@ class OAuth2TokenView(View):
         """
         Handles token post
         """
-        logger = Logger('api')
+        expiration_user = Configuration.get('ovs/framework/api/oauth|expiration_user', default=OAuth2Toolbox.EXPIRATION_USER)
+        expiration_client = Configuration.get('ovs/framework/api/oauth|expiration_client', default=OAuth2Toolbox.EXPIRATION_CLIENT)
         _ = args, kwargs
         if 'grant_type' not in request.POST:
             raise HttpBadRequestException(error='invalid_request',
@@ -77,7 +80,7 @@ class OAuth2TokenView(View):
             client = clients[0]
             try:
                 access_token, _ = OAuth2Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
-                access_token.expiration = int(time.time() + 86400)
+                access_token.expiration = int(time.time() + expiration_user)
                 access_token.save()
             except ValueError as error:
                 if error.message == 'invalid_scope':
@@ -87,7 +90,7 @@ class OAuth2TokenView(View):
             OAuth2Toolbox.clean_tokens(client)
             return HttpResponse(json.dumps({'access_token': access_token.access_token,
                                             'token_type': 'bearer',
-                                            'expires_in': 86400}),
+                                            'expires_in': expiration_user}),
                                 content_type='application/json')
         elif grant_type == 'client_credentials':
             # Client Credentials
@@ -117,19 +120,19 @@ class OAuth2TokenView(View):
                 try:
                     OAuth2Toolbox.clean_tokens(client)
                 except Exception as error:
-                    logger.error('Error during session cleanup: {0}'.format(error))
+                    self.logger.error('Error during session cleanup: {0}'.format(error))
                 return HttpResponse(json.dumps({'access_token': access_token.access_token,
                                                 'token_type': 'bearer',
-                                                'expires_in': 3600}),
+                                                'expires_in': expiration_client}),
                                     content_type='application/json')
             except HttpBadRequestException:
                 raise
             except ObjectNotFoundException as ex:
-                logger.warning('Error matching client: {0}'.format(ex))
+                self.logger.warning('Error matching client: {0}'.format(ex))
                 raise HttpBadRequestException(error='invalid_client',
                                               error_description='Client could not be found')
             except Exception as ex:
-                logger.exception('Error matching client: {0}'.format(ex))
+                self.logger.exception('Error matching client: {0}'.format(ex))
                 raise HttpBadRequestException(error='invalid_client',
                                               error_description='Error loading client')
         else:

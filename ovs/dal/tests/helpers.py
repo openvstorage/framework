@@ -44,6 +44,7 @@ from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
+from ovs_extensions.packages.packagefactory import PackageFactory
 from ovs_extensions.services.mockups.systemd import SystemdMock
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -132,6 +133,8 @@ class DalHelper(object):
                  'storagerouter_domains': []}  # (<id>, <storagerouter_id>, <domain_id>)
             )
         """
+        Configuration.set(key=Configuration.EDITION_KEY, value=PackageFactory.EDITION_ENTERPRISE)
+
         if previous_structure is None:
             previous_structure = {}
         vdisks = previous_structure.get('vdisks', {})

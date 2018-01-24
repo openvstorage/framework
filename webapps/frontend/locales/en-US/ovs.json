@@ -228,6 +228,7 @@
         "save": "Save",
         "saved": "Saved",
         "scrub": "Scrub",
+        "seconds": "Seconds",
         "showing": "Showing",
         "signin": "Sign in",
         "size": "Size",
@@ -269,7 +270,8 @@
             "vdisk": {
                 "HALTED": "Halted",
                 "NON-RUNNING": "Warning",
-                "RUNNING": "Running"
+                "RUNNING": "Running",
+                "UNKNOWN": "Unknown"
             },
             "vpool": {
                 "DELETING": "Deleting",
@@ -509,51 +511,66 @@
         }
     },
     "support": {
-        "alba": "Alba",
-        "alba-ee": "Alba Enterprise Edition",
-        "arakoon": "Arakoon",
-        "callhome": "Call Home settings",
-        "clusterid": "Cluster ID:",
-        "commercialsupport": "Commercial support:",
-        "commercialsupporturl": "https://www.openvstorage.com",
-        "communitysupport": "Community support:",
-        "communitysupporturl": "https://groups.google.com/forum/#!forum/open-vstorage",
-        "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
-        "downloading_logs": "Collecting logfiles",
-        "download_logs": "Download logfiles",
-        "enable": "Heartbeat enabled",
-        "enablesupport": "Remote Access enabled",
-        "failed": "Error",
-        "failedmsg": "Error while applying your settings",
-        "importantwebsites": "Important Websites",
-        "information": "Support information",
-        "installedproducts": "Installed Packages",
-        "lastheartbeat": "Last time received",
-        "metadata": "Heartbeat data",
-        "nodeid": "Node ID",
-        "nodes": "Storage Routers:",
-        "no_heartbeat": "never",
-        "openvstorage": "Open vStorage",
-        "openvstorage-backend": "Open vStorage Backend",
-        "openvstorage-sdm": "Storage Device Manager",
+        "heart_beat": {
+            "last_heart_beat": "Last time received",
+            "no_heart_beat": "never",
+            "title": "Heart Beat Data"
+        },
+        "information": {
+            "cluster_id": "Cluster ID:",
+            "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
+            "downloading_logs": "Collecting logfiles",
+            "download_logs": "Download logfiles",
+            "nodes": "Storage Routers:",
+            "title": "Support Information"
+        },
+        "packages": {
+            "alba": "Alba",
+            "alba-ee": "Alba Enterprise Edition",
+            "arakoon": "Arakoon",
+            "openvstorage": "Open vStorage",
+            "openvstorage-backend": "Open vStorage Backend",
+            "openvstorage-sdm": "Storage Device Manager",
+            "title": "Installed Packages",
+            "volumedriver-no-dedup-base": "Storage Driver - Base",
+            "volumedriver-no-dedup-server": "Storage Driver - Server",
+            "volumedriver-ee-base": "Storage Driver Enterprise Edition - Base",
+            "volumedriver-ee-server": "Storage Driver Enterprise Edition - Server"
+        },
         "product": "Open vStorage",
-        "projectwebsite": "Project Website:",
-        "projectwebsiteurl": "http://www.openvstorage.org",
-        "save": "Save settings",
-        "saved": "Saved",
-        "savedmsg": "Settings applied",
-        "saving": "Saving",
-        "savingmsg": "Your settings are being applied",
-        "sourcecode": "Source Code:",
-        "sourcecodeurl": "https://github.com/openvstorage",
+        "settings": {
+            "failed": "Failure",
+            "failed_msg": "Failed to apply the settings: __error__",
+            "heart_beat": "Heart Beat",
+            "remote_access": "Remote Access",
+            "save": "Save Settings",
+            "saved": "Applied",
+            "saved_msg": "The settings have been successfully applied",
+            "saving": "Applying",
+            "saving_msg": "The settings are being applied",
+            "stats_monkey": "Collect Statistics",
+            "support_agent": "Heart Beat",
+            "title": "Support Settings"
+        },
         "title": "Support",
-        "volumedriver-no-dedup-base": "Storage Driver - Base",
-        "volumedriver-no-dedup-server": "Storage Driver - Server",
-        "volumedriver-ee-base": "Storage Driver Enterprise Edition - Base",
-        "volumedriver-ee-server": "Storage Driver Enterprise Edition - Server"
+        "websites": {
+            "commercial_support": "Commercial support:",
+            "commercial_support_url": "https://www.openvstorage.com",
+            "community_support": "Community support:",
+            "community_support_url": "https://groups.google.com/forum/#!forum/open-vstorage",
+            "project_website": "Project Website:",
+            "project_website_url": "http://www.openvstorage.org",
+            "source_code": "Source Code:",
+            "source_code_url": "https://github.com/openvstorage",
+            "title": "Important Websites"
+        }
     },
     "title": "Open vStorage",
     "updates": {
+        "additional_info": {
+            "migrations": "Migration code needs to run",
+            "service_restart": "Services need to be restarted"
+        },
         "button": "Update",
         "collective_updates_at_broke": "Update functionality depends on 'at' to be running properly. This appears not to be the case on all StorageRouters",
         "collective_updates_checking": "Checking if any updates are in progress",
@@ -673,6 +690,7 @@
             "success": "Save complete",
             "success_msg": "The configuration details for __what__ are saved."
         },
+        "search": "Search vDisks",
         "set_as_template": {
             "failed_msg": "Converting vDisk __what__ into vTemplate failed: __why__",
             "no": "Close",
@@ -1147,6 +1165,30 @@
                 "title": "Verify the entered information"
             }
         },
+        "stats_monkey_configure": {
+            "basic_info": "Statistics information",
+            "configure_edit": "Edit configuration",
+            "connection_info": "Connection information",
+            "database": "Database Name:",
+            "database_required": "Missing database name",
+            "environment": "Statistics Name:",
+            "environment_required": "Missing statistics name",
+            "host": "Host:",
+            "host_invalid": "Invalid host",
+            "host_required": "Missing host",
+            "interval": "Interval:",
+            "password": "Password:",
+            "password_required": "Missing password",
+            "port": "Port:",
+            "title": "Collect Statistics",
+            "transport_types": {
+                "influxdb": "InfluxDB",
+                "redis": "Redis"
+            },
+            "type": "Type:",
+            "username": "Username:",
+            "username_required": "Missing username"
+        },
         "update": {
             "component_choose": "Please choose at least 1 component to update",
             "component_framework": "Framework",
@@ -1158,7 +1200,6 @@
                 "gui": "GUI",
                 "none": "No components will experience downtime",
                 "ovsdb": "Model",
-                "proxy": "Proxy service for vPool",
                 "voldrv": "Storage Driver Registry"
             },
             "failure": "Update failed to launch: __why__",

@@ -24,7 +24,6 @@ from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
 from api.backend.serializers.serializers import FullSerializer
-from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
@@ -44,7 +43,7 @@ from ovs.lib.vpool import VPoolController
 
 class StorageRouterViewSet(viewsets.ViewSet):
     """
-    Information about Storage Routers
+    Information about StorageRouters
     """
     permission_classes = (IsAuthenticated,)
     prefix = r'storagerouters'
@@ -56,16 +55,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'manage'])
     @return_list(StorageRouter, 'name')
     @load()
-    def list(self, query=None):
+    def list(self):
         """
-        Overview of all Storage Routers
-        :param query: A query to filter the StorageRouters
-        :type query: DataQuery
+        Overview of all StorageRouters
+        :return: List of StorageRouters
+        :rtype: list[ovs.dal.hybrids.storagerouter.StorageRouter]
         """
-        if query is None:
-            return StorageRouterList.get_storagerouters()
-        else:
-            return DataList(StorageRouter, query)
+        return StorageRouterList.get_storagerouters()
 
     @log()
     @required_roles(['read', 'manage'])
@@ -73,9 +69,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def retrieve(self, storagerouter):
         """
-        Load information about a given storage router
+        Load information about a given StorageRouter
         :param storagerouter: StorageRouter to return
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: The StorageRouter requested
+        :rtype: ovs.dal.hybrids.storagerouter.StorageRouter
         """
         return storagerouter
 
@@ -87,11 +85,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Update a StorageRouter
         :param storagerouter: StorageRouter to update
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
         :param request: The raw Request
         :type request: Request
         :param contents: Contents to be updated/returned
         :type contents: str
+        :return: The StorageRouter updated
+        :rtype: ovs.dal.hybrids.storagerouter.StorageRouter
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(StorageRouter, contents=contents, instance=storagerouter, data=request.DATA)
@@ -108,7 +108,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
         :param storagerouter: StorageRouter to mark offline
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageDriverController.mark_offline.delay(storagerouter.guid)
 
@@ -119,9 +121,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def get_metadata(self, storagerouter):
         """
-        Returns a list of mountpoints on the given Storage Router
+        Returns a list of mount points on the given StorageRouter
         :param storagerouter: StorageRouter to get the metadata from
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageRouterController.get_metadata.delay(storagerouter.guid)
 
@@ -132,9 +136,12 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def get_version_info(self, storagerouter):
         """
-        Gets version information of a given Storage Router
+        DEPRECATED API CALL
+        Gets version information of a given StorageRouter
         :param storagerouter: StorageRouter to get the versions from
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageRouterController.get_version_info.delay(storagerouter.guid)
 
@@ -143,15 +150,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
-    def get_support_info(self, storagerouter):
+    def get_support_info(self):
         """
-        Gets support information of a given Storage Router
-        :param storagerouter: StorageRouter to get the support info from
-        :type storagerouter: StorageRouter
+        Returns support information for the entire cluster
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
-        return StorageRouterController.get_support_info.s(storagerouter.guid).apply_async(
-            routing_key='sr.{0}'.format(storagerouter.machine_id)
-        )
+        return StorageRouterController.get_support_info.delay()
 
     @link()
     @log()
@@ -160,11 +165,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def get_proxy_config(self, storagerouter, vpool_guid):
         """
-        Gets the ALBA proxy for a given Storage Router and vPool
+        Gets the ALBA proxy for a given StorageRouter and vPool
         :param storagerouter: StorageRouter on which the ALBA proxy is configured
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
         :param vpool_guid: Guid of the vPool for which the proxy is configured
         :type vpool_guid: str
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageRouterController.get_proxy_config.delay(vpool_guid=vpool_guid,
                                                               storagerouter_guid=storagerouter.guid)
@@ -180,14 +187,15 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Create the required configuration files to be able to make use of HPRM (aka PRACC)
         These configuration will be zipped and made available for download
         :param local_storagerouter: StorageRouter this call is executed on
-        :type local_storagerouter: StorageRouter
+        :type local_storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
         :param storagerouter: The StorageRouter for which a HPRM manager needs to be deployed
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
         :param parameters: Additional information required for the HPRM configuration files
         :type parameters: dict
         :return: Asynchronous result of a CeleryTask
         :rtype: celery.result.AsyncResult
         """
+        _ = storagerouter
         Toolbox.verify_required_params(actual_params=parameters,
                                        required_params={'vpool_guid': (str, Toolbox.regex_guid)})
         return VPoolController.create_hprm_config_files.delay(parameters=parameters,
@@ -201,9 +209,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def get_support_metadata(self, storagerouter):
         """
-        Gets support metadata of a given Storage Router
+        Gets support metadata of a given StorageRouter
         :param storagerouter: StorageRouter to get the support metadata from
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageRouterController.get_support_metadata.apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
@@ -214,15 +224,19 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def configure_support(self, enable, enable_support):
+    def configure_support(self, support_info):
         """
-        Configures support
-        :param enable: Indicates whether to enable heartbeats
-        :type enable: bool
-        :param enable_support: Indicates whether to enable remote support
-        :type enable_support: bool
+        Configures support on all StorageRouters
+        :param support_info: Information about which components should be configured
+            {'stats_monkey': True,  # Enable/disable the stats monkey scheduled task
+             'support_agent': True,  # Responsible for enabling the ovs-support-agent service, which collects heart beat data
+             'remote_access': False,  # Cannot be True when support agent is False. Is responsible for opening an OpenVPN tunnel to allow for remote access
+             'stats_monkey_config': {}}  # Dict with information on how to configure the stats monkey (Only required when enabling the stats monkey
+        :type support_info: dict
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
-        return StorageRouterController.configure_support.delay(enable, enable_support)
+        return StorageRouterController.configure_support.delay(support_info=support_info)
 
     @link()
     @log()
@@ -231,11 +245,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def get_logfiles(self, local_storagerouter, storagerouter):
         """
-        Collects logs, moves them to a web-accessible location and returns log tgz's filename
-        :param local_storagerouter: StorageRouter this call is executed on (to store the logfiles on)
-        :type local_storagerouter: StorageRouter
+        Collects logs, moves them to a web-accessible location and returns log TGZs filename
+        :param local_storagerouter: StorageRouter this call is executed on (to store the log files on)
+        :type local_storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
         :param storagerouter: The StorageRouter to collect the logs from
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageRouterController.get_logfiles.s(local_storagerouter.guid).apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
@@ -248,11 +264,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def check_mtpt(self, storagerouter, name):
         """
-        Validates whether the mountpoint for a vPool is available
-        :param storagerouter: The StorageRouter to validate the mountpoint on
-        :type storagerouter: StorageRouter
-        :param name: The name of the mountpoint to validate (vPool name)
+        Validates whether the mount point for a vPool is available
+        :param storagerouter: The StorageRouter to validate the mount point on
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :param name: The name of the mount point to validate (vPool name)
         :type name: str
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageRouterController.mountpoint_exists.delay(name=str(name), storagerouter_guid=storagerouter.guid)
 
@@ -263,13 +281,15 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def add_vpool(self, call_parameters, local_storagerouter, request):
         """
-        Adds a vPool to a given Storage Router
+        Adds a vPool to a given StorageRouter
         :param call_parameters: A complex (JSON encoded) dictionary containing all various parameters to create the vPool
         :type call_parameters: dict
         :param local_storagerouter: StorageRouter on which the call is executed
-        :type local_storagerouter: StorageRouter
+        :type local_storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
         :param request: The raw request
         :type request: Request
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         # API backwards compatibility
         if 'backend_connection_info' in call_parameters:
@@ -330,7 +350,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         call_parameters['config_params'].pop('cache_strategy', None)
 
         # Finally, launching the add_vpool task
-        return StorageRouterController.add_vpool.delay(call_parameters)
+        return StorageRouterController.add_vpool.delay(StorageRouterController, call_parameters)
 
     @link()
     @log()
@@ -342,7 +362,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Return available updates for framework, volumedriver, ...
         DEPRECATED API call
         :param storagerouter: StorageRouter to get the update information from
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         update_info = UpdateController.get_update_information_core({})
         framework_info = update_info.pop('framework', None)
@@ -391,7 +413,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
           - Checks if 'at' can be used properly
           - Checks if ongoing updates are busy
         :param storagerouter: StorageRouter to get the update metadata from
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return UpdateController.get_update_metadata.delay(storagerouter.ip)
 
@@ -405,7 +429,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Initiate a task on the given StorageRouter to update the framework on ALL StorageRouters
         DEPRECATED API call - use update_components in the future
         :param storagerouter: StorageRouter to start the update on
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         _ = storagerouter
         return UpdateController.update_components.delay(components=['framework'])
@@ -420,7 +446,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Initiate a task on the given StorageRouter to update the volumedriver on ALL StorageRouters
         DEPRECATED API call - use update_components in the future
         :param storagerouter: StorageRouter to start the update on
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         _ = storagerouter
         return UpdateController.update_components.delay(components=['storagedriver'])
@@ -435,6 +463,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Initiate a task on a StorageRouter to update the specified components on ALL StorageRouters
         :param components: Components to update
         :type components: list
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return UpdateController.update_components.delay(components=components)
 
@@ -447,7 +477,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Configures a disk on a StorageRouter
         :param storagerouter: StorageRouter on which to configure the disk
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
         :param disk_guid: The GUID of the Disk to configure
         :type disk_guid: str
         :param offset: The offset of the partition to configure
@@ -458,6 +488,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :type roles: list
         :param partition_guid: The guid of the partition if applicable
         :type partition_guid: str
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageRouterController.configure_disk.delay(storagerouter.guid, disk_guid, partition_guid, offset, size, roles)
 
@@ -468,9 +500,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def rescan_disks(self, storagerouter):
         """
-        Triggers a disk sync on the given storagerouter
+        Triggers a disk sync on the given StorageRouter
         :param storagerouter: StorageRouter on which to rescan all disks
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return DiskController.sync_with_reality.delay(storagerouter.guid)
 
@@ -483,7 +517,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Refreshes all hardware parameters
         :param storagerouter: StorageRouter on which to refresh all hardware capabilities
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return StorageRouterController.refresh_hardware.delay(storagerouter.guid)
 
@@ -496,7 +532,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Configures the given domains to the StorageRouter.
         :param storagerouter: The StorageRouter to update
-        :type storagerouter: StorageRouter
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
         :param domain_guids: A list of Domain guids
         :type domain_guids: list
         :param recovery_domain_guids: A list of Domain guids to set as recovery Domain
@@ -547,6 +583,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def merge_package_information(self):
         """
         Retrieve the package information from the model for both StorageRouters and ALBA Nodes and merge it
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return UpdateController.merge_package_information.delay()
 
@@ -558,6 +596,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def refresh_package_information(self):
         """
         Refresh the updates for all StorageRouters
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return GenericController.refresh_package_information.delay()
 
@@ -574,5 +614,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
             - services that will be restarted
             - packages that will be updated
             - prerequisites that have not been met
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
-        return UpdateController.get_update_information_all.delay()
+        return UpdateController.merge_downtime_information.delay()

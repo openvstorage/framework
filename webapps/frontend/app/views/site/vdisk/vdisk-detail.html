@@ -112,17 +112,10 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td style="width: 35%;">
                                 <div style="width: 14px; height: 14px;"
                                      data-bind="tooltip: 'ovs:generic.states.vdisk.' + liveStatus(),
-                                                status: {
-                                                    colors: {
-                                                        green: liveStatus() === 'RUNNING',
-                                                        orange: liveStatus() === 'NON-RUNNING',
-                                                        red: liveStatus() === 'HALTED'
-                                                    },
-                                                    defaultColor: 'lightgrey'
-                                                }">
+                                                status: liveStatusColorBinding()">
                                 </div>
                             <td style="width: 15%;" data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? iops : '-'"></span></td>
+                            <td><span data-bind="text: iopsDisplay"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.vpool"></td>
@@ -133,7 +126,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                 </span>
                             </td>
                             <td data-i18n="ovs:generic.read_speed"></td>
-                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? readSpeed : '-'"></span></td>
+                            <td><span data-bind="text: readSpeedDisplay"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storagerouter"></td>
@@ -144,7 +137,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                 </span>
                             </td>
                             <td data-i18n="ovs:generic.write_speed"></td>
-                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? writeSpeed : '-'"></span></td>
+                            <td><span data-bind="text: writeSpeedDisplay"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.size"></td>
@@ -153,26 +146,19 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storeddata"></td>
-                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? storedData : '-'"></span></td>
+                            <td><span data-bind="text: storedDataDisplay"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofsnapshots"></td>
-                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? snapshots().length : '-'"></span></td>
+                            <td><span data-bind="text: snapshotsDisplay"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.dtl_status"></td>
                             <td>
-                                <div data-bind="status: {
-                                                    colors: {
-                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
-                                                        orange: ['catch_up', 'checkup_required'].contains(dtlStatus()),
-                                                        red: dtlStatus() === 'degraded',
-                                                        grey: dtlStatus() === 'disabled'
-                                                    },
-                                                    defaultColor: 'lightgrey'
-                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
+                                <div data-bind="status: dtlStatusColorBinding(),
+                                                tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
                                      style="width: 14px; height: 14px;"></div>
                             </td>
                             <td colspan="2">&nbsp;</td>
@@ -184,7 +170,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.namespace"></td>
-                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? namespace : '-'"></span></td>
+                            <td><span data-bind="text: namespaceDisplay"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>
                     </tbody>

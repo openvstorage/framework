@@ -1,4 +1,9 @@
-﻿/**
+/**
+ * Durandal 2.2.0 Copyright (c) 2010-2016 Blue Spire Consulting, Inc. All Rights Reserved.
+ * Available via the MIT license.
+ * see: http://durandaljs.com or https://github.com/BlueSpire/Durandal for details.
+ */
+/**
  * Serializes and deserializes data to/from JSON.
  * @module serializer
  * @requires system
@@ -128,6 +133,16 @@ define(['durandal/system'], function(system) {
             var reviver = settings.reviver || function(key, value) { return that.reviver(key, value, getTypeId, getConstructor); };
 
             return JSON.parse(text, reviver);
+        },
+        /**
+         * Clone the object.
+         * @method clone
+         * @param {object} obj The object to clone.
+         * @param {object} [settings] Settings can specify any of the options allowed by the serialize or deserialize methods.
+         * @return {object} The new clone.
+         */
+        clone:function(obj, settings) {
+            return this.deserialize(this.serialize(obj, settings), settings);
         }
     };
 });

@@ -39,9 +39,9 @@ class Configuration(_Configuration):
                                          'generic': []},
                    'paths': {'basedir': '/opt/OpenvStorage',
                              'ovsdb': '/opt/OpenvStorage/db'},
-                   'support': {'enablesupport': False,
-                               'enabled': True,
-                               'interval': 60},
+                   'support': {'interval': 60,
+                               'remote_access': False,
+                               'support_agent': True},
                    'webapps': {'html_endpoint': '/',
                                'oauth2': {'mode': 'local'}}}
 
@@ -61,6 +61,8 @@ class Configuration(_Configuration):
         :type port_info: dict
         :return: None
         """
+        from ovs.extensions.migration.migration.ovsmigrator import ExtensionMigrator  # Import here to prevent from circular references
+
         if cls.exists('/ovs/framework/hosts/{0}/setupcompleted'.format(host_id)):
             return
         if port_info is None:
@@ -74,7 +76,7 @@ class Configuration(_Configuration):
                                  'mds': [mds_port_range],
                                  'arakoon': [arakoon_start_port]},
                        'setupcompleted': False,
-                       'versions': {'ovs': 9},
+                       'versions': {'ovs': ExtensionMigrator.THIS_VERSION},
                        'type': 'UNCONFIGURED'}
         for key, value in host_config.iteritems():
             cls.set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
@@ -103,7 +105,9 @@ class Configuration(_Configuration):
                          'arakoon_clusters': {},
                          'stores': {'persistent': 'pyrakoon',
                                     'volatile': 'memcache'},
-                         'logging': {'type': 'console', 'level': 'INFO'}})
+                         'logging': {'type': 'console', 'level': 'INFO'},
+                         'scheduling/celery': {'ovs.stats_monkey.run_all': None,  # Disable stats monkey scheduled task by default
+                                               'alba.stats_monkey.run_all': None}})
         if logging_target is not None:
             base_cfg['logging'] = logging_target
         if cls.exists('/ovs/framework/memcache') is False:

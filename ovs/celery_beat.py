@@ -25,7 +25,6 @@ import cPickle
 import inspect
 from celery import current_app
 from celery.beat import Scheduler
-from celery.schedules import crontab, timedelta
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonSockNotReadable
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
@@ -75,19 +74,11 @@ class DistributedScheduler(Scheduler):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                for member in inspect.getmembers(mod, predicate=inspect.isclass):
+                    if member[1].__module__ == name:
                         for submember in inspect.getmembers(member[1]):
-                            if hasattr(submember[1], 'schedule') and (isinstance(submember[1].schedule, crontab) or
-                                                                      isinstance(submember[1].schedule, timedelta) or
-                                                                      isinstance(submember[1].schedule, Schedule)):
-                                if isinstance(submember[1].schedule, Schedule):
-                                    schedule, source = submember[1].schedule.generate_schedule(submember[1].name)
-                                else:
-                                    schedule = submember[1].schedule
-                                    source = 'crontab or timedelta from code'
+                            if hasattr(submember[1], 'schedule') and isinstance(submember[1].schedule, Schedule):
+                                schedule, source = submember[1].schedule.generate_schedule(submember[1].name)
                                 if schedule is not None:
                                     schedules[submember[1].name] = {'task': submember[1].name,
                                                                     'schedule': schedule,
