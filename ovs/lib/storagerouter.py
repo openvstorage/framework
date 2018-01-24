@@ -56,6 +56,7 @@ from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalS
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import ovs_task
+from ovs.lib.helpers.exceptions import RoleDuplicationException
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
@@ -1693,6 +1694,12 @@ class StorageRouterController(object):
             if DiskPartition.ROLES.BACKEND in partition.roles:
                 raise RuntimeError('The given Disk is in use by a Backend')
 
+        if len({DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL}.intersection(set(roles))) > 0:
+            roles_on_sr = StorageRouterController._get_roles_on_storagerouter(storagerouter.ip)
+            for role in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL]:
+                if role in roles_on_sr and role in roles and roles_on_sr[role][0] != disk.name:  # DB and DTL roles still have to be unassignable
+                    raise RoleDuplicationException('Disk {0} cannot have the {1} role due to presence on disk {2}'.format(disk.name, role, roles_on_sr[role][0]))
+
         # Create partition
         if partition_guid is None:
             StorageRouterController._logger.debug('Creating new partition - Offset: {0} bytes - Size: {1} bytes - Roles: {2}'.format(offset, size, roles))
@@ -1816,6 +1823,24 @@ class StorageRouterController(object):
         if successful is False:
             raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))
         return arakoon_config
+
+    @staticmethod
+    def _get_roles_on_storagerouter(ip):
+        """
+        returns a set with the roles present on the storagerouter
+        :param ip: string with ip of the storagerouter
+        :return: Dict
+        """
+        sr = StorageRouterList.get_by_ip(ip)
+        roles_on_sr = {}
+        for sr_disk in sr.disks:
+            for partition in sr_disk.partitions:
+                for part_role in partition.roles:
+                    if part_role not in roles_on_sr:
+                        roles_on_sr[part_role] = [sr_disk.name]
+                    else:
+                        roles_on_sr[part_role].append(sr_disk.name)
+        return roles_on_sr
 
     @staticmethod
     def _revert_vpool_status(vpool, status=VPool.STATUSES.RUNNING, storagedriver=None, client=None, dirs_created=None):
