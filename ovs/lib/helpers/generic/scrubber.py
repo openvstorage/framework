@@ -20,6 +20,7 @@ Scrubber Module
 import json
 import time
 import uuid
+import itertools
 from Queue import Empty, Queue
 from random import randint
 from threading import Thread
@@ -52,12 +53,33 @@ class ScrubShared(object):
 
     _SCRUB_KEY = 'ovs/framework/jobs/scrub'  # Parent key for all scrub related jobs
     _SCRUB_NAMESPACE = 'ovs_jobs_scrub'
-    _SCRUB_NAMESPACE_VPOOL_FORMAT = '{0}_vpool_{{0}}'.format(_SCRUB_NAMESPACE)
-    _SCRUB_NAMESPACE_WORKER_FORMAT = '{0}_storagerouter_{{1}}worker-pid_{{2}}_worker-time_{{3}}'.format(_SCRUB_NAMESPACE_VPOOL_FORMAT)
+    _SCRUB_VDISK_KEY = '{0}_{{0}}_vdisks'.format(_SCRUB_NAMESPACE)  # Second format should be the vpool name
+    _SCRUB_PROXY_KEY = '{0}_{{0}}'.format(_SCRUB_NAMESPACE)  # Second format should be the proxy name
 
-    def __init__(self):
+    def __init__(self, job_id):
+        self.job_id = job_id
         self._persistent = PersistentFactory.get_client()
         self._service_manager = ServiceFactory.get_manager()
+
+        self._relevant_work_items = None  # All relevant scrubbing items
+        self._fetched_work_items = None  # All retrieved scrubbing items
+
+        # Required to be overruled
+        self.worker_contexts = None
+
+        self._key = None
+        self._log = None  # To be overruled
+
+    @property
+    def worker_context(self):
+        """
+        Return the own worker context
+        :return: Worker context
+        :rtype: dict
+        """
+        if self.worker_contexts is None:
+            raise NotImplementedError('No worker_contexts have yet been implemented')
+        return self.worker_contexts[System.get_my_storagerouter()]
 
     def _safely_store(self, key, value, expected_value, logging_start, key_not_exist=False, max_retries=5, hooks=None):
         """
@@ -90,7 +112,7 @@ class ScrubShared(object):
                 args = []
             func = hooks.get(hook)
             if func is not None and callable(func):
-                hook(*args, **kwargs)
+                func(*args, **kwargs)
 
         if hooks is None:
             hooks = {}
@@ -110,7 +132,7 @@ class ScrubShared(object):
                 success = True
                 return_value = self._persistent.get(key)
                 continue
-            tries += 0
+            tries += 1
             if tries > max_retries:
                 raise last_exception
             self._persistent.assert_value(key, expected_value, transaction=transaction)
@@ -128,56 +150,115 @@ class ScrubShared(object):
                 _execute_hook('assert_fail_value')
         return return_value
 
+    def _get_relevant_items(self, relevant_values, relevant_keys):
+        """
+        Retrieves all scrub work currently being done based on relevant values and the relevant format
+        - Filters out own data
+        - Filters out relevant data
+        - Removes obsolete data
+        :param relevant_values: The values to check relevancy on (Only supporting dict types)
+        :type relevant_values: list[dict]
+        :param relevant_keys: The keys that are relevant for checking relevancy
+        (found items will strip keys to match to this format) (this format will be used to check in relevant values)
+        :type relevant_keys: list
+        :return: All pending scrub work in list of vdisk guids and all items to be removed
+        :rtype: tuple(list, list)
+        :raises: ValueError: When an irregular item has been detected
+        """
+        if any(not isinstance(v, dict )for v in relevant_values):
+            raise ValueError('Not all relevant values are a dict')
+        if not isinstance(relevant_keys, list):
+            raise ValueError('The relevant keys should be a list of keys that are relevant')
+        if any(set(v.keys()) != set(relevant_keys) for v in relevant_values):
+            raise ValueError('The relevant values do not match the relevant format')
+        # Fetch all items, yield empty list if None
+        all_items = self._fetch_registered_items() or []
+        self._relevant_work_items = []
+        # Filter out the relevant items
+        try:
+            for item in all_items:
+                # Extract relevant context. Note this is just a shallow copy and when retrieving items with lists/dicts we should not modify these in any way
+                # because the referance is kept in _relevant_work_items
+                relevant_context = dict((k, v) for k, v in item.iteritems() if k in relevant_keys)
+                if relevant_context in relevant_values:
+                    self._relevant_work_items.append(item)
+                else:
+                    # Not a item for the current scrubbing context. Possible remnant of an aborted scrub job so it will be removed when re-saving all total work items
+                    self._logger.debug('{0} - Will be removing {1} on the next save as it is no longer relevant'.format(self._log, item))
+        except KeyError:
+            raise ValueError('{0} - Someone is registering keys different to worker context + vdisk guid'.format(self._log))
+        return self._relevant_work_items
+
+    def _fetch_registered_items(self):
+        """
+        Fetches all items currently registered on the key
+        Saves them under _fetched_work_items for caching purposes
+        :return: All current items (None if the key has not yet been registered)
+        """
+        if self._key is None:
+            raise ValueError('self._key has no value. Nothing to fetch')
+        if self._persistent.exists(self._key) is True:
+            items = list(self._persistent.get(self._key))
+        else:
+            items = None
+        self._fetched_work_items = items
+        return items
+
     @classmethod
-    def generate_key(cls, vpool, storagerouter, worker_contexts):
+    def _covert_data_objects(cls, item):
+        # Change all data objects to their GUID
+        if isinstance(item, list):
+            return [cls._covert_data_objects(i) for i in item]
+        elif isinstance(item, dict):
+            return dict((cls._covert_data_objects(k), cls._covert_data_objects(v)) for k, v in item.iteritems())
+        elif isinstance(item, DataObject):
+            return item.guid
+        return item
+
+    def _format_message(self, message):
         """
-        Generates the key to store items under
-        :param vpool: vPool to generate key from
-        :param storagerouter: StorageRouter to generate key from
-        :param worker_contexts: Context about all workers in the cluster
-        :return: The generated key
+        Formats a message with the set _log property in front (to remove redundancy)
+        :param message: The message to format
+        :return: Newly formatted message
         """
-        if storagerouter is None:
-            storagerouter = System.get_my_storagerouter()
-        if storagerouter not in worker_contexts:
-            raise ValueError('Worker contexts do not contain any information of StorageRouter {0}'.format(storagerouter.guid))
-        worker_context = worker_contexts[storagerouter]
-        return cls._SCRUB_NAMESPACE_WORKER_FORMAT.format(vpool.guid, storagerouter.guid, worker_context['worker_pid'], worker_context['worker_start'])
+        if self._log is None:
+            raise ValueError('_log property has no value. Nothing to format with')
+        return '{0} - {1}'.format(self._log, message)
 
 
-class StackWorkGenerator(ScrubShared):
+class StackWorkHandler(ScrubShared):
     """
-    Handles generation and saving of vpool stack work
+    Handles generation, unregistering and saving of vpool stack work
     """
-    def __init__(self, vpool, vdisks, worker_contexts):
+    def __init__(self, job_id, vpool, vdisks, worker_contexts):
         """
         Initialize
         :param vpool: vPool to generate work for
+        :type vpool: ovs.dal.hybrids.vpool.VPool
         :param vdisks: vDisks to include in the work
+        :type vdisks: list
+        :param worker_contexts: Contexts about the workers
+        :type worker_contexts: dict
         """
-        super(StackWorkGenerator, self).__init__()
+        super(StackWorkHandler, self).__init__(job_id)
 
         self.vpool = vpool
         self.vdisks = vdisks
         self.worker_contexts = worker_contexts
         self.work_queue = Queue()
 
-        self._registered_work_items = None  # All scrubbing items
-        self._own_registered_work_items = None  # Scrubbing items registered for this instance
+        self._relevant_work_items = None  # All relevant scrubbing items
+        self._fetched_work_items = None  # All retrieved scrubbing items
 
-        self._key = self.generate_key(vpool, System.get_my_storagerouter(), worker_contexts)
+        self._key = self._SCRUB_VDISK_KEY.format(self.vpool.name)  # Key to register items under
         self._log = 'Scrubber - vPool {0}'.format(self.vpool.name)
 
     def generate_save_scrub_work(self):
         """
         Generates applicable scrub work and saves the scrub work consistently
-        Generates scrub work to be done
         :return: Queue of work items
         """
         work_queue = self._generate_scrub_work()
-        # @TODO Look for some auto-resolving thing which could clear potential stale entries in DB
-        # Sometimes workers are killed and the data is Arakoon might no longer be relevant
-        # Might register it with hostname-worker pid and check if it has changed to discard the current stored items
         if work_queue.qsize() > 0:
             work_queue = self._save_work()
         return work_queue
@@ -188,15 +269,14 @@ class StackWorkGenerator(ScrubShared):
         :return: Queue of work items
         :rtype: Queue
         """
-        # Save the key if it does not exists, else return the value
-        # self._safely_store(self._key, [], expected_value=None, key_not_exist=True, logging_start=self._log)
-        self._registered_work_items = self._get_pending_scrub_work()
+        self._get_pending_scrub_work()
+        registered_vdisks = [item['vdisk_guid'] for item in self._relevant_work_items]
         # Clear current queue
         with self.work_queue.mutex:
             self.work_queue.queue.clear()
         for vd in self.vdisks:
             logging_start_vd = '{0} - vDisk {1} {2}'.format(self._log, vd.guid, vd.name)
-            if vd.guid in self._registered_work_items:
+            if vd.guid in registered_vdisks:
                 self._logger.info('{0} - has already been registered to get scrubbed, not queueing again'.format(logging_start_vd))
                 continue
             if vd.is_vtemplate is True:
@@ -209,32 +289,31 @@ class StackWorkGenerator(ScrubShared):
             self.work_queue.put(vd.guid)
         return self.work_queue
 
+    def _wrap_data(self, vdisk_guid):
+        """
+        Wrap the vdisk guid in a dict with some other metadata
+        Saving the worker context allows the other scrub jobs to determine what is still valid scrub data
+        :param vdisk_guid: The guid of the vDisk to store
+        :return: The wrapped data
+        :rtype: dict
+        """
+        data = {'vdisk_guid': vdisk_guid}
+        data.update(self.worker_context)
+        return data
+
     def _get_pending_scrub_work(self):
         """
         Retrieves all scrub work currently being done
-        - Discards obsolete data
-        - Removes obsolete data keys
-        :return: All pending scrub work in list of vdisk guids
-        :rtype: list
+        - Filters out own data
+        - Filters out relevant data
+        - Removes obsolete data
+        :return: All pending scrub work in list of vdisk guids and all items to be removed
+        :rtype: tuple(list, list)
+        :raises: ValueError: When an irregular item has been detected
         """
-        pending_work = []
-        key_prefix = self._SCRUB_NAMESPACE_VPOOL_FORMAT.format(self.vpool.guid)
-        valid_keys = [self.generate_key(self.vpool, storagerouter, self.worker_contexts) for storagerouter in self.worker_contexts.keys()]
-        keys_to_delete = []
-        for key, data in self._persistent.prefix_entries(key_prefix):
-            if key == self._key:
-                self._own_registered_work_items = data
-            if key in valid_keys:
-                pending_work.extend(data)
-            else:
-                # Namespace is not matching any of the current workers. This data is stale and should be removed
-                keys_to_delete.append(key)
-        # Remove the stale data. Arakoon only handles one command at the same time, so the key could be removed by another thread
-        # These were stale keys anyway so they don't matter anymore
-        for key in keys_to_delete:
-            self._logger.debug('{0} - Removing {1} as it is no longer relevant'.format(self._log, key))
-            self._persistent.delete(key, must_exist=False)
-        return pending_work
+        # This will strip out the vdisk_guid to check the relevancy of the item (keeping the worker context)
+        return self._get_relevant_items(relevant_values=self.worker_contexts.values(),
+                                        relevant_keys=self.worker_context.keys())
 
     def _save_work(self):
         """
@@ -242,27 +321,56 @@ class StackWorkGenerator(ScrubShared):
         :return: Current work to be done
         :rtype: Queue
         """
+        # Add current queue items to the pool
+        def get_total_items(*args, **kwargs):
+            _ = args, kwargs
+            return list(itertools.chain(self._relevant_work_items, (self._wrap_data(item) for item in self.work_queue.queue)))
         # Register some hooks to combat race conditions: Scrubbing vdisks might have changed (some removed, some added)
         # To combat this, regenerate our work and apply
         hooks = {'assert_fail_before': self._generate_scrub_work,
-                 'assert_fail_value': lambda *args, **kwargs: list(self.work_queue.queue),
-                 # Total items will be changed as registered items are fetched again and work items generated again
-                 'assert_fail_expected': lambda *args, **kwargs: self._registered_work_items}  # Registered items will be fetched again by the generator
-
+                 'assert_fail_value': get_total_items,  # Total items will be changed as registered items are fetched again and work items generated again
+                 'assert_fail_expected': lambda *args, **kwargs: self._fetched_work_items}  # Total fetched items will be changed as the generate_scrub_work needs this info
         # Attempt to save with all fetched data during work generation, expect the current key to not have changed
-        self._safely_store(self._key, list(self.work_queue.queue),
-                           expected_value=self._own_registered_work_items,
+        self._safely_store(self._key, get_total_items(),
+                           expected_value=self._fetched_work_items,
                            logging_start=self._log,
                            hooks=hooks)
         # The queue might be different of when the function got called due to the hooking in the save
         return self.work_queue
+
+    def remove_vdisk(self, vdisk_guid):
+        """
+        Safely removes a vdisk from the pool
+        :param vdisk_guid: Guid of the vDisk to remove
+        :type vdisk_guid: basestring
+        :return: Remaining items
+        :rtype: list
+        """
+        def get_remaining_items():
+            try:
+                self._relevant_work_items.remove(self._wrap_data(vdisk_guid))
+            except ValueError as ex:
+                raise ValueError('The registering data is not in the list. Something must have removed it! ({0})'.format(str(ex)))
+            return self._relevant_work_items
+        self._logger.debug('{0} - Unregistering vDisk {1}'.format(self._log, vdisk_guid))
+        hooks = {'assert_fail_before': self._get_pending_scrub_work,
+                 'assert_fail_value': get_remaining_items,  # Total items will be changed as registered items are fetched again by the hook
+                 'assert_fail_expected': lambda *args, **kwargs: self._fetched_work_items}  # Registered items will be fetched again by the hook
+
+        self._get_pending_scrub_work()  # Fetch the data before generating the total items to be up to date
+        # Attempt to save with all fetched data during work generation, expect the current key to not have changed
+        self._safely_store(self._key, get_remaining_items(),
+                           expected_value=self._fetched_work_items,
+                           logging_start=self._log,
+                           hooks=hooks)
+        return self._relevant_work_items
 
 
 class StackWorker(ScrubShared):
     """
     This class represents a worker of the scrubbing stack
     """
-    def __init__(self, queue, vpool, scrub_info, error_messages, worker_contexts):
+    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stack_number):
         """
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
         :type queue: Queue
@@ -274,27 +382,37 @@ class StackWorker(ScrubShared):
         :type scrub_info: dict
         :param error_messages: A list of error messages to be filled (by reference)
         :type error_messages: list
+        :param stack_work_handler: A stack work handler instance
+        :type stack_work_handler: StackWorkHandler
         :param worker_contexts: Context of all ovs-worker services (dict with storagerouter guid, worker_pid and worker_start)
         :type worker_contexts: dict
+        :param stack_number: Number given by the stack spawner
+        :type stack_number: int
         """
-        super(StackWorker, self).__init__()
+        super(StackWorker, self).__init__(job_id)
         self.queue = queue
         self.vpool = vpool
         self.error_messages = error_messages
         self.worker_contexts = worker_contexts
+        self.stack_number = stack_number
+        self.stack_work_handler = stack_work_handler
 
+        self.stack_id = str(uuid.uuid4())
         self.storagerouter = scrub_info['storagerouter']
         self.partition_guid = scrub_info['partition_guid']
         self.alba_proxy_service = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(self.vpool.name, self.storagerouter.name, self.partition_guid)
         self.scrub_directory = '{0}/scrub_work_{1}'.format(scrub_info['scrub_path'], uuid.uuid4())
         self.scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, self.partition_guid)
         self.backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, self.partition_guid)
-
         self.lock_time = 5 * 60
         self.lock_key = 'ovs_albaproxy_scrub_{0}'.format(self.alba_proxy_service)
+        self.registered_proxy = False
+        self.registering_data = {'job_id': self.job_id, 'stack_id': self.stack_id}  # Data to register within Arakoon about this StackWorker
+        self.registering_data.update(self.worker_context)
 
         self._client = None
-        self._log = 'Scrubber - vPool {0} - StorageRouter {1}'.format(self.vpool.name, self.storagerouter.name)
+        self._log = 'Scrubber - vPool {0} - StorageRouter {1} - Stack {2}'.format(self.vpool.name, self.storagerouter.name, self.stack_number)
+        self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_service)
 
     def deploy_stack_and_scrub(self):
         """
@@ -380,7 +498,6 @@ class StackWorker(ScrubShared):
                             continue
 
                         # Do the actual scrubbing
-                        # @TODO handles disks that are done (remove them from stack work)
                         with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
                             self._logger.info('{0} - vDisk {1} - Retrieve and apply scrub work'.format(self._log, vdisk.name))
                             work_units = locked_client.get_scrubbing_workunits()
@@ -402,8 +519,9 @@ class StackWorker(ScrubShared):
                         self.error_messages.append(message)
                         self._logger.exception(message)
                     finally:
-                        # Remove vDisk from volatile memory
+                        # Remove vDisk from volatile memory and scrub work
                         volatile_client.delete(volatile_key)
+                        self.stack_work_handler.remove_vdisk(vdisk_guid)
 
         except Empty:  # Raised when all items have been fetched from the queue
             self._logger.info('{0} - Queue completely processed'.format(self._log))
@@ -412,14 +530,66 @@ class StackWorker(ScrubShared):
             self.error_messages.append(message)
             self._logger.exception(message)
 
-    def _register_proxy_usages(self):
+    def _get_registered_proxy_users(self):
         """
-        Registers that this object is using the proxy
-        :return: None
-        :rtype: NoneType
+        Retrieves all stacks using a certain proxy
+        - Discards obsolete data
+        - Removes obsolete data keys
+        :return: List of stacks using the proxy
+        :rtype: list
         """
-        key = self.generate_key(self.vpool, self.storagerouter, self.worker_contexts)
-        # current_worker_items =
+        # This will strip out the job_id, stack_id to check the relevancy of the item (keeping the worker context)
+        return self._get_relevant_items(relevant_values=self.worker_contexts.values(),
+                                        relevant_keys=self.worker_context.keys())
+
+    def _register_proxy_usage(self):
+        """
+        Registers that this worker is using the proxy
+        :return: Current list of items
+        :rtype: list
+        """
+        def get_total_items():
+            return self._relevant_work_items + [self.registering_data]
+
+        self._logger.debug('{0} - Registering usage of {1}'.format(self._log, self.alba_proxy_service))
+        hooks = {'assert_fail_before': self._get_registered_proxy_users,
+                 'assert_fail_value': get_total_items,  # Total items will be changed as registered items are fetched again by the hook
+                 'assert_fail_expected': lambda *args, **kwargs: self._fetched_work_items}  # Registered items will be fetched again by the hook
+
+        self._get_registered_proxy_users()  # Fetch the data before generating the total items to be up to date
+        # Attempt to save with all fetched data during work generation, expect the current key to not have changed
+        self._safely_store(self._key, get_total_items(),
+                           expected_value=self._fetched_work_items,
+                           logging_start=self._log,
+                           hooks=hooks)
+        self.registered_proxy = True
+        return self.registering_data
+
+    def _unregister_proxy_usage(self):
+        """
+        Unregisters that this worker is using this proxy
+        :return: The remaining data entires
+        :rtype: list
+        """
+        def get_remaining_items():
+            try:
+                self._relevant_work_items.remove(self.registering_data)
+            except ValueError as ex:
+                raise ValueError('The registering data is not in the list. Something must have removed it! ({0})'.format(str(ex)))
+            return self._relevant_work_items
+        self._logger.debug('{0} - Unregistering usage of {1}'.format(self._log, self.alba_proxy_service))
+        hooks = {'assert_fail_before': self._get_registered_proxy_users,
+                 'assert_fail_value': get_remaining_items,  # Total items will be changed as registered items are fetched again by the hook
+                 'assert_fail_expected': lambda *args, **kwargs: self._fetched_work_items}  # Registered items will be fetched again by the hook
+
+        self._get_registered_proxy_users()  # Fetch the data before generating the total items to be up to date
+        if self.registered_proxy is True:
+            # Attempt to save with all fetched data during work generation, expect the current key to not have changed
+            self._safely_store(self._key, get_remaining_items(),
+                               expected_value=self._fetched_work_items,
+                               logging_start=self._log,
+                               hooks=hooks)
+        return self._relevant_work_items
 
     def _deploy_proxy(self):
         """
@@ -430,10 +600,9 @@ class StackWorker(ScrubShared):
         :rtype: NoneType
         """
         try:
-            # @todo keep track of what proxy is doing what (figure out an Arakoon key which can be shared across multiple jobs and how to detect if one is busy >>
             # Locking with volatile as different workers need to lock the remote detection/deployment of the proxy
             with volatile_mutex(name=self.lock_key, wait=self.lock_time):
-                self._logger.info('{0} - Deploying ALBA proxy {1}'.format(self._log, self.alba_proxy_service))
+                self._logger.info('{0} - Checking for ALBA proxy {1} deployment'.format(self._log, self.alba_proxy_service))
                 self._client = SSHClient(self.storagerouter, 'root')
                 self._client.dir_create(self.scrub_directory)
                 self._client.dir_chmod(self.scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
@@ -441,6 +610,7 @@ class StackWorker(ScrubShared):
                     self._logger.info('{0} - Re-using existing proxy service {1}'.format(self._log, self.alba_proxy_service))
                     scrub_config = Configuration.get(self.scrub_config_key)
                 else:
+                    self._logger.info('{0} - Deploying ALBA proxy {1}'.format(self._log, self.alba_proxy_service))
                     machine_id = System.get_my_machine_id(self._client)
                     port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
                     with volatile_mutex('deploy_proxy_for_scrub_{0}'.format(self.storagerouter.guid), wait=30):
@@ -468,12 +638,13 @@ class StackWorker(ScrubShared):
                             value['alba_connection_port'] = scrub_config['port']
                 # Copy backend connection manager information in separate key
                 Configuration.set(self.backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
-                # Todo register usage of the proxy consistently
+                self._register_proxy_usage()
         except Exception:
             message = '{0} - An error occurred deploying ALBA proxy {1}. Removing...'.format(self._log, self.alba_proxy_service)
             self.error_messages.append(message)
             self._logger.exception(message)
-            self._remove_proxy(lock=False)
+            # Locking the removal here because others might register a proxy to be used
+            self._remove_proxy(lock=True)
             # No proxy could be set so no scrubbing would be able to happen
             raise
         return scrub_config
@@ -485,11 +656,15 @@ class StackWorker(ScrubShared):
         :type lock: bool
         :return: None
         """
-        # @todo check if other workers are using the proxy
         def remove():
             try:
                 if self._client is None:
                     raise ValueError('No SSHClient has been setup!')
+                # No longer using the proxy as we want to remove it
+                proxy_users = self._unregister_proxy_usage()
+                if len(proxy_users) > 0:
+                    self._logger.info('{0} - Service {1} still in use by others'.format(self._log, self.alba_proxy_service))
+                    return
                 self._logger.info('{0} - Removing service {1}'.format(self._log, self.alba_proxy_service))
                 self._client.dir_delete(self.scrub_directory)
                 if self._service_manager.has_service(self.alba_proxy_service, client=self._client) is True:
@@ -522,9 +697,7 @@ class Scrubber(ScrubShared):
       - Keep internal track of items to scrub
     - Cleanup stale job entries
     """
-    # @todo set key lifetime back to 7 days
-    # _KEY_LIFETIME = 7 * 24 * 60 * 60  # All job keys are kept for 7 days and after that the next scrubbing job will remove the outdated ones
-    _KEY_LIFETIME = 1
+    _KEY_LIFETIME = 7 * 24 * 60 * 60  # All job keys are kept for 7 days and after that the next scrubbing job will remove the outdated ones
 
     def __init__(self, vpool_guids=None, vdisk_guids=None, storagerouter_guid=None, manual=False, task_id=None):
         """
@@ -553,30 +726,28 @@ class Scrubber(ScrubShared):
         if manual is False and (len(vpool_guids) > 0 or len(vdisk_guids) > 0):
             raise ValueError('When specifying vDisks or vPools, "manual" must be True')
 
-        super(Scrubber, self).__init__()
+        super(Scrubber, self).__init__(task_id or str(uuid.uuid4()))
 
-        self.scrub_id = task_id or str(uuid.uuid4())
         self.task_id = task_id  # Be able to differentiate between directly executed ones for debugging purposes
         self.vdisk_guids = vdisk_guids
         self.vpool_guids = vpool_guids
         self.storagerouter_guid = storagerouter_guid
         self.manual = manual
 
+        self._service_manager = ServiceFactory.get_manager()
+        self._log = 'Scrubber'
+
         self.time_start = None
         self.time_end = None
-
         self.vpool_vdisk_map = self.generate_vpool_vdisk_map(vpool_guids=vpool_guids, vdisk_guids=vdisk_guids, manual=manual)
         self.scrub_locations = self.get_scrub_locations(storagerouter_guid)
+        self.worker_contexts = self.get_worker_contexts()  # Could give off an outdated view but that would be picked up by the next scrub job
 
         # Scrubbing stack
         self.error_messages = []  # Keep track of all messages that might occur
         self.max_stacks_per_vpool = None
         self.stacks = {}
         self.stack_threads = []
-
-        self.worker_contexts = self.get_worker_contexts()  # Could give off an outdated view but that would be picked up by the next scrub job
-
-        self._service_manager = ServiceFactory.get_manager()
 
     def get_worker_contexts(self):
         """
@@ -629,23 +800,26 @@ class Scrubber(ScrubShared):
         self.set_main_job_info()
         counter = 0
         for vp, vdisks in self.vpool_vdisk_map.iteritems():
-            logging_start = 'Scrubber - vPool {0}'.format(vp.name)
+            logging_start = '{0} - vPool {1}'.format(self._log, vp.name)
             # Verify amount of vDisks on vPool
             self._logger.info('{0} - Checking scrub work'.format(logging_start))
-            stack_work_generator = StackWorkGenerator(vpool=vp, vdisks=vdisks, worker_contexts=self.worker_contexts)
-            vpool_queue = stack_work_generator.generate_save_scrub_work()
+            stack_work_handler = StackWorkHandler(vpool=vp, vdisks=vdisks, worker_contexts=self.worker_contexts, job_id=self.job_id)
+            vpool_queue = stack_work_handler.generate_save_scrub_work()
             if vpool_queue.qsize() == 0:
                 self._logger.info('{0} - No scrub work'.format(logging_start))
                 continue
             stacks_to_spawn = min(self.max_stacks_per_vpool, len(self.scrub_locations))
             self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
-            for _ in xrange(stacks_to_spawn):
+            for stack_number in xrange(stacks_to_spawn):
                 scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
                 stack_worker = StackWorker(queue=vpool_queue,
                                            vpool=vp,
                                            scrub_info=scrub_target,
                                            error_messages=self.error_messages,
-                                           worker_contexts=self.worker_contexts)
+                                           worker_contexts=self.worker_contexts,
+                                           stack_work_handler=stack_work_handler,
+                                           job_id=self.job_id,
+                                           stack_number=stack_number)
                 stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                args=())
                 stack.start()
@@ -662,7 +836,7 @@ class Scrubber(ScrubShared):
         self._cleanup_job_entries()
 
         if len(self.error_messages) > 0:
-            raise Exception('Errors occurred while scrubbing:\n  - {0}'.format('\n  - '.join(self.error_messages)))
+            raise Exception(self._format_message('Errors occurred while scrubbing:\n  - {0}'.format('\n  - '.join(self.error_messages))))
 
     def set_main_job_info(self):
         """
@@ -675,7 +849,7 @@ class Scrubber(ScrubShared):
         if any(item is None for item in [self.max_stacks_per_vpool, self.time_start]):
             raise ValueError('Scrubbing has not been executed yet. Not registering the current job')
 
-        job_key = '{0}/{1}/job_info'.format(self._SCRUB_KEY, self.scrub_id)
+        job_key = '{0}/{1}/job_info'.format(self._SCRUB_KEY, self.job_id)
         job_info = {'scrub_locations': [self._covert_data_objects(x) for x in self.scrub_locations],
                     'task_id': self.task_id,
                     'max_stacks_per_vpool': self.max_stacks_per_vpool,
@@ -717,8 +891,7 @@ class Scrubber(ScrubShared):
             vpool_vdisk_map = dict((vpool, list(vpool.vdisks)) for vpool in VPoolList.get_vpools())
         return vpool_vdisk_map
 
-    @classmethod
-    def get_scrub_locations(cls, storagerouter_guid=None):
+    def get_scrub_locations(self, storagerouter_guid=None):
         """
         Retrieve all scrub locations
         :param storagerouter_guid: Guid of the StorageRouter to execute the scrub work on
@@ -738,30 +911,18 @@ class Scrubber(ScrubShared):
                 SSHClient(endpoint=storagerouter, username='root')
                 for partition_guid in scrub_partitions:
                     partition = DiskPartition(partition_guid)
-                    cls._logger.info('Scrubber - Storage Router {0} has {1} partition at {2}'.format(storagerouter.ip, DiskPartition.ROLES.SCRUB, partition.folder))
+                    self._logger.info(self._format_message('Storage Router {0} has {1} partition at {2}'.format(storagerouter.ip, DiskPartition.ROLES.SCRUB, partition.folder)))
                     scrub_locations.append({'scrub_path': str(partition.folder),
                                             'partition_guid': partition.guid,
                                             'storagerouter': storagerouter})
             except UnableToConnectException:
-                cls._logger.warning('Scrubber - Storage Router {0} is not reachable'.format(storagerouter.ip))
+                self._logger.warning(self._format_message('Storage Router {0} is not reachable'.format(storagerouter.ip)))
 
         if len(scrub_locations) == 0:
             raise ValueError('No scrub locations found, cannot scrub')
         return scrub_locations
 
-    @classmethod
-    def _covert_data_objects(cls, item):
-        # Change all data objects to their GUID
-        if isinstance(item, list):
-            return [cls._covert_data_objects(i) for i in item]
-        elif isinstance(item, dict):
-            return dict((cls._covert_data_objects(k), cls._covert_data_objects(v)) for k, v in item.iteritems())
-        elif isinstance(item, DataObject):
-            return item.guid
-        return item
-
-    @classmethod
-    def _cleanup_job_entries(cls):
+    def _cleanup_job_entries(self):
         """
         Clean up job entries which have been stored longer than the _KEY_LIFETIME number of seconds
         :return: List of removed keys
@@ -770,16 +931,16 @@ class Scrubber(ScrubShared):
         removed_keys = []
         try:
             with volatile_mutex('scrubber_clean_entries', wait=30):
-                for key in Configuration.list(cls._SCRUB_KEY):
-                    full_key = '{0}/{1}'.format(cls._SCRUB_KEY, key)
+                for key in Configuration.list(self._SCRUB_KEY):
+                    full_key = '{0}/{1}'.format(self._SCRUB_KEY, key)
                     job_info = Configuration.get('{0}/job_info'.format(full_key))
                     time_start = job_info.get('time_start')
                     time_end = job_info.get('time_end')
-                    if time_start is None or (time_end is not None and time_end - time_start >= cls._KEY_LIFETIME):
+                    if time_start is None or (time_end is not None and time_end - time_start >= self._KEY_LIFETIME):
                         Configuration.delete(full_key)
                         removed_keys.append(full_key)
                 if len(removed_keys) > 0:
-                    cls._logger.info('Cleaned up the following outdated scrub keys: {0}'.format('\n - '.join(removed_keys)))
+                    self._logger.info(self._format_message('Cleaned up the following outdated scrub keys: {0}'.format('\n - '.join(removed_keys))))
         except NoLockAvailableException:
-            cls._logger.warning('Could not get the lock to clean entries')
+            self._logger.warning(self._format_message('Could not get the lock to clean entries'))
         return removed_keys
