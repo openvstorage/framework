@@ -14,6 +14,9 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
+#@todo remove
+import ovs.deadlocker as stacktracer
+stacktracer.trace_start("/tmp/trace.html")
 """
 Scrubber Module
 """
@@ -81,7 +84,7 @@ class ScrubShared(object):
             raise NotImplementedError('No worker_contexts have yet been implemented')
         return self.worker_contexts[System.get_my_storagerouter()]
 
-    def _safely_store(self, key, value, expected_value, logging_start, key_not_exist=False, max_retries=5, hooks=None):
+    def _safely_store(self, key, value, expected_value, logging_start, key_not_exist=False, max_retries=20, hooks=None):
         """
         Safely store a key/value pair within the persistent storage
         :param key: Key to store
@@ -112,11 +115,10 @@ class ScrubShared(object):
                 args = []
             func = hooks.get(hook)
             if func is not None and callable(func):
-                func(*args, **kwargs)
+                return func(*args, **kwargs)
 
         if hooks is None:
             hooks = {}
-        transaction = self._persistent.begin_transaction()
         tries = 0
         success = False
         last_exception = None
@@ -124,30 +126,25 @@ class ScrubShared(object):
         if key_not_exist is True and self._persistent.exists(key) is True:
             return_value = self._persistent.get(key)
             success = True
-            self._logger.debug('{0} - key {1} is already present and key_not_exist given. Not saving and returning current value ({2})'
-                               .format(logging_start, key, return_value))
+            self._logger.debug('{0} - key {1} is already present and key_not_exist given. Not saving and returning current value'.format(logging_start, key))
         while success is False:
-            if key_not_exist is True and self._persistent.exists(key) is True:
-                # No need to save a new one ourselves
-                success = True
-                return_value = self._persistent.get(key)
-                continue
+            transaction = self._persistent.begin_transaction()
+            return_value = value  # Value might change because of hooking
             tries += 1
             if tries > max_retries:
                 raise last_exception
             self._persistent.assert_value(key, expected_value, transaction=transaction)
             self._persistent.set(key, value, transaction=transaction)
             try:
-                self._logger.debug('{0} - Registering key ({1}:{2})'.format(logging_start, key, value))
                 self._persistent.apply_transaction(transaction)
                 success = True
             except AssertException as ex:
-                self._logger.debug('{0} - Asserting failed. Retrying {1} more times'.format(logging_start, max_retries - tries))
+                self._logger.debug('{0} - Asserting failed for key {1}. Retrying {2} more times'.format(logging_start, key, max_retries - tries))
                 last_exception = ex
                 time.sleep(randint(0, 25) / 100.0)
                 _execute_hook('assert_fail_before')
-                _execute_hook('assert_fail_expected')
-                _execute_hook('assert_fail_value')
+                expected_value = _execute_hook('assert_fail_expected')
+                value = _execute_hook('assert_fail_value')
         return return_value
 
     def _get_relevant_items(self, relevant_values, relevant_keys):
@@ -192,13 +189,13 @@ class ScrubShared(object):
     def _fetch_registered_items(self):
         """
         Fetches all items currently registered on the key
-        Saves them under _fetched_work_items for caching purposes
+        Saves them under _fetched_work_items for caching purposes. When None is returned, an empty list is set
         :return: All current items (None if the key has not yet been registered)
         """
         if self._key is None:
             raise ValueError('self._key has no value. Nothing to fetch')
         if self._persistent.exists(self._key) is True:
-            items = list(self._persistent.get(self._key))
+            items = self._persistent.get(self._key)
         else:
             items = None
         self._fetched_work_items = items
@@ -338,14 +335,17 @@ class StackWorkHandler(ScrubShared):
         # The queue might be different of when the function got called due to the hooking in the save
         return self.work_queue
 
-    def remove_vdisk(self, vdisk_guid):
+    def remove_vdisk(self, vdisk_guid, retries=5):
         """
         Safely removes a vdisk from the pool
         :param vdisk_guid: Guid of the vDisk to remove
         :type vdisk_guid: basestring
+        :param retries: Amount of retries to do
+        :type retries: int
         :return: Remaining items
         :rtype: list
         """
+        # @todo fix that remaining items are not diminishing!!
         def get_remaining_items():
             try:
                 self._relevant_work_items.remove(self._wrap_data(vdisk_guid))
@@ -362,7 +362,8 @@ class StackWorkHandler(ScrubShared):
         self._safely_store(self._key, get_remaining_items(),
                            expected_value=self._fetched_work_items,
                            logging_start=self._log,
-                           hooks=hooks)
+                           hooks=hooks,
+                           max_retries=retries)
         return self._relevant_work_items
 
 
@@ -370,7 +371,7 @@ class StackWorker(ScrubShared):
     """
     This class represents a worker of the scrubbing stack
     """
-    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stack_number):
+    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number):
         """
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
         :type queue: Queue
@@ -386,6 +387,8 @@ class StackWorker(ScrubShared):
         :type stack_work_handler: StackWorkHandler
         :param worker_contexts: Context of all ovs-worker services (dict with storagerouter guid, worker_pid and worker_start)
         :type worker_contexts: dict
+        :param stacks_to_spawn: Amount of stacks that were spawned. Required to resolve racing with retries
+        :type stacks_to_spawn: int
         :param stack_number: Number given by the stack spawner
         :type stack_number: int
         """
@@ -395,8 +398,10 @@ class StackWorker(ScrubShared):
         self.error_messages = error_messages
         self.worker_contexts = worker_contexts
         self.stack_number = stack_number
+        self.stacks_to_spawn = stacks_to_spawn
         self.stack_work_handler = stack_work_handler
 
+        self.queue_size = self.queue.qsize()
         self.stack_id = str(uuid.uuid4())
         self.storagerouter = scrub_info['storagerouter']
         self.partition_guid = scrub_info['partition_guid']
@@ -413,6 +418,7 @@ class StackWorker(ScrubShared):
         self._client = None
         self._log = 'Scrubber - vPool {0} - StorageRouter {1} - Stack {2}'.format(self.vpool.name, self.storagerouter.name, self.stack_number)
         self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_service)
+        self._state_key = '{0}_state'.format(self._key)
 
     def deploy_stack_and_scrub(self):
         """
@@ -427,31 +433,37 @@ class StackWorker(ScrubShared):
             self.error_messages.append('vPool {0} does not have any valid StorageDrivers configured'.format(self.vpool.name))
             return
 
-        # Deploy a proxy
-        self._deploy_proxy()
+        try:
+            # Deploy a proxy
+            self._deploy_proxy()
 
-        # Execute the actual scrubbing
-        threads = []
-        threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
-        amount_threads = Configuration.get(key=threads_key) if Configuration.exists(key=threads_key) else 2
-        if not isinstance(amount_threads, int):
-            self.error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
-            return
+            # Execute the actual scrubbing
+            threads = []
+            threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
+            amount_threads = Configuration.get(key=threads_key) if Configuration.exists(key=threads_key) else 2
+            if not isinstance(amount_threads, int):
+                self.error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
+                return
 
-        amount_threads = max(amount_threads, 1)  # Make sure amount_threads is at least 1
-        amount_threads = min(min(self.queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
-        self._logger.info('{0} - Spawning {1} threads for proxy service {2}'.format(self._log, amount_threads, self.alba_proxy_service))
-        for index in range(amount_threads):
-            thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(self.vpool.guid, self.partition_guid, index),
-                            target=self._execute_scrub,
-                            args=())
-            thread.start()
-            threads.append(thread)
-        for thread in threads:
-            thread.join()
+            amount_threads = max(amount_threads, 1)  # Make sure amount_threads is at least 1
+            amount_threads = min(min(self.queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
+            self._logger.info('{0} - Spawning {1} threads for proxy service {2}'.format(self._log, amount_threads, self.alba_proxy_service))
+            for index in range(amount_threads):
+                thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(self.vpool.guid, self.partition_guid, index),
+                                target=self._execute_scrub,
+                                args=())
+                thread.start()
+                threads.append(thread)
+            for thread in threads:
+                thread.join()
 
-        # Delete the proxy again
-        self._remove_proxy(lock=True)
+            # Delete the proxy again
+            self._remove_proxy()
+        finally:
+            pass
+            # # Attempt to remove all registered items
+            # for vdisk_guid in self.queue.queue:
+            #     self.stack_work_handler.remove_vdisk(vdisk_guid)
 
     def _execute_scrub(self):
         """
@@ -470,7 +482,6 @@ class StackWorker(ScrubShared):
             return vdisk_configs
 
         volatile_client = VolatileFactory.get_client()
-        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(self.vpool.guid, self.partition_guid)
         try:
             # Empty the queue with vDisks to scrub
             with remote(self.storagerouter.ip, [VDisk]) as rem:
@@ -505,7 +516,7 @@ class StackWorker(ScrubShared):
                                 res = locked_client.scrub(work_unit=work_unit,
                                                           scratch_dir=self.scrub_directory,
                                                           log_sinks=[LogHandler.get_sink_path('scrubber_{0}'.format(self.vpool.name), allow_override=True, forced_target_type='file')],
-                                                          backend_config=Configuration.get_configuration_path(backend_config_key))
+                                                          backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                             if work_units:
                                 self._logger.info('{0} - vDisk {1} - {2} work units successfully applied'.format(self._log, vdisk.name, len(work_units)))
@@ -521,7 +532,7 @@ class StackWorker(ScrubShared):
                     finally:
                         # Remove vDisk from volatile memory and scrub work
                         volatile_client.delete(volatile_key)
-                        self.stack_work_handler.remove_vdisk(vdisk_guid)
+                        self.stack_work_handler.remove_vdisk(vdisk_guid, self.queue_size)
 
         except Empty:  # Raised when all items have been fetched from the queue
             self._logger.info('{0} - Queue completely processed'.format(self._log))
@@ -549,7 +560,8 @@ class StackWorker(ScrubShared):
         :rtype: list
         """
         def get_total_items():
-            return self._relevant_work_items + [self.registering_data]
+            self._relevant_work_items.append(self.registering_data)
+            return self._relevant_work_items
 
         self._logger.debug('{0} - Registering usage of {1}'.format(self._log, self.alba_proxy_service))
         hooks = {'assert_fail_before': self._get_registered_proxy_users,
@@ -563,7 +575,7 @@ class StackWorker(ScrubShared):
                            logging_start=self._log,
                            hooks=hooks)
         self.registered_proxy = True
-        return self.registering_data
+        return self._relevant_work_items
 
     def _unregister_proxy_usage(self):
         """
@@ -588,8 +600,45 @@ class StackWorker(ScrubShared):
             self._safely_store(self._key, get_remaining_items(),
                                expected_value=self._fetched_work_items,
                                logging_start=self._log,
-                               hooks=hooks)
+                               hooks=hooks,
+                               max_retries=self.stacks_to_spawn)
         return self._relevant_work_items
+
+    def _long_poll_proxy_state(self, state, timeout=None):
+        """
+        Start long polling for the proxy state. This state is not fetched by the service manager but rather by the threads injecting a key in Arakoon
+        This function will return once the requested state has been achieved
+        :param state: State of the key
+        :type state: Possible states are:
+        - 'deploying': proxy is still being deployed
+        - 'deployed': proxy has been deployed
+        - 'removing': proxy is being removed
+        - 'removed': proxy has been removed
+        :param timeout: Amount of seconds to wait (Defaults to 5 minutes)
+        :return: None
+        :rtype: NoneType
+        """
+        if timeout is None:
+            timeout = self.lock_time
+        if self._persistent.exists(self._state_key) is True:
+            start = time.time()
+            while True:
+                current_state = self._persistent.get(self._state_key)
+                if current_state == state:
+                    return
+                if time.time() - start > timeout:
+                    raise RuntimeError('Long polling for the state has timed out')
+                self._logger.debug(self._format_message('Proxy {0}\'s state does not match {1}  (Current: {2})'.format(self.alba_proxy_service, state, current_state)))
+                time.sleep(1)
+        return
+
+    def _set_proxy_state(self, state):
+        """
+        Sets the state of the proxy
+        :param state: State of key
+        :return: The state that was set
+        """
+        self._persistent.set(self._state_key, state)
 
     def _deploy_proxy(self):
         """
@@ -600,33 +649,33 @@ class StackWorker(ScrubShared):
         :rtype: NoneType
         """
         try:
-            # Locking with volatile as different workers need to lock the remote detection/deployment of the proxy
-            with volatile_mutex(name=self.lock_key, wait=self.lock_time):
-                self._logger.info('{0} - Checking for ALBA proxy {1} deployment'.format(self._log, self.alba_proxy_service))
+            self._logger.info(self._format_message('Checking for ALBA proxy {0} deployment'.format(self.alba_proxy_service)))
+            registered_users = self._register_proxy_usage()
+            self._logger.info(self._format_message('Current registered users: {0}'.format(registered_users)))
+            if len(registered_users) == 1:
+                self._logger.info(self._format_message('Deploying ALBA proxy {0}'.format(self.alba_proxy_service)))
+                self._set_proxy_state('deploying')
+                # First to register, allowed to deploy the proxy
+                # Check the proxy status - could be that it is removing
                 self._client = SSHClient(self.storagerouter, 'root')
                 self._client.dir_create(self.scrub_directory)
                 self._client.dir_chmod(self.scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
-                if self._service_manager.has_service(name=self.alba_proxy_service, client=self._client) is True and self._service_manager.get_service_status(name=self.alba_proxy_service, client=self._client) == 'active':
-                    self._logger.info('{0} - Re-using existing proxy service {1}'.format(self._log, self.alba_proxy_service))
-                    scrub_config = Configuration.get(self.scrub_config_key)
-                else:
-                    self._logger.info('{0} - Deploying ALBA proxy {1}'.format(self._log, self.alba_proxy_service))
-                    machine_id = System.get_my_machine_id(self._client)
-                    port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
-                    with volatile_mutex('deploy_proxy_for_scrub_{0}'.format(self.storagerouter.guid), wait=30):
-                        port = System.get_free_ports(selected_range=port_range, nr=1, client=self._client)[0]
-                    scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(self.vpool.guid))
-                    scrub_config['port'] = port
-                    scrub_config['transport'] = 'tcp'
-                    Configuration.set(self.scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
+                machine_id = System.get_my_machine_id(self._client)
+                port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
+                port = System.get_free_ports(selected_range=port_range, nr=1, client=self._client)[0]
+                scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(self.vpool.guid))
+                scrub_config['port'] = port
+                scrub_config['transport'] = 'tcp'
+                Configuration.set(self.scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
 
-                    params = {'VPOOL_NAME': self.vpool.name,
-                              'LOG_SINK': LogHandler.get_sink_path(self.alba_proxy_service),
-                              'CONFIG_PATH': Configuration.get_configuration_path(self.scrub_config_key)}
-                    self._service_manager.add_service(name='ovs-albaproxy', params=params, client=self._client, target_name=self.alba_proxy_service)
-                    self._service_manager.start_service(name=self.alba_proxy_service, client=self._client)
-                    self._logger.info('{0} - Deployed ALBA proxy {1} (Config: {2})'.format(self._log, self.alba_proxy_service, scrub_config))
-                    # @Todo better check if editing needs to happen (other threads also call this)
+                params = {'VPOOL_NAME': self.vpool.name,
+                          'LOG_SINK': LogHandler.get_sink_path(self.alba_proxy_service),
+                          'CONFIG_PATH': Configuration.get_configuration_path(self.scrub_config_key)}
+                self._service_manager.add_service(name='ovs-albaproxy', params=params, client=self._client, target_name=self.alba_proxy_service)
+                self._service_manager.start_service(name=self.alba_proxy_service, client=self._client)
+                self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(self.alba_proxy_service, scrub_config)))
+                # Backend config is tied to the proxy, so only need to register while the proxy has to be deployed
+                self._logger.info(self._format_message('Setting up backend config'))
                 backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
                 if backend_config.get('backend_type') != 'MULTI':
                     backend_config['alba_connection_host'] = '127.0.0.1'
@@ -638,52 +687,54 @@ class StackWorker(ScrubShared):
                             value['alba_connection_port'] = scrub_config['port']
                 # Copy backend connection manager information in separate key
                 Configuration.set(self.backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
-                self._register_proxy_usage()
+                self._logger.info(self._format_message('Backend config was set up'))
+                self._set_proxy_state('deployed')
+            else:
+                # Long polling for the status
+                self._logger.info(self._format_message('Re-using existing proxy service {0}'.format(self.alba_proxy_service)))
+                self._logger.info(self._format_message('Waiting for proxy service {0} to be deployed'.format(self.alba_proxy_service)))
+                self._long_poll_proxy_state(state='deployed')
+                self._logger.info(self._format_message('Proxy service {0} was deployed'.format(self.alba_proxy_service)))
         except Exception:
             message = '{0} - An error occurred deploying ALBA proxy {1}. Removing...'.format(self._log, self.alba_proxy_service)
             self.error_messages.append(message)
             self._logger.exception(message)
             # Locking the removal here because others might register a proxy to be used
-            self._remove_proxy(lock=True)
+            self._remove_proxy()
             # No proxy could be set so no scrubbing would be able to happen
             raise
-        return scrub_config
 
-    def _remove_proxy(self, lock=False):
+    def _remove_proxy(self):
         """
         Removes the proxy that was used
-        :param lock: Remove in a locked context
-        :type lock: bool
         :return: None
         """
-        def remove():
-            try:
-                if self._client is None:
-                    raise ValueError('No SSHClient has been setup!')
-                # No longer using the proxy as we want to remove it
-                proxy_users = self._unregister_proxy_usage()
-                if len(proxy_users) > 0:
-                    self._logger.info('{0} - Service {1} still in use by others'.format(self._log, self.alba_proxy_service))
-                    return
-                self._logger.info('{0} - Removing service {1}'.format(self._log, self.alba_proxy_service))
-                self._client.dir_delete(self.scrub_directory)
-                if self._service_manager.has_service(self.alba_proxy_service, client=self._client) is True:
-                    if self._service_manager.get_service_status(name=self.alba_proxy_service, client=self._client) == 'active':
-                        self._service_manager.stop_service(self.alba_proxy_service, client=self._client)
-                    self._service_manager.remove_service(self.alba_proxy_service, client=self._client)
-                if Configuration.exists(self.scrub_config_key):
-                    Configuration.delete(self.scrub_config_key)
-                self._logger.info('{0} - Removed service {1}'.format(self._log, self.alba_proxy_service))
-            except Exception:
-                message = '{0} - Removing service {1} failed'.format(self._log, self.alba_proxy_service)
-                self.error_messages.append(message)
-                self._logger.exception(message)
-                raise
-        if lock is True:
-            with volatile_mutex(name=self.lock_key, wait=self.lock_time):
-                remove()
-        else:
-            remove()
+        try:
+            # No longer using the proxy as we want to remove it
+            proxy_users = self._unregister_proxy_usage()
+            self._client = SSHClient(self.storagerouter, 'root')
+            if len(proxy_users) > 0:
+                self._logger.info('{0} - Service {1} still in use by others'.format(self._log, self.alba_proxy_service))
+                return
+            self._logger.info('{0} - Removing service {1}'.format(self._log, self.alba_proxy_service))
+            self._set_proxy_state('removing')
+            self._client.dir_delete(self.scrub_directory)
+            if self._service_manager.has_service(self.alba_proxy_service, client=self._client) is True:
+                if self._service_manager.get_service_status(name=self.alba_proxy_service,client=self._client) == 'active':
+                    self._service_manager.stop_service(self.alba_proxy_service, client=self._client)
+                self._service_manager.remove_service(self.alba_proxy_service, client=self._client)
+            if Configuration.exists(self.scrub_config_key):
+                Configuration.delete(self.scrub_config_key)
+            self._logger.info('{0} - Removed service {1}'.format(self._log, self.alba_proxy_service))
+        except Exception:
+            message = '{0} - Removing service {1} failed'.format(self._log, self.alba_proxy_service)
+            self.error_messages.append(message)
+            self._logger.exception(message)
+            raise
+        finally:
+            # Not sure if this is the right call. Proxy deployment/removal errors should be looked after
+            # This will cause the next proxy setup to fail as the service already exists and that one will attempt to clean up again
+            self._set_proxy_state('removed')
 
 
 class Scrubber(ScrubShared):
@@ -819,6 +870,7 @@ class Scrubber(ScrubShared):
                                            worker_contexts=self.worker_contexts,
                                            stack_work_handler=stack_work_handler,
                                            job_id=self.job_id,
+                                           stacks_to_spawn=stacks_to_spawn,
                                            stack_number=stack_number)
                 stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                args=())

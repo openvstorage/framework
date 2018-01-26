@@ -202,7 +202,9 @@ class GenericController(object):
         """
         from ovs.lib.helpers.generic.scrubber import Scrubber
         # GenericController.execute_scrub.request.id gets the current celery task id (None if executed directly)
-        scrubber = Scrubber(vpool_guids, vdisk_guids, storagerouter_guid, manual=manual, task_id=GenericController.execute_scrub.request.id)
+        # Fetching the task_id with the hasattr because Unittesting does not execute the wrapper (No celery task but a normal function being called)
+        task_id = GenericController.execute_scrub.request.id if hasattr(GenericController.execute_scrub, 'request') else None
+        scrubber = Scrubber(vpool_guids, vdisk_guids, storagerouter_guid, manual=manual, task_id=task_id)
         return scrubber.execute_scrubbing()
 
     @staticmethod
@@ -330,4 +332,11 @@ class GenericController(object):
 
 # @todo remove
 if __name__ == '__main__':
+    # threads = []
+    # thread = Thread(target=GenericController.execute_scrub,
+    #                args=())
+    # thread.start()
+    # threads.append(thread)
+    # for thread in threads:
+    #     thread.join()
     GenericController.execute_scrub()
