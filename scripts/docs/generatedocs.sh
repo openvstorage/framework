@@ -20,6 +20,7 @@ if [ "$(ls -A $DIR/)" ]; then
      echo "Directory $DIR/ must be empty"
      exit 1
 fi
+export PYTHONPATH=$PYTHONPATH:/opt/OpenvStorage/lib/python2.7/site-packages/
 mkdir $DIR/lib
 epydoc --graph umlclasstree ovs.lib -o $DIR/lib -v --parse-only > /dev/null
 mkdir $DIR/dal
