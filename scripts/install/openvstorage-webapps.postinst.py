@@ -39,8 +39,7 @@ if __name__ == '__main__':
     secret_key = ''.join([random.SystemRandom().choice(SECRET_SELECTION) for i in range(SECRET_KEY_LENGTH)])
 
     os.chdir('/opt/OpenvStorage/webapps/api')
-    check_output('export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput', shell=True)
-
+    check_output(['python', 'manage.py', 'syncdb', '--noinput'])
     run_level_regex = '^[KS][0-9]{2}(.*)'
 
     # Create web certificates

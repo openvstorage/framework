@@ -28,6 +28,6 @@ install:
   - docker run -dit --name fwk fwk  # Run it detached, with stdin open and TTY to keep it running
   - docker ps -a
 script:
-  - docker exec -it fwk bash -c "ovs unittest"
+  - docker exec -it fwk bash -c "export PYTHONPATH=${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps; ovs unittest"
 after_failure:
   - docker logs fwk
