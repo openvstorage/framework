@@ -30,7 +30,9 @@ from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInst
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
+from ovs.extensions.generic.system import System
 from ovs_extensions.generic.threadhelpers import Waiter
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
@@ -292,6 +294,9 @@ class Generic(unittest.TestCase):
         )
         vdisk = structure['vdisks'][1]
         storagerouter = structure['storagerouters'][1]
+        vpool = structure['vpools'][1]
+        # New scrubbing code changes requires local Storagerouter to be available
+        System._machine_id['none'] = System._machine_id[storagerouter.ip]
         LockedClient.scrub_controller = {'possible_threads': None,
                                          'volumes': {},
                                          'waiter': Waiter(1)}
@@ -299,15 +304,16 @@ class Generic(unittest.TestCase):
                                                                      'scrub_work': [0]}
 
         # Remove SCRUB partition from StorageRouter and try to scrub on it
-        expected_log = 'Scrubber - Storage Router {0} is not reachable'.format(storagerouter.ip)
+        expected_log = 'Scrubber unittest - Storage Router {0} is not reachable'.format(storagerouter.ip)
         storagerouter.disks[0].partitions[0].roles = []
         storagerouter.disks[0].partitions[0].save()
         with self.assertRaises(ValueError) as raise_info:
             GenericController.execute_scrub(vdisk_guids=[vdisk.guid], manual=True)
         self.assertIn(member='No scrub locations found',
                       container=raise_info.exception.message)
+        logs = LogHandler._logs.get('lib_generic tasks scrub', [])  # No logging should have happened yet
         self.assertNotIn(member=expected_log,
-                         container=LogHandler._logs['lib_generic tasks'])
+                         container=logs)
 
         # Restore SCRUB partition and make sure StorageRouter is unreachable
         storagerouter.disks[0].partitions[0].roles = [DiskPartition.ROLES.SCRUB]
@@ -316,7 +322,7 @@ class Generic(unittest.TestCase):
         SSHClient._raise_exceptions[storagerouter.ip] = {'users': ['root'], 'exception': UnableToConnectException('No route to host')}
         with self.assertRaises(ValueError):
             GenericController.execute_scrub(vdisk_guids=[vdisk.guid], manual=True)
-        logs = LogHandler._logs['lib_generic tasks']
+        logs = LogHandler._logs['lib_generic tasks scrub']
         self.assertIn(member=expected_log,
                       container=logs)
         self.assertEqual(first=logs[expected_log],
@@ -326,7 +332,9 @@ class Generic(unittest.TestCase):
         SSHClient._raise_exceptions = {}
         with self.assertRaises(Exception) as raise_info:
             GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid, manual=True)
-        self.assertIn(member='StorageRouter {0} - vDisk {1} - Scrubbing failed'.format(storagerouter.name, vdisk.name),
+        # Only one stack would be deployed (one scrub location)
+        expected_log = 'Scrubber unittest - vPool {0} - StorageRouter {1} - Stack 0 - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
+        self.assertIn(member=expected_log,
                       container=raise_info.exception.message)
 
         # Make sure scrubbing succeeds now
@@ -354,6 +362,8 @@ class Generic(unittest.TestCase):
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
         storagerouter_1 = structure['storagerouters'][1]
+        # New scrubbing code changes requires local Storagerouter to be available
+        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
         storagerouter_2 = structure['storagerouters'][2]
         LockedClient.scrub_controller = {'possible_threads': ['execute_scrub_{0}_{1}_0'.format(vpool.guid, storagerouter_1.disks[0].partitions[0].guid),
                                                               'execute_scrub_{0}_{1}_1'.format(vpool.guid, storagerouter_1.disks[0].partitions[0].guid)],
@@ -434,6 +444,8 @@ class Generic(unittest.TestCase):
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
         storagerouter_1 = structure['storagerouters'][1]
+        # # New scrubbing code changes requires local Storagerouter to be available
+        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
         # Have 1 volume as a template, scrubbing should not be triggered on it
         vdisk_t = structure['vdisks'][11]
         vdisk_t.storagedriver_client.set_volume_as_template(volume_id=vdisk_t.volume_id)
@@ -466,8 +478,8 @@ class Generic(unittest.TestCase):
         # Verify all threads have been 'consumed'
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
-        self.assertIn(member='Scrubber - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vpool.name, vdisk_t.guid, vdisk_t.name),
-                      container=LogHandler._logs['lib_generic tasks'])
+        self.assertIn(member='Scrubber unittest - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vpool.name, vdisk_t.guid, vdisk_t.name),
+                      container=LogHandler._logs['lib_generic tasks scrub'])
 
         ##############
         # Scenario 4 #
@@ -486,6 +498,9 @@ class Generic(unittest.TestCase):
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
+        storagerouter_1 = structure['storagerouters'][1]
+        # New scrubbing code changes requires local Storagerouter to be available
+        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
 
         # Amount of actual threads calculation:
         #   - Threads per VPool * vPools * 2 threads per StorageRouter
@@ -536,6 +551,9 @@ class Generic(unittest.TestCase):
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
+        storagerouter_1 = structure['storagerouters'][1]
+        # New scrubbing code changes requires local Storagerouter to be available
+        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
 
         # Amount of actual threads calculation:
         #   - Threads per VPool * vPools * 2 threads per StorageRouter
@@ -607,7 +625,7 @@ class Generic(unittest.TestCase):
         for vdisk_id, vdisk in vdisks.iteritems():
             self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
                                  list2=[])
-        logs = LogHandler._logs['lib_generic tasks']
+        logs = LogHandler._logs['lib_generic tasks scrub']
         for log in logs:
             self.assertNotRegexpMatches(text=log,
                                         unexpected_regexp='.*Scrubber - vPool [{0}|{1}] - StorageRouter {2} - .*'.format(vpools[1].name, vpools[2].name, storagerouters[1].name))
@@ -630,6 +648,9 @@ class Generic(unittest.TestCase):
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
+        storagerouter_1 = structure['storagerouters'][1]
+        # New scrubbing code changes requires local Storagerouter to be available
+        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
 
         # Set amount of stack threads for SR1 to 5 and leave for SR2 to default (2)
         sr_1_threads = 5
@@ -665,11 +686,11 @@ class Generic(unittest.TestCase):
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
         counter = 0
-        for log in LogHandler._logs['lib_generic tasks']:
+        for log in LogHandler._logs['lib_generic tasks scrub']:
             if 'threads for proxy service' in log:
-                match = re.match('^Scrubber - vPool [1|2] - StorageRouter ([1|2]) - .*ovs-albaproxy_.*_scrub', log)
+                match = re.match('^Scrubber unittest - vPool ([1|2]) - StorageRouter ([1|2]) - Stack ([0|1]) - .*ovs-albaproxy.*_scrub', log)
                 self.assertIsNotNone(match)
-                if match.groups()[0] == storagerouters[1].name:
+                if match.groups()[1] == storagerouters[1].name:
                     expected_threads = 5
                 else:
                     expected_threads = 2
@@ -678,7 +699,6 @@ class Generic(unittest.TestCase):
                 counter += 1
         self.assertEqual(first=4,  # Log entry for each combination of 2 vPools and 2 StorageRouters
                          second=counter)
-        # @todo create scrubbing tests which test concurrency
 
     def test_arakoon_collapse(self):
         """

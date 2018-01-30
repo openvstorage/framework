@@ -26,10 +26,10 @@ from time import mktime
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.lib.helpers.decorators import ovs_task
+from ovs.lib.helpers.generic.scrubber import Scrubber
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -200,10 +200,12 @@ class GenericController(object):
         :return: None
         :rtype: NoneType
         """
-        from ovs.lib.helpers.generic.scrubber import Scrubber
         # GenericController.execute_scrub.request.id gets the current celery task id (None if executed directly)
-        # Fetching the task_id with the hasattr because Unittesting does not execute the wrapper (No celery task but a normal function being called)
-        task_id = GenericController.execute_scrub.request.id if hasattr(GenericController.execute_scrub, 'request') else None
+        # Fetching the task_id with the hasattr because Unit testing does not execute the wrapper (No celery task but a normal function being called)
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            task_id = 'unittest'
+        else:
+            task_id = GenericController.execute_scrub.request.id if hasattr(GenericController.execute_scrub, 'request') else None
         scrubber = Scrubber(vpool_guids, vdisk_guids, storagerouter_guid, manual=manual, task_id=task_id)
         return scrubber.execute_scrubbing()
 
@@ -332,11 +334,30 @@ class GenericController(object):
 
 # @todo remove
 if __name__ == '__main__':
+    # from ci.main import Workflow
+    # from ci.api_lib.setup.vdisk import VDiskSetup
+    # w = Workflow()
+    # for i in xrange(0, 25):
+    #     try:
+    #         VDiskSetup.create_vdisk('my_test_{0}'.format(i), 'myvpool01', 1024 ** 3, '10.100.199.211', w.api)
+    #     except:
+    #         print 'Failed to create my_test_{0}'.format(i)
+    from ovs.dal.lists.vdisklist import VDiskList
+    # x = {}
+    # # Split the items in 2 lists for testing
+    # for i, vdisk in enumerate(VDiskList.get_vdisks()):
+    #     j = i % 2
+    #     if j not in x:
+    #         x[j] = []
+    #     x[j].append(vdisk.guid)
     # threads = []
-    # thread = Thread(target=GenericController.execute_scrub,
-    #                args=())
-    # thread.start()
-    # threads.append(thread)
+    # for i, vdisk_guids in x.iteritems():
+    #     thread = Thread(target=GenericController.execute_scrub,
+    #                     args=(), kwargs={'vdisk_guids': vdisk_guids, 'manual': True})
+    #     thread.start()
+    #     time.sleep(10)
+    #     threads.append(thread)
     # for thread in threads:
     #     thread.join()
-    GenericController.execute_scrub()
+    vdisks = [x.guid for x in VDiskList.get_vdisks()[0:10]]
+    GenericController.execute_scrub(vdisk_guids=vdisks, manual=True)
