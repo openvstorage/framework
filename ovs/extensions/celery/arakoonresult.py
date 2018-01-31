@@ -116,7 +116,7 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         return data
 
     def _extract_data_multi(self, keys):
-        return (self._extract_data(data=data) for data in self._client.get_multi(keys))
+        return (self._extract_data(data=data) for data in self._client.get_multi(keys, must_exist=False))
 
     def _set_data(self, key, value):
         """
