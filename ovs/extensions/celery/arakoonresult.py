@@ -105,7 +105,7 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         :return: Extract data or full data
         """
         if key is None and data is None:
-            raise ValueError('Either key or data need to be supplied')
+            return None  # Could be that the supplied data is None when a mget wants to do an unwrapping
         if data is None:
             try:
                 data = self._client.get(key)
