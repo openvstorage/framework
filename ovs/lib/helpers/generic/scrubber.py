@@ -691,7 +691,7 @@ class StackWorker(ScrubShared):
                 # Long polling for the status
                 self._logger.info(self._format_message('Re-using existing proxy service {0}'.format(self.alba_proxy_service)))
                 self._logger.info(self._format_message('Waiting for proxy service {0} to be deployed'.format(self.alba_proxy_service)))
-                self._long_poll_proxy_state(state='deployed')
+                self._long_poll_proxy_state(states=['deployed'])
                 self._logger.info(self._format_message('Proxy service {0} was deployed'.format(self.alba_proxy_service)))
         except Exception:
             message = '{0} - An error occurred deploying ALBA proxy {1}. Removing...'.format(self._log, self.alba_proxy_service)
@@ -714,7 +714,7 @@ class StackWorker(ScrubShared):
         try:
             # No longer using the proxy as we want to remove it
 
-            self._long_poll_proxy_state('deployed')
+            self._long_poll_proxy_state(['deployed'])
             self._set_proxy_state('removing')
             with self._client_cluster_lock:
                 self._logger.info(self._format_message('Removing directory {0}'.format(self.scrub_directory)))
@@ -819,7 +819,8 @@ class Scrubber(ScrubShared):
                         self._logger.error('Assuming StorageRouter {0} is dead. Not scrubbing there'.format(storagerouter.guid))
                         break
                     try:
-                        client = SSHClient(storagerouter, username='root', timeout=30)
+                        # @Todo fix the caching issue of the paramiko client
+                        client = SSHClient(storagerouter, username='root', timeout=30, cached=False)
                     except:
                         self._logger.exception(self._format_message('Unable to connect to StorageRouter {0} - Retrying {1} more times before assuming it is down'.format(storagerouter.guid, max_tries - tries)))
                 if client is not None:
