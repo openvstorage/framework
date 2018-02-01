@@ -53,7 +53,7 @@ class ScrubShared(object):
     """
     _logger = LogHandler.get('lib', name='generic tasks scrub')
 
-    _SCRUB_KEY = 'ovs/framework/jobs/scrub'  # Parent key for all scrub related jobs
+    _SCRUB_KEY = '/ovs/framework/jobs/scrub'  # Parent key for all scrub related jobs
     _SCRUB_NAMESPACE = 'ovs_jobs_scrub'
     _SCRUB_VDISK_KEY = '{0}_{{0}}_vdisks'.format(_SCRUB_NAMESPACE)  # Second format should be the vpool name
     _SCRUB_PROXY_KEY = '{0}_{{0}}'.format(_SCRUB_NAMESPACE)  # Second format should be the proxy name
@@ -70,6 +70,7 @@ class ScrubShared(object):
         self._log = None  # To be overruled
         # used to lock SSHClient usage. SSHClient should be locked as Paramiko will fork the SSHProcess causing some issues in multithreading context
         self._client_lock = file_mutex('{0}_client_lock'.format(self._SCRUB_NAMESPACE))
+        self._client_cluster_lock = volatile_mutex('{0}_client_cluster_lock'.format(self._SCRUB_NAMESPACE), wait=5 * 60)
 
     @property
     def worker_context(self):
@@ -317,13 +318,14 @@ class StackWorkHandler(ScrubShared):
         relevant_work_items, fetched_work_items = self._get_pending_scrub_work()
         item_to_remove = self._wrap_data(vdisk_guid)
         try:
-            self._logger.info(self._format_message('Unregister vDisk {0} - Items before removal: {1}'.format(vdisk_guid, relevant_work_items)))
+            self._logger.info(self._format_message('Unregister vDisk {0}'.format(vdisk_guid)))
             relevant_work_items.remove(item_to_remove)
         except ValueError:
-            message = 'The registering data ({0}) is not in the list. Something must have removed it! (Current items {1})'.format(item_to_remove, relevant_work_items)
+            # Indicates a race condition
+            message = 'The registering data ({0}) is not in the list. Something must have removed it!'.format(item_to_remove)
             self._logger.exception(self._format_message(message))
             raise ValueError(message)
-        self._logger.info(self._format_message('Unregister vDisk {0} - Remaining items: {1}'.format(vdisk_guid, relevant_work_items)))
+        self._logger.info(self._format_message('Unregister vDisk {0}'.format(vdisk_guid)))
         return relevant_work_items, fetched_work_items
 
     def remove_vdisk(self, vdisk_guid, retries=5):
@@ -350,7 +352,7 @@ class StackWorkHandler(ScrubShared):
                            get_value_and_expected_value=_get_value_and_expected_value,
                            logging_start='{0} - Unregistering vDisk {1}'.format(self._log, vdisk_guid),
                            max_retries=retries)
-        self._logger.info(self._format_message('Successfully unregistered vDisk {0} - Remaining items {1}'.format(vdisk_guid, special['relevant_work_items'])))
+        self._logger.info(self._format_message('Successfully unregistered vDisk {0}'.format(vdisk_guid, special['relevant_work_items'])))
         return special['relevant_work_items']
 
 
@@ -358,7 +360,7 @@ class StackWorker(ScrubShared):
     """
     This class represents a worker of the scrubbing stack
     """
-    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number):
+    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number, client):
         """
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
         :type queue: Queue
@@ -378,6 +380,8 @@ class StackWorker(ScrubShared):
         :type stacks_to_spawn: int
         :param stack_number: Number given by the stack spawner
         :type stack_number: int
+        :param client: SSHClient instance
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         """
         super(StackWorker, self).__init__(job_id)
         self.queue = queue
@@ -403,10 +407,10 @@ class StackWorker(ScrubShared):
         self.registering_data = {'job_id': self.job_id, 'stack_id': self.stack_id}  # Data to register within Arakoon about this StackWorker
         self.registering_data.update(self.worker_context)
 
-        self._client = None
         self._log = 'Scrubber {0} - vPool {1} - StorageRouter {2} - Stack {3}'.format(self.job_id, self.vpool.name, self.storagerouter.name, self.stack_number)
         self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_service)
         self._state_key = '{0}_state'.format(self._key)
+        self._client = client
 
     def deploy_stack_and_scrub(self):
         """
@@ -576,13 +580,13 @@ class StackWorker(ScrubShared):
         def _get_value_and_expected_value():
             relevant_work_items, fetched_work_items = self._get_registered_proxy_users()
             try:
-                self._logger.info(self._format_message('Unregister proxy {0} - Items before removal: {1}'.format(self.alba_proxy_service, relevant_work_items)))
+                self._logger.info(self._format_message('Unregister proxy {0}'.format(self.alba_proxy_service)))
                 relevant_work_items.remove(self.registering_data)
             except ValueError:
-                message = 'The registering data ({0}) is not in the list. Something must have removed it! (Current items {1})'.format(self.registering_data, relevant_work_items)
+                message = 'The registering data ({0}) is not in the list. Something must have removed it!'.format(self.registering_data)
                 self._logger.error(self._format_message(message))
                 raise ValueError(message)
-            self._logger.info(self._format_message('Unregister proxy {0} - Remaining items: {1}'.format(self.alba_proxy_service, relevant_work_items)))
+            self._logger.info(self._format_message('Unregister proxy {0}'.format(self.alba_proxy_service)))
             special['relevant_work_items'] = relevant_work_items
             return relevant_work_items, fetched_work_items
 
@@ -594,22 +598,22 @@ class StackWorker(ScrubShared):
                                get_value_and_expected_value=_get_value_and_expected_value,
                                logging_start='{0} - Unregistering proxy {1}'.format(self._log, self.alba_proxy_service),
                                max_retries=self.stacks_to_spawn)
-        self._logger.info(self._format_message('Successfully unregistered proxy {0} - Remaining items'.format(self.alba_proxy_service, special['relevant_work_items'])))
+        self._logger.info(self._format_message('Successfully unregistered proxy {0}'.format(self.alba_proxy_service)))
         return special['relevant_work_items']
 
-    def _long_poll_proxy_state(self, state, timeout=None):
+    def _long_poll_proxy_state(self, states, timeout=None):
         """
         Start long polling for the proxy state. This state is not fetched by the service manager but rather by the threads injecting a key in Arakoon
         This function will return once the requested state has been achieved
-        :param state: State of the key
-        :type state: Possible states are:
+        :param states: States of the key
+        :type states: Possible states are:
         - 'deploying': proxy is still being deployed
         - 'deployed': proxy has been deployed
         - 'removing': proxy is being removed
         - 'removed': proxy has been removed
         :param timeout: Amount of seconds to wait (Defaults to 5 minutes)
-        :return: None
-        :rtype: NoneType
+        :return: Current state
+        :rtype: str
         """
         if timeout is None:
             timeout = self.lock_time
@@ -617,11 +621,11 @@ class StackWorker(ScrubShared):
             start = time.time()
             while True:
                 current_state = self._persistent.get(self._state_key)
-                if current_state == state:
+                if current_state in states:
                     return
                 if time.time() - start > timeout:
                     raise RuntimeError('Long polling for the state has timed out')
-                self._logger.debug(self._format_message('Proxy {0}\'s state does not match \'{1}\'  (Current: {2})'.format(self.alba_proxy_service, state, current_state)))
+                self._logger.debug(self._format_message('Proxy {0}\'s state does not match any in  \'{1}\'  (Current: {2})'.format(self.alba_proxy_service, states, current_state)))
                 time.sleep(1)
         return
 
@@ -646,12 +650,11 @@ class StackWorker(ScrubShared):
             registered_users = self._register_proxy_usage()
             self._logger.info(self._format_message('Current registered users: {0}'.format(registered_users)))
             if len(registered_users) == 1:
-                self._logger.info(self._format_message('Deploying ALBA proxy {0}'.format(self.alba_proxy_service)))
-                self._set_proxy_state('deploying')
                 # First to register, allowed to deploy the proxy
+                self._logger.info(self._format_message('Deploying ALBA proxy {0}'.format(self.alba_proxy_service)))
                 # Check the proxy status - could be that it is removing
-                with self._client_lock:
-                    self._client = SSHClient(self.storagerouter, 'root')
+                self._set_proxy_state('deploying')
+                with self._client_cluster_lock:
                     self._logger.info(self._format_message('Creating directory {0}'.format(self.scrub_directory)))
                     self._client.dir_create(self.scrub_directory)
                     self._client.dir_chmod(self.scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
@@ -668,7 +671,7 @@ class StackWorker(ScrubShared):
                               'CONFIG_PATH': Configuration.get_configuration_path(self.scrub_config_key)}
                     self._service_manager.add_service(name='ovs-albaproxy', params=params, client=self._client, target_name=self.alba_proxy_service)
                     self._service_manager.start_service(name=self.alba_proxy_service, client=self._client)
-                    self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(self.alba_proxy_service, scrub_config)))
+                self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(self.alba_proxy_service, scrub_config)))
                 # Backend config is tied to the proxy, so only need to register while the proxy has to be deployed
                 self._logger.info(self._format_message('Setting up backend config'))
                 backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
@@ -704,15 +707,16 @@ class StackWorker(ScrubShared):
         Removes the proxy that was used
         :return: None
         """
+        proxy_users = self._unregister_proxy_usage()
+        if len(proxy_users) > 0:
+            self._logger.info('{0} - Service {1} still in use by others'.format(self._log, self.alba_proxy_service))
+            return
         try:
             # No longer using the proxy as we want to remove it
-            proxy_users = self._unregister_proxy_usage()
-            if len(proxy_users) > 0:
-                self._logger.info('{0} - Service {1} still in use by others'.format(self._log, self.alba_proxy_service))
-                return
-            with self._client_lock:
-                self._client = SSHClient(self.storagerouter, 'root')
-                self._set_proxy_state('removing')
+
+            self._long_poll_proxy_state('deployed')
+            self._set_proxy_state('removing')
+            with self._client_cluster_lock:
                 self._logger.info(self._format_message('Removing directory {0}'.format(self.scrub_directory)))
                 self._client.dir_delete(self.scrub_directory)
                 self._logger.info(self._format_message('Removing service {0}'.format(self.alba_proxy_service)))
@@ -786,6 +790,7 @@ class Scrubber(ScrubShared):
 
         self.time_start = None
         self.time_end = None
+        self.clients = self.build_clients()
         self.vpool_vdisk_map = self.generate_vpool_vdisk_map(vpool_guids=vpool_guids, vdisk_guids=vdisk_guids, manual=manual)
         self.scrub_locations = self.get_scrub_locations(self.storagerouter_guid)
         self.worker_contexts = self.get_worker_contexts()  # Could give off an outdated view but that would be picked up by the next scrub job
@@ -796,40 +801,63 @@ class Scrubber(ScrubShared):
         self.stacks = {}
         self.stack_threads = []
 
+    def build_clients(self):
+        """
+        Builds SSHClients towards all StorageRouters
+        :return: SSHClient mapped by storagerouter
+        :rtype: dict((storagerouter, sshclient))
+        """
+        clients = {}
+        with self._client_lock:
+            for storagerouter in StorageRouterList.get_storagerouters():
+                client = None
+                tries = 0
+                max_tries = 5
+                while client is None:
+                    tries += 1
+                    if tries > max_tries:
+                        self._logger.error('Assuming StorageRouter {0} is dead. Not scrubbing there'.format(storagerouter.guid))
+                        break
+                    try:
+                        client = SSHClient(storagerouter, username='root', timeout=30)
+                    except:
+                        self._logger.exception(self._format_message('Unable to connect to StorageRouter {0} - Retrying {1} more times before assuming it is down'.format(storagerouter.guid, max_tries - tries)))
+                if client is not None:
+                    clients[storagerouter] = client
+        return clients
+
     def get_worker_contexts(self):
         """
         Retrieves information about the all workers (where it is executed and under what PID)
+        This information is later used to check which data can be discarded (because of interrupted workers)
         :return: Information about the current workers
         :rtype: dict
         """
         workers_context = {}
-        for storagerouter in StorageRouterList.get_storagerouters():
-            with self._client_lock:
+        worker_pid = 0
+        worker_start = None
+        for storagerouter, client in self.clients.iteritems():
+            if os.environ.get('RUNNING_UNITTESTS') == 'True':
+                worker_pid = randint(10000, 65535)
+                worker_start = 'Mon Jan {0} {1}:{2}:00 2018'.format(randint(0, 30), randint(0, 23), randint(0, 59))
+            else:
                 try:
-                    client = SSHClient(storagerouter, username='root')
-                except:
-                    self._logger.warning('Unable to connect to StorageRouter {0}'.format(storagerouter.guid))
-                    continue
-                if os.environ.get('RUNNING_UNITTESTS') == 'True':
-                    worker_pid = randint(10000, 65535)
-                    worker_start = 'Mon Jan {0} {1}:{2}:00 2018'.format(randint(0, 30), randint(0, 23), randint(0, 59))
-                else:
+                    # Retrieve the current start time of the process (used to create a unique key)
+                    # Output of the command:
+                    #                  STARTED   PID
+                    # Mon Jan 22 11:49:04 2018 22287
                     worker_pid = self._service_manager.get_service_pid(name='ovs-workers', client=client)
-                    worker_start = None
                     if worker_pid == 0:
                         self._logger.warning('The workers are down on StorageRouter {0}'.format(storagerouter.guid))
                     else:
-                        try:
-                            # Retrieve the current start time of the process (used to create a unique key)
-                            # Output of the command:
-                            #                  STARTED   PID
-                            # Mon Jan 22 11:49:04 2018 22287
-                            worker_start = client.run(['ps', '-o', 'lstart', '-p', worker_pid]).strip().splitlines()[-1].replace(' ', '-')
-                        except Exception:
-                            self._logger.warning('Unable to retrieve start time of the worker')
+                        worker_start = client.run(['ps', '-o', 'lstart', '-p', worker_pid]).strip().splitlines()[-1].replace(' ', '-')
+                except Exception:
+                    self._logger.exception(self._format_message('Unable to retrieve information about the worker'))
             workers_context[storagerouter] = {'storagerouter_guid': storagerouter.guid,
                                               'worker_pid': worker_pid,
                                               'worker_start': worker_start}
+        if System.get_my_storagerouter() not in workers_context:
+            raise ValueError(self._format_message('The context about the workers on this machine should be known'))
         return workers_context
 
     def execute_scrubbing(self):
@@ -864,6 +892,7 @@ class Scrubber(ScrubShared):
             self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
             for stack_number in xrange(stacks_to_spawn):
                 scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
+                storagerouter = scrub_target['storagerouter']
                 stack_worker = StackWorker(queue=vpool_queue,
                                            vpool=vp,
                                            scrub_info=scrub_target,
@@ -872,7 +901,8 @@ class Scrubber(ScrubShared):
                                            stack_work_handler=stack_work_handler,
                                            job_id=self.job_id,
                                            stacks_to_spawn=stacks_to_spawn,
-                                           stack_number=stack_number)
+                                           stack_number=stack_number,
+                                           client=self.clients[storagerouter])
                 stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                args=())
                 stack.start()
@@ -954,25 +984,25 @@ class Scrubber(ScrubShared):
         :rtype: list[dict]
         """
         scrub_locations = []
-        storagerouters = StorageRouterList.get_storagerouters() if storagerouter_guid is None else [
-            StorageRouter(storagerouter_guid)]
+        storagerouters = StorageRouterList.get_storagerouters() if storagerouter_guid is None else [StorageRouter(storagerouter_guid)]
         for storagerouter in storagerouters:
+            if storagerouter not in self.clients:
+                # StorageRouter is assumed to be dead so not using it as a scrubbing location
+                continue
             scrub_partitions = storagerouter.partition_config.get(DiskPartition.ROLES.SCRUB, [])
             if len(scrub_partitions) == 0:
                 continue
-            with self._client_lock:
-                try:
-                    SSHClient(endpoint=storagerouter, username='root', timeout=30)
-                    for partition_guid in scrub_partitions:
-                        partition = DiskPartition(partition_guid)
-                        self._logger.info(self._format_message('Storage Router {0} has {1} partition at {2}'.format(storagerouter.ip, DiskPartition.ROLES.SCRUB, partition.folder)))
-                        scrub_locations.append({'scrub_path': str(partition.folder),
-                                                'partition_guid': partition.guid,
-                                                'storagerouter': storagerouter})
-                except UnableToConnectException:
-                    self._logger.warning(self._format_message('Storage Router {0} is not reachable'.format(storagerouter.ip)))
-                except Exception:
-                    self._logger.exception(self._format_message('Could not retrieve worker information of Storage Router {0}'.format(storagerouter.ip)))
+            try:
+                for partition_guid in scrub_partitions:
+                    partition = DiskPartition(partition_guid)
+                    self._logger.info(self._format_message('Storage Router {0} has {1} partition at {2}'.format(storagerouter.ip, DiskPartition.ROLES.SCRUB, partition.folder)))
+                    scrub_locations.append({'scrub_path': str(partition.folder),
+                                            'partition_guid': partition.guid,
+                                            'storagerouter': storagerouter})
+            except UnableToConnectException:
+                self._logger.warning(self._format_message('Storage Router {0} is not reachable'.format(storagerouter.ip)))
+            except Exception:
+                self._logger.exception(self._format_message('Could not retrieve worker information of Storage Router {0}'.format(storagerouter.ip)))
 
         if len(scrub_locations) == 0:
             raise ValueError('No scrub locations found, cannot scrub')
@@ -988,7 +1018,7 @@ class Scrubber(ScrubShared):
         try:
             with volatile_mutex('scrubber_clean_entries', wait=30):
                 for key in Configuration.list(self._SCRUB_KEY):
-                    full_key = '{0}/{1}'.format(self._SCRUB_KEY, key)
+                    full_key = os.path.join(self._SCRUB_KEY, key)
                     job_info = Configuration.get('{0}/job_info'.format(full_key))
                     time_start = job_info.get('time_start')
                     time_end = job_info.get('time_end')

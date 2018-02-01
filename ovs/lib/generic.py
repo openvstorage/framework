@@ -26,6 +26,7 @@ from time import mktime
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.lib.helpers.decorators import ovs_task
@@ -41,7 +42,6 @@ class GenericController(object):
     executed at certain intervals and should be self-containing
     """
     _logger = LogHandler.get('lib', name='generic tasks')
-    _SCRUB_KEY = 'ovs/framework/jobs/scrub'  # Parent key for all scrub related jobs
 
     @staticmethod
     @ovs_task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'), ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['ovs.generic.delete_snapshots']})
@@ -339,25 +339,23 @@ if __name__ == '__main__':
     # w = Workflow()
     # for i in xrange(0, 25):
     #     try:
-    #         VDiskSetup.create_vdisk('my_test_{0}'.format(i), 'myvpool01', 1024 ** 3, '10.100.199.211', w.api)
+    #         VDiskSetup.create_vdisk('my_test_{0}'.format(i), 'myvpool01', 1024 ** 3, '10.100.199.171', w.api)
     #     except:
     #         print 'Failed to create my_test_{0}'.format(i)
-    from ovs.dal.lists.vdisklist import VDiskList
-    # x = {}
-    # # Split the items in 2 lists for testing
-    # for i, vdisk in enumerate(VDiskList.get_vdisks()):
-    #     j = i % 2
-    #     if j not in x:
-    #         x[j] = []
-    #     x[j].append(vdisk.guid)
-    # threads = []
-    # for i, vdisk_guids in x.iteritems():
-    #     thread = Thread(target=GenericController.execute_scrub,
-    #                     args=(), kwargs={'vdisk_guids': vdisk_guids, 'manual': True})
-    #     thread.start()
-    #     time.sleep(10)
-    #     threads.append(thread)
-    # for thread in threads:
-    #     thread.join()
-    vdisks = [x.guid for x in VDiskList.get_vdisks()[0:10]]
-    GenericController.execute_scrub(vdisk_guids=vdisks, manual=True)
+    x = {}
+    # Split the items in 2 lists for testing
+    for i, vdisk in enumerate(VDiskList.get_vdisks()):
+        j = i % 2
+        if j not in x:
+            x[j] = []
+        x[j].append(vdisk.guid)
+    threads = []
+    for i, vdisk_guids in x.iteritems():
+        thread = Thread(target=GenericController.execute_scrub,
+                        args=(), kwargs={'vdisk_guids': vdisk_guids, 'manual': True})
+        thread.start()
+        threads.append(thread)
+    for thread in threads:
+        thread.join()
+    # vdisks = [x.guid for x in VDiskList.get_vdisks()[0:10]]
+    # GenericController.execute_scrub(vdisk_guids=vdisks, manual=True)
