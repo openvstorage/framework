@@ -612,7 +612,7 @@ class StackWorker(ScrubShared):
         - 'removing': proxy is being removed
         - 'removed': proxy has been removed
         :param timeout: Amount of seconds to wait (Defaults to 5 minutes)
-        :return: Current state
+        :return: Current state or None (when the given key does not exist)
         :rtype: str
         """
         if timeout is None:
@@ -622,12 +622,12 @@ class StackWorker(ScrubShared):
             while True:
                 current_state = self._persistent.get(self._state_key)
                 if current_state in states:
-                    return
+                    return current_state
                 if time.time() - start > timeout:
                     raise RuntimeError('Long polling for the state has timed out')
                 self._logger.debug(self._format_message('Proxy {0}\'s state does not match any in  \'{1}\'  (Current: {2})'.format(self.alba_proxy_service, states, current_state)))
                 time.sleep(1)
-        return
+        return None
 
     def _set_proxy_state(self, state):
         """
