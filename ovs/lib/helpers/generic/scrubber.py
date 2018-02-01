@@ -360,7 +360,7 @@ class StackWorker(ScrubShared):
     """
     This class represents a worker of the scrubbing stack
     """
-    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number, client):
+    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number):
         """
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
         :type queue: Queue
@@ -380,8 +380,6 @@ class StackWorker(ScrubShared):
         :type stacks_to_spawn: int
         :param stack_number: Number given by the stack spawner
         :type stack_number: int
-        :param client: SSHClient instance
-        :type client: ovs.extensions.generic.sshclient.SSHClient
         """
         super(StackWorker, self).__init__(job_id)
         self.queue = queue
@@ -410,7 +408,6 @@ class StackWorker(ScrubShared):
         self._log = 'Scrubber {0} - vPool {1} - StorageRouter {2} - Stack {3}'.format(self.job_id, self.vpool.name, self.storagerouter.name, self.stack_number)
         self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_service)
         self._state_key = '{0}_state'.format(self._key)
-        self._client = client
 
     def deploy_stack_and_scrub(self):
         """
@@ -656,11 +653,12 @@ class StackWorker(ScrubShared):
                 self._set_proxy_state('deploying')
                 with self._client_cluster_lock:
                     self._logger.info(self._format_message('Creating directory {0}'.format(self.scrub_directory)))
-                    self._client.dir_create(self.scrub_directory)
-                    self._client.dir_chmod(self.scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
-                    machine_id = System.get_my_machine_id(self._client)
+                    client = SSHClient(self.storagerouter, 'root', cached=False)  # Explicitly request a new connection here
+                    client.dir_create(self.scrub_directory)
+                    client.dir_chmod(self.scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
+                    machine_id = System.get_my_machine_id(client)
                     port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
-                    port = System.get_free_ports(selected_range=port_range, nr=1, client=self._client)[0]
+                    port = System.get_free_ports(selected_range=port_range, nr=1, client=client)[0]
                     scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(self.vpool.guid))
                     scrub_config['port'] = port
                     scrub_config['transport'] = 'tcp'
@@ -669,8 +667,8 @@ class StackWorker(ScrubShared):
                     params = {'VPOOL_NAME': self.vpool.name,
                               'LOG_SINK': LogHandler.get_sink_path(self.alba_proxy_service),
                               'CONFIG_PATH': Configuration.get_configuration_path(self.scrub_config_key)}
-                    self._service_manager.add_service(name='ovs-albaproxy', params=params, client=self._client, target_name=self.alba_proxy_service)
-                    self._service_manager.start_service(name=self.alba_proxy_service, client=self._client)
+                    self._service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=self.alba_proxy_service)
+                    self._service_manager.start_service(name=self.alba_proxy_service, client=client)
                 self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(self.alba_proxy_service, scrub_config)))
                 # Backend config is tied to the proxy, so only need to register while the proxy has to be deployed
                 self._logger.info(self._format_message('Setting up backend config'))
@@ -718,12 +716,13 @@ class StackWorker(ScrubShared):
             self._set_proxy_state('removing')
             with self._client_cluster_lock:
                 self._logger.info(self._format_message('Removing directory {0}'.format(self.scrub_directory)))
-                self._client.dir_delete(self.scrub_directory)
+                client = SSHClient(self.storagerouter, 'root', cached=False)  # Explicitly ask for a new connection here
+                client.dir_delete(self.scrub_directory)
                 self._logger.info(self._format_message('Removing service {0}'.format(self.alba_proxy_service)))
-                if self._service_manager.has_service(self.alba_proxy_service, client=self._client) is True:
-                    if self._service_manager.get_service_status(name=self.alba_proxy_service,client=self._client) == 'active':
-                        self._service_manager.stop_service(self.alba_proxy_service, client=self._client)
-                    self._service_manager.remove_service(self.alba_proxy_service, client=self._client)
+                if self._service_manager.has_service(self.alba_proxy_service, client=client) is True:
+                    if self._service_manager.get_service_status(name=self.alba_proxy_service, client=client) == 'active':
+                        self._service_manager.stop_service(self.alba_proxy_service, client=client)
+                    self._service_manager.remove_service(self.alba_proxy_service, client=client)
             if Configuration.exists(self.scrub_config_key):
                 Configuration.delete(self.scrub_config_key)
             self._logger.info('{0} - Removed service {1}'.format(self._log, self.alba_proxy_service))
@@ -819,7 +818,7 @@ class Scrubber(ScrubShared):
                         self._logger.error('Assuming StorageRouter {0} is dead. Not scrubbing there'.format(storagerouter.guid))
                         break
                     try:
-                        # @Todo fix the caching issue of the paramiko client
+                        # Requesting new client to avoid races (if the same worker would build the clients again)
                         client = SSHClient(storagerouter, username='root', timeout=30, cached=False)
                     except:
                         self._logger.exception(self._format_message('Unable to connect to StorageRouter {0} - Retrying {1} more times before assuming it is down'.format(storagerouter.guid, max_tries - tries)))
@@ -893,7 +892,6 @@ class Scrubber(ScrubShared):
             self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
             for stack_number in xrange(stacks_to_spawn):
                 scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
-                storagerouter = scrub_target['storagerouter']
                 stack_worker = StackWorker(queue=vpool_queue,
                                            vpool=vp,
                                            scrub_info=scrub_target,
@@ -902,8 +900,7 @@ class Scrubber(ScrubShared):
                                            stack_work_handler=stack_work_handler,
                                            job_id=self.job_id,
                                            stacks_to_spawn=stacks_to_spawn,
-                                           stack_number=stack_number,
-                                           client=self.clients[storagerouter])
+                                           stack_number=stack_number)
                 stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                args=())
                 stack.start()

@@ -330,32 +330,3 @@ class GenericController(object):
         """
         for fct in Toolbox.fetch_hooks('backend', 'domains-update'):
             fct(backend_guid=backend_guid)
-
-
-# @todo remove
-if __name__ == '__main__':
-    # from ci.main import Workflow
-    # from ci.api_lib.setup.vdisk import VDiskSetup
-    # w = Workflow()
-    # for i in xrange(0, 25):
-    #     try:
-    #         VDiskSetup.create_vdisk('my_test_{0}'.format(i), 'myvpool01', 1024 ** 3, '10.100.199.171', w.api)
-    #     except:
-    #         print 'Failed to create my_test_{0}'.format(i)
-    x = {}
-    # Split the items in 2 lists for testing
-    for i, vdisk in enumerate(VDiskList.get_vdisks()):
-        j = i % 2
-        if j not in x:
-            x[j] = []
-        x[j].append(vdisk.guid)
-    threads = []
-    for i, vdisk_guids in x.iteritems():
-        thread = Thread(target=GenericController.execute_scrub,
-                        args=(), kwargs={'vdisk_guids': vdisk_guids, 'manual': True})
-        thread.start()
-        threads.append(thread)
-    for thread in threads:
-        thread.join()
-    # vdisks = [x.guid for x in VDiskList.get_vdisks()[0:10]]
-    # GenericController.execute_scrub(vdisk_guids=vdisks, manual=True)
