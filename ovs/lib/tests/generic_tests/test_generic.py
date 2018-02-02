@@ -32,10 +32,12 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.threadhelpers import Waiter
+from ovs_extensions.services.mockups.systemd import SystemdMock
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
+from ovs.lib.helpers.generic.scrubber import ScrubShared
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
 
@@ -281,6 +283,15 @@ class Generic(unittest.TestCase):
         * Scenario 6: Configure amount of threads per StorageRouter to 5 for SR1
                       2 vPools, 20 vDisks, 2 scrub roles
                       Validate expected amount of threads is spawned
+        * Scenario 7: 2 vPools, 20 vDisks, 2 scrub roles
+                      Validate special conditions that can occur
+                      - Proxy deployment fail (No thread should should and all should fail)
+                      - Proxy removal fail after scrub (All threads will try to clean up the proxy)
+        * Scenario 8: 2 vPools, 20 vDisks, 2 scrub roles
+                      Validate race condition handling
+                      - Validate that proxies will be re-used
+                      - Validate that already queued items won't be scrubbed again
+                      - Validate that proxies won't be removed when still in use
         """
         ##############
         # Scenario 1 #
@@ -292,11 +303,10 @@ class Generic(unittest.TestCase):
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
+        self._prepare_scrubbing(structure)
         vdisk = structure['vdisks'][1]
         storagerouter = structure['storagerouters'][1]
         vpool = structure['vpools'][1]
-        # New scrubbing code changes requires local Storagerouter to be available
-        System._machine_id['none'] = System._machine_id[storagerouter.ip]
         LockedClient.scrub_controller = {'possible_threads': None,
                                          'volumes': {},
                                          'waiter': Waiter(1)}
@@ -304,7 +314,7 @@ class Generic(unittest.TestCase):
                                                                      'scrub_work': [0]}
 
         # Remove SCRUB partition from StorageRouter and try to scrub on it
-        expected_log = 'Scrubber unittest - Storage Router {0} is not reachable'.format(storagerouter.ip)
+        expected_log = 'Scrubber unittest - Assuming StorageRouter {0} is dead. Not scrubbing there'.format(storagerouter.ip)
         storagerouter.disks[0].partitions[0].roles = []
         storagerouter.disks[0].partitions[0].save()
         with self.assertRaises(ValueError) as raise_info:
@@ -326,14 +336,15 @@ class Generic(unittest.TestCase):
         self.assertIn(member=expected_log,
                       container=logs)
         self.assertEqual(first=logs[expected_log],
-                         second='warning')
+                         second='error')
 
         # Now actually attempt to scrub
+        # The scrub should fail as no result has been set for the vDisks
         SSHClient._raise_exceptions = {}
         with self.assertRaises(Exception) as raise_info:
             GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid, manual=True)
-        # Only one stack would be deployed (one scrub location)
-        expected_log = 'Scrubber unittest - vPool {0} - StorageRouter {1} - Stack 0 - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
+        # Only one stack would be deployed (one scrub location) and only one thread (one vDisk)
+        expected_log = 'Scrubber unittest - vPool {0} - StorageRouter {1} - Stack 0 - Scrubbing thread 0 - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
         self.assertIn(member=expected_log,
                       container=raise_info.exception.message)
 
@@ -349,8 +360,7 @@ class Generic(unittest.TestCase):
         ##############
         # Scenario 2 #
         ##############
-        self.volatile._clean()
-        self.persistent._clean()
+        self._clean_scrubbing_test()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
@@ -359,11 +369,10 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
+        self._prepare_scrubbing(structure)
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
         storagerouter_1 = structure['storagerouters'][1]
-        # New scrubbing code changes requires local Storagerouter to be available
-        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
         storagerouter_2 = structure['storagerouters'][2]
         LockedClient.scrub_controller = {'possible_threads': ['execute_scrub_{0}_{1}_0'.format(vpool.guid, storagerouter_1.disks[0].partitions[0].guid),
                                                               'execute_scrub_{0}_{1}_1'.format(vpool.guid, storagerouter_1.disks[0].partitions[0].guid)],
@@ -432,8 +441,7 @@ class Generic(unittest.TestCase):
         ##############
         # Scenario 3 #
         ##############
-        self.volatile._clean()
-        self.persistent._clean()
+        self._clean_scrubbing_test()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],  # vPool 2 has no vDisks attached to it
              'vdisks': [(i, 1, 1, 1) for i in xrange(1, 12)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
@@ -441,11 +449,10 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2, 3, 4],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
+        self._prepare_scrubbing(structure)
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
         storagerouter_1 = structure['storagerouters'][1]
-        # # New scrubbing code changes requires local Storagerouter to be available
-        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
         # Have 1 volume as a template, scrubbing should not be triggered on it
         vdisk_t = structure['vdisks'][11]
         vdisk_t.storagedriver_client.set_volume_as_template(volume_id=vdisk_t.volume_id)
@@ -484,8 +491,7 @@ class Generic(unittest.TestCase):
         ##############
         # Scenario 4 #
         ##############
-        self.volatile._clean()
-        self.persistent._clean()
+        self._clean_scrubbing_test()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2, 3],
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
@@ -495,13 +501,10 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2, 3, 4, 5],
              'storagedrivers': [(1, 1, 1), (2, 2, 1), (3, 3, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
+        self._prepare_scrubbing(structure)
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
-        storagerouter_1 = structure['storagerouters'][1]
-        # New scrubbing code changes requires local Storagerouter to be available
-        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
-
         # Amount of actual threads calculation:
         #   - Threads per VPool * vPools * 2 threads per StorageRouter
         #   - Threads per vPool is 2 when 3 vPools and 5 StorageRouters
@@ -538,8 +541,7 @@ class Generic(unittest.TestCase):
         ##############
         # Scenario 5 #
         ##############
-        self.volatile._clean()
-        self.persistent._clean()
+        self._clean_scrubbing_test()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              'vdisks': [(1, 1, 1, 1), (2, 2, 1, 2), (3, 3, 2, 3), (4, 4, 2, 4),
@@ -548,13 +550,10 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
+        self._prepare_scrubbing(structure)
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
-        storagerouter_1 = structure['storagerouters'][1]
-        # New scrubbing code changes requires local Storagerouter to be available
-        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
-
         # Amount of actual threads calculation:
         #   - Threads per VPool * vPools * 2 threads per StorageRouter
         #   - Threads per vPool is 2 when 2 vPools and 2 StorageRouters
@@ -628,13 +627,12 @@ class Generic(unittest.TestCase):
         logs = LogHandler._logs['lib_generic tasks scrub']
         for log in logs:
             self.assertNotRegexpMatches(text=log,
-                                        unexpected_regexp='.*Scrubber - vPool [{0}|{1}] - StorageRouter {2} - .*'.format(vpools[1].name, vpools[2].name, storagerouters[1].name))
+                                        unexpected_regexp='.*Scrubber unittest - vPool [{0}|{1}] - StorageRouter {2} - .*'.format(vpools[1].name, vpools[2].name, storagerouters[1].name))
 
         ##############
         # Scenario 6 #
         ##############
-        self.volatile._clean()
-        self.persistent._clean()
+        self._clean_scrubbing_test()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
@@ -645,13 +643,10 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
+        self._prepare_scrubbing(structure)
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
-        storagerouter_1 = structure['storagerouters'][1]
-        # New scrubbing code changes requires local Storagerouter to be available
-        System._machine_id['none'] = System._machine_id[storagerouter_1.ip]
-
         # Set amount of stack threads for SR1 to 5 and leave for SR2 to default (2)
         sr_1_threads = 5
         sr_2_threads = 2
@@ -699,6 +694,75 @@ class Generic(unittest.TestCase):
                 counter += 1
         self.assertEqual(first=4,  # Log entry for each combination of 2 vPools and 2 StorageRouters
                          second=counter)
+
+        ##############
+        # Scenario 7 #
+        ##############
+        def _raise_exception(message):
+            raise RuntimeError(message)
+
+        self._clean_scrubbing_test()
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1, 2],
+             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
+                        (6, 2, 1, 2), (7, 2, 1, 2), (8, 2, 1, 2), (9, 2, 1, 2), (10, 2, 1, 2),
+                        (11, 3, 2, 3), (12, 3, 2, 3), (13, 3, 2, 3), (14, 3, 2, 3), (15, 3, 2, 3),
+                        (16, 4, 2, 4), (17, 4, 2, 4), (18, 4, 2, 4), (19, 4, 2, 4), (20, 4, 2, 4)],
+             # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)],  # (<id>, <storagedriver_id>)
+             'storagerouters': [1, 2],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        self._prepare_scrubbing(structure)
+        vpools = structure['vpools']
+        vdisks = structure['vdisks']
+        storagerouters = structure['storagerouters']
+        # Amount of actual threads calculation:
+        #   - Threads per VPool * vPools * 2 threads per StorageRouter
+        #   - Threads per vPool is 2 when 2 vPools and 2 StorageRouters
+        #   - Amount of threads that will be created: 2 * 2 * 2 = 8
+        # Amount of possible threads calculation:
+        #   - vPools * StorageRouters * 2 threads per StorageRouter
+        #   - Amount of possible threads to be created: 2 * 2 * 2 = 8
+        thread_names = []
+        for vpool in vpools.values():
+            for storagerouter in storagerouters.values():
+                for partition in storagerouter.disks[0].partitions:
+                    for index in range(2):
+                        thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition.guid, index))
+        LockedClient.scrub_controller = {'possible_threads': thread_names,
+                                         'volumes': {},
+                                         'waiter': Waiter(len(thread_names))}
+
+        # Scrub all volumes
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
+                                                                         'scrub_work': range(vdisk_id)}
+        # Insert some hooks to create some failure cases
+        hooks = {'post_proxy_deployment': lambda x: _raise_exception('Simulated proxy deployment failure')}
+        ScrubShared._test_hooks.update(hooks)
+        # No scrubbing should have taken place
+        with self.assertRaises(Exception) as raise_info:
+            GenericController.execute_scrub(vdisk_guids=[vdisk.guid], manual=True)
+        # Todo more asserting (check if no vdisks were deployed and check cleanup message)
+
+        ##############
+        # Scenario 8 #
+        ##############
+        self._clean_scrubbing_test()
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1, 2],
+             # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
+                        (6, 2, 1, 2), (7, 2, 1, 2), (8, 2, 1, 2), (9, 2, 1, 2), (10, 2, 1, 2),
+                        (11, 3, 2, 3), (12, 3, 2, 3), (13, 3, 2, 3), (14, 3, 2, 3), (15, 3, 2, 3),
+                        (16, 4, 2, 4), (17, 4, 2, 4), (18, 4, 2, 4), (19, 4, 2, 4), (20, 4, 2, 4)],
+             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)],  # (<id>, <storagedriver_id>)
+             'storagerouters': [1, 2],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        # @todo implement hooking to run the specified scenario
+        self._prepare_scrubbing(structure)
 
     def test_arakoon_collapse(self):
         """
@@ -1013,3 +1077,47 @@ class Generic(unittest.TestCase):
     @staticmethod
     def _from_timestamp(timestamp):
         return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+
+    @classmethod
+    def _prepare_scrubbing(cls, dal_structure):
+        """
+        Prepare everything related to scrubbing
+        - Setup worker services
+        - Setup System.get_my_storagerouter
+        :param dal_structure: The built DAL structure for the case
+        :return: None
+        :rtype: NoneType
+        """
+        storagerouter = dal_structure['storagerouters'][1]
+        # New scrubbing code changes requires local Storagerouter to be available
+        System._machine_id['none'] = System._machine_id[storagerouter.ip]
+        # Setup worker information
+        cls._setup_worker_service(dal_structure['storagerouters'].values())
+
+    @staticmethod
+    def _setup_worker_service(storagerouters):
+        """
+        Sets mocked ovs-worker service
+        :param storagerouters: StorageRouter to setup workers for
+        :type storagerouters: list
+        :return: None
+        :rtype: NoneType
+        """
+        service_name = 'ovs-workers'
+        service_manager = ServiceFactory.get_manager()
+        for storagerouter in storagerouters:
+            client = SSHClient(storagerouter, 'root')
+            service_manager.add_service(service_name, client)
+            service_manager.start_service(service_name, client)
+
+    def _clean_scrubbing_test(self):
+        """
+        Clean all affected items for scrubbing
+        :return: None
+        :rtype: NoneType
+        """
+        self.volatile._clean()
+        self.persistent._clean()
+        SystemdMock._clean()
+        Configuration._unittest_data = {}
+        ScrubShared._test_hooks = {}

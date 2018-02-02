@@ -51,6 +51,9 @@ class ScrubShared(object):
     """
     Class which has functions to ensure consistency
     """
+    # Test hooks for unit tests
+    _test_hooks = {}
+
     _logger = LogHandler.get('lib', name='generic tasks scrub')
 
     _SCRUB_KEY = '/ovs/framework/jobs/scrub'  # Parent key for all scrub related jobs
@@ -61,6 +64,7 @@ class ScrubShared(object):
     def __init__(self, job_id):
         self.job_id = job_id
         self._persistent = PersistentFactory.get_client()
+        self._volatile = VolatileFactory.get_client()
         self._service_manager = ServiceFactory.get_manager()
 
         # Required to be overruled
@@ -209,6 +213,7 @@ class StackWorkHandler(ScrubShared):
     """
     Handles generation, unregistering and saving of vpool stack work
     """
+
     def __init__(self, job_id, vpool, vdisks, worker_contexts):
         """
         Initialize
@@ -328,7 +333,7 @@ class StackWorkHandler(ScrubShared):
         self._logger.info(self._format_message('Unregister vDisk {0}'.format(vdisk_guid)))
         return relevant_work_items, fetched_work_items
 
-    def remove_vdisk(self, vdisk_guid, retries=5):
+    def remove_vdisk(self, vdisk_guid, retries=25):
         """
         Safely removes a vdisk from the pool
         :param vdisk_guid: Guid of the vDisk to remove
@@ -360,6 +365,7 @@ class StackWorker(ScrubShared):
     """
     This class represents a worker of the scrubbing stack
     """
+
     def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number):
         """
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
@@ -422,44 +428,41 @@ class StackWorker(ScrubShared):
             self.error_messages.append('vPool {0} does not have any valid StorageDrivers configured'.format(self.vpool.name))
             return
 
-        try:
-            # Deploy a proxy
-            self._deploy_proxy()
+        # Deploy a proxy
+        self._deploy_proxy()
 
-            # Execute the actual scrubbing
-            threads = []
-            threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
-            amount_threads = Configuration.get(key=threads_key) if Configuration.exists(key=threads_key) else 2
-            if not isinstance(amount_threads, int):
-                self.error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
-                return
+        # Execute the actual scrubbing
+        threads = []
+        threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
+        amount_threads = Configuration.get(key=threads_key) if Configuration.exists(key=threads_key) else 2
+        if not isinstance(amount_threads, int):
+            self.error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
+            return
 
-            amount_threads = max(amount_threads, 1)  # Make sure amount_threads is at least 1
-            amount_threads = min(min(self.queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
-            self._logger.info('{0} - Spawning {1} threads for proxy service {2}'.format(self._log, amount_threads, self.alba_proxy_service))
-            for index in range(amount_threads):
-                thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(self.vpool.guid, self.partition_guid, index),
-                                target=self._execute_scrub,
-                                args=())
-                thread.start()
-                threads.append(thread)
-            for thread in threads:
-                thread.join()
+        amount_threads = max(amount_threads, 1)  # Make sure amount_threads is at least 1
+        amount_threads = min(min(self.queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
+        self._logger.info('{0} - Spawning {1} threads for proxy service {2}'.format(self._log, amount_threads, self.alba_proxy_service))
+        for index in range(amount_threads):
+            # Name the threads for unit testing purposes
+            thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(self.vpool.guid, self.partition_guid, index),
+                            target=self._execute_scrub,
+                            args=(index,))
+            thread.start()
+            threads.append(thread)
+        for thread in threads:
+            thread.join()
 
-            # Delete the proxy again
-            self._remove_proxy()
-        finally:
-            pass
-            # # Attempt to remove all registered items
-            # for vdisk_guid in self.queue.queue:
-            #     self.stack_work_handler.remove_vdisk(vdisk_guid)
+        # Delete the proxy again
+        self._remove_proxy()
 
-    def _execute_scrub(self):
+    def _execute_scrub(self, thread_number):
         """
         Executes the actual scrubbing
         - Ask the Volumedriver what scrub work is to be done
         - Ask to Volumedriver to do scrub work
         - Ask the Volumedriver to apply this work (when not applied, scrubbing leaves garbage on the backend)
+        :param thread_number: Number of the Thread that is executing the scrubbing
+        :type thread_number: int
         :return: None
         :rtype: NoneType
         """
@@ -469,8 +472,7 @@ class StackWorker(ScrubShared):
             if len(vdisk_configs) == 0:
                 raise RuntimeError('Could not load MDS configuration')
             return vdisk_configs
-
-        volatile_client = VolatileFactory.get_client()
+        log = '{0} - Scrubbing thread {1}'.format(self._log, thread_number)
         try:
             # Empty the queue with vDisks to scrub
             with remote(self.storagerouter.ip, [VDisk]) as rem:
@@ -481,25 +483,25 @@ class StackWorker(ScrubShared):
                     try:
                         # Check MDS master is local. Trigger MDS handover if necessary
                         vdisk = rem.VDisk(vdisk_guid)
-                        self._logger.info('{0} - vDisk {1} - Started scrubbing at location {2}'.format(self._log, vdisk.name, self.scrub_directory))
+                        self._logger.info('{0} - vDisk {1} - Started scrubbing at location {2}'.format(log, vdisk.name, self.scrub_directory))
                         configs = _verify_mds_config(current_vdisk=vdisk)
                         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
                         if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                            self._logger.info('{0} - vDisk {1} - MDS master is not local, trigger handover'.format(self._log, vdisk.name))
+                            self._logger.info('{0} - vDisk {1} - MDS master is not local, trigger handover'.format(log, vdisk.name))
                             MDSServiceController.ensure_safety(vdisk_guid=vdisk_guid)  # Do not use a remote VDisk instance here
                             configs = _verify_mds_config(current_vdisk=vdisk)
                             if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                                self._logger.warning('{0} - vDisk {1} - Skipping because master MDS still not local'.format(self._log, vdisk.name))
+                                self._logger.warning('{0} - vDisk {1} - Skipping because master MDS still not local'.format(log, vdisk.name))
                                 continue
 
                         # Check if vDisk is already being scrubbed
-                        if volatile_client.add(key=volatile_key, value=volatile_key, time=24 * 60 * 60) is False:
-                            self._logger.warning('{0} - vDisk {1} - Skipping because vDisk is already being scrubbed'.format(self._log, vdisk.name))
+                        if self._volatile.add(key=volatile_key, value=volatile_key, time=24 * 60 * 60) is False:
+                            self._logger.warning('{0} - vDisk {1} - Skipping because vDisk is already being scrubbed'.format(log, vdisk.name))
                             continue
 
                         # Do the actual scrubbing
                         with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
-                            self._logger.info('{0} - vDisk {1} - Retrieve and apply scrub work'.format(self._log, vdisk.name))
+                            self._logger.info('{0} - vDisk {1} - Retrieve and apply scrub work'.format(log, vdisk.name))
                             work_units = locked_client.get_scrubbing_workunits()
                             for work_unit in work_units:
                                 res = locked_client.scrub(work_unit=work_unit,
@@ -508,25 +510,25 @@ class StackWorker(ScrubShared):
                                                           backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                             if work_units:
-                                self._logger.info('{0} - vDisk {1} - {2} work units successfully applied'.format(self._log, vdisk.name, len(work_units)))
+                                self._logger.info('{0} - vDisk {1} - {2} work units successfully applied'.format(log, vdisk.name, len(work_units)))
                             else:
-                                self._logger.info('{0} - vDisk {1} - No scrubbing required'.format(self._log, vdisk.name))
+                                self._logger.info('{0} - vDisk {1} - No scrubbing required'.format(log, vdisk.name))
                     except Exception:
                         if vdisk is None:
-                            message = '{0} - vDisk with guid {1} could not be found'.format(self._log, vdisk_guid)
+                            message = '{0} - vDisk with guid {1} could not be found'.format(log, vdisk_guid)
                         else:
-                            message = '{0} - vDisk {1} - Scrubbing failed'.format(self._log, vdisk.name)
+                            message = '{0} - vDisk {1} - Scrubbing failed'.format(log, vdisk.name)
                         self.error_messages.append(message)
                         self._logger.exception(message)
                     finally:
                         # Remove vDisk from volatile memory and scrub work
-                        volatile_client.delete(volatile_key)
-                        self.stack_work_handler.remove_vdisk(vdisk_guid, self.queue_size)
+                        self._volatile.delete(volatile_key)
+                        self.stack_work_handler.remove_vdisk(vdisk_guid)
 
         except Empty:  # Raised when all items have been fetched from the queue
-            self._logger.info('{0} - Queue completely processed'.format(self._log))
+            self._logger.info('{0} - Queue completely processed'.format(log))
         except Exception:
-            message = '{0} - Scrubbing failed'.format(self._log)
+            message = '{0} - Scrubbing failed'.format(log)
             self.error_messages.append(message)
             self._logger.exception(message)
 
@@ -577,13 +579,11 @@ class StackWorker(ScrubShared):
         def _get_value_and_expected_value():
             relevant_work_items, fetched_work_items = self._get_registered_proxy_users()
             try:
-                self._logger.info(self._format_message('Unregister proxy {0}'.format(self.alba_proxy_service)))
                 relevant_work_items.remove(self.registering_data)
             except ValueError:
                 message = 'The registering data ({0}) is not in the list. Something must have removed it!'.format(self.registering_data)
                 self._logger.error(self._format_message(message))
                 raise ValueError(message)
-            self._logger.info(self._format_message('Unregister proxy {0}'.format(self.alba_proxy_service)))
             special['relevant_work_items'] = relevant_work_items
             return relevant_work_items, fetched_work_items
 
@@ -663,7 +663,6 @@ class StackWorker(ScrubShared):
                     scrub_config['port'] = port
                     scrub_config['transport'] = 'tcp'
                     Configuration.set(self.scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
-
                     params = {'VPOOL_NAME': self.vpool.name,
                               'LOG_SINK': LogHandler.get_sink_path(self.alba_proxy_service),
                               'CONFIG_PATH': Configuration.get_configuration_path(self.scrub_config_key)}
@@ -684,35 +683,41 @@ class StackWorker(ScrubShared):
                 # Copy backend connection manager information in separate key
                 Configuration.set(self.backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
                 self._logger.info(self._format_message('Backend config was set up'))
+
+                if 'post_proxy_deployment' in self._test_hooks:
+                    self._test_hooks['post_proxy_deployment'](self)
+
                 self._set_proxy_state('deployed')
             else:
                 # Long polling for the status
                 self._logger.info(self._format_message('Re-using existing proxy service {0}'.format(self.alba_proxy_service)))
-                self._logger.info(self._format_message('Waiting for proxy service {0} to be deployed'.format(self.alba_proxy_service)))
-                self._long_poll_proxy_state(states=['deployed'])
+                self._logger.info(self._format_message('Waiting for proxy service {0} to be deployed by another worker'.format(self.alba_proxy_service)))
+                proxy_state = self._long_poll_proxy_state(states=['deployed', 'removed'])
+                if proxy_state == 'removed':  # A different worker has tried to remove and might or might not have succeeded
+                        raise RuntimeError(self._format_message('Proxy service {0} deployment failed with another worker'.format(self.alba_proxy_service)))
                 self._logger.info(self._format_message('Proxy service {0} was deployed'.format(self.alba_proxy_service)))
         except Exception:
-            message = '{0} - An error occurred deploying ALBA proxy {1}. Removing...'.format(self._log, self.alba_proxy_service)
+            message = '{0} - An error occurred deploying ALBA proxy {1}'.format(self._log, self.alba_proxy_service)
             self.error_messages.append(message)
             self._logger.exception(message)
-            # Locking the removal here because others might register a proxy to be used
-            self._remove_proxy()
-            # No proxy could be set so no scrubbing would be able to happen
-            raise
+            self._remove_proxy(force=True)
+            raise  # No proxy could be set so no scrubbing could happen for this worker
 
-    def _remove_proxy(self):
+    def _remove_proxy(self, force=False):
         """
         Removes the proxy that was used
+        :param force: Force removal. This will skip all the check of registered user.
+        Should be set to True when deployment failed to re-deploy the proxy by a different worker
         :return: None
+        :rtype: None
         """
-        proxy_users = self._unregister_proxy_usage()
-        if len(proxy_users) > 0:
-            self._logger.info('{0} - Service {1} still in use by others'.format(self._log, self.alba_proxy_service))
-            return
+        proxy_users = self._unregister_proxy_usage()  # Always unregister the usage
+        if force is False:
+            if len(proxy_users) > 0:
+                self._logger.info('{0} - Cannot remove service {1} as it is still in use by others'.format(self._log, self.alba_proxy_service))
+                return
         try:
             # No longer using the proxy as we want to remove it
-
-            self._long_poll_proxy_state(['deployed'])
             self._set_proxy_state('removing')
             with self._client_cluster_lock:
                 self._logger.info(self._format_message('Removing directory {0}'.format(self.scrub_directory)))
@@ -748,6 +753,7 @@ class Scrubber(ScrubShared):
       - Keep internal track of items to scrub
     - Cleanup stale job entries
     """
+
     _KEY_LIFETIME = 7 * 24 * 60 * 60  # All job keys are kept for 7 days and after that the next scrubbing job will remove the outdated ones
 
     def __init__(self, vpool_guids=None, vdisk_guids=None, storagerouter_guid=None, manual=False, task_id=None):
@@ -815,13 +821,13 @@ class Scrubber(ScrubShared):
                 while client is None:
                     tries += 1
                     if tries > max_tries:
-                        self._logger.error('Assuming StorageRouter {0} is dead. Not scrubbing there'.format(storagerouter.guid))
+                        self._logger.error(self._format_message('Assuming StorageRouter {0} is dead. Not scrubbing there'.format(storagerouter.ip)))
                         break
                     try:
                         # Requesting new client to avoid races (if the same worker would build the clients again)
                         client = SSHClient(storagerouter, username='root', timeout=30, cached=False)
                     except:
-                        self._logger.exception(self._format_message('Unable to connect to StorageRouter {0} - Retrying {1} more times before assuming it is down'.format(storagerouter.guid, max_tries - tries)))
+                        self._logger.exception(self._format_message('Unable to connect to StorageRouter {0} - Retrying {1} more times before assuming it is down'.format(storagerouter.ip, max_tries - tries)))
                 if client is not None:
                     clients[storagerouter] = client
         return clients
@@ -838,7 +844,7 @@ class Scrubber(ScrubShared):
         worker_start = None
         for storagerouter, client in self.clients.iteritems():
             if os.environ.get('RUNNING_UNITTESTS') == 'True':
-                worker_pid = randint(10000, 65535)
+                # PID has been mocked, start time hasn't
                 worker_start = 'Mon Jan {0} {1}:{2}:00 2018'.format(randint(0, 30), randint(0, 23), randint(0, 59))
             else:
                 try:
@@ -868,6 +874,7 @@ class Scrubber(ScrubShared):
         :return: None
         :rtype: NoneType
         """
+        self._logger.info(self._format_message('Executing scrub'))
         number_of_vpools = len(self.vpool_vdisk_map)
         if number_of_vpools >= 6:
             self.max_stacks_per_vpool = 1
@@ -879,12 +886,14 @@ class Scrubber(ScrubShared):
         self.time_start = time.time()
         self.set_main_job_info()
         counter = 0
+        vp_work_map = {}
         for vp, vdisks in self.vpool_vdisk_map.iteritems():
-            logging_start = '{0} - vPool {1}'.format(self._log, vp.name)
+            logging_start = self._format_message('vPool {0}'.format(vp.name))
             # Verify amount of vDisks on vPool
             self._logger.info('{0} - Checking scrub work'.format(logging_start))
             stack_work_handler = StackWorkHandler(vpool=vp, vdisks=vdisks, worker_contexts=self.worker_contexts, job_id=self.job_id)
             vpool_queue = stack_work_handler.generate_save_scrub_work()
+            vp_work_map[vp] = (vpool_queue, stack_work_handler)
             if vpool_queue.qsize() == 0:
                 self._logger.info('{0} - No scrub work'.format(logging_start))
                 continue
@@ -917,7 +926,29 @@ class Scrubber(ScrubShared):
         self._cleanup_job_entries()
 
         if len(self.error_messages) > 0:
+            try:
+                self._clean_up_leftover_items(vp_work_map)
+            except Exception as ex:
+                self.error_messages.append(self._format_message('Exception while clearing remaining entries: {0}'.format(str(ex))))
             raise Exception(self._format_message('Errors occurred while scrubbing:\n  - {0}'.format('\n  - '.join(self.error_messages))))
+
+    def _clean_up_leftover_items(self, vpool_work_map):
+        """
+        Cleans up leftover work items when scrubbing would have failed
+        Doing this in the scrubber as the workers do not know if other workers have failed or not
+        :param vpool_work_map: A mapping with which vpool did what work and the stackwork handler
+        :type vpool_work_map: dict((ovs.dal.hybrids.vpool.VPool, tuple(queue.Queue, StackWorkHandler)
+        :return: None
+        :rtype: NoneType
+        """
+        for vpool, work_tools in vpool_work_map.iteritems():
+            queue, stack_work_handler = work_tools
+            if queue.qsize() > 0:
+                self._logger.warning(self._format_message('Clearing remaining items for vpool {0}. The following items will be unregistered: \n - {1}'
+                                                          .format(vpool.name, '\n - '.join(queue.queue))))
+                while queue.qsize() > 0:
+                    vdisk_guid = queue.get()
+                    stack_work_handler.remove_vdisk(vdisk_guid)
 
     def set_main_job_info(self):
         """
