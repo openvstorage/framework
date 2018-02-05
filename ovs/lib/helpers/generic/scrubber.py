@@ -253,16 +253,16 @@ class StackWorkHandler(ScrubShared):
         registered_vdisks = [item['vdisk_guid'] for item in relevant_work_items]
         work_queue = Queue()
         for vd in self.vdisks:
-            logging_start_vd = '{0} - vDisk {1} {2}'.format(self._log, vd.guid, vd.name)
+            logging_start_vd = '{0} - vDisk {1} with guid {2}'.format(self._log, vd.name, vd.guid)
             if vd.guid in registered_vdisks:
-                self._logger.info('{0} - has already been registered to get scrubbed, not queueing again'.format(logging_start_vd))
+                self._logger.info('{0} has already been registered to get scrubbed, not queueing again'.format(logging_start_vd))
                 continue
             if vd.is_vtemplate is True:
-                self._logger.info('{0} - Is a template, not scrubbing'.format(logging_start_vd))
+                self._logger.info('{0} is a template, not scrubbing'.format(logging_start_vd))
                 continue
             vd.invalidate_dynamics('storagedriver_id')
             if not vd.storagedriver_id:
-                self._logger.warning('{0} - No StorageDriver ID found'.format(logging_start_vd))
+                self._logger.warning('{0} no StorageDriver ID found'.format(logging_start_vd))
                 continue
             work_queue.put(vd.guid)
         total_items = list(itertools.chain(relevant_work_items, (self._wrap_data(item) for item in work_queue.queue)))
@@ -311,7 +311,7 @@ class StackWorkHandler(ScrubShared):
         # The queue might be different of when the function got called due to the hooking in the save
         return special['queue']
 
-    def _remove_vdisk(self, vdisk_guid):
+    def _unregister_vdisk(self, vdisk_guid):
         """
         Removes a certain vdisk from the current data list
         :param vdisk_guid: Guid of the vDisk to remove
@@ -330,10 +330,9 @@ class StackWorkHandler(ScrubShared):
             message = 'The registering data ({0}) is not in the list. Something must have removed it!'.format(item_to_remove)
             self._logger.exception(self._format_message(message))
             raise ValueError(message)
-        self._logger.info(self._format_message('Unregister vDisk {0}'.format(vdisk_guid)))
         return relevant_work_items, fetched_work_items
 
-    def remove_vdisk(self, vdisk_guid, retries=25):
+    def unregister_vdisk(self, vdisk_guid, retries=25):
         """
         Safely removes a vdisk from the pool
         :param vdisk_guid: Guid of the vDisk to remove
@@ -347,7 +346,7 @@ class StackWorkHandler(ScrubShared):
         special = {'total_items': None}
 
         def _get_value_and_expected_value():
-            relevant_work_items, fetched_work_items = self._remove_vdisk(vdisk_guid)
+            relevant_work_items, fetched_work_items = self._unregister_vdisk(vdisk_guid)
             special['relevant_work_items'] = relevant_work_items
             return relevant_work_items, fetched_work_items
 
@@ -395,6 +394,7 @@ class StackWorker(ScrubShared):
         self.stack_number = stack_number
         self.stacks_to_spawn = stacks_to_spawn
         self.stack_work_handler = stack_work_handler
+        self.scrub_info = scrub_info  # Stored for testing purposes
 
         self.queue_size = self.queue.qsize()
         self.stack_id = str(uuid.uuid4())
@@ -434,7 +434,7 @@ class StackWorker(ScrubShared):
         # Execute the actual scrubbing
         threads = []
         threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
-        amount_threads = Configuration.get(key=threads_key) if Configuration.exists(key=threads_key) else 2
+        amount_threads = Configuration.get(key=threads_key, default=2)
         if not isinstance(amount_threads, int):
             self.error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
             return
@@ -523,7 +523,7 @@ class StackWorker(ScrubShared):
                     finally:
                         # Remove vDisk from volatile memory and scrub work
                         self._volatile.delete(volatile_key)
-                        self.stack_work_handler.remove_vdisk(vdisk_guid)
+                        self.stack_work_handler.unregister_vdisk(vdisk_guid)
 
         except Empty:  # Raised when all items have been fetched from the queue
             self._logger.info('{0} - Queue completely processed'.format(log))
@@ -642,10 +642,13 @@ class StackWorker(ScrubShared):
         :return: None
         :rtype: NoneType
         """
+        if 'pre_proxy_deployment' in self._test_hooks:
+            self._test_hooks['pre_proxy_deployment'](self)
+
+        self._logger.info(self._format_message('Checking for ALBA proxy {0} deployment'.format(self.alba_proxy_service)))
+        registered_users = self._register_proxy_usage()
+        self._logger.info(self._format_message('Current registered users: {0}'.format(registered_users)))
         try:
-            self._logger.info(self._format_message('Checking for ALBA proxy {0} deployment'.format(self.alba_proxy_service)))
-            registered_users = self._register_proxy_usage()
-            self._logger.info(self._format_message('Current registered users: {0}'.format(registered_users)))
             if len(registered_users) == 1:
                 # First to register, allowed to deploy the proxy
                 self._logger.info(self._format_message('Deploying ALBA proxy {0}'.format(self.alba_proxy_service)))
@@ -803,7 +806,7 @@ class Scrubber(ScrubShared):
         # Scrubbing stack
         self.error_messages = []  # Keep track of all messages that might occur
         self.max_stacks_per_vpool = None
-        self.stacks = {}
+        self.stack_workers = []  # Unit tests can hook into this variable to do some fiddling
         self.stack_threads = []
 
     def build_clients(self):
@@ -843,22 +846,18 @@ class Scrubber(ScrubShared):
         worker_pid = 0
         worker_start = None
         for storagerouter, client in self.clients.iteritems():
-            if os.environ.get('RUNNING_UNITTESTS') == 'True':
-                # PID has been mocked, start time hasn't
-                worker_start = 'Mon Jan {0} {1}:{2}:00 2018'.format(randint(0, 30), randint(0, 23), randint(0, 59))
-            else:
-                try:
-                    # Retrieve the current start time of the process (used to create a unique key)
-                    # Output of the command:
-                    #                  STARTED   PID
-                    # Mon Jan 22 11:49:04 2018 22287
-                    worker_pid = self._service_manager.get_service_pid(name='ovs-workers', client=client)
-                    if worker_pid == 0:
-                        self._logger.warning('The workers are down on StorageRouter {0}'.format(storagerouter.guid))
-                    else:
-                        worker_start = client.run(['ps', '-o', 'lstart', '-p', worker_pid]).strip().splitlines()[-1].replace(' ', '-')
-                except Exception:
-                    self._logger.exception(self._format_message('Unable to retrieve information about the worker'))
+            try:
+                # Retrieve the current start time of the process (used to create a unique key)
+                # Output of the command:
+                #                  STARTED   PID
+                # Mon Jan 22 11:49:04 2018 22287
+                worker_pid = self._service_manager.get_service_pid(name='ovs-workers', client=client)
+                if worker_pid == 0:
+                    self._logger.warning('The workers are down on StorageRouter {0}'.format(storagerouter.guid))
+                else:
+                    worker_start = self._service_manager.get_service_start_time(name='ovs-workers', client=client)
+            except Exception:
+                self._logger.exception(self._format_message('Unable to retrieve information about the worker'))
             workers_context[storagerouter] = {'storagerouter_guid': storagerouter.guid,
                                               'worker_pid': worker_pid,
                                               'worker_start': worker_start}
@@ -910,11 +909,15 @@ class Scrubber(ScrubShared):
                                            job_id=self.job_id,
                                            stacks_to_spawn=stacks_to_spawn,
                                            stack_number=stack_number)
+                self.stack_workers.append(stack_worker)
                 stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                args=())
                 stack.start()
                 self.stack_threads.append(stack)
                 counter += 1
+
+        if 'post_stack_worker_deployment' in self._test_hooks:
+            self._test_hooks['post_stack_worker_deployment'](self)
 
         for thread in self.stack_threads:
             thread.join()
@@ -948,7 +951,7 @@ class Scrubber(ScrubShared):
                                                           .format(vpool.name, '\n - '.join(queue.queue))))
                 while queue.qsize() > 0:
                     vdisk_guid = queue.get()
-                    stack_work_handler.remove_vdisk(vdisk_guid)
+                    stack_work_handler.unregister_vdisk(vdisk_guid)
 
     def set_main_job_info(self):
         """

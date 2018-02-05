@@ -22,9 +22,12 @@ import re
 import time
 import datetime
 import unittest
+from threading import Event
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
@@ -37,7 +40,7 @@ from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
-from ovs.lib.helpers.generic.scrubber import ScrubShared
+from ovs.lib.helpers.generic.scrubber import ScrubShared, StackWorker
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
 
@@ -289,8 +292,10 @@ class Generic(unittest.TestCase):
                       - Proxy removal fail after scrub (All threads will try to clean up the proxy)
         * Scenario 8: 2 vPools, 20 vDisks, 2 scrub roles
                       Validate race condition handling
-                      - Validate that proxies will be re-used
                       - Validate that already queued items won't be scrubbed again
+        * Scenario 9: 2 vPools, 20 vDisks, 2 scrub roles
+                      Validate race condition handling
+                      - Validate that proxies will be re-used
                       - Validate that proxies won't be removed when still in use
         """
         ##############
@@ -485,7 +490,7 @@ class Generic(unittest.TestCase):
         # Verify all threads have been 'consumed'
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
-        self.assertIn(member='Scrubber unittest - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vpool.name, vdisk_t.guid, vdisk_t.name),
+        self.assertIn(member='Scrubber unittest - vPool {0} - vDisk {1} with guid {2} is a template, not scrubbing'.format(vpool.name, vdisk_t.name, vdisk_t.guid),
                       container=LogHandler._logs['lib_generic tasks scrub'])
 
         ##############
@@ -725,9 +730,14 @@ class Generic(unittest.TestCase):
         #   - vPools * StorageRouters * 2 threads per StorageRouter
         #   - Amount of possible threads to be created: 2 * 2 * 2 = 8
         thread_names = []
+        proxy_names = []
+        vdisk_namespaces = {}
         for vpool in vpools.values():
+            vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
             for storagerouter in storagerouters.values():
                 for partition in storagerouter.disks[0].partitions:
+                    proxy_name = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vpool.name, storagerouter.name, partition.guid)
+                    proxy_names.append(proxy_name)
                     for index in range(2):
                         thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition.guid, index))
         LockedClient.scrub_controller = {'possible_threads': thread_names,
@@ -742,13 +752,20 @@ class Generic(unittest.TestCase):
         hooks = {'post_proxy_deployment': lambda x: _raise_exception('Simulated proxy deployment failure')}
         ScrubShared._test_hooks.update(hooks)
         # No scrubbing should have taken place
-        with self.assertRaises(Exception) as raise_info:
-            GenericController.execute_scrub(vdisk_guids=[vdisk.guid], manual=True)
-        # Todo more asserting (check if no vdisks were deployed and check cleanup message)
-
+        with self.assertRaises(Exception):
+            GenericController.execute_scrub()
+        # Check if service has been removed properly
+        service_manager = ServiceFactory.get_manager()
+        for storagerouter in storagerouters.values():
+            client = SSHClient(storagerouter, 'root')
+            for proxy_name in proxy_names:
+                self.assertFalse(service_manager.has_service(proxy_name, client), 'StorageRouter {0} still has proxy {1}'.format(storagerouter.name, proxy_name))
+        for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():  # All registered items of this job should be cleaned up
+            self.assertEquals(self.persistent.get(vdisk_namespace), namespace_value)
         ##############
         # Scenario 8 #
         ##############
+        # Test queue work detection
         self._clean_scrubbing_test()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
@@ -761,8 +778,152 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        # @todo implement hooking to run the specified scenario
         self._prepare_scrubbing(structure)
+        vpools = structure['vpools']
+        vdisks = structure['vdisks']
+        storagerouters = structure['storagerouters']
+        thread_names = []
+        proxy_names = []
+        vdisk_namespaces = {}
+        # Thread calculation is the same as Scenario 7
+        for vpool in vpools.values():
+            vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
+            for storagerouter in storagerouters.values():
+                for partition in storagerouter.disks[0].partitions:
+                    proxy_name = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vpool.name, storagerouter.name, partition.guid)
+                    proxy_names.append(proxy_name)
+                    for index in range(2):
+                        thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition.guid, index))
+        LockedClient.scrub_controller = {'possible_threads': thread_names,
+                                         'volumes': {},
+                                         'waiter': Waiter(len(thread_names))}
+
+        # Scrub all volumes
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
+                                                                         'scrub_work': range(vdisk_id)}
+        # Test already queued items
+        local_sr = System.get_my_storagerouter()  # Executor of the scrubbing
+        pid = None
+        start_time = None
+        other_sr = None
+        for ip, service_info in SystemdMock.services.iteritems():
+            if ip == local_sr.ip:
+                continue
+            other_sr = StorageRouterList.get_by_ip(ip)
+            worker_info = service_info.get('ovs-workers', {})
+            pid = worker_info.get('pid')
+            start_time = worker_info.get('start_time')
+            break
+        self.assertNotEqual(pid, None, 'A PID should be found for a different StorageRouter\'s ovs-worker process')
+        self.assertNotEqual(start_time, None, 'A start time should be found for a different StorageRouter\'s ovs-worker process')
+        # Register vdisks beforehand
+        for index, vdisk in enumerate(vdisks.values()):
+            if index == 2:
+                break
+            for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():
+                namespace_value.append({'vdisk_guid': vdisk.guid, 'worker_pid': pid, 'worker_start': start_time, 'storagerouter_guid': other_sr.guid})
+                self.persistent.set(vdisk_namespace, namespace_value)
+        GenericController.execute_scrub()
+        logs = LogHandler._logs['lib_generic tasks scrub']
+        for registered_items in vdisk_namespaces.values():
+            for registered_item in registered_items:
+                vdisk = VDisk(registered_item['vdisk_guid'])
+                log = 'Scrubber unittest - vPool {0} - vDisk {1} with guid {2} has already been registered to get scrubbed, not queueing again'.format(vdisk.vpool.name, vdisk.name, vdisk.guid)
+                self.assertIn(log, logs)
+
+        ##############
+        # Scenario 9 #
+        ##############
+        stack_workers = []  # Copied stack workers by hooking
+
+        def _wait_for_event(event):
+            """
+            Wait forever until the event is set
+            :param event: Event object
+            :type event: Threading.Event
+            :return: None
+            :rtype: NoneType
+            """
+            event.wait()
+
+        def _inject_race(self):
+            """
+            Injects a race condition. The stack worker threads will wait for another the event to clear.
+            A stackworker is taken to duplicate it and register its proxy usage
+            :param self: Scrubber instance
+            :return: None
+            :rtype: NoneType
+            """
+            for model_stack_worker in self.stack_workers:
+                stack_worker = StackWorker(queue=model_stack_worker.queue,
+                                           vpool=model_stack_worker.vpool,
+                                           scrub_info=model_stack_worker.scrub_info,
+                                           error_messages=self.error_messages,
+                                           worker_contexts=self.worker_contexts,
+                                           stack_work_handler=model_stack_worker.stack_work_handler,
+                                           job_id='Another job',
+                                           stacks_to_spawn=100,
+                                           stack_number=100)
+                stack_workers.append(stack_worker)
+                stack_worker._test_hooks = {}  # Clear hooks
+                stack_worker._deploy_proxy()
+            proxy_event.set()  # Allow others to deploy proxies now
+
+        # Test proxy re-use
+        # Test is use proxies won't be removed
+        self._clean_scrubbing_test()
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1, 2],
+             # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 1, 1), (5, 1, 1, 1),
+                        (6, 2, 1, 2), (7, 2, 1, 2), (8, 2, 1, 2), (9, 2, 1, 2), (10, 2, 1, 2),
+                        (11, 3, 2, 3), (12, 3, 2, 3), (13, 3, 2, 3), (14, 3, 2, 3), (15, 3, 2, 3),
+                        (16, 4, 2, 4), (17, 4, 2, 4), (18, 4, 2, 4), (19, 4, 2, 4), (20, 4, 2, 4)],
+             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)],  # (<id>, <storagedriver_id>)
+             'storagerouters': [1, 2],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        self._prepare_scrubbing(structure)
+        vpools = structure['vpools']
+        vdisks = structure['vdisks']
+        storagerouters = structure['storagerouters']
+        thread_names = []
+        proxy_names = []
+        # Thread calculation is the same as Scenario 7
+        for vpool in vpools.values():
+            for storagerouter in storagerouters.values():
+                for partition in storagerouter.disks[0].partitions:
+                    proxy_names.append('ovs-albaproxy_{0}_{1}_{2}_scrub'.format(vpool.name, storagerouter.name, partition.guid))
+                    for index in range(2):
+                        thread_names.append('execute_scrub_{0}_{1}_{2}'.format(vpool.guid, partition.guid, index))
+        LockedClient.scrub_controller = {'possible_threads': thread_names,
+                                         'volumes': {},
+                                         'waiter': Waiter(len(thread_names))}
+
+        # Scrub all volumes
+        for vdisk_id, vdisk in vdisks.iteritems():
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
+                                                                         'scrub_work': range(vdisk_id)}
+        proxy_event = Event()
+        hooks = {'pre_proxy_deployment': lambda x: _wait_for_event(proxy_event),  # This will make the scrubber stacks to wait forever before deploying proxies
+                 'post_stack_worker_deployment': lambda x: _inject_race(x)}
+        ScrubShared._test_hooks.update(hooks)
+        GenericController.execute_scrub()
+        logs = LogHandler._logs['lib_generic tasks scrub']
+        re_use_logs = ['Re-using existing proxy service {0}'.format(proxy_name) for proxy_name in proxy_names]
+        remove_logs = ['Cannot remove service {0} as it is still in use by others'.format(proxy_name) for proxy_name in proxy_names]
+        self.assertEquals(len([log for log in logs if log.endswith(tuple(re_use_logs))]), 4, 'All deployed stacks should be re-using the proxies')
+        self.assertEquals(len([log for log in logs if log.endswith(tuple(remove_logs))]), 4, 'All deployed stacks should be not be touching the proxies')
+        service_manager = ServiceFactory.get_manager()
+        for stack_worker in stack_workers:
+            client = SSHClient(stack_worker.storagerouter, 'root')
+            self.assertTrue(service_manager.get_service_status(name=stack_worker.alba_proxy_service, client=client) == 'active', 'The proxy should be still running')
+        for stack_worker in stack_workers:
+            stack_worker._remove_proxy()
+        for stack_worker in stack_workers:
+            client = SSHClient(stack_worker.storagerouter, 'root')
+            self.assertFalse(stack_worker._service_manager.has_service(name=stack_worker.alba_proxy_service, client=client), 'The proxy should be removed')
 
     def test_arakoon_collapse(self):
         """
@@ -1121,3 +1282,4 @@ class Generic(unittest.TestCase):
         SystemdMock._clean()
         Configuration._unittest_data = {}
         ScrubShared._test_hooks = {}
+        LogHandler._logs = {}
