@@ -41,6 +41,7 @@ from ovs.extensions.storageserver.storagedriver import LOG_LEVEL_MAPPING
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import ovs_task
+from ovs.lib.helpers.exceptions import RoleDuplicationException
 from volumedriver.storagerouter import storagerouterclient
 
 
@@ -488,6 +489,12 @@ class StorageRouterController(object):
             if DiskPartition.ROLES.BACKEND in partition.roles:
                 raise RuntimeError('The given Disk is in use by a Backend')
 
+        if len({DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL}.intersection(set(roles))) > 0:
+            roles_on_sr = StorageRouterController._get_roles_on_storagerouter(storagerouter.ip)
+            for role in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL]:
+                if role in roles_on_sr and role in roles and roles_on_sr[role][0] != disk.name:  # DB and DTL roles still have to be unassignable
+                    raise RoleDuplicationException('Disk {0} cannot have the {1} role due to presence on disk {2}'.format(disk.name, role, roles_on_sr[role][0]))
+
         # Create partition
         if partition_guid is None:
             StorageRouterController._logger.debug('Creating new partition - Offset: {0} bytes - Size: {1} bytes - Roles: {2}'.format(offset, size, roles))
@@ -594,3 +601,66 @@ class StorageRouterController(object):
             if mp and not mp.startswith('/dev') and not mp.startswith('/proc') and not mp.startswith('/sys') and not mp.startswith('/run') and not mp.startswith('/mnt/alba-asd') and mp != '/':
                 mountpoints.append(mp)
         return mountpoints
+
+    @staticmethod
+    def _retrieve_alba_arakoon_config(alba_backend_guid, ovs_client):
+        """
+        Retrieve the ALBA Arakoon configuration
+        :param alba_backend_guid: Guid of the ALBA Backend
+        :type alba_backend_guid: str
+        :param ovs_client: OVS client object
+        :type ovs_client: OVSClient
+        :return: Arakoon configuration information
+        :rtype: dict
+        """
+        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(alba_backend_guid))
+        successful, arakoon_config = ovs_client.wait_for_task(task_id, timeout=300)
+        if successful is False:
+            raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))
+        return arakoon_config
+
+    @staticmethod
+    def _revert_vpool_status(vpool, status=VPool.STATUSES.RUNNING, storagedriver=None, client=None, dirs_created=None):
+        """
+        Remove the vPool being created or revert the vPool being extended
+        :return: None
+        :rtype: NoneType
+        """
+        vpool.status = status
+        vpool.save()
+
+        if status == VPool.STATUSES.RUNNING:
+            if len(dirs_created) > 0:
+                try:
+                    client.dir_delete(directories=dirs_created)
+                except Exception:
+                    StorageRouterController._logger.warning('Failed to clean up following directories: {0}'.format(', '.join(dirs_created)))
+
+            if storagedriver is not None:
+                for sdp in storagedriver.partitions:
+                    sdp.delete()
+                for proxy in storagedriver.alba_proxies:
+                    proxy.delete()
+                storagedriver.delete()
+            if len(vpool.storagedrivers) == 0:
+                vpool.delete()
+                if Configuration.dir_exists(key='/ovs/vpools/{0}'.format(vpool.guid)):
+                    Configuration.delete(key='/ovs/vpools/{0}'.format(vpool.guid))
+
+    @staticmethod
+    def _get_roles_on_storagerouter(ip):
+        """
+        returns a set with the roles present on the storagerouter
+        :param ip: string with ip of the storagerouter
+        :return: Dict
+        """
+        sr = StorageRouterList.get_by_ip(ip)
+        roles_on_sr = {}
+        for sr_disk in sr.disks:
+            for partition in sr_disk.partitions:
+                for part_role in partition.roles:
+                    if part_role not in roles_on_sr:
+                        roles_on_sr[part_role] = [sr_disk.name]
+                    else:
+                        roles_on_sr[part_role].append(sr_disk.name)
+        return roles_on_sr

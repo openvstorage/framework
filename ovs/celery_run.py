@@ -20,14 +20,12 @@ Celery entry point module
 
 from __future__ import absolute_import
 
-import sys
-sys.path.append('/opt/OpenvStorage')
-
 import os
 import uuid
 import threading
 import traceback
 from celery import Celery
+from celery.backends import BACKEND_ALIASES
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
 from celery.task.control import inspect
 from kombu import Queue
@@ -120,6 +118,9 @@ if os.environ.get('RUNNING_UNITTESTS') == 'True':
     inspect = InspectMockup
     celery = CeleryMockup()
 else:
+    # Update the BACKEND_ALIASES when this item is loaded in (to support the Arakoon backend)
+    BACKEND_ALIASES.update({'arakoon': 'ovs.extensions.celery.arakoonresult:ArakoonResultBackend'})
+
     memcache_servers = Configuration.get('/ovs/framework/memcache|endpoints')
     rmq_servers = Configuration.get('/ovs/framework/messagequeue|endpoints')
 
@@ -135,7 +136,7 @@ else:
     celery = Celery('ovs', include=include)
 
     # http://docs.celeryproject.org/en/latest/configuration.html#cache-backend-settings
-    celery.conf.CELERY_RESULT_BACKEND = "cache+memcached://{0}/".format(';'.join(memcache_servers))
+    celery.conf.CELERY_RESULT_BACKEND = 'arakoon'
     celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.get('/ovs/framework/messagequeue|protocol'),
                                                                     Configuration.get('/ovs/framework/messagequeue|user'),
                                                                     Configuration.get('/ovs/framework/messagequeue|password'),
@@ -155,6 +156,7 @@ else:
     celery.conf.CELERYBEAT_SCHEDULE = {}
     celery.conf.CELERY_TRACK_STARTED = True  # http://docs.celeryproject.org/en/latest/configuration.html#std:setting-CELERY_TRACK_STARTED
     celery.conf.CELERYD_HIJACK_ROOT_LOGGER = False
+    celery.conf.CELERY_RESULT_SERIALIZER = 'json'  # Change default pickle to json
 
 
 @task_postrun.connect

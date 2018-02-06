@@ -581,6 +581,7 @@ class NodeTypeController(object):
    {{rabbit, [{{tcp_listeners, [{0}]}},
               {{default_user, <<"{1}">>}},
               {{default_pass, <<"{2}">>}},
+              {{cluster_partition_handling, autoheal}},
               {{log_levels, [{{connection, warning}}]}},
               {{vm_memory_high_watermark, 0.2}}]}}
 ].""".format(rabbitmq_port, rabbitmq_login, rabbitmq_password))

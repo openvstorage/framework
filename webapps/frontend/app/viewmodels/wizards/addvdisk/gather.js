@@ -49,7 +49,7 @@ define([
                 reasons = reasons.concat(preValidation.reasons);
                 fields = fields.concat(preValidation.fields);
             }
-            if (self.data.name() === '') {
+            if (!self.data.name.valid()) {
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_name'));
@@ -230,7 +230,7 @@ define([
                 deferred.resolve();
                 api.post('vdisks', {
                     data: {
-                        name: self.data.name(),
+                        name: self.data.name().toString(),
                         size: self.data.size(),
                         vpool_guid: self.data.vPool().guid(),
                         storagerouter_guid: self.data.storageRouter().guid()

@@ -23,8 +23,6 @@ import time
 import uuid
 import random
 
-sys.path.append('/opt/OpenvStorage')
-
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.datalist import DataList

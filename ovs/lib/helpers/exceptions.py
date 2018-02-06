@@ -24,3 +24,9 @@ class EnsureSingleTimeoutReached(Exception):
     Exception thrown when a celery.task with the ensure_single decorator could not be started in due time
     """
     pass
+
+class RoleDuplicationException(Exception):
+    """
+    Raised when the DB or DTL role is tried to be assigned, while this role is already present in one of the storagerouter's disks
+    """
+    pass

@@ -453,7 +453,6 @@ class Authentication(unittest.TestCase):
         request = self.factory.get('/')
         response = backend.authenticate(request)
         self.assertIsNone(response)
-
         time.sleep(180)
         header = 'Bearer foobar'
         request = self.factory.get('/', HTTP_AUTHORIZATION=header)

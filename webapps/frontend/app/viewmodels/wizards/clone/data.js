@@ -14,12 +14,11 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['jquery', 'knockout'], function($, ko){
+define(['jquery', 'knockout', 'ovs/generic'], function($, ko, generic){
     "use strict";
-    var nameRegex = /^[0-9a-zA-Z][\-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$/,
-        singleton = function() {
+        var singleton = function() {
         var data = {
-            name:           ko.observable('').extend({ regex: nameRegex }),
+            name:           ko.observable('').extend({ regex: generic.vdiskNameRegex }),
             vDisk:          ko.observable(),
             snapshot:       ko.observable(),
             storageRouter:  ko.observable(),

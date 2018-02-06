@@ -41,14 +41,7 @@ but WITHOUT ANY WARRANTY of any kind.
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
                     <div data-bind="tooltip: 'ovs:generic.states.vdisk.' + liveStatus(),
-                                    status: {
-                                        colors: {
-                                            green: liveStatus() === 'RUNNING',
-                                            orange: liveStatus() === 'NON-RUNNING',
-                                            red: liveStatus() === 'HALTED'
-                                        },
-                                        defaultColor: 'lightgrey'
-                                    }"
+                                    status: liveStatusColorBinding()"
                          style="width: 14px; height: 14px; margin-top: 1px;">
                     </div>
                 </td>
@@ -80,20 +73,13 @@ but WITHOUT ANY WARRANTY of any kind.
                     </span>
                 </td>
                 <td><span data-bind="text: size"></span></td>
-                <td><span data-bind="text: liveStatus() === 'RUNNING' ? storedData : '-'"></span></td>
-                <td><span data-bind="text: liveStatus() === 'RUNNING' ? iops : '-'"></span></td>
-                <td><span data-bind="text: liveStatus() === 'RUNNING' ? readSpeed : '-'"></span></td>
-                <td><span data-bind="text: liveStatus() === 'RUNNING' ? writeSpeed : '-'"></span></td>
+                <td><span data-bind="text: storedDataDisplay"></span></td>
+                <td><span data-bind="text: iopsDisplay"></span></td>
+                <td><span data-bind="text: readSpeedDisplay"></span></td>
+                <td><span data-bind="text: writeSpeedDisplay"></span></td>
                 <td>
-                    <div data-bind="status: {
-                                        colors: {
-                                            green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
-                                            orange: ['catch_up', 'checkup_required'].contains(dtlStatus()),
-                                            red: dtlStatus() === 'degraded',
-                                            grey: dtlStatus() === 'disabled'
-                                        },
-                                        defaultColor: 'lightgrey'
-                                    }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
+                    <div data-bind="status: dtlStatusColorBinding(),
+                                    tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
                          style="width: 14px; height: 14px;">
                     </div>
                 </td>

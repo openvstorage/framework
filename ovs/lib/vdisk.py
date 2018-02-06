@@ -856,6 +856,7 @@ class VDiskController(object):
         """
         # Validations
         storagedriver = StorageDriver(storagedriver_guid)
+        volume_name = str(volume_name)
         devicename = VDiskController.clean_devicename(volume_name)
         vpool = storagedriver.vpool
         if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
@@ -1604,6 +1605,8 @@ class VDiskController(object):
         :return: A cleaned device name
         :rtype: str
         """
+        if not isinstance(name, basestring):
+            raise TypeError('Given name "{0}" could not be converted to a clean device name, str required'.format(name))
         name = name.strip('/').replace(' ', '_')
         while '//' in name:
             name = name.replace('//', '/')

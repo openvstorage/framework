@@ -40,6 +40,8 @@ class VDisk(DataObject):
     """
     STATUSES = DataObject.enumerator('Status', ['HALTED', 'NON_RUNNING', 'RUNNING', 'UNKNOWN'])
 
+    VDISK_NAME_REGEX = '^[0-9a-zA-Z][\-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$'
+
     _logger = Logger('hybrids')
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),

@@ -598,4 +598,45 @@ class MigrationController(object):
             except Exception:
                 MigrationController._logger.exception('Executing command "systemctl daemon-reload" failed')
 
+        #########################################################
+        # Addition of 'Environment=OCAMLRUNPARAM='b,a=1,s=4096k,O=50' for AlbaProxy SystemD services
+        if ServiceFactory.get_service_type() == 'systemd':
+            changed_clients = set()
+            for storagedriver in StorageDriverList.get_storagedrivers():
+                root_client = sr_client_map[storagedriver.storagerouter_guid]
+                for alba_proxy in storagedriver.alba_proxies:
+                    service = alba_proxy.service
+                    service_name = 'ovs-{0}'.format(service.name)
+                    if not service_manager.has_service(name=service_name, client=root_client):
+                        continue
+                    if "Environment=OCAMLRUNPARAM='b,a=1,s=4096k,O=50" in root_client.file_read(filename='/lib/systemd/system/{0}.service'.format(service_name)):
+                        continue
+                    try:
+                        service_manager.regenerate_service(name='ovs-albaproxy', client=root_client, target_name=service_name)
+                        changed_clients.add(root_client)
+                    except:
+                        MigrationController._logger.exception('Error rebuilding service {0}'.format(service_name))
+            for root_client in changed_clients:
+                root_client.run(['systemctl', 'daemon-reload'])
+        #########################################################
+        # Addition of 'Environment=OCAMLRUNPARAM='b,a=1,s=4096k,O=50' for Arakoon SystemD services
+        if ServiceFactory.get_service_type() == 'systemd':
+            changed_clients = set()
+            for storagerouter in StorageRouterList.get_storagerouters():
+                root_client = sr_client_map[storagerouter.guid]
+                for service_name in service_manager.list_services(client=root_client):
+                    if not service_name.startswith('ovs-arakoon-'):
+                        continue
+                    if not service_manager.has_service(name=service_name, client=root_client):
+                        continue
+                    if "Environment=OCAMLRUNPARAM='b,a=1,s=4096k,O=50" in root_client.file_read(filename='/lib/systemd/system/{0}.service'.format(service_name)):
+                        continue
+                    try:
+                        service_manager.regenerate_service(name='ovs-arakoon', client=root_client, target_name=service_name)
+                        changed_clients.add(root_client)
+                    except:
+                        MigrationController._logger.exception('Error rebuilding service {0}'.format(service_name))
+            for root_client in changed_clients:
+                root_client.run(['systemctl', 'daemon-reload'])
+
         MigrationController._logger.info('Finished out of band migrations')
