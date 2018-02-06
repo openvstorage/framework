@@ -21,7 +21,6 @@ import os
 import json
 import time
 import uuid
-import itertools
 from Queue import Empty, Queue
 from random import randint
 from threading import Thread
@@ -149,20 +148,19 @@ class ScrubShared(object):
         :rtype: tuple(list, list)
         :raises: ValueError: When an irregular item has been detected
         """
-        if any(not isinstance(v, dict )for v in relevant_values):
+        if any(not isinstance(v, dict)for v in relevant_values):
             raise ValueError('Not all relevant values are a dict')
         if not isinstance(relevant_keys, list):
             raise ValueError('The relevant keys should be a list of keys that are relevant')
         if any(set(v.keys()) != set(relevant_keys) for v in relevant_values):
             raise ValueError('The relevant values do not match the relevant format')
-        # Fetch all items, yield empty list if None
         fetched_items = self._fetch_registered_items()
         relevant_work_items = []
         # Filter out the relevant items
         try:
-            for item in fetched_items or []:
+            for item in fetched_items or []:  # Fetched items could be None
                 # Extract relevant context. Note this is just a shallow copy and when retrieving items with lists/dicts we should not modify these in any way
-                # because the referance is kept in _relevant_work_items
+                # because the reference is kept in _relevant_work_items
                 relevant_context = dict((k, v) for k, v in item.iteritems() if k in relevant_keys)
                 if relevant_context in relevant_values:
                     relevant_work_items.append(item)
@@ -265,7 +263,7 @@ class StackWorkHandler(ScrubShared):
                 self._logger.warning('{0} no StorageDriver ID found'.format(logging_start_vd))
                 continue
             work_queue.put(vd.guid)
-        total_items = list(itertools.chain(relevant_work_items, (self._wrap_data(item) for item in work_queue.queue)))
+        total_items = relevant_work_items + list(self._wrap_data(item) for item in work_queue.queue)
         return work_queue, total_items, fetched_work_items
 
     def _wrap_data(self, vdisk_guid):
@@ -829,7 +827,7 @@ class Scrubber(ScrubShared):
                     try:
                         # Requesting new client to avoid races (if the same worker would build the clients again)
                         client = SSHClient(storagerouter, username='root', timeout=30, cached=False)
-                    except:
+                    except Exception:
                         self._logger.exception(self._format_message('Unable to connect to StorageRouter {0} - Retrying {1} more times before assuming it is down'.format(storagerouter.ip, max_tries - tries)))
                 if client is not None:
                     clients[storagerouter] = client

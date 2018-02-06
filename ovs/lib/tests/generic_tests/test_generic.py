@@ -301,6 +301,7 @@ class Generic(unittest.TestCase):
         ##############
         # Scenario 1 #
         ##############
+        self._clean_scrubbing_test()
         structure = DalHelper.build_dal_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
@@ -375,6 +376,7 @@ class Generic(unittest.TestCase):
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         self._prepare_scrubbing(structure)
+        vpools = structure['vpools']
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
         storagerouter_1 = structure['storagerouters'][1]
@@ -416,6 +418,12 @@ class Generic(unittest.TestCase):
         # Execute scrubbing a 1st time
         with self.assertRaises(Exception) as raise_info:
             GenericController.execute_scrub()
+        vdisk_namespaces = {}  # Validate all registered items are gone
+        for vpool in vpools.values():
+            vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
+        for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():  # All registered items of this job should be cleaned up
+            self.assertEquals(self.persistent.get(vdisk_namespace), namespace_value)
+
         for vdisk in failed_vdisks:
             self.assertIn(vdisk.name, raise_info.exception.message)
 
@@ -437,6 +445,12 @@ class Generic(unittest.TestCase):
             vdisk = vdisks[vdisk_id]
             LockedClient.scrub_controller['volumes'][vdisk.volume_id]['success'] = True
         GenericController.execute_scrub()
+        vdisk_namespaces = {}  # Validate all registered items are gone
+        for vpool in vpools.values():
+            vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
+        for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():  # All registered items of this job should be cleaned up
+            self.assertEquals(self.persistent.get(vdisk_namespace), namespace_value)
+
         for vdisk in vdisks.values():
             with vdisk.storagedriver_client.make_locked_client(vdisk.volume_id) as locked_client:
                 self.assertEqual(first=len(locked_client.get_scrubbing_workunits()),
@@ -456,6 +470,7 @@ class Generic(unittest.TestCase):
         )
         self._prepare_scrubbing(structure)
         vpool = structure['vpools'][1]
+        vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouter_1 = structure['storagerouters'][1]
         # Have 1 volume as a template, scrubbing should not be triggered on it
@@ -487,10 +502,16 @@ class Generic(unittest.TestCase):
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
         GenericController.execute_scrub()
+        vdisk_namespaces = {}  # Validate all registered items are gone
+        for vpool in vpools.values():
+            vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
+        for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():  # All registered items of this job should be cleaned up
+            self.assertEquals(self.persistent.get(vdisk_namespace), namespace_value)
+
         # Verify all threads have been 'consumed'
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
-        self.assertIn(member='Scrubber unittest - vPool {0} - vDisk {1} with guid {2} is a template, not scrubbing'.format(vpool.name, vdisk_t.name, vdisk_t.guid),
+        self.assertIn(member='Scrubber unittest - vPool {0} - vDisk {1} with guid {2} is a template, not scrubbing'.format(vdisk_t.vpool.name, vdisk_t.name, vdisk_t.guid),
                       container=LogHandler._logs['lib_generic tasks scrub'])
 
         ##############
@@ -532,6 +553,12 @@ class Generic(unittest.TestCase):
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
         GenericController.execute_scrub()
+        vdisk_namespaces = {}  # Validate all registered items are gone
+        for vpool in vpools.values():
+            vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
+        for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():  # All registered items of this job should be cleaned up
+            self.assertEquals(self.persistent.get(vdisk_namespace), namespace_value)
+
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=18,  # 30 possible thread_names - 12 which should be created and consumed
                          msg='Not all threads have been used in the process')
@@ -581,6 +608,12 @@ class Generic(unittest.TestCase):
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
         GenericController.execute_scrub()
+        vdisk_namespaces = {}  # Validate all registered items are gone
+        for vpool in vpools.values():
+            vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
+        for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():  # All registered items of this job should be cleaned up
+            self.assertEquals(self.persistent.get(vdisk_namespace), namespace_value)
+
         for vdisk in vdisks.values():
             self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
                                  list2=[])
@@ -607,7 +640,8 @@ class Generic(unittest.TestCase):
             else:
                 expected_work = range(vdisk_id)
             self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
-                                 list2=expected_work)
+                                 list2=expected_work,
+                                 msg='Not all expected work items were applied for vDisk {0}'.format(vdisk.name))
 
         # Scrub a combination of a vPool and a vDisk
         for vdisk_id, vdisk in vdisks.iteritems():
@@ -628,7 +662,8 @@ class Generic(unittest.TestCase):
         GenericController.execute_scrub(storagerouter_guid=storagerouters[2].guid)
         for vdisk_id, vdisk in vdisks.iteritems():
             self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
-                                 list2=[])
+                                 list2=[],
+                                 msg='Not all scrub work was applied for vDisk {0}'.format(vdisk.name))
         logs = LogHandler._logs['lib_generic tasks scrub']
         for log in logs:
             self.assertNotRegexpMatches(text=log,
@@ -685,6 +720,11 @@ class Generic(unittest.TestCase):
         # Verify all threads have been 'consumed'
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
+        vdisk_namespaces = {}  # Validate all registered items are gone
+        for vpool in vpools.values():
+            vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
+        for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():  # All registered items of this job should be cleaned up
+            self.assertEquals(self.persistent.get(vdisk_namespace), namespace_value)
         counter = 0
         for log in LogHandler._logs['lib_generic tasks scrub']:
             if 'threads for proxy service' in log:
