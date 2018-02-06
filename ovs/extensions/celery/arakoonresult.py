@@ -19,9 +19,9 @@ Arakoon ResultBackend Module
 """
 import time
 from celery.backends.base import KeyValueStoreBackend
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.storage.exceptions import KeyNotFoundException
-from ovs.log.log_handler import LogHandler
 
 
 class ArakoonResultBackend(KeyValueStoreBackend):
@@ -34,7 +34,7 @@ class ArakoonResultBackend(KeyValueStoreBackend):
     supports_native_join = True
     implements_incr = True
 
-    _logger = LogHandler.get('celery', 'arakoon_result')
+    _logger = Logger('celery')
 
     def __init__(self, app, expires=None, backend=None, options=None, url=None, **kwargs):
         super(ArakoonResultBackend, self).__init__(app, **kwargs)

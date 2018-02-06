@@ -864,7 +864,7 @@ class Generic(unittest.TestCase):
                 namespace_value.append({'vdisk_guid': vdisk.guid, 'worker_pid': pid, 'worker_start': start_time, 'storagerouter_guid': other_sr.guid})
                 self.persistent.set(vdisk_namespace, namespace_value)
         GenericController.execute_scrub()
-        logs = LogHandler._logs['lib_generic tasks scrub']
+        logs = Logger._logs['lib']
         for registered_items in vdisk_namespaces.values():
             for registered_item in registered_items:
                 vdisk = VDisk(registered_item['vdisk_guid'])
@@ -949,7 +949,7 @@ class Generic(unittest.TestCase):
                  'post_stack_worker_deployment': lambda x: _inject_race(x)}
         ScrubShared._test_hooks.update(hooks)
         GenericController.execute_scrub()
-        logs = LogHandler._logs['lib_generic tasks scrub']
+        logs = Logger._logs['lib']
         re_use_logs = ['Re-using existing proxy service {0}'.format(proxy_name) for proxy_name in proxy_names]
         remove_logs = ['Cannot remove service {0} as it is still in use by others'.format(proxy_name) for proxy_name in proxy_names]
         self.assertEquals(len([log for log in logs if log.endswith(tuple(re_use_logs))]), 4, 'All deployed stacks should be re-using the proxies')
@@ -1317,4 +1317,4 @@ class Generic(unittest.TestCase):
         SystemdMock._clean()
         Configuration._unittest_data = {}
         ScrubShared._test_hooks = {}
-        LogHandler._logs = {}
+        Logger._logs = {}

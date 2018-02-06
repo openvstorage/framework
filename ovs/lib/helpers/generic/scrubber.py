@@ -34,16 +34,18 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex
+from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
+from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs_extensions.generic.volatilemutex import NoLockAvailableException
+from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs_extensions.storage.exceptions import AssertException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.log_handler import LogHandler
 
 
 class ScrubShared(object):
@@ -53,7 +55,7 @@ class ScrubShared(object):
     # Test hooks for unit tests
     _test_hooks = {}
 
-    _logger = LogHandler.get('lib', name='generic tasks scrub')
+    _logger = Logger('lib')
 
     _SCRUB_KEY = '/ovs/framework/jobs/scrub'  # Parent key for all scrub related jobs
     _SCRUB_NAMESPACE = 'ovs_jobs_scrub'
@@ -504,7 +506,7 @@ class StackWorker(ScrubShared):
                             for work_unit in work_units:
                                 res = locked_client.scrub(work_unit=work_unit,
                                                           scratch_dir=self.scrub_directory,
-                                                          log_sinks=[LogHandler.get_sink_path('scrubber_{0}'.format(self.vpool.name), allow_override=True, forced_target_type='file')],
+                                                          log_sinks=[Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)],
                                                           backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                             if work_units:
@@ -648,6 +650,7 @@ class StackWorker(ScrubShared):
         self._logger.info(self._format_message('Current registered users: {0}'.format(registered_users)))
         try:
             if len(registered_users) == 1:
+                alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
                 # First to register, allowed to deploy the proxy
                 self._logger.info(self._format_message('Deploying ALBA proxy {0}'.format(self.alba_proxy_service)))
                 # Check the proxy status - could be that it is removing
@@ -665,8 +668,10 @@ class StackWorker(ScrubShared):
                     scrub_config['transport'] = 'tcp'
                     Configuration.set(self.scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
                     params = {'VPOOL_NAME': self.vpool.name,
-                              'LOG_SINK': LogHandler.get_sink_path(self.alba_proxy_service),
-                              'CONFIG_PATH': Configuration.get_configuration_path(self.scrub_config_key)}
+                              'LOG_SINK': Logger.get_sink_path(self.alba_proxy_service),
+                              'CONFIG_PATH': Configuration.get_configuration_path(self.scrub_config_key),
+                              'ALBA_PKG_NAME': alba_pkg_name,
+                              'ALBA_VERSION_CMD': alba_version_cmd}
                     self._service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=self.alba_proxy_service)
                     self._service_manager.start_service(name=self.alba_proxy_service, client=client)
                 self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(self.alba_proxy_service, scrub_config)))
