@@ -841,9 +841,9 @@ class Scrubber(ScrubShared):
         :rtype: dict
         """
         workers_context = {}
-        worker_pid = 0
-        worker_start = None
         for storagerouter, client in self.clients.iteritems():
+            worker_pid = 0
+            worker_start = None
             try:
                 # Retrieve the current start time of the process (used to create a unique key)
                 # Output of the command:
