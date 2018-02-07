@@ -662,7 +662,7 @@ class StackWorker(ScrubShared):
                     client.dir_chmod(self.scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
                     machine_id = System.get_my_machine_id(client)
                     port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
-                    port = System.get_free_ports(selected_range=port_range, nr=1, client=client)[0]
+                    port = System.get_free_ports(selected_range=port_range, amount=1, client=client)[0]
                     scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(self.vpool.guid))
                     scrub_config['port'] = port
                     scrub_config['transport'] = 'tcp'
