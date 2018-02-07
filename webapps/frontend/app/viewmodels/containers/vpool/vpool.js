@@ -17,8 +17,9 @@
 define([
     'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
-    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk'
-], function($, ko, shared, generic, api, BackendType, VDisk) {
+    'viewmodels/containers/backend/backendtype', 'viewmodels/containers/vdisk/vdisk',
+    './cache', './configuration', './backend', 'viewmodels/services/vpool'
+], function($, ko, shared, generic, api, BackendType, VDisk, CacheData, Configuration, BackendInfo, vpoolService) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -40,12 +41,14 @@ define([
         self.backendName          = ko.observable();
         self.backendPort          = ko.observable();
         self.backendPreset        = ko.observable();
+        self.backendPolicies      = ko.observableArray([]);
         self.backendRead          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendReadSpeed     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.backendWriteSpeed    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.backendWritten       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cachingInfo          = ko.observable();
         self.cacheMisses          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.configuration        = ko.observable();
         self.extensible           = ko.observable(true);
@@ -54,7 +57,7 @@ define([
         self.loaded               = ko.observable(false);
         self.loading              = ko.observable(false);
         self.metadata             = ko.observable();
-        self.name                 = ko.observable();
+        self.name                 = ko.observable().extend({regex: generic.nameRegex});
         self.notExtensibleReasons = ko.observableArray([]);
         self.rdmaEnabled          = ko.observable();
         self.readSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -90,14 +93,18 @@ define([
             }
             if (data.metadata !== undefined && data.metadata !== null && data.metadata.hasOwnProperty('backend')) {
                 if (data.metadata.backend.hasOwnProperty('backend_info')) {
-                    generic.trySet(self.backendGuid, data.metadata.backend.backend_info, 'backend_guid');
-                    generic.trySet(self.backendName, data.metadata.backend.backend_info, 'name');
-                    generic.trySet(self.backendPreset, data.metadata.backend.backend_info, 'preset');
-                }
-                if (data.metadata.backend.hasOwnProperty('connection_info')) {
-                    generic.trySet(self.backendHost, data.metadata.backend.connection_info, 'host');
-                    generic.trySet(self.backendPort, data.metadata.backend.connection_info, 'port');
-                    generic.trySet(self.backendLocal, data.metadata.backend.connection_info, 'local');
+                    var backendInfo = data.metadata.backend.backend_info;
+                    generic.trySet(self.backendGuid, backendInfo, 'backend_guid');
+                    generic.trySet(self.backendName, backendInfo, 'name');
+                    generic.trySet(self.backendPreset, backendInfo, 'preset');
+                    generic.trySet(self.backendPolicies, backendInfo, 'policies');
+
+                    if (backendInfo.hasOwnProperty('connection_info')) {
+                        var connectionInfo = backendInfo.connection_info;
+                        generic.trySet(self.backendHost, connectionInfo, 'host');
+                        generic.trySet(self.backendPort, connectionInfo, 'port');
+                        generic.trySet(self.backendLocal, connectionInfo, 'local');
+                    }
                 }
             }
             if (data.hasOwnProperty('vdisks_guids') && !generic.tryGet(options, 'skipDisks', false)) {
@@ -164,13 +171,88 @@ define([
                     self.storageRouterHandle = api.get('vpools/' + self.guid() + '/storagerouters')
                         .done(function(data) {
                             self.storageRouterGuids(data.data);
-                            deferred.resolve();
+                            deferred.resolve(self.storageRouterGuids());
                         })
-                        .fail(deferred.reject);
+                        .fail(function(error) {
+                            deferred.reject(error)
+                        });
                 } else {
-                    deferred.resolve();
+                    deferred.resolve(self.storageRouterGuids());
                 }
             }).promise();
         };
+        /**
+         * Get the caching data for a certain StorageRouter that is linked to this vpool
+         * @param storageRouterGuid: Guid of the StorageRouter
+         * @type storageRouterGuid: str
+         * @param returnViewModel: Return a ViewModel object or not
+         * @type returnViewModel: bool
+         * @param allowEmpty: Allow an empty ViewModel to be returned
+         * @type allowEmpty: bool
+         * @return {*}
+         */
+        self.getCachingData = function(storageRouterGuid, returnViewModel, allowEmpty) {
+            allowEmpty = (allowEmpty === undefined) ? false : allowEmpty;
+            var cachingInfo = self.metadata() === undefined? {} : self.metadata().caching_info;
+            returnViewModel = returnViewModel || false;
+            if (!(storageRouterGuid in cachingInfo)) {
+                if (allowEmpty === true) {
+                    return new CacheData()
+                }
+                throw new Error('VPool has no metadata about Storagerouter {0}'.format([storageRouterGuid]))
+            }
+            var cachingData = cachingInfo[storageRouterGuid];
+            if (returnViewModel === true) {
+                return new CacheData(cachingData)
+            }
+            return cachingData
+        };
+        /**
+         * Get possible connection info for caches
+         */
+        self.getCacheConnectionInfoMapping = function() {
+            var mapping = {};
+            var cachingInfo = self.metadata() === undefined? {} : self.metadata().caching_info;
+            $.each(vpoolService.cacheTypes(), function(index, cacheType) {
+                mapping[cacheType] = {};
+            });
+            $.each(cachingInfo, function(strGuid, cacheTypeData) {
+                var cacheData = new CacheData(cacheTypeData);
+                $.each(vpoolService.cacheTypes(), function(index, cacheType) {
+                    if (cacheData[cacheType].is_backend() === true) {
+                        mapping[cacheType][strGuid] = cacheData[cacheType].backend_info.connection_info.toJS()
+                    }
+                });
+            });
+            return mapping
+        };
+        /**
+         * Get configuration data of this vpool
+         * @param returnViewModel: Return a viewmodel or plain object
+         * @type returnViewModel: bool
+         * @return {*}
+         */
+        self.getConfiguration = function(returnViewModel) {
+            returnViewModel = returnViewModel || false;
+            var configuration = self.configuration();
+            if (returnViewModel === true) {
+                return new Configuration(configuration)
+            }
+            return configuration;
+        };
+        /**
+         * Get backend data of this vpool
+         * @param returnViewModel: Return a viewmodel or plain object
+         * @type returnViewModel: bool
+         * @return {*}
+         */
+        self.getBackendInfo = function(returnViewModel) {
+            returnViewModel = (returnViewModel === undefined) ? false : returnViewModel;
+            var backendInfo = self.metadata() === undefined? {} : self.metadata().backend;
+            if (returnViewModel === true) {
+                return new BackendInfo(backendInfo)
+            }
+            return backendInfo
+        }
     };
 });

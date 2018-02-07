@@ -18,14 +18,18 @@
 StorageDriver module
 """
 
+import copy
 import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.logger import Logger
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.services.servicefactory import ServiceFactory
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 
 
 class StorageDriver(DataObject):
@@ -50,8 +54,10 @@ class StorageDriver(DataObject):
                   Dynamic('statistics', dict, 4),
                   Dynamic('edge_clients', list, 30),
                   Dynamic('vdisks_guids', list, 15),
+                  Dynamic('proxy_summary', dict, 15),
                   Dynamic('vpool_backend_info', dict, 60),
-                  Dynamic('cluster_node_config', dict, 3600)]
+                  Dynamic('cluster_node_config', dict, 3600),
+                  Dynamic('global_write_buffer', int, 60)]
 
     def _status(self):
         """
@@ -122,55 +128,31 @@ class StorageDriver(DataObject):
         :return: Information about vPool and accelerated Backend
         :rtype: dict
         """
-        from ovs.dal.hybrids.diskpartition import DiskPartition
-        from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
-
-        global_write_buffer = 0
-        for partition in self.partitions:
-            if partition.role == DiskPartition.ROLES.WRITE and partition.sub_role == StorageDriverPartition.SUBROLE.SCO:
-                global_write_buffer += partition.size
-
-        cache_read = None
-        cache_write = None
-        cache_quota_fc = None
-        cache_quota_bc = None
-        backend_info = None
-        connection_info = None
-        block_cache_read = None
-        block_cache_write = None
-        block_cache_backend_info = None
-        block_cache_connection_info = None
-        metadata_key = 'backend_aa_{0}'.format(self.storagerouter_guid)
-        if metadata_key in self.vpool.metadata:
-            metadata = self.vpool.metadata[metadata_key]
-            backend_info = metadata['backend_info']
-            connection_info = metadata['connection_info']
-        metadata_key = 'backend_bc_{0}'.format(self.storagerouter_guid)
-        if metadata_key in self.vpool.metadata:
-            metadata = self.vpool.metadata[metadata_key]
-            block_cache_backend_info = metadata['backend_info']
-            block_cache_connection_info = metadata['connection_info']
-
-        if self.storagerouter_guid in self.vpool.metadata['backend']['caching_info']:
-            caching_info = self.vpool.metadata['backend']['caching_info'][self.storagerouter_guid]
-            cache_read = caching_info['fragment_cache_on_read']
-            cache_write = caching_info['fragment_cache_on_write']
-            cache_quota_fc = caching_info.get('quota_fc')
-            cache_quota_bc = caching_info.get('quota_bc')
-            block_cache_read = caching_info.get('block_cache_on_read')
-            block_cache_write = caching_info.get('block_cache_on_write')
-
-        return {'cache_read': cache_read,
-                'cache_write': cache_write,
-                'cache_quota_fc': cache_quota_fc,
-                'cache_quota_bc': cache_quota_bc,
-                'backend_info': backend_info,
-                'connection_info': connection_info,
-                'block_cache_read': block_cache_read,
-                'block_cache_write': block_cache_write,
-                'block_cache_backend_info': block_cache_backend_info,
-                'block_cache_connection_info': block_cache_connection_info,
-                'global_write_buffer': global_write_buffer}
+        vpool_backend_info = {'backend': copy.deepcopy(self.vpool.metadata['backend']),
+                              'caching_info': {StorageDriverConfiguration.CACHE_BLOCK: {'read': False,
+                                                                                        'write': False,
+                                                                                        'quota': None,
+                                                                                        'backend_info': None},  # Will contain connection info if it wouldn't be None
+                                               StorageDriverConfiguration.CACHE_FRAGMENT: {'read': False,
+                                                                                           'write': False,
+                                                                                           'quota': None,
+                                                                                           'backend_info': None}}}
+        if 'caching_info' not in self.vpool.metadata:
+            self._logger.critical('Metadata structure has not been updated yet')
+            return vpool_backend_info
+        if self.storagerouter_guid not in self.vpool.metadata['caching_info']:
+            # No caching configured
+            return vpool_backend_info
+        for cache_type, cache_data in vpool_backend_info['caching_info'].iteritems():
+            caching_info = self.vpool.metadata['caching_info'][self.storagerouter_guid][cache_type]
+            # Update the cache data matching the keys currently specified in cache_data
+            cache_data.update((k, caching_info[k]) for k in cache_data.viewkeys() & caching_info.viewkeys())
+            # Possible set backend_info to None to match this view
+            if caching_info['is_backend'] is False:
+                cache_data['backend_info'] = None
+        # Add global write buffer
+        vpool_backend_info['global_write_buffer'] = self.global_write_buffer
+        return vpool_backend_info
 
     def _cluster_node_config(self):
         """
@@ -212,3 +194,52 @@ class StorageDriver(DataObject):
                                                              self.storage_ip,
                                                              self.ports['edge']),
                 'node_distance_map': distance_map}
+
+    def _proxy_summary(self):
+        """
+        Returns a summary of the proxies of this StorageDriver
+        :return: summary of the proxies
+        :rtype: dict
+        """
+        proxy_info = {'red': 0,
+                      'orange': 0,
+                      'green': 0}
+        summary = {'proxies': proxy_info}
+
+        try:
+            service_manager = ServiceFactory.get_manager()
+            client = SSHClient(self.storagerouter)
+        except Exception:
+            self._logger.exception('Unable to retrieve necessary clients')
+        else:
+            for alba_proxy in self.alba_proxies:
+                try:
+                    service_status = service_manager.get_service_status(alba_proxy.service.name, client)
+                except Exception:
+                    # A ValueError can occur when the services are still being deployed (the model will be updated before the actual deployment)
+                    self._logger.exception('Unable to retrieve the service status for service {0} of StorageDriver {1}'.format(alba_proxy.service.name, self.guid))
+                    proxy_info['red'] += 1
+                    continue
+                if service_status == 'active':
+                    proxy_info['green'] += 1
+                elif service_status == 'inactive':
+                    proxy_info['orange'] += 1
+                else:
+                    proxy_info['red'] += 1
+        finally:
+            return summary
+
+    def _global_write_buffer(self):
+        """
+        Return the global write buffer for available for a StorageDriver
+        :return: Calculated global write buffer
+        :rtype: int
+        """
+        # Avoid circular import
+        from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+
+        global_write_buffer = 0
+        for partition in self.partitions:
+            if partition.role == DiskPartition.ROLES.WRITE and partition.sub_role == StorageDriverPartition.SUBROLE.SCO:
+                global_write_buffer += partition.size
+        return global_write_buffer

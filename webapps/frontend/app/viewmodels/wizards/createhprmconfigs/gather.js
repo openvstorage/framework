@@ -36,7 +36,7 @@ define([
         self.proxyConfigLoaded        = ko.observable(false);
 
         // Computed
-        self.canContinue = ko.computed(function() {
+        self.canContinue = ko.pureComputed(function() {
             var reasons = [], fields = [];
             if (!self.data.identifier.valid()) {
                 fields.push('identifier');
@@ -54,17 +54,14 @@ define([
                     self.loadProxyConfigHandle = api.get('storagerouters/' + self.data.storageRouter().guid() + '/get_proxy_config', {queryparams: {vpool_guid: self.data.vPool().guid()}})
                         .then(self.shared.tasks.wait)
                         .done(function(data) {
+                            var cachingInfo = self.data.vPool().getCachingData(self.data.storageRouter().guid(), true);
                             self.data.useFC(data.fragment_cache[0] === 'alba');
                             if (data.fragment_cache[0] !== 'none') {
                                 self.data.fragmentCacheOnRead(data.fragment_cache[1].cache_on_read);
                                 self.data.fragmentCacheOnWrite(data.fragment_cache[1].cache_on_write);
                             }
                             if (self.data.useFC() === true) {
-                                $.each(self.data.vPool().metadata(), function(key, value) {
-                                    if (key === 'backend_aa_' + self.data.storageRouter().guid()) {
-                                        self.data.localHostFC(value.connection_info.local);
-                                    }
-                                })
+                                self.data.localHostFC(cachingInfo.fragment_cache.backend_info.isLocalBackend());
                             }
                             if (data.block_cache !== undefined) {
                                 self.data.useBC(data.block_cache[0] === 'alba');
@@ -73,11 +70,7 @@ define([
                                     self.data.blockCacheOnWrite(data.block_cache[1].cache_on_write);
                                 }
                                 if (self.data.useBC() === true) {
-                                    $.each(self.data.vPool().metadata(), function(key, value) {
-                                        if (key === 'backend_bc_' + self.data.storageRouter().guid()) {
-                                            self.data.localHostBC(value.connection_info.local);
-                                        }
-                                    })
+                                    self.data.localHostBC(cachingInfo.block_cache.backend_info.isLocalBackend());
                                 }
                             }
                         })

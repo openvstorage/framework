@@ -17,7 +17,7 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../../containers/domain'
+    'viewmodels/containers/domain/domain'
 ], function($, app, dialog, ko, shared, generic, Refresher, api, Domain) {
     "use strict";
     return function () {

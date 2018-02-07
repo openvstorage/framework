@@ -315,6 +315,8 @@ class StorageDriverConfiguration(object):
     """
     StorageDriver configuration class
     """
+    CACHE_BLOCK = 'block_cache'
+    CACHE_FRAGMENT = 'fragment_cache'
 
     def __init__(self, vpool_guid, storagedriver_id):
         """

@@ -16,7 +16,8 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api', 'ovs/shared', '../containers/edgeclient'
+    'ovs/generic', 'ovs/api', 'ovs/shared',
+    'viewmodels/containers/vdisk/edgeclient'
 ], function($, ko, generic, api, shared, EdgeClient) {
     "use strict";
     return function(guid) {

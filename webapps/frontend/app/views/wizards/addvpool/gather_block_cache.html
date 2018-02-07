@@ -17,32 +17,38 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <p data-i18n="ovs:wizards.add_vpool.gather_block_cache.basic_info"></p>
+    <!-- ko with: data.cachingData.block_cache -->
+    <!-- Root is the wizard, as is the parent-->
     <div class="form-group">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.block_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
             <span data-bind="dropdown: {
-                                 enabled: canConfigureBCRW,
-                                 items: blockCacheSettings, target: blockCacheSetting,
+                                 enabled: $root.data.supportsBlockCache,
+                                 items: cacheSettings, target: cacheSetting,
                                  text: function(item) {
-                                     return $.t('ovs:generic.blockcaches.' + item);
+                                     return $.t('ovs:generic.blockCaches.' + item);
                                  }
                              }">
             </span>
         </div>
     </div>
-    <div data-bind="visible: data.blockCacheOnRead() || data.blockCacheOnWrite()">
+    <div data-bind="visible: isUsed()">
         <div class="form-group">
             <div class="col-lg-3"></div>
             <div class="col-lg-7">
-                <input type="radio" name="bcBackend" id="useAcceleratedAlbaNo" class="autofocus" data-bind="checked: data.useBC, checkedValue: false" />
-                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_local" style="font-weight: normal;"></label><br />
-                <input type="radio" name="bcBackend" id="useAcceleratedAlbaYes" class="autofocus" data-bind="checked: data.useBC, checkedValue: true" />
-                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_backend_bc" style="font-weight: normal;"></label>
+                <input type="radio" name="fcBackend" id="useAcceleratedAlbaNo" class="autofocus"
+                       data-bind="checked: is_backend, checkedValue: false" />
+                <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_local_disk"
+                       style="font-weight: normal;"></label><br />
+                <input type="radio" name="fcBackend" id="useAcceleratedAlbaYes" class="autofocus"
+                       data-bind="checked: is_backend, checkedValue: true" />
+                <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_block_cache.use_backend"
+                       style="font-weight: normal;"></label>
             </div>
         </div>
-        <div data-bind="visible: data.useBC()">
+        <div data-bind="visible: is_backend()">
             <p data-i18n="ovs:wizards.add_vpool.gather_block_cache.accelerated_info"></p>
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('quota') }">
+            <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('quota') }">
                 <label class="col-lg-3 control-label" style="padding-top: 8px;">
                     <a data-bind="popover: {
                                       title: 'ovs:wizards.add_vpool.gather_block_cache.cache_quota_title',
@@ -54,29 +60,30 @@ but WITHOUT ANY WARRANTY of any kind.
                 </label>
                 <div class="col-lg-2">
                     <input class="form-control" type="text" style="text-align: center;"
-                           data-bind="value: data.cacheQuotaBC, valueUpdate: 'input', disable: data.cacheQuotaBCConfigured() || !hasCacheQuota()">
+                           data-bind="value: quota, valueUpdate: 'input', disable: !$root.data.hasCacheQuota()">
                 </div>
                 <label class="col-lg-1" data-i18n="ovs:generic.units.gib" style="padding-top: 7px; padding-left: 0"></label>
             </div>
-            <p data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.backend_info"></p>
-            <div data-bind="visible: localBackendsAvailable()">
+            <!-- ko with: backend_info.connection_info -->
+            <p data-i18n="ovs:wizards.add_vpool.gather_block_cache.backend_info"></p>
+            <div data-bind=>
                 <div class="form-group">
                     <div class="col-lg-3"></div>
                     <div class="col-lg-7">
-                        <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: data.localHostBC" />
-                        <label for="inputBackendLocalHost" data-i18n="ovs:wizards.add_vpool.gather_block_cache.local_host" style="font-weight: normal;"></label>
+                        <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: isLocalBackend" />
+                        <label for="inputBackendLocalHost" data-i18n="ovs:wizards.add_vpool.gather_block_cache.local_backend" style="font-weight: normal;"></label>
                     </div>
                 </div>
             </div>
-            <div data-bind="visible: !data.localHostBC() && reUseableStorageRouters().length > 1">
+            <div data-bind="visible: !isLocalBackend()">
                 <div class="form-group">
-                    <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_block_cache.re_use_connection_info"></label>
+                    <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.re_use_connection_info"></label>
                     <div class="col-lg-7">
                         <span data-bind="dropdown: {
                                              key: 'guid',
                                              keyisfunction: true,
-                                             items: reUseableStorageRouters,
-                                             target: reUsedStorageRouter,
+                                             items: $root.reUsableStorageRouters,
+                                             target: $root.reUsedStorageRouter,
                                              text: function(item) {
                                                  if (item !== undefined) {
                                                      return item.name();
@@ -88,46 +95,49 @@ but WITHOUT ANY WARRANTY of any kind.
                         </span>
                     </div>
                 </div>
+                <div data-bind="css: { 'has-error': $root.canContinue().fields.contains('invalid_alba_info') }">
+                    <div class="form-group">
+                        <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_block_cache.host"></label>
+                        <div class="col-lg-3">
+                            <input type="text" id="inputBackendHost" class="autofocus form-control" data-bind="value: host, valueUpdate: 'input'" />
+                        </div>
+                        <label class="col-lg-1 control-label" for="inputBackendPort" data-i18n="ovs:wizards.add_vpool.gather_block_cache.port"></label>
+                        <div class="col-lg-2">
+                            <input type="text" id="inputBackendPort" class="autofocus form-control" data-bind="value: port, valueUpdate: 'input'" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="col-lg-3 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.add_vpool.gather_block_cache.client_id"></label>
+                        <div class="col-lg-7">
+                            <input type="text" id="inputBackendClientId" class="autofocus form-control" data-bind="value: client_id, valueUpdate: 'input'" />
+                        </div>
+                    </div>
+                    <div class="form-group" >
+                        <label class="col-lg-3 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.add_vpool.gather_block_cache.client_secret"></label>
+                        <div class="col-lg-7">
+                            <input type="password" id="inputBackendClientSecret" class="autofocus form-control" data-bind="value: client_secret, valueUpdate: 'input'" />
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div data-bind="visible: !data.localHostBC()">
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
-                    <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_block_cache.host"></label>
-                    <div class="col-lg-3">
-                        <input type="text" id="inputBackendHost" class="autofocus form-control" data-bind="value: data.hostBC, valueUpdate: 'input'" />
-                    </div>
-                    <label class="col-lg-1 control-label" for="inputBackendPort" data-i18n="ovs:wizards.add_vpool.gather_block_cache.port"></label>
-                    <div class="col-lg-2">
-                        <input type="text" id="inputBackendPort" class="autofocus form-control" data-bind="value: data.portBC, valueUpdate: 'input'" />
-                    </div>
-                </div>
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
-                    <label class="col-lg-3 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.add_vpool.gather_block_cache.client_id"></label>
-                    <div class="col-lg-7">
-                        <input type="text" id="inputBackendClientId" class="autofocus form-control" data-bind="value: data.clientIDBC, valueUpdate: 'input'" />
-                    </div>
-                </div>
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientsecret') }">
-                    <label class="col-lg-3 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.add_vpool.gather_block_cache.client_secret"></label>
-                    <div class="col-lg-7">
-                        <input type="password" id="inputBackendClientSecret" class="autofocus form-control" data-bind="value: data.clientSecretBC, valueUpdate: 'input'" />
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
+            <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('backend') }">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_backend"></label>
-                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }">
-                    <!-- ko if: loadingBackends() === true -->
+                <div class="col-lg-7">
+                    <!-- ko if: $root.data.loadingBackends() === true -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
                     <!-- /ko -->
-                    <!-- ko if: loadingBackends() === false && (backendsBC() === undefined || backendsBC().length === 0) -->
-                        <i data-i18n="[html]ovs:wizards.add_vpool.gather_block_cache.no_backends"
-                           style="display: inline-block; margin-top: 7px;"></i>
+                    <!-- ko if: $root.data.loadingBackends() === false && ($root.blockCacheBackends() === undefined || $root.blockCacheBackends().length === 0) -->
+                        <div>
+                            <label class="col-lg-5 control-label" style="text-align: left; padding-left: 0">
+                                <i data-i18n="[html]ovs:wizards.add_vpool.gather_block_cache.no_backends"></i>
+                            </label>
+                        </div>
                     <!-- /ko -->
-                    <!-- ko if: loadingBackends() === false && (backendsBC() !== undefined && backendsBC().length > 0) -->
-                        <span data-bind="visible: (data.vPool() === undefined || data.backendBC() !== undefined),
+                    <!-- ko if: $root.data.loadingBackends() === false && ($root.blockCacheBackends() !== undefined && $root.blockCacheBackends().length > 0) -->
+                        <span data-bind="visible: ($root.data.vPool() === undefined || $root.blockCacheBackend() !== undefined),
                                          dropdown: {
                                              key: 'guid', keyisfunction: false,
-                                             items: backendsBC, target: data.backendBC,
+                                             items: $root.blockCacheBackends, target: $root.blockCacheBackend,
                                              text: function(item) {
                                                  if (item !== undefined) {
                                                      return item.name;
@@ -137,23 +147,24 @@ but WITHOUT ANY WARRANTY of any kind.
                         </span>
                     <!-- /ko -->
                     <button type ='button' class="btn btn-default"  style="margin-left: 10px;"
-                            data-bind="click: loadBackends,
-                                       style: {'margin-top': (backendsBC() !== undefined && backendsBC().length > 0 ? '-26px' : '')},
-                                       enable: !loadingBackends(),
-                                       visible: !data.localHostBC()">
-                        <span class="fa fa-" data-bind="css: { 'fa-spin': loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
+                            data-bind="click: $root.loadBackends,
+                                       style: {'margin-top': ($root.blockCacheBackends() !== undefined && $root.blockCacheBackends().length > 0 ? '-26px' : '')},
+                                       enable: !$root.data.loadingBackends() && hasRemoteInfo(),
+                                       visible: !isLocalBackend()">
+                        <span class="fa fa-" data-bind="css: { 'fa-spin': $root.data.loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
                         <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
                     </button>
                 </div>
             </div>
-            <div class="form-group" data-bind="visible: data.backendBC() !== undefined">
+            <div class="form-group" data-bind="visible: $root.blockCacheBackend() !== undefined">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_preset"></label>
-                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('preset') }">
-                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && data.presetBC() === undefined)"></span>
-                    <span data-bind="visible: (data.vPool() === undefined || data.presetBC() !== undefined),
+                <div class="col-lg-7" data-bind="css: { 'has-error': $root.canContinue().fields.contains('preset') }">
+                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: ($root.preset() === undefined)"></span>
+                    <span data-bind="visible: ($root.preset() !== undefined),
                                      dropdown: {
-                                         key: 'name', keyisfunction: false,
-                                         items: data.enhancedPresetsBC, target: data.presetBC,
+                                         key: 'name',
+                                         keyisfunction: false,
+                                         items: $root.enhancedPresets, target: $root.preset,
                                          emptyisloading: false,
                                          text: function(item) {
                                              var policies = [];
@@ -167,47 +178,25 @@ but WITHOUT ANY WARRANTY of any kind.
                                      }"></span>
                 </div>
             </div>
-        </div>
-        <div data-bind="if: options !== undefined && options.customlocal === true &&
-                            !data.useBC() && (data.fragmentCacheOnRead() || data.fragmentCacheOnWrite())">
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('local_path') }">
-                <label class="col-lg-3 control-label" for="localPath" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.local_path"></label>
-                <div class="col-lg-5">
-                    <input type="text" id="localPath" class="autofocus form-control" data-bind="value: data.localPathBC, valueUpdate: 'afterkeydown'" />
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="col-lg-3 control-label" for="localSize" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.local_size"></label>
-                <div class="col-lg-2">
-                    <input type="text" id="localSize" class="autofocus form-control" data-bind="value: data.localSizeBC, valueUpdate: 'afterkeydown'" />
-                </div>
-                <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib" style="margin-left: -20px;"></label>
-            </div>
+            <!-- /ko -->
         </div>
     </div>
-    <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
-        <span data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_preset_unavailable"></span>
-    </div>
-    <div class="alert alert-info" data-bind="visible: !hasBlockCache() || !hasCacheQuota()" style="margin-top: 20px;">
-        <span data-bind="visible: !hasBlockCache()">
-            <span data-i18n="ovs:generic.ee_teasers.no_block_cache" data-bind="visible: !hasEE()"></span>
-            <span data-i18n="ovs:generic.version_teasers.no_block_cache" data-bind="visible: hasEE()"></span>
+    <div class="alert alert-info" data-bind="visible: !$root.data.supportsBlockCache() || !$root.data.hasCacheQuota()" style="margin-top: 20px;">
+        <span data-bind="visible: !$root.data.supportsBlockCache()">
+            <span data-i18n="ovs:generic.ee_teasers.no_block_cache"></span>
+            <span data-i18n="ovs:generic.version_teasers.no_block_cache"></span>
         </span>
-        <span data-bind="visible: !hasCacheQuota() && hasBlockCache()">
-            <span data-i18n="ovs:generic.ee_teasers.no_cache_quota" data-bind="visible: !hasEE()"></span>
-            <span data-i18n="ovs:generic.version_teasers.no_cache_quota" data-bind="visible: hasEE()"></span>
+        <span data-bind="visible: !$root.data.hasCacheQuota() && $root.data.supportsBlockCache()">
+            <span data-i18n="ovs:generic.ee_teasers.no_cache_quota"></span>
+            <span data-i18n="ovs:generic.version_teasers.no_cache_quota"></span>
         </span>
     </div>
-    <div class="alert alert-info" data-bind="visible: (data.vPool() !== undefined && !data.vPoolAdd()) || (data.useBC() && loadingBackends())" style="margin-top: 20px;">
-        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_block_cache.loading_backend_information', visible: (data.useBC() && loadingBackends())"></span>
-        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_block_cache.information_extend', visible: data.vPool() !== undefined"></span>
-        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_block_cache.information_extend_quota', visible: data.vPool() !== undefined && data.cacheQuotaBCConfigured() && data.useBC()"></span>
-    </div>
-    <div class="alert alert-danger" data-bind="visible: (!data.useBC() || (data.useBC() && !loadingBackends())) && (!canContinue().value || canContinue().showErrors)" style="margin-bottom: -10px;">
-        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
-        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
-        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+    <div class="alert alert-danger" data-bind="visible: (isUsed() && !$root.data.loadingBackends()) && (!$root.canContinue().value || $root.canContinue().showErrors)" style="margin-bottom: -10px;">
+        <p data-bind="visible: $root.canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: $root.canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: $root.canContinue().reasons.length > 0, foreach: $root.canContinue().reasons">
             <li data-bind="text: $data"></li>
         </ul>
     </div>
+    <!-- /ko -->
 </div>

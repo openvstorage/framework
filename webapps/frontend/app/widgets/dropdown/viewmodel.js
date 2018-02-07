@@ -26,6 +26,7 @@ define([
         self.text          = undefined;
         self.unique        = generic.getTimestamp().toString();
 
+        self.itemsSubscription = undefined;
         // Observables
         self.key            = ko.observable();
         self.keyIsFunction  = ko.observable(false);
@@ -121,15 +122,34 @@ define([
 
         // Durandal
         self.activate = function(settings) {
-            if (!settings.hasOwnProperty('items')) {
-                throw 'Items should be specified';
+            if (!settings.hasOwnProperty('items') || !(ko.utils.unwrapObservable(settings.items) instanceof Array)) {
+                throw 'Items should be a specified array';
             }
             if (!settings.hasOwnProperty('target')) {
                 throw 'Target should be specified';
             }
-            self.items = settings.items;
+            // Items can be dynamic if it is an observable array but this is not required
+            if (settings.items.isObservableArray) {
+                self.items = settings.items;
+            } else if (ko.isObservable(settings.items)) {  // Handle the case where it would be an observable / computed so updates can be pushed
+                self.items(settings.items());
+                self.itemsSubscription = settings.items.subscribe(function(newValue){
+                    self.items(newValue)
+                })
+            } else {
+                self.items(settings.items)  // Can be a normal array / computed / observable
+            }
             self.target = settings.target;
-            self.enabled = generic.tryGet(settings, 'enabled', ko.observable(true));
+            if ('enabled' in settings) {
+                self.enabled = settings.enabled
+            } else if ('disabled' in settings) {
+                self.enabled = ko.pureComputed(function() {
+                   return !settings.disabled()
+                });
+            } else {
+                // Default to true
+                self.enabled = ko.observable(true)
+            }
             self.key(generic.tryGet(settings, 'key', undefined));
             self.small(generic.tryGet(settings, 'small', false));
             self.keyIsFunction(generic.tryGet(settings, 'keyisfunction', false));
@@ -176,5 +196,12 @@ define([
                 self.target.valueHasMutated();
             }
         };
+        self.deactivate = function() {
+            // Dispose of the subscriptions
+            if (self.itemsSubscription !== undefined) {
+                self.itemsSubscription.dispose();
+            }
+
+        }
     };
 });

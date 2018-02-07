@@ -109,7 +109,7 @@ class MDSServiceController(object):
             mds_port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|mds'.format(System.get_my_machine_id(client)))
             free_ports = System.get_free_ports(selected_range=mds_port_range,
                                                exclude=occupied_ports,
-                                               nr=1,
+                                               amount=1,
                                                client=client)
             if len(free_ports) != 1:
                 raise RuntimeError('Failed to find an available port on StorageRouter {0} within range {1}'.format(storagerouter.name, mds_port_range))

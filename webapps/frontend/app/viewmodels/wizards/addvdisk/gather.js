@@ -17,7 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic', 'ovs/refresher', 'ovs/shared',
-    './data', '../../containers/vpool', '../../containers/storagerouter'
+    './data',
+    'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagerouter/storagerouter'
 ], function($, ko,
             api, generic, Refresher, shared,
             data, VPool, StorageRouter) {
@@ -119,7 +120,7 @@ define([
                 } else {
                     self.loadingBackend(true);
                     generic.xhrAbort(self.loadAlbaBackendHandle);
-                    var connectionInfo = vPool.metadata().backend.connection_info,
+                    var connectionInfo = vPool.metadata().backend.backend_info.connection_info,
                         getData = {ip: connectionInfo.host,
                                    port: connectionInfo.port,
                                    client_id: connectionInfo.client_id,

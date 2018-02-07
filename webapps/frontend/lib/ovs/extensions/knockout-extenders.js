@@ -16,13 +16,28 @@
 /*global define, window */
 define(['knockout', 'ovs/generic'], function(ko, generic) {
     "use strict";
+    /**
+     * Extend a numeric observable to set a minimum/maximum and potentially validate on it
+     * @param target: The target Observable (provided by .extend method)
+     * @param settings: Settings to take in (Supplied, possible settings are:
+     * {min: minimal numeric value,
+      * max : maximal numeric value,
+      * allowUndefined: set to undefined instead of min when it is not defined
+      * validateMin: validate instead of setting to min
+      * validateMax: validate instead of setting to max
+     * @return {*|void}
+     */
     ko.extenders.numeric = function(target, settings) {
+        var valid = ko.observable(true);
         var computed = ko.computed({
             read: target,
             write: function(newValue) {
                 var parsedValue = parseInt(newValue, 10);
                 if (isNaN(parsedValue)) {
                     if (settings.hasOwnProperty('allowUndefined') && settings.allowUndefined === true) {
+                        if (target() === undefined) {
+                            return;
+                        }
                         target(undefined);
                         target.notifySubscribers(undefined);
                         return;
@@ -30,10 +45,18 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                     parsedValue = 0;
                 }
                 if (computed.hasOwnProperty('min') && computed.min !== undefined) {
-                    parsedValue = Math.max(computed.min, parsedValue);
+                    if (settings.hasOwnProperty('validate') && settings.validate === true) {
+                        valid(parsedValue < computed.min)
+                    } else {
+                        parsedValue = Math.max(computed.min, parsedValue);
+                    }
                 }
                 if (computed.hasOwnProperty('max') && computed.max !== undefined) {
-                    parsedValue = Math.min(computed.max, parsedValue);
+                    if (settings.hasOwnProperty('validate') && settings.validate === true) {
+                        valid(parsedValue > computed.max)
+                    } else {
+                        parsedValue = Math.min(computed.max, parsedValue);
+                    }
                 }
                 if ((target() !== undefined ? target().toString() : 'undefined') !== newValue) {
                     target(parsedValue);
@@ -43,6 +66,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         }).extend({ notify: 'always' });
         computed.min = generic.tryGet(settings, 'min', undefined);
         computed.max = generic.tryGet(settings, 'max', undefined);
+        computed.valid = valid;
         computed(target());
         return computed;
     };
@@ -92,6 +116,9 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         return computed;
     };
     ko.extenders.removeWhiteSpaces = function(target) {
+        if (target() === undefined) {
+            return target
+        }
         var computed = ko.computed({
             read: target,
             write: function(newValue) {

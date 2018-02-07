@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-StorageDriver module
+StorageDriverController class responsible for making changes to existing StorageDrivers
 """
 
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -398,7 +398,7 @@ class StorageDriverController(object):
                     storagedriver_config.save()
 
     @staticmethod
-    def generate_backoff_gap_settings(cache_size):
+    def calculate_trigger_and_backoff_gap(cache_size):
         """
         Generates decent gap sizes for a given cache size
         :param cache_size: Size of the cache on which the gap sizes should be based
@@ -406,6 +406,10 @@ class StorageDriverController(object):
         :return: Dictionary with keys 'trigger' and 'backoff', containing their sizes in bytes
         :rtype: dict
         """
+        # * Information about backoff_gap and trigger_gap (Reason for 'smallest_write_partition' introduction)
+        # * Once the free space on a mount point is < trigger_gap (default 1GiB), it will be cleaned up and the cleaner attempts to
+        # * make sure that <backoff_gap> free space is available => backoff_gap must be <= size of the partition
+        # * Both backoff_gap and trigger_gap apply to each mount point individually, but cannot be configured on a per mount point base
         if cache_size is None:
             StorageDriverController._logger.warning('Got request to calculate gaps for None as cache size. Returned default (2/1GiB)'.format(cache_size))
             return {'backoff': 2 * 1024 ** 3,
@@ -419,3 +423,19 @@ class StorageDriverController(object):
             current_config = max(current_config, gap_settings[2])
             gap_configuration[gap] = current_config
         return gap_configuration
+
+    @staticmethod
+    def calculate_update_impact(storagedriver_guid, requested_config):
+        """
+        Calculate the impact of the update for a StorageDriver with a given config
+        :param storagedriver_guid: Guid of the storage driver
+        :type storagedriver_guid: str
+        :param requested_config: requested configuration
+        :type requested_config: dict
+        :return: dict indicating what will be needed to be done
+        :rtype: dict
+        """
+        # TODO: Implement for reconfiguring purposes
+        storagedriver = StorageDriver(storagedriver_guid)
+        # Get a difference between the current config and the requested one
+        return {}
