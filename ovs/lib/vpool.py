@@ -101,7 +101,7 @@ class VPoolController(object):
             # Create the vPool as soon as possible in the process to be displayed in the GUI (INSTALLING/EXTENDING state)
             if vp_installer.is_new is True:
                 vp_installer.create(rdma_enabled=sd_installer.rdma_enabled)
-                vp_installer.configure_mds(config=parameters.get('mds_config_params'))
+                vp_installer.configure_mds(config=parameters.get('mds_config_params', {}))
             else:
                 vp_installer.update_status(status=VPool.STATUSES.EXTENDING)
 
