@@ -151,8 +151,8 @@ define([
             deferEvaluation: true,  // Wait with computing for an actual subscription
             read: function () {
                 var backends = self.getVPoolBackends();
-                if (backends.length === 0) {
-                    // Update our Model
+                // Reset the current Model
+                if (backends.length === 0 && self.data.isExtend() === false) {
                     self.resetBackend();
                 }
                 return backends;
