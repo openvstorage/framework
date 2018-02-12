@@ -207,7 +207,7 @@ class SupportAgent(object):
     def _get_package_information(self):
         versions_dict = {self._client.ip: {}}
         # ALba is always installed with OpenvStorage. The current split however offloads retrieving Alba information to the AlbaNode which is not
-        # present for non openvstorage-hc installs. Therefore explicititely request the alba information like this (otherwise update will get jeopardized.
+        # present for non openvstorage-hc installs. Therefore explicititely request the alba information like this (otherwise update will get jeopardized).
         final_dict = {}
         threads = []
 
