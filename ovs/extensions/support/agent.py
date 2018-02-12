@@ -202,7 +202,9 @@ class SupportAgent(object):
 
     def _get_package_information(self):
         versions_dict = collections.OrderedDict()
-        for pkg_name, version in self._package_manager.get_installed_versions(client=self._client).iteritems():
+        # ALba is always installed with OpenvStorage. The current split however offloads retrieving Alba information to the AlbaNode which is not
+        # present for non openvstorage-hc installs. Therefore explicititely request the alba information like this (otherwise update will get jeopardized
+        for pkg_name, version in self._package_manager.get_installed_versions(client=self._client, get_alba_info=True).iteritems():
             versions_dict[pkg_name] = str(version)
         return versions_dict
 
