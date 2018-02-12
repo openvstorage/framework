@@ -58,9 +58,30 @@ class UpdateController(object):
     #########
     # HOOKS #
     #########
+
     @classmethod
     @add_hooks('update', 'get_package_info_cluster')
     def _get_package_information_cluster_fwk(cls, client, package_info):
+        packages = PackageFactory.get_version_information(client)[0]
+
+        try:
+            for component, pkg_info in packages.iteritems():
+                if component not in package_info[client.ip]:
+                    package_info[client.ip][component] = pkg_info
+                else:
+                    for package_name, package_versions in pkg_info.iteritems():
+                        package_info[client.ip][component][package_name] = package_versions
+            cls._logger.info('StorageRouter {0}: Refreshed framework package information'.format(client.ip))
+        except Exception as ex:
+            cls._logger.exception('StorageRouter {0}: Refreshing framework package information failed'.format(client.ip))
+            if 'errors' not in package_info[client.ip]:
+                package_info[client.ip]['errors'] = []
+            package_info[client.ip]['errors'].append(ex)
+
+
+    @classmethod
+    @add_hooks('update', 'get_package_update_info_cluster')
+    def _get_package_update_information_cluster_fwk(cls, client, package_info):
         """
         Retrieve information about the currently installed versions of the core packages
         Retrieve information about the versions to which each package can potentially be updated
