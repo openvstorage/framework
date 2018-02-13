@@ -25,6 +25,7 @@ import requests
 import collections
 from collections import OrderedDict
 from ConfigParser import RawConfigParser
+from distutils.version import LooseVersion
 from subprocess import check_output
 from threading import Thread
 from ovs.extensions.generic.configuration import Configuration
@@ -204,6 +205,12 @@ class SupportAgent(object):
                 self.logger.exception('Could not instantiate a local client')
         return self._client
 
+    @staticmethod
+    def _stringify_looseversion(item):
+        if isinstance(item, LooseVersion):
+            return str(item)
+        return item
+
     def _get_package_information(self):
         versions_dict = {self._client.ip: {}}
         # ALba is always installed with OpenvStorage. The current split however offloads retrieving Alba information to the AlbaNode which is not
@@ -221,13 +228,14 @@ class SupportAgent(object):
 
         for versions in versions_dict[self._client.ip].itervalues():
             for package, version in versions.iteritems():
-                str_version = str(version)
                 if package in final_dict:
-                    if str_version != final_dict[package]:
+                    if version != final_dict[package]:
                         final_dict[package] = min(version, final_dict[package])
                 else:
-                    final_dict[package] = str_version
-        return OrderedDict(sorted(final_dict.items(), key=lambda t: t[0]))
+                    final_dict[package] = version
+        sorted_dict = sorted(final_dict.items(), key=lambda t: t[0])
+        sorted_dict = OrderedDict([(key, SupportAgent._stringify_looseversion(value)) for key, value in sorted_dict])
+        return sorted_dict
 
     def _get_version_information(self):
         services = collections.OrderedDict()
