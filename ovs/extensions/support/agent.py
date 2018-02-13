@@ -219,8 +219,8 @@ class SupportAgent(object):
         for thread in threads:
             thread.join()
 
-        for _, d in versions_dict[self._client.ip].iteritems():
-            for package, version in d.iteritems():
+        for versions in versions_dict[self._client.ip].itervalues():
+            for package, version in versions.iteritems():
                 str_version = str(version)
                 if package in final_dict:
                     if str_version != final_dict[package]:
