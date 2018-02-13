@@ -26,7 +26,6 @@ from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.generic.threadhelpers import Waiter
 # noinspection PyProtectedMember
 from ovs.lib.helpers.decorators import Decorators, _ensure_single, ovs_task
-from ovs.lib.helpers.toolbox import Toolbox
 
 
 class Helpers(unittest.TestCase):
@@ -600,21 +599,6 @@ class Helpers(unittest.TestCase):
         Helpers._wait_for(condition=_check_condition('FINISHED', 'async_test_3_1_delayed'))
         Helpers._wait_for(condition=_check_condition('FINISHED', 'async_test_3_2_delayed'))
 
-    def test_version_info_function(self):
-        version_nr1 = '3.2.1'
-        version_nr2 = '2.3.5'
-        version_nr3 = '2.3.a'
-        version_nr4 = '2.2.2.2'
-        version_nr5 = 2
-
-        with self.assertRaises(excClass=ValueError):
-            Toolbox.get_lowest_version(version_nr5, version_nr3)
-        with self.assertRaises(excClass=ValueError):
-            Toolbox.get_lowest_version(version_nr4, version_nr3)
-        with self.assertRaises(excClass=ValueError):
-            Toolbox.get_lowest_version(version_nr2, version_nr3)
-        self.assertTrue(Toolbox.get_lowest_version(version_nr1, version_nr2) is version_nr2)
-        self.assertTrue(Toolbox.get_lowest_version(version_nr2, version_nr1) is version_nr2)
 
 class Callback(object):
     """

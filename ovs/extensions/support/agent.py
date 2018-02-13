@@ -221,12 +221,12 @@ class SupportAgent(object):
 
         for _, d in versions_dict[self._client.ip].iteritems():
             for package, version in d.iteritems():
-                version = str(version)
+                str_version = str(version)
                 if package in final_dict:
-                    if version != final_dict[package]:
-                        final_dict[package] = Toolbox.get_lowest_version(version, final_dict[package])
+                    if str_version != final_dict[package]:
+                        final_dict[package] = min(version, final_dict[package])
                 else:
-                    final_dict[package] = version
+                    final_dict[package] = str_version
         return OrderedDict(sorted(final_dict.items(), key=lambda t: t[0]))
 
     def _get_version_information(self):
