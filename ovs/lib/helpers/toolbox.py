@@ -345,6 +345,39 @@ class Toolbox(object):
         size = size * -1 if negative is True else size * 1
         return '{{0:.{0}f}}{{1}}'.format(decimals).format(size, units[counter])
 
+    @staticmethod
+    def get_lowest_version(version_a, version_b):
+        """
+        Returns the oldest version of 2 '.' seperated version numbers, eg: 2.3.5 and 3.2.1
+        DOES NOT SUPPORT ALPHABETICAL CHARACTERS
+        :param version_a: str
+        :param version_b: str
+        :return: oldest version number
+        :raises ValueError if inequal lenghts of version numbers are provided
+                           if non-integer characters are present in the version number
+                AttributeError if non-string parameters are passed
+        """
+        if type(version_a) is not str or type(version_b) is not str:
+            raise ValueError("Invalid argument type passed: '{0}' and '{1}' should be strings".format(version_a, version_b))
+        list_version_nr_a = version_a.split('.')
+        list_version_nr_b = version_b.split('.')
+        if len(list_version_nr_a) != len(list_version_nr_b):
+            raise ValueError("Incompatible version identifiers passed: '{0}' not of equal length as '{1}'".format(version_a, version_b))
+        for item_a, item_b in zip(list_version_nr_a, list_version_nr_b):  # Iterates over 2 lists at once
+            try:
+                item_a = int(item_a)
+                item_b = int(item_b)
+                if item_a == item_b:
+                    continue
+                if item_a > item_b:
+                    return version_b
+                else:
+                    return version_a
+            except ValueError:
+                raise ValueError("Invalid comparison between {0} and {1}: '{2}' and '{3}' could not be matched.".format(version_a, version_b, item_a, item_b))
+
+        return version_a
+
 
 class Schedule(object):
     """

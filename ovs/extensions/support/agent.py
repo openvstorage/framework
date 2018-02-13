@@ -224,7 +224,7 @@ class SupportAgent(object):
                 version = str(version)
                 if package in final_dict:
                     if version != final_dict[package]:
-                        pass #what to do
+                        final_dict[package] = Toolbox.get_lowest_version(version, final_dict[package])
                 else:
                     final_dict[package] = version
         return OrderedDict(sorted(final_dict.items(), key=lambda t: t[0]))
