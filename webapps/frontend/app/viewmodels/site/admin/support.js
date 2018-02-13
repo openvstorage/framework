@@ -209,6 +209,9 @@ define([
                                         storageRouter.metadata(data);
                                         storageRouter.versions(data.metadata.versions);
                                         storageRouter.packageNames(generic.keys(data.metadata.versions));
+                                        storageRouter.packageNames.sort(function(name1, name2) {
+                                            return name1 < name2 ? -1 : 1;
+                                        });
                                     });
                                 calls.push(self.supportMetadataHandle[storageRouter.guid()]);
                             }

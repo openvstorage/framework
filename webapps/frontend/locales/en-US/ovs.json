@@ -530,6 +530,7 @@
             "arakoon": "Arakoon",
             "openvstorage": "Open vStorage",
             "openvstorage-backend": "Open vStorage Backend",
+            "openvstorage-extensions": "Open vStorage Extensions",
             "openvstorage-sdm": "Storage Device Manager",
             "title": "Installed Packages",
             "volumedriver-no-dedup-base": "Storage Driver - Base",
