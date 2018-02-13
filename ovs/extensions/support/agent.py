@@ -233,9 +233,7 @@ class SupportAgent(object):
                         final_dict[package] = min(version, final_dict[package])
                 else:
                     final_dict[package] = version
-        sorted_dict = sorted(final_dict.items(), key=lambda t: t[0])
-        sorted_dict = OrderedDict([(key, SupportAgent._stringify_looseversion(value)) for key, value in sorted_dict])
-        return sorted_dict
+        return OrderedDict((key, self._stringify_looseversion(value)) for key, value in sorted(final_dict.items(), key=lambda v: v[0]))
 
     def _get_version_information(self):
         services = collections.OrderedDict()
