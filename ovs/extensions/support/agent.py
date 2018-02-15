@@ -23,14 +23,18 @@ import time
 import base64
 import requests
 import collections
-from subprocess import check_output
+from collections import OrderedDict
 from ConfigParser import RawConfigParser
+from distutils.version import LooseVersion
+from subprocess import check_output
+from threading import Thread
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
+from ovs.lib.helpers.toolbox import Toolbox
 
 
 class ConfigurationNotFoundError(RuntimeError):
@@ -107,6 +111,7 @@ class SupportAgent(object):
         """
         # Safe calls
         self._node_id = System.get_my_machine_id().replace(r"'", r"'\''")
+        # Alba is currently always installed but the Alba version/package info is located in the SDM section
         self._package_manager = PackageFactory.get_manager()
         self._service_manager = ServiceFactory.get_manager()
 
@@ -195,16 +200,40 @@ class SupportAgent(object):
         """
         if self._client is None:
             try:
-                self._client = SSHClient(endpoint='127.0.0.1')
+                self._client = SSHClient(endpoint='127.0.0.1', username='root')
             except Exception:
                 self.logger.exception('Could not instantiate a local client')
         return self._client
 
+    @staticmethod
+    def _stringify_looseversion(item):
+        if isinstance(item, LooseVersion):
+            return str(item)
+        return item
+
     def _get_package_information(self):
-        versions_dict = collections.OrderedDict()
-        for pkg_name, version in self._package_manager.get_installed_versions(client=self._client).iteritems():
-            versions_dict[pkg_name] = str(version)
-        return versions_dict
+        versions_dict = {self._client.ip: {}}
+        # ALba is always installed with OpenvStorage. The current split however offloads retrieving Alba information to the AlbaNode which is not
+        # present for non openvstorage-hc installs. Therefore explicititely request the alba information like this (otherwise update will get jeopardized).
+        final_dict = {}
+        threads = []
+
+        for fct in Toolbox.fetch_hooks(component='update', sub_component='get_package_info_cluster'):
+            thread = Thread(target=fct, args=(self._client, versions_dict))
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        for versions in versions_dict[self._client.ip].itervalues():
+            for package, version in versions.iteritems():
+                if package in final_dict:
+                    if version != final_dict[package]:
+                        final_dict[package] = min(version, final_dict[package])
+                else:
+                    final_dict[package] = version
+        return OrderedDict((key, self._stringify_looseversion(value)) for key, value in sorted(final_dict.items(), key=lambda v: v[0]))
 
     def _get_version_information(self):
         services = collections.OrderedDict()

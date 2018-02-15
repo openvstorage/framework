@@ -301,7 +301,7 @@ class GenericController(object):
         GenericController._logger.debug('Retrieving package information for the cluster')
         threads = []
         for storagerouter, client in client_map.iteritems():
-            for fct in Toolbox.fetch_hooks(component='update', sub_component='get_package_info_cluster'):
+            for fct in Toolbox.fetch_hooks(component='update', sub_component='get_package_update_info_cluster'):
                 thread = Thread(target=fct, args=(client, package_info_cluster))
                 thread.start()
                 threads.append(thread)

@@ -396,7 +396,8 @@ class StorageRouterController(object):
                 stats_monkey_celery_config['alba.stats_monkey.run_all'] = None
 
             Configuration.set(key=stats_monkey_celery_key, value=stats_monkey_celery_config)
-            for root_client in root_clients.itervalues():
+            for storagerouter in StorageRouterList.get_masters():
+                root_client = root_clients[storagerouter]
                 StorageRouterController._logger.debug('Restarting ovs-scheduled-tasks service on node with IP {0}'.format(root_client.ip))
                 StorageRouterController._service_manager.restart_service(name=service_name, client=root_client)
 

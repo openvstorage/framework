@@ -538,12 +538,14 @@
             "arakoon": "Arakoon",
             "openvstorage": "Open vStorage",
             "openvstorage-backend": "Open vStorage Backend",
+            "openvstorage-extensions": "Open vStorage Extensions",
             "openvstorage-sdm": "Storage Device Manager",
             "title": "Installed Packages",
             "volumedriver-no-dedup-base": "Storage Driver - Base",
             "volumedriver-no-dedup-server": "Storage Driver - Server",
             "volumedriver-ee-base": "Storage Driver Enterprise Edition - Base",
-            "volumedriver-ee-server": "Storage Driver Enterprise Edition - Server"
+            "volumedriver-ee-server": "Storage Driver Enterprise Edition - Server",
+            "openvstorage-iscsi-plugin": "Open vStorage iSCSI plugin"
         },
         "product": "Open vStorage",
         "settings": {
