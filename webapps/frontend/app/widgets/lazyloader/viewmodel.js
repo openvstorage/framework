@@ -30,30 +30,27 @@ define([
         self.undefinedLoading = ko.observable(true);
 
         // Computed
-        self.isLoaded = ko.computed(function() {
-            var observable = self._item();
-            if (observable === undefined) {
+        self.isLoaded = ko.pureComputed(function() {
+            // Item can either by a native object, observable or a viewModel with observable properties
+            var item = ko.utils.unwrapObservable(self._item());
+            if ([undefined, null].contains(item)){
                 return false;
             }
-            if (observable.hasOwnProperty(self.loadedObservable)) {
-                return observable[self.loadedObservable]();
-            }
-            if (!observable.call || observable() === undefined) {
-                return false;
-            }
-            if (observable().hasOwnProperty(self.loadedObservable)) {
-                return observable()[self.loadedObservable]();
+            if (item.hasOwnProperty(self.loadedObservable)) {
+                return item[self.loadedObservable]();
             }
             return true;
         });
-        self.item = ko.computed(function() {
-            var returnValue = self._item();
-            if (returnValue !== undefined) {
-                return returnValue();
-            }
-            return returnValue;
+        self.item = ko.pureComputed(function() {
+            return ko.utils.unwrapObservable(self._item());
+        });
+        self.itemHasValue = ko.pureComputed(function() {
+            return ![null, undefined].contains(ko.utils.unwrapObservable(self._item())) || self.undefinedLoading()
         });
 
+        self.itemIsUndefined = ko.pureComputed(function() {
+           return ko.utils.unwrapObservable(self._item()) === undefined && !self.undefinedLoading()
+        });
         // Durandal
         self.activate = function(settings) {
             if (!settings.hasOwnProperty('item')) {

@@ -68,12 +68,12 @@ class ContentOptions(object):
         self.content_options = {}
         self.has_content = False
         if contents is not None:
-            if isinstance(contents, str):
+            if isinstance(contents, basestring):
                 contents_list = contents.split(',')
             elif isinstance(contents, list):
                 contents_list = contents
             else:
-                raise UnsupportContentException('Contents should be a comma-separated list')
+                raise UnsupportContentException('Contents should be a comma-separated list instead of \'{0}\''.format(contents))
         else:
             return
         self.has_content = True
@@ -255,7 +255,7 @@ class FullSerializer(serializers.Serializer):
                 relation_key = relation.name if relation_type == 'own' else relation
                 relation_hybrid = relation.foreign_type if relation_type == 'own' else Descriptor().load(relations[relation]['class']).get_object()
                 # Possible extra content supplied for a relation
-                relation_content = contents.get_option('_relation_content_{0}'.format(relation_key))
+                relation_content = contents.get_option('_relation_contents_{0}'.format(relation_key))
                 if relation_content is None and relation_contents == 're-use':
                     relation_content_options = relation_contents_options
                 else:
@@ -267,7 +267,7 @@ class FullSerializer(serializers.Serializer):
                 if relation_depth == 0:
                     continue
                 # @Todo prevent the same one-to-one relations from being serialized multiple times? Not sure if helpful though
-                self.fields[relation_key] = FullSerializer(relation_hybrid, contents=relation_content_options, depth=relation_depth - 1, *args, **kwargs)
+                self.fields[relation_key] = FullSerializer(relation_hybrid, contents=relation_content_options, depth=relation_depth - 1)
 
     def get_identity(self, data):
         """

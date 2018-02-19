@@ -761,6 +761,25 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
 		};
     String.prototype.format.regex = new RegExp("{-?[0-9]+}", "g");
 
+    JSON.stringifyOnce = function (obj, replacer, space) {
+        // Function to remove all circular references (could prove useful while debugging).
+        // Usage: JSON.stringifyOnce(ko.toJS(item));
+        var cache = [];
+        var json = JSON.stringify(obj, function(key, value) {
+            if (typeof value === 'object' && value !== null) {
+                if (cache.indexOf(value) !== -1) {
+                    // Circular reference found, discard key
+                    return;
+                }
+                // Store value in our collection
+                cache.push(value);
+            }
+            return replacer ? replacer(key, value) : value;
+        }, space);
+        cache = null;
+        return json;
+    };
+
     return {
         // Vars
         ipRegex: ipRegex,
