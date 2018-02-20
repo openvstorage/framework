@@ -20,7 +20,6 @@ Arakoon ResultBackend Module
 import time
 import yaml
 from celery.backends.base import KeyValueStoreBackend
-from ovs.dal.dataobject import DataObject
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.storage.exceptions import KeyNotFoundException
@@ -128,9 +127,7 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         :param value: Value to store
         :return: True if successful, false if not
         """
-        # @Todo allow for deserializing of DataObject (storing the Descriptor in arakoon)
-        if isinstance(value, DataObject):
-            value = value.serialize()
+        # @Todo allow DataObjects to be stored and retrieved
         return self._client.set(key, {'data': value, 'time_set': time.time()})
 
     def get_key_for_task(self, *args, **kwargs):
