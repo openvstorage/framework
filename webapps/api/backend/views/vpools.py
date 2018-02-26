@@ -91,20 +91,21 @@ class VPoolViewSet(viewsets.ViewSet):
         :param storagerouter_guid: Guid of the Storage Router
         :type storagerouter_guid: str
         """
-        backend_info = vpool.metadata['backend']['backend_info']
-        preset_name = backend_info['preset']
-        # Check if the policy is satisfiable before shrinking - Doing it here so the issue is transparent in the GUI
-        alba_backend_guid = backend_info['alba_backend_guid']
-        api_url = 'alba/backends/{0}'.format(alba_backend_guid)
-        connection_info = backend_info['connection_info']
-        ovs_client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
-        _presets = ovs_client.get(api_url, params={'contents': 'presets'})['presets']
-        try:
-            _preset = filter(lambda p: p['name'] == preset_name, _presets)[0]
-            if _preset['is_available'] is False:
-                raise RuntimeError('Policy is currently not satisfied: cannot shrink vPool {0} according to preset {1}'.format(vpool.name, preset_name))
-        except IndexError:
-            pass
+        if len(vpool.vdisks) > 0:  # Check to prevent obsolete testing
+            backend_info = vpool.metadata['backend']['backend_info']
+            preset_name = backend_info['preset']
+            # Check if the policy is satisfiable before shrinking - Doing it here so the issue is transparent in the GUI
+            alba_backend_guid = backend_info['alba_backend_guid']
+            api_url = 'alba/backends/{0}'.format(alba_backend_guid)
+            connection_info = backend_info['connection_info']
+            ovs_client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
+            _presets = ovs_client.get(api_url, params={'contents': 'presets'})['presets']
+            try:
+                _preset = filter(lambda p: p['name'] == preset_name, _presets)[0]
+                if _preset['is_available'] is False:
+                    raise RuntimeError('Policy is currently not satisfied: cannot shrink vPool {0} according to preset {1}'.format(vpool.name, preset_name))
+            except IndexError:
+                pass
 
         # Raise if not satisfied
         sr = StorageRouter(storagerouter_guid)
