@@ -15,7 +15,7 @@ Depends: aptdaemon, rabbitmq-server (>= 3.2.4), python-memcache (>= 1.47-2), mem
  python-kombu (>= 3.0.7), python-kombu (<< 3.1), python-celery (= 3.1.23-5), python-celery-common (= 3.1.23-5),
  python-pika, python-six, python-protobuf, python-pyudev, sshpass, at,
  python-billiard (>= 3.3.0.20), python-billiard (<< 3.3.1),
- python-requests (>=2.9.1), redis-server, python-redis, python-ujson,
+ python-requests (>=2.9.1), redis-server, python-redis, python-ujson, python-yaml,
  openvstorage-extensions (>= 0.1.1)
 Recommends: avahi-utils (>= 0.6.31), openvpn, ntp
 Description: OpenvStorage core
