@@ -147,10 +147,21 @@ class ArakoonResultBackend(KeyValueStoreBackend):
 
     def cleanup(self):
         """
-        Delete expired metadata.
+        Delete expired metadata. It will not remove results of tasks that are 'STARTED', 'PENDING' or 'RETRY' as the user
+        would not be able to retrieve the information of the task if it would be removed
+        The clean up task is scheduled by the celery beat. The default expires is 1 day (can be overruled in the settings)
         """
+
         for key, value in self._client.prefix_entries(self._NAMESPACE_PREFIX):
-            if isinstance(value, dict) and 'time_set' in value:
-                if time.time() - value['time_set'] > self.expires:
-                    self._logger.debug('Removing {0} as it has expired'.format(key))
-                    self._client.delete(key, must_exist=False)
+            if isinstance(value, dict):
+                if all(k in value for k in ['time_set', 'data']):  # Dealing with a wrapped instance
+                    data = value.get('data')
+                    if isinstance(data, dict) and 'status' in data:  # Check for state
+                        status = data['status']
+                        # All possible states: PENDING, STARTED, RETRY, FAILURE, SUCCESS
+                        if status in ['STARTED', 'RETRY', 'PENDING']:
+                            self._logger.debug('Not removing {0} as it has not finished'.format(key))
+                            continue
+                    if time.time() - value['time_set'] > self.expires:
+                        self._logger.debug('Removing {0} as it has expired'.format(key))
+                        self._client.delete(key, must_exist=False)
