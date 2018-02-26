@@ -157,7 +157,7 @@ else:
     celery.conf.CELERYBEAT_SCHEDULE = {}
     celery.conf.CELERY_TRACK_STARTED = True  # http://docs.celeryproject.org/en/latest/configuration.html#std:setting-CELERY_TRACK_STARTED
     celery.conf.CELERYD_HIJACK_ROOT_LOGGER = False
-    celery.conf.CELERY_RESULT_SERIALIZER = 'json'  # Change default pickle to json
+    celery.conf.CELERY_RESULT_SERIALIZER = 'yaml'  # Change default pickle to YAML as it support more typing than JSON
 
 
 @task_postrun.connect
