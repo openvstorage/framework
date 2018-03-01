@@ -19,34 +19,47 @@ define([
 ], function($, ko) {
     "use strict";
     // Return a constructor for a basic viewModel
-    var baseModel = function() {
+    function BaseModel()  {
         var self = this;
 
         // Functions
+        // @Todo cleanup these instanced methods as they do not support prototypical inheritance
+        // These methods are currently pointing towards the prototyped function for backwards compatibility
+        self.toJSON = function(){
+            BaseModel.prototype.toJSON.call(self);
+        };
+        self.toJS = function() {
+            BaseModel.prototype.toJS.call(self)
+        };
+        self.update = function(data) {
+            BaseModel.prototype.update.call(self, data)
+        }
+    }
+    BaseModel.prototype = {
         /**
          * Return a JSON representation of this object
          * Will respect the mapping applied to the viewModel
          * @return {string|*}
          */
-        self.toJSON = function(){
-            return ko.toJSON(self.toJS())
-        };
+        toJSON: function () {
+            return ko.toJSON(this.toJS())
+        },
         /**
          * Return a javascript Object from this object
          * Will respect the mapping applied to the viewModel
          * @return {object}
          */
-        self.toJS = function() {
-            return ko.mapping.toJS(self)
-        };
+        toJS: function() {
+            return ko.mapping.toJS(this)
+        },
         /**
          * Update the current view model with the supplied data
          * @param data: Data to update on this view model (keys map with the observables)
          * @type data: Object
          */
-        self.update = function(data) {
-            ko.mapping.fromJS(data, self)
+        update: function(data) {
+            ko.mapping.fromJS(data, this)
         }
     };
-    return baseModel;
+    return BaseModel;
 });
