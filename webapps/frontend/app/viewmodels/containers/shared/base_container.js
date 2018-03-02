@@ -22,6 +22,9 @@ define([
     function BaseModel()  {
         var self = this;
 
+        // Variables
+        self.disposables = [];
+
         // Functions
         // @Todo cleanup these instanced methods as they do not support prototypical inheritance
         // These methods are currently pointing towards the prototyped function for backwards compatibility
@@ -36,6 +39,26 @@ define([
         }
     }
     BaseModel.prototype = {
+        /**
+         * Disposes all possible subscriptions (Events/subscriptions/...)
+         * Ideally called in the deactivator
+         */
+        dispose: function() {
+            $.each(this.disposables, this.disposeOne);  // Remove the registered disposables
+            $.each(this, this.disposeOne);  // Loop over all properties and check if they are disposable, if so, dispose
+        },
+        // little helper that handles being given a value or prop + value
+        /**
+         *
+         * @param propOrValue: Property key or value (key in case of an object, value in case of array)
+         * @param value: Value (Provided in case this function was passed as a callback to an object loop)
+         */
+        disposeOne: function(propOrValue, value) {
+            var disposable = value || propOrValue;
+            if (disposable && typeof disposable.dispose === "function") {
+                disposable.dispose();
+            }
+        },
         /**
          * Return a JSON representation of this object
          * Will respect the mapping applied to the viewModel
