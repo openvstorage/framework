@@ -19,12 +19,19 @@ define([
 ], function($, ko) {
     "use strict";
     // Return a constructor for a basic viewModel
+    var IDKeys = ['guid', 'id'];
     function BaseModel()  {
         var self = this;
 
         // Variables
         self.disposables = [];
 
+        // computed
+        self.initialized = ko.pureComputed(function() {
+            return IDKeys.some(function(key) {
+                return !!ko.utils.unwrapObservable(self[key])
+            });
+        });
         // Functions
         // @Todo cleanup these instanced methods as they do not support prototypical inheritance
         // These methods are currently pointing towards the prototyped function for backwards compatibility
@@ -43,9 +50,12 @@ define([
          * Disposes all possible subscriptions (Events/subscriptions/...)
          * Ideally called in the deactivator
          */
-        dispose: function() {
-            $.each(this.disposables, this.disposeOne);  // Remove the registered disposables
+        disposeAll: function() {
+            this.disposeDisposables();
             $.each(this, this.disposeOne);  // Loop over all properties and check if they are disposable, if so, dispose
+        },
+        disposeDisposables: function() {
+            $.each(this.disposables, this.disposeOne);  // Remove the registered disposables
         },
         // little helper that handles being given a value or prop + value
         /**
@@ -55,8 +65,11 @@ define([
          */
         disposeOne: function(propOrValue, value) {
             var disposable = value || propOrValue;
-            if (disposable && typeof disposable.dispose === "function") {
+            if (disposable && typeof disposable.dispose === "function") {  // Clean up subscriptions
                 disposable.dispose();
+            }
+            else if (disposable && typeof disposable.off === "function") {  // Clean up event subscriptions
+                disposable.off();
             }
         },
         /**
