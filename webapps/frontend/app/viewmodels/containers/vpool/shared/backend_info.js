@@ -25,12 +25,12 @@ define([
     var backendInfoMapping = {
         'connection_info': {
             create: function (options) {
-                if (options.data !== null) return new connectionInfoViewModel(options.data);
+                if (options.data !== null) return new ConnectionInfoViewModel(options.data);
             }
         }
     };
     var connectionInfoMapping = {};
-    var backendInfoViewModel = function(data) {
+    function BackendInfoViewModel(data) {
         var self = this;
 
         // Inherit from base
@@ -73,8 +73,9 @@ define([
         self.isLocalBackend = ko.pureComputed(function() {
             return self.connection_info.isLocalBackend()
         });
-    };
-    var connectionInfoViewModel = function(data) {
+    }
+    BackendInfoViewModel.prototype = $.extend({}, BaseModel.prototype);
+    function ConnectionInfoViewModel(data) {
         var self = this;
 
         // Inherit from base
@@ -124,6 +125,7 @@ define([
             });
             return hasRemoteInfo;
         });
-    };
-    return backendInfoViewModel;
+    }
+    ConnectionInfoViewModel.prototype = $.extend({}, BaseModel.prototype);
+    return BackendInfoViewModel;
 });

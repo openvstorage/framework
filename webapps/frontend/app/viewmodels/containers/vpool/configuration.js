@@ -209,5 +209,6 @@ define([
             // self.non_disposable_scos_factor(newSettings.non_disposable_scos_factor);
        }
     };
+    ConfigurationViewModel.prototype = $.extend({}, BaseModel.prototype);
     return ConfigurationViewModel;
 });

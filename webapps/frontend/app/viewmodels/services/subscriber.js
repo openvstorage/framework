@@ -41,7 +41,7 @@ define([
     }
     var functions = {
         /**
-         * Creates a subscription or registers a callback for the specified event.
+         * Creates a subscription or registers a callback for the specified event which is registered under a context.
          * @method on
          * @param {string} events One or more events, separated by white space.
          * @param {function} [callback] The callback function to invoke when the event is triggered. If `callback` is not provided, a subscription instance is returned.
@@ -49,13 +49,14 @@ define([
          * @param {object} [context] An object to use as `this` when invoking the `callback`.
          * @return {Subscription|Events} A subscription is returned if no callback is supplied, otherwise the events object is returned for chaining.
          */
-        on: function(events, viewModelContext, callback, context) {
+        onEvents: function(events, viewModelContext, callback, context) {
             var self = this;
             if (typeof viewModelContext === "undefined") { viewModelContext = baseContext }
             if (!(viewModelContext in self.subscriptions)) {
                 self.subscriptions[viewModelContext] = []
             }
-            return self.subscriptions[viewModelContext][self.subscriptions[viewModelContext].push( Events.prototype.on(events, callback, context)) - 1]
+            var insertIndex = self.subscriptions[viewModelContext].push( self.on(events, callback, context));
+            return self.subscriptions[viewModelContext][insertIndex - 1]
         },
         /**
          * Dispose all subscriptions for a given context

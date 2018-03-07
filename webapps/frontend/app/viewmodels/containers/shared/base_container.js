@@ -20,6 +20,9 @@ define([
     "use strict";
     // Return a constructor for a basic viewModel
     var IDKeys = ['guid', 'id'];
+    // @Todo figure something out to map guid updates to a different model and to reset that model when the guid changes
+    // Example: storagerouter_guid -> changed because of updating mapping trigger -> reset this.storagerouter and load in new guid
+    // The basemodel should overrule his update to check these changed
     function BaseModel()  {
         var self = this;
 
@@ -32,18 +35,6 @@ define([
                 return !!ko.utils.unwrapObservable(self[key])
             });
         });
-        // Functions
-        // @Todo cleanup these instanced methods as they do not support prototypical inheritance
-        // These methods are currently pointing towards the prototyped function for backwards compatibility
-        self.toJSON = function(){
-            BaseModel.prototype.toJSON.call(self);
-        };
-        self.toJS = function() {
-            BaseModel.prototype.toJS.call(self)
-        };
-        self.update = function(data) {
-            BaseModel.prototype.update.call(self, data)
-        }
     }
     BaseModel.prototype = {
         /**
