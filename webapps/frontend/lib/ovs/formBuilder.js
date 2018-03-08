@@ -339,7 +339,7 @@ define([
          */
         questions = (typeof questions !== 'undefined') ? questions : formQuestions;
         fieldMapping = (typeof fieldMapping !== 'undefined') ? fieldMapping : formFieldMapping;
-        var formItem =questions.splice(ko.utils.unwrapObservalbe(index), 1)[0];
+        var formItem =questions.splice(ko.utils.unwrapObservable(index), 1)[0];
         // Remove left over data entries
         fieldMapping()[formItem().field()].observable.remove(formItem().data);
         var ids = fieldMapping()[formItem().field()].ids;
