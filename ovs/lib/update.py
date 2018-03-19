@@ -178,7 +178,7 @@ class UpdateController(object):
 
                         # For Arakoon we retrieve the clusters which have been deployed and verify whether they need a restart
                         if component == PackageFactory.COMP_FWK:
-                            cluster_names = ['ovsdb', 'config']
+                            cluster_names = ['ovsdb', 'cacc']
                         elif component == PackageFactory.COMP_SD:
                             cluster_names = ['voldrv'] if len(VPoolList.get_vpools()) > 0 else []
                         else:
