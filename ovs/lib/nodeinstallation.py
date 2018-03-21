@@ -748,7 +748,7 @@ class NodeInstallationController(object):
             service_manager.register_service(node_name=machine_id,
                                              service_metadata=arakoon_installer.service_metadata[cluster_ip])
         else:
-            arakoon_cacc_cluster = 'cacc'
+            arakoon_cacc_cluster = Configuration.ARAKOON_NAME
             arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cacc_cluster)
             arakoon_installer.load(ip=cluster_ip)
             arakoon_installer.claim_cluster()
