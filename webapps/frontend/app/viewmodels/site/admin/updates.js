@@ -188,6 +188,7 @@ define([
                                     $.each(pluginInfo, function(packageName, packageInfo) {
                                         var pkg = {};
                                         pkg.name = packageName;
+                                        pkg.tooltip = self.getTooltip(packageInfo);
                                         pkg.candidate = packageInfo.candidate;
                                         pkg.installed = packageInfo.installed.replace('-reboot', '');
                                         packages.push(pkg);
