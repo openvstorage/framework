@@ -72,7 +72,7 @@ class Watcher(object):
                 from ovs.extensions.generic.configuration import Configuration
                 with open(Configuration.CACC_LOCATION) as config_file:
                     contents = config_file.read()
-                config = ArakoonClusterConfig(cluster_id='cacc', load_config=False)
+                config = ArakoonClusterConfig(cluster_id=Configuration.ARAKOON_NAME, load_config=False)
                 config.read_config(contents=contents)
                 client = ArakoonInstaller.build_client(config)
                 contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())

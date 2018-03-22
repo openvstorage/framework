@@ -78,7 +78,6 @@ class UpdateController(object):
                 package_info[client.ip]['errors'] = []
             package_info[client.ip]['errors'].append(ex)
 
-
     @classmethod
     @add_hooks('update', 'get_package_update_info_cluster')
     def _get_package_update_information_cluster_fwk(cls, client, package_info):
@@ -178,7 +177,7 @@ class UpdateController(object):
 
                         # For Arakoon we retrieve the clusters which have been deployed and verify whether they need a restart
                         if component == PackageFactory.COMP_FWK:
-                            cluster_names = ['ovsdb', 'config']
+                            cluster_names = ['ovsdb', Configuration.ARAKOON_NAME]
                         elif component == PackageFactory.COMP_SD:
                             cluster_names = ['voldrv'] if len(VPoolList.get_vpools()) > 0 else []
                         else:
@@ -193,7 +192,7 @@ class UpdateController(object):
 
                             if package_name in pkg_component_info or arakoon_service_version is not None:
                                 arakoon_update_info = ArakoonInstaller.get_arakoon_update_info(cluster_name=actual_cluster_name,
-                                                                                               ip=StorageRouterList.get_masters()[0].ip if internal_cluster_name == 'config' else None)
+                                                                                               ip=StorageRouterList.get_masters()[0].ip if internal_cluster_name == Configuration.ARAKOON_NAME else None)
                                 if arakoon_update_info['internal'] is False:
                                     cls._logger.debug('StorageRouter {0}: Arakoon cluster {1} is externally managed'.format(client.ip, internal_cluster_name))
                                     continue
@@ -379,7 +378,7 @@ class UpdateController(object):
             for service_name in arakoon_services:
                 try:
                     cluster_name = ArakoonInstaller.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'ovs-arakoon-'))
-                    ip = System.get_my_storagerouter().ip if cluster_name == 'config' else None
+                    ip = System.get_my_storagerouter().ip if cluster_name == Configuration.ARAKOON_NAME else None
                     arakoon_metadata = ArakoonInstaller.get_arakoon_update_info(cluster_name=cluster_name, ip=ip)
                     if arakoon_metadata['internal'] is True:
                         arakoon_installer = ArakoonInstaller(cluster_name=cluster_name)

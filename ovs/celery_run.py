@@ -22,6 +22,7 @@ from __future__ import absolute_import
 
 import os
 import uuid
+import yaml
 import threading
 import traceback
 from celery import Celery
@@ -29,7 +30,9 @@ from celery.backends import BACKEND_ALIASES
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
 from celery.task.control import inspect
 from kombu import Queue
+from kombu.serialization import register
 from threading import Thread
+from ovs.extensions.celery.extendedyaml import YamlExtender
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
@@ -120,7 +123,8 @@ if os.environ.get('RUNNING_UNITTESTS') == 'True':
 else:
     # Update the BACKEND_ALIASES when this item is loaded in (to support the Arakoon backend)
     BACKEND_ALIASES.update({'arakoon': 'ovs.extensions.celery.arakoonresult:ArakoonResultBackend'})
-
+    # Register the YAML encoder
+    register('ovsyaml', YamlExtender.ordered_dump, yaml.safe_load, content_type='application/x-yaml', content_encoding='utf-8')
     memcache_servers = Configuration.get('/ovs/framework/memcache|endpoints')
     rmq_servers = Configuration.get('/ovs/framework/messagequeue|endpoints')
 
@@ -156,7 +160,7 @@ else:
     celery.conf.CELERYBEAT_SCHEDULE = {}
     celery.conf.CELERY_TRACK_STARTED = True  # http://docs.celeryproject.org/en/latest/configuration.html#std:setting-CELERY_TRACK_STARTED
     celery.conf.CELERYD_HIJACK_ROOT_LOGGER = False
-    celery.conf.CELERY_RESULT_SERIALIZER = 'yaml'  # Change default pickle to YAML as it support more typing than JSON
+    celery.conf.CELERY_RESULT_SERIALIZER = 'ovsyaml'  # Change default pickle to ovsyaml as it support more typing than JSON
 
 
 @task_postrun.connect

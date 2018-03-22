@@ -29,6 +29,7 @@ from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
@@ -235,7 +236,7 @@ class GenericController(object):
                                                                      ServiceType.SERVICE_TYPES.NS_MGR,
                                                                      ServiceType.SERVICE_TYPES.ALBA_MGR):
                 cluster = ExtensionsToolbox.remove_prefix(service.name, 'arakoon-')
-                if cluster in cluster_names and cluster not in ['cacc', 'unittest-cacc']:
+                if cluster in cluster_names and cluster not in [Configuration.ARAKOON_NAME, Configuration.ARAKOON_NAME_UNITTEST]:
                     continue
                 cluster_names.append(cluster)
                 cluster_info.append((cluster, service.storagerouter))
@@ -243,7 +244,7 @@ class GenericController(object):
         cluster_config_map = {}
         for cluster, storagerouter in cluster_info:
             GenericController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
-            ip = storagerouter.ip if cluster in ['cacc', 'unittest-cacc'] else None
+            ip = storagerouter.ip if cluster in [Configuration.ARAKOON_NAME, Configuration.ARAKOON_NAME_UNITTEST] else None
             try:
                 config = ArakoonClusterConfig(cluster_id=cluster, source_ip=ip)
                 cluster_config_map[cluster] = config
