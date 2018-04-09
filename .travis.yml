@@ -1,33 +1,24 @@
 sudo: required
 dist: trusty
-
 language: python
 python:
-  - "2.7"
-
+- '2.7'
 env:
+  global:
+  - secure: PYJd6H9g0aIbFyTYt1m/zZeRcb4Ai7xPxYtaARwQHPdX02OtCZb1e/f2kXekh2FUgfcHz50QToXQSopifXBw5wBjVy33ds6nlMqcDMvelmXbj5HalgJST5i25AP/EMxDfix2CqRvowIu5ful+H+8k1T5LHwCPgpgb7tA4N4ALbj4JB7uziPuUt1qYJwy6F6L+uJeoIr2Eu/+ipV8y1Mcr3RcD6v8XtlrgqDFaiwD3SI76SVEfOnzOl8pik85YtIA44ac2CfUzsAs9XxW410EX/KiTPKIh5xvjiOjFyMnOwnpZteVvdLFfDsJICdfu76jjjZaPzubEpE0k8axkQn7WXvQ4Lb8VNtZAzBPBehYdV4mQK2NPKPyR57+3sIBQ9r5ouqMTo1WEq0i7JU4qbXHap/05LC+DFRC/zB0LaOu82bi0AX6wx6Aie5aPWVAVKXsXSghnNSzVDT6sC87waLf+v52V60C1R3m5Ps6PDfCslMbGI3SHPgGwrrGUrYFt9P4AuJCHhB1u5YmirvI0/dLnTO59h2qNhCQL00o1rlI+l6nmIE3J6vNOidjoiOcNkq1xhuiepGRPT3NP38qJQB5XRLTpzJUX/Ih222bW1+f0ajIV0uIJyqnAn0b/aEjuG2XodsnZIX44jfr+u/H4YA8sw3dTz4Gsjdp9+3jrNV8BoQ=
+  matrix:
   - distribution: ubuntu:16.04
-#  - distribution: ubuntu:14.04
-
 notifications:
   email: false
   slack:
     rooms:
       secure: Ze8lCMV8b38bfesOMfmAYchAde0c23BMkz4PVc1g1p4sdGBSvrfGx15l8Mp4hfoOme51+wctGa38z42HiESCe0hjM2mEkh2OljxNs39Ug/ZpCBveEi63tt/tIfqBjm16Fvi73Y9LvjTOSKB7isaPaUMgh4QDEZJ0SgN7aIhP/9DOnKVPwX0AcYDO4Bk4Gu9wM9jMoe8wAE1lalZa7iTtTG5L+EtTbok3NhiRKxKRuNOSAtP/8aHsp46lZL64Fix3i6RKXE+DjU5hzXchMwF3Qp0hr63S9G+KnK6H3JRQEsUUdjYQ7nKDMZRI9VQUlncGCjTgz1xLcknhMZ/eAagm82youMkzPgE/HDpfirwWF+G0Vu8DIbKiAuXcfVElhw+d4aoE8HWQkTFxaP057br28NPI2QgPTMDldq3ZakoEgI3PvGyZx4mxYRUWqKKzgl8PQu9cMEfp2x3y+tvEqCxByDvfjZOYn627O1MvxsrLpKEP+6TNRY15q+bKbMXuAJmqD+Ez0KVMbxKVlHot+FXGbEjLQsZqfrD4nQqdweaeMa5Na3NUHXhzOQFk5TrD1PSmjaG7t47qn3T5aDkgBwsbgY8WR2eFkQhGSAHYE96QoSpxibe4eYYf+zXX0gcgHUMWh7T5tW5kvaq/vAcFT99hgsL07UWQ5DGOZCOpIctE2Ik=
-
 services:
-  - docker
-
+- docker
 before_install:
-  - env | sort
-  - docker --version
-  - repo=`python scripts/travis/repository_resolver.py`
+- env | sort
+- docker --version
 install:
-  - docker pull ${distribution}
-  - docker build --cache-from ${distribution} --tag fwk --build-arg repo=${repo} --file scripts/travis/docker/${distribution}/Dockerfile .
-  - docker run -dit --name fwk fwk  # Run it detached, with stdin open and TTY to keep it running
-  - docker ps -a
-script:
-  - docker exec -it fwk bash -c "export PYTHONPATH=${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps; ovs unittest"
+- bash scripts/docker/install_docker.sh ${distribution} ${repo_url}
 after_failure:
-  - docker logs fwk
+- docker logs fwk
