@@ -18,7 +18,8 @@ services:
 before_install:
 - env | sort
 - docker --version
-install:
+script:
+  # Has to be under script or Travis won't take the exitcode of the output to mark the build
 - bash scripts/docker/install_docker.sh ${distribution} ${repo_url}
 after_failure:
 - docker logs fwk
