@@ -20,7 +20,8 @@ class RepoMapper
 """
 
 import os
-from subprocess import Popen, PIPE
+import argparse
+from subprocess import check_output, Popen, PIPE
 
 
 class RepositoryResolver(object):
@@ -31,38 +32,51 @@ class RepositoryResolver(object):
                'develop': 'fwk-develop'}
 
     @classmethod
-    def get_repository(cls):
+    def get_repository(cls, branch=None, on_travis=False):
+        # type: (str, bool) -> str
         """
         Gets the repository associated with the branch travis is working on
+        :param branch: Name of the branch the repository is currently on
+        :type branch: str
+        :param on_travis: Indicate that the script is running on an environment from Travis
+        :type on_travis: bool
         :return: Name of the repository
         :rtype: str
         """
-        branch = os.environ.get('TRAVIS_BRANCH')
+        if branch is None:
+            if on_travis is True:
+                branch = os.environ.get('TRAVIS_BRANCH')
+            else:
+                branch = check_output('git branch | grep -e "^*" | cut -d" " -f 2', shell=True).strip()
         if branch not in cls.MAPPING:
             # If the branch is not in the mapping by default, figure out it's parent
-            branch = cls.determine_parent()  # Let it throw an error when it could not determine the parent
+            branch = cls.determine_parent(branch, on_travis)  # Let it throw an error when it could not determine the parent
             if branch not in cls.MAPPING:
                 raise RuntimeError('Unable to fetch the right release for branch {0}'.format(branch))
         return cls.MAPPING[branch]
 
     @classmethod
-    def determine_parent(cls):
+    def determine_parent(cls, branch, on_travis):
+        # type: (str, bool) -> str
         """
         When working with a branch which branched of from either master or develop
         knowing which branch it was is necessary to install the correct packaged
+        :param branch: Name of the branch the repository is currently on
+        :type branch: str
+        :param on_travis: Indicate that the script is running on an environment from Travis
+        :type on_travis: bool
         :raises RunTimeError: If the parent branch name could not be found
         :return: Parent branch
         :rtype: str
         """
         # Validation
-        if os.environ.get('TRAVIS_PULL_REQUEST') is False:
+        if on_travis is True and os.environ.get('TRAVIS_PULL_REQUEST') is False:
             # Travis will be performing a merge and run the tests on the result of the merge when it's a PR
             # To currently check which apt-repo to use, we need to restore the HEAD reference by checking out the branch we would test on
             # However this would mean we'd lose the merge and thus would be testing the wrong things
             raise RuntimeError('Travis is currently not supporting pull requests on branches other than master and develop')
         cls.fetch_remote()
         parent_branch = None
-        branch = os.environ.get('TRAVIS_BRANCH')
         # Find the newest common ancestor (aka fork point)
         fork_point_develop = Popen(['git', 'merge-base', branch, 'origin/develop'], stdout=PIPE, stderr=PIPE).communicate()[0].strip()
         fork_point_master = Popen(['git', 'merge-base', branch, 'origin/master'], stdout=PIPE, stderr=PIPE).communicate()[0].strip()
@@ -81,6 +95,7 @@ class RepositoryResolver(object):
 
     @staticmethod
     def fetch_remote():
+        # type: () -> None
         """
         Reconfigure the git config to fetch all remote metadata
         :return: None
@@ -92,10 +107,13 @@ class RepositoryResolver(object):
 
     @staticmethod
     def remove_prefix(text, prefix):
+        # type: (str, str) -> str
         """
         Removes a given prefix from a string
         :param text: String to remove prefix from
+        :type text: str
         :param prefix: Prefix to remove
+        :type prefix: str
         :return: Passed in text with or without the prefix
         :rtype: str
         """
@@ -105,5 +123,9 @@ class RepositoryResolver(object):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(prog='Repository resolver', description='Finds the closest ancestor to the current supplied branch')
+    parser.add_argument('-b', '--branch', default=None, help="The branch we are currently on", type=str)
+    on_travis = 'TRAVIS_BRANCH' in os.environ
+    arguments = parser.parse_args()
     # Make sure it gets outputted to stdout for the Travis build to capture
-    print RepositoryResolver.get_repository()
+    print RepositoryResolver.get_repository(branch=arguments.branch, on_travis=on_travis)
