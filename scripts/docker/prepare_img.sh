@@ -21,7 +21,7 @@ repo=$1
 repo_url=$2
 
 # Update Ubuntu Software repository
-echo "Installing packages"
+echo "Installing packages from ${repo}"
 echo "deb ${repo_url} ${repo} main" > /etc/apt/sources.list.d/ovsaptrepo.list
 printf 'Package: *\nPin: origin apt-ee.openvstorage.com\nPin-Priority: 1000\n\nPackage: *\nPin: origin apt.openvstorage.com\nPin-Priority: 1000\n' > /etc/apt/preferences
 apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4EFFB1E7
@@ -45,9 +45,9 @@ cp -R /root/repo-code /opt/OpenvStorage
 echo "Further tweaking the OVS install"
 cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/
 chmod 777 /usr/bin/ovs
-export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/dist-packages
 cd /opt/OpenvStorage/webapps/api; export PYTHONPATH=/opt/OpenvStorage:/opt/OpenvStorage/webapps:$PYTHONPATH; python manage.py syncdb --noinput
 echo '{"configuration_store":"arakoon"}' > /opt/OpenvStorage/config/framework.json
 
 # Run tests
+echo "Running unittests"
 export PYTHONPATH=${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps; ovs unittest
