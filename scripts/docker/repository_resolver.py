@@ -125,7 +125,7 @@ class RepositoryResolver(object):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='Repository resolver', description='Finds the closest ancestor to the current supplied branch')
     parser.add_argument('-b', '--branch', default=None, help="The branch we are currently on", type=str)
-    parser.add_argument('-t', '--travis', default=False, action='store_true', help='Indicate that we are working in Travis. This will make the script access the environment variables instead')
+    on_travis = 'TRAVIS_BRANCH' in os.environ
     arguments = parser.parse_args()
     # Make sure it gets outputted to stdout for the Travis build to capture
-    print RepositoryResolver.get_repository(branch=arguments.branch, on_travis=arguments.travis)
+    print RepositoryResolver.get_repository(branch=arguments.branch, on_travis=on_travis)
