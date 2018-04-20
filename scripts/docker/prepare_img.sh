@@ -39,7 +39,7 @@ chmod 777 /run
 
 # Move over the Travis cloned code base. The repository code was mapped under /root/repo-code (see install_docker.sh)
 echo "Copying the mapped code"
-cp -R /root/repo-code /opt/OpenvStorage
+cp -R /root/repo-code/. /opt/OpenvStorage
 
 # Further tweaks to run our tests
 echo "Further tweaking the OVS install"
