@@ -109,7 +109,8 @@ class DalHelper(object):
         Logger._logs = {}
         DataList._test_hooks = {}
         Toolbox._function_pointers = {}
-        Configuration._unittest_data = {}
+        # Clean underlying persistent store
+        Configuration.get_client()._clean()
 
         for file_name in glob.glob(ArakoonClusterConfig.CONFIG_FILE.format('unittest*')):
             os.remove(file_name)
