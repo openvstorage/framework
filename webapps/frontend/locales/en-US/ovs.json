@@ -808,7 +808,7 @@
                 "complete": "Adding vDisk complete",
                 "failed": "Adding vDisk failed: __why__",
                 "in_progress": "Adding vDisk in progress",
-                "invalid_name": "The vDisk name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "invalid_name": "The vDisk name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 characters has to be maintained.",
                 "invalid_preset": "No preset available for the chosen vPool",
                 "invalid_size": "Maximum size of __amount__ __unit__ exceeded",
                 "invalid_storagerouter": "No valid storagerouter selected",
