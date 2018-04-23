@@ -342,8 +342,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 call_parameters['connection_info_bc'] = connection_info_bc
 
         if 'caching_info' not in call_parameters:
-            call_parameters['caching_info'] = {'cache_quota_bc': call_parameters.pop('cache_quota_bc', False),
-                                               'cache_quota_fc': call_parameters.pop('cache_quota_fc', False),
+            call_parameters['caching_info'] = {'cache_quota_bc': call_parameters.pop('cache_quota_bc', None),
+                                               'cache_quota_fc': call_parameters.pop('cache_quota_fc', None),
                                                'block_cache_on_read': call_parameters.pop('block_cache_on_read', False),
                                                'block_cache_on_write': call_parameters.pop('block_cache_on_write', False),
                                                'fragment_cache_on_read': call_parameters.pop('fragment_cache_on_read', False),
