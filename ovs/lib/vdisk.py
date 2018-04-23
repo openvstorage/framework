@@ -135,10 +135,11 @@ class VDiskController(object):
                 VDiskController.clean_vdisk_from_model(vdisk)
         command = None
         try:
+            # This should belong in the Alba plugin together with Alba Proxies...
             vpool = vdisk.vpool
             storagedriver = vpool.storagedrivers[0]
             storagerouter = storagedriver.storagerouter
-            if 'cache-quota' in storagerouter.features['alba']['features']:
+            if StorageRouter.ALBA_FEATURES.CACHE_QUOTA in storagerouter.features['alba']['features']:
                 proxy = storagedriver.alba_proxies[0]
                 configuration = Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/abm'.format(vpool.guid, proxy.guid))
                 client = SSHClient(storagerouter)
@@ -147,9 +148,9 @@ class VDiskController(object):
                     bcq = vdisk.cache_quota.get(VPool.CACHES.BLOCK)
                 else:
                     vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
-                    metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
-                    fcq = metadata.get('quota_fc')
-                    bcq = metadata.get('quota_bc')
+                    metadata = vpool.metadata['caching_info'].get(vdisk.storagerouter_guid, {})
+                    fcq = metadata.get(StorageDriverConfiguration.CACHE_FRAGMENT, {}).get('quota')
+                    bcq = metadata.get(StorageDriverConfiguration.CACHE_BLOCK, {}).get('quota')
                 if fcq is not None and fcq > 0:
                     fcq_action = 'Setting FCQ to {0}'.format(fcq)
                     fcq_command = ['--fragment-cache-quota', str(fcq)]
