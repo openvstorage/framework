@@ -187,6 +187,8 @@ define([
 
             if (settings.hasOwnProperty('placeholder')) { self.placeholder($.t(settings.placeholder)) }
             else { self.placeholder('') }
+            // Initially build up the default query
+            self.getData()
 
         };
 
