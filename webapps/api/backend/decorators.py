@@ -637,3 +637,33 @@ def log(log_slow=True):
         return new_function
 
     return wrap
+
+#####################
+# Django Decorators #
+#####################
+
+
+def extended_action(methods=None, detail=None, url_path=None, url_name=None, **kwargs):
+    """
+    Mark a ViewSet method as a routable action.
+
+    Set the `detail` boolean to determine if this action should apply to
+    instance/detail requests or collection/list requests.
+
+    See: https://github.com/encode/django-rest-framework/blob/master/docs/api-guide/viewsets.md#marking-extra-actions-for-routing
+    Decorator to mark a 'post' action. Decorator from version 3.8.2 to use for the internal router
+    """
+    methods = ['get'] if (methods is None) else methods
+    methods = [method.lower() for method in methods]
+
+    assert detail is not None, ( "@action() missing required argument: 'detail'" )
+
+    def decorator(func):
+        func.bind_to_methods = methods
+        func.detail = detail
+        func.url_path = url_path if url_path else func.__name__
+        func.url_name = url_name if url_name else func.__name__.replace('_', '-')
+        func.kwargs = kwargs
+        return func
+    return decorator
+
