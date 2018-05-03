@@ -20,12 +20,11 @@ Django URL module for main API
 import os
 import imp
 import inspect
-import itertools
 from inspect import getmembers
 from collections import namedtuple
 from django.conf.urls import patterns, include, url
 from django.core.exceptions import ImproperlyConfigured
-from rest_framework.routers import SimpleRouter, replace_methodname, flatten
+from rest_framework.routers import SimpleRouter, flatten
 from api.oauth2.tokenview import OAuth2TokenView
 from api.oauth2.redirectview import OAuth2RedirectView
 from api.openapi import OpenAPIView
@@ -55,6 +54,8 @@ class OVSRouter(SimpleRouter):
     Extended SimpleRouter
     Brings in feature from RestFramework 3.8.2 - to enable generic routes
     Adjusted a tiny bit to enable it in RestFramework 2.3.12
+
+    This might break certain URL resolving using the Django Framework like reversing of URLs (not used in OVS)
     """
     routes = [
         # List route.
