@@ -315,5 +315,4 @@ urlpatterns = patterns('',
                        url(r'^relay/', relay),
                        url(r'^swagger.json', OpenAPIView.as_view()),
                        url(r'^$', MetadataView.as_view()),
-                       url(r'', include(build_router_urls())),
-                       url(r'^storagerouter/test_generic', StorageRouterViewSet.as_view({'post': 'test_generic'})))
+                       url(r'', include(build_router_urls())))
