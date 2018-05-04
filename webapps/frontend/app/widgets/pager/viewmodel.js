@@ -312,10 +312,8 @@ define([
                             generic.crossFiller(keys, self.container(), dataset.loader, self.key, false);
                             $.each(self.container()(), function (index, item) {
                                 if ($.inArray(item[self.key](), keys) !== -1 && (self.skipOn === undefined || !item[self.skipOn]())) {
-                                    item.fillData(idata[item[self.key]()]);
-                                    if (dataset.dependencyLoader !== undefined) {
-                                        dataset.dependencyLoader(item);
-                                    }
+                                    if (typeof item.fillData === 'function') { item.fillData(idata[item[self.key]()]); }
+                                    if (typeof dataset.dependencyLoader === 'function') { dataset.dependencyLoader(item); }
                                 }
                                 item.loading(false);
                             });
