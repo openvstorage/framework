@@ -29,7 +29,6 @@ from api.oauth2.tokenview import OAuth2TokenView
 from api.oauth2.redirectview import OAuth2RedirectView
 from api.openapi import OpenAPIView
 from api.view import MetadataView, relay
-from api.backend.views.storagerouters import StorageRouterViewSet
 from ovs.extensions.generic.logger import Logger
 
 
