@@ -29,7 +29,6 @@ from api.oauth2.tokenview import OAuth2TokenView
 from api.oauth2.redirectview import OAuth2RedirectView
 from api.openapi import OpenAPIView
 from api.view import MetadataView, relay
-from api.backend.views.storagerouters import StorageRouterViewSet
 from ovs.extensions.generic.logger import Logger
 
 
@@ -137,12 +136,13 @@ class OVSRouter(SimpleRouter):
             """
             if hasattr(action, 'detail'):
                 return action.detail
-            return None
+            return True  # Default to True as all older routes are detailed
 
         # converting to list as iterables are good for one pass, known host needs to be checked again and again for
         # different functions.
         known_actions = list(flatten([route.mapping.values() for route in self.routes if isinstance(route, Route)]))
         extra_actions = get_extra_actions(viewset)
+
         # checking action names against the known actions list
         not_allowed = [
             action.__name__ for action in extra_actions
