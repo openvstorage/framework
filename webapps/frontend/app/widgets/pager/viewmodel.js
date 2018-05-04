@@ -313,7 +313,7 @@ define([
                             $.each(self.container()(), function (index, item) {
                                 if ($.inArray(item[self.key](), keys) !== -1 && (self.skipOn === undefined || !item[self.skipOn]())) {
                                     if (typeof item.fillData === 'function') { item.fillData(idata[item[self.key]()]); }
-                                    if (typeof item.dependencyLoader === 'function') { dataset.dependencyLoader(item); }
+                                    if (typeof dataset.dependencyLoader === 'function') { dataset.dependencyLoader(item); }
                                 }
                                 item.loading(false);
                             });
