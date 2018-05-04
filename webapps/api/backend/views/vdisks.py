@@ -254,7 +254,6 @@ class VDiskViewSet(viewsets.ViewSet):
                                              error_description='vDisk has clones')
         return VDiskController.set_as_template.delay(vdisk_guid=vdisk.guid)
 
-    @action()
     @log()
     @required_roles(['read', 'write'])
     @return_task()
