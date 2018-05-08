@@ -72,8 +72,8 @@ class DiskController(object):
                 alias_name_mapping[symlink_path] = link
 
         # Parse 'lsblk' output
-        # --exclude 1 for RAM devices, 2 for floppy devices, 11 for CD-ROM devices (See https://www.kernel.org/doc/Documentation/devices.txt)
-        command = ['lsblk', '--pairs', '--bytes', '--noheadings', '--exclude', '1,2,11']
+        # --exclude 1 for RAM devices, 2 for floppy devices, 11 for CD-ROM devices, 43 for nbd devices (See https://www.kernel.org/doc/html/v4.15/admin-guide/devices.html)
+        command = ['lsblk', '--pairs', '--bytes', '--noheadings', '--exclude', '1,2,11,43']
         output = '--output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,LOG-SEC{0}'
         regex = '^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" LOG-SEC="(?P<sector_size>\d*)"( SERIAL="(?P<serial>.*)")?$'
         try:
