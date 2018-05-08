@@ -79,8 +79,10 @@ class MonitoringController(object):
             for cache_type, cache_type_data in storagedriver.vpool_backend_info['caching_info'].iteritems():
                 cache_quota = cache_type_data['quota']
                 backend_info = cache_type_data['backend_info']
-                connection_info = cache_type_data.get('backend_info', {}).get('connection_info', None)
-                if backend_info is None or connection_info is None:
+                if backend_info is None:
+                    continue
+                connection_info = backend_info.get('connection_info', None)
+                if connection_info is None:
                     continue
 
                 alba_backend_name = backend_info['name']
