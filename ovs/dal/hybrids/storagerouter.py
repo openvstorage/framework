@@ -53,7 +53,8 @@ class StorageRouter(DataObject):
                   Dynamic('features', dict, 3600)]
 
     ALBA_FEATURES = DataObject.enumerator('Alba_features', {'CACHE_QUOTA': 'cache-quota',
-                                                            'BLOCK_CACHE': 'block-cache'})
+                                                            'BLOCK_CACHE': 'block-cache',
+                                                            'AUTO_CLEANUP': 'auto-cleanup-deleted-namespaces'})
     STORAGEDRIVER_FEATURES = DataObject.enumerator('Storagedriver_features', {'DIRECTORY_UNLINK': 'directory_unlink'})
 
     def _statistics(self, dynamic):
@@ -180,7 +181,8 @@ class StorageRouter(DataObject):
             alba_version_lv = LooseVersion(alba_version['version'])
             alba_features = [feature for feature, version
                              in {self.ALBA_FEATURES.CACHE_QUOTA: ('1.4.4', PackageFactory.EDITION_ENTERPRISE),
-                                 self.ALBA_FEATURES.BLOCK_CACHE: ('1.4.0', PackageFactory.EDITION_ENTERPRISE)}.iteritems()
+                                 self.ALBA_FEATURES.BLOCK_CACHE: ('1.4.0', PackageFactory.EDITION_ENTERPRISE),
+                                 self.ALBA_FEATURES.AUTO_CLEANUP: ('1.5.27', PackageFactory.EDITION_ENTERPRISE)}.iteritems()
                              if alba_version_lv >= LooseVersion(version[0])
                              and (version[1] is None or version[1] == alba_edition)]
 
@@ -192,4 +194,4 @@ class StorageRouter(DataObject):
             pass
         except Exception:
             StorageRouter._logger.exception('Could not load feature information')
-        return None
+        return {}

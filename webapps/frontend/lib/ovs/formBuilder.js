@@ -56,6 +56,7 @@ define([
             'inputItems': null,  // default if missing  // Custom inputItems - used for dropdown
             'group': 0,  // Sorting purposes
             'displayOn': ['gather']  // Display on a particular step
+            'value: 10  // Starting value for the item, defaults to undefined
            }
          * Dropdown:
          * 'osd_type': {
@@ -125,6 +126,7 @@ define([
         var extender = undefined;
         var inputItems = undefined;
         var widgetName = undefined;
+        var value = undefined;
         // Check if list of known types
         if (type !== undefined && type.startsWith(listPrefix)) {
             arrayType = true;
@@ -150,9 +152,10 @@ define([
             display = actionMapping[field].displayOn || display;
             extender = actionMapping[field].extender || extender;
             widgetName = actionMapping[field].widgetName || widgetName;
+            value = actionMapping[field].value || value;
         }
         // Add data-binding
-        var observable = ko.observable();
+        var observable = ko.observable(value);
         var linkedObservable = undefined;
         if (arrayType === true) {
             // In case of an array, the consumer of the form items should be checking on the values of the array
