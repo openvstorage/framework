@@ -17,8 +17,8 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../../containers/storagerouter',
-    '../../wizards/update/index'
+    'viewmodels/containers/storagerouter/storagerouter',
+    'viewmodels/wizards/update/index'
 ], function($, dialog, ko, shared, generic, Refresher, api, StorageRouter, UpdateWizard) {
     "use strict";
     return function() {
@@ -188,7 +188,6 @@ define([
                                     $.each(pluginInfo, function(packageName, packageInfo) {
                                         var pkg = {};
                                         pkg.name = packageName;
-                                        pkg.tooltip = self.getTooltip(packageInfo);
                                         pkg.candidate = packageInfo.candidate;
                                         pkg.installed = packageInfo.installed.replace('-reboot', '');
                                         packages.push(pkg);

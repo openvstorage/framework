@@ -1,0 +1,72 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <p data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.basic_info"></p>
+    <!-- ko with: data.vPool -->
+    <div class="form-group">
+        <label class="col-lg-3 control-label" for="inputVpoolName" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.vpool_name"></label>
+        <div class="col-lg-7">
+            <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: name, valueUpdate: 'input', disable: true" />
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" for="inputBackendName" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.backend_name"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <input type="text" id="inputBackendName" class="autofocus form-control" data-bind="value: backendName, valueUpdate: 'input', disable: true" />
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" for="inputPreset" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.preset"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <input type="text" id="inputPreset" class="autofocus form-control" data-bind="value: $root.enhancedPreset, valueUpdate: 'input', disable: true" />
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" for="proxyAmount" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.proxy_amount"></label>
+        <div class="col-lg-3">
+            <div data-bind="widget: {kind: 'numberinput', item: $parent.data.proxyAmount}"></div>
+        </div>
+    </div>
+    <!-- /ko -->
+    <!-- ko with: data.storageRouter -->
+    <p data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.extended_info"></p>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" for="inputStorageRouter" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.storagerouter_name"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <input type="text" id="inputStorageRouter" class="autofocus form-control"
+                   data-bind="value: name(), valueUpdate: 'input', disable: true" />
+        </div>
+    </div>
+    <!-- /ko -->
+    <!-- ko with: data.storageDriver -->
+    <div class="form-group">
+        <label class="col-lg-3 control-label" for="inputStorageIP" data-i18n="ovs:wizards.reconfigure_vpool.gather_vpool.storage_ip"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <input type="text" id="inputStorageIP" class="autofocus form-control" data-bind="value: storageIP, valueUpdate: 'input', disable: true" />
+        </div>
+    </div>
+    <!-- /ko -->
+    <div class="alert alert-danger" style="margin-bottom: -3px;"
+         data-bind="visible: !canContinue().value || canContinue().showErrors">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

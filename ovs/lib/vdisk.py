@@ -39,6 +39,7 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -98,6 +99,21 @@ class VDiskController(object):
         vdisk.delete()
 
     @staticmethod
+    def remove_stale_vdisks(vpool):
+        """
+        Remove vDisks related to the specified vPool from the model
+        :param vpool: vPool to clean stale vDisks from
+        :type vpool: ovs.dal.hybrids.vpool.VPool
+        :return: None
+        :rtype: NoneType
+        """
+        voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
+        voldrv_vdisk_guids = VDiskList.get_in_volume_ids(voldrv_vdisks).guids
+        for vdisk_guid in set(vpool.vdisks_guids).difference(set(voldrv_vdisk_guids)):
+            VDiskController._logger.warning('vDisk with guid {0} does no longer exist on any StorageDriver linked to vPool {1}, deleting...'.format(vdisk_guid, vpool.name))
+            VDiskController.clean_vdisk_from_model(vdisk=VDisk(vdisk_guid))
+
+    @staticmethod
     def vdisk_checkup(vdisk):
         """
         Triggers a few (async) tasks to make sure the vDisk is in a healthy state.
@@ -119,10 +135,11 @@ class VDiskController(object):
                 VDiskController.clean_vdisk_from_model(vdisk)
         command = None
         try:
+            # This should belong in the Alba plugin together with Alba Proxies...
             vpool = vdisk.vpool
             storagedriver = vpool.storagedrivers[0]
             storagerouter = storagedriver.storagerouter
-            if 'cache-quota' in storagerouter.features['alba']['features']:
+            if StorageRouter.ALBA_FEATURES.CACHE_QUOTA in storagerouter.features['alba']['features']:
                 proxy = storagedriver.alba_proxies[0]
                 configuration = Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/abm'.format(vpool.guid, proxy.guid))
                 client = SSHClient(storagerouter)
@@ -131,9 +148,9 @@ class VDiskController(object):
                     bcq = vdisk.cache_quota.get(VPool.CACHES.BLOCK)
                 else:
                     vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
-                    metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
-                    fcq = metadata.get('quota_fc')
-                    bcq = metadata.get('quota_bc')
+                    metadata = vpool.metadata['caching_info'].get(vdisk.storagerouter_guid, {})
+                    fcq = metadata.get(StorageDriverConfiguration.CACHE_FRAGMENT, {}).get('quota')
+                    bcq = metadata.get(StorageDriverConfiguration.CACHE_BLOCK, {}).get('quota')
                 if fcq is not None and fcq > 0:
                     fcq_action = 'Setting FCQ to {0}'.format(fcq)
                     fcq_command = ['--fragment-cache-quota', str(fcq)]
@@ -969,15 +986,15 @@ class VDiskController(object):
         new_config_params.pop('readcache_limit', None)
         new_config_params.pop('metadata_cache_size', None)
 
-        Toolbox.verify_required_params(verify_keys=True,
-                                       actual_params=new_config_params,
-                                       required_params={'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys(), False),
-                                                        'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys(), False),
-                                                        'dtl_target': (list, Toolbox.regex_guid, False),
-                                                        'cache_quota': (dict, {VPool.CACHES.FRAGMENT: (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False),
-                                                                               VPool.CACHES.BLOCK: (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False)}, False),
-                                                        'write_buffer': (int, {'min': 128, 'max': 10 * 1024}, False),
-                                                        'pagecache_ratio': (float, {'min': 0, 'max': 1, 'exclude': [0]}, False)})
+        ExtensionsToolbox.verify_required_params(verify_keys=True,
+                                                 actual_params=new_config_params,
+                                                 required_params={'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys(), False),
+                                                                  'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys(), False),
+                                                                  'dtl_target': (list, ExtensionsToolbox.regex_guid, False),
+                                                                  'cache_quota': (dict, {VPool.CACHES.FRAGMENT: (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False),
+                                                                                         VPool.CACHES.BLOCK: (int, {'min': 1024 ** 3 / 10, 'max': 1024 ** 4}, False)}, False),
+                                                                  'write_buffer': (int, {'min': 128, 'max': 10 * 1024}, False),
+                                                                  'pagecache_ratio': (float, {'min': 0, 'max': 1, 'exclude': [0]}, False)})
 
         errors = False
         vdisk = VDisk(vdisk_guid)
@@ -1028,7 +1045,7 @@ class VDiskController(object):
             # Set manual DTL flag (Before 'set_manual_dtl_config' is called, because of DTL state transition event)
             vpool_config = vdisk.vpool.configuration
             orig_manual_flag = vdisk.has_manual_dtl
-            Toolbox.verify_required_params(actual_params=vpool_config, required_params={'dtl_enabled': (bool, None)})
+            ExtensionsToolbox.verify_required_params(actual_params=vpool_config, required_params={'dtl_enabled': (bool, None)})
 
             manual = len(dtl_targets) > 0
             if vpool_config['dtl_enabled'] is False:
@@ -1199,10 +1216,10 @@ class VDiskController(object):
                     vpool = vdisk.vpool
                     lock_key = 'dtl_checkup_{0}'.format(vdisk.guid)
                     vpool_config = vpool.configuration
-                    Toolbox.verify_required_params(required_params={'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
-                                                                    'dtl_enabled': (bool, None),
-                                                                    'dtl_config_mode': (str, [StorageDriverClient.VOLDRV_DTL_MANUAL_MODE, StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE])},
-                                                   actual_params=vpool_config)
+                    ExtensionsToolbox.verify_required_params(required_params={'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
+                                                                              'dtl_enabled': (bool, None),
+                                                                              'dtl_config_mode': (str, [StorageDriverClient.VOLDRV_DTL_MANUAL_MODE, StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE])},
+                                                             actual_params=vpool_config)
 
                     volume_id = str(vdisk.volume_id)
                     dtl_vpool_enabled = vpool_config['dtl_enabled']

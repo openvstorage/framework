@@ -17,8 +17,8 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../../containers/backend', '../../containers/backendtype', '../../containers/domain',
-    '../../wizards/addbackend/index'
+    'viewmodels/containers/backend/backend', 'viewmodels/containers/backend/backendtype', 'viewmodels/containers/domain/domain',
+    'viewmodels/wizards/addbackend/index'
 ], function($, dialog, ko, shared, generic, Refresher, api, Backend, BackendType, Domain, AddBackendWizard) {
     "use strict";
     return function() {

@@ -19,7 +19,7 @@ define([
     'plugins/router',
     'ovs/api', 'ovs/shared', 'ovs/generic',
     './data',
-    '../../containers/backend', '../../containers/backendtype'
+    'viewmodels/containers/backend/backend', 'viewmodels/containers/backend/backendtype'
 ], function($, ko, router, api, shared, generic, data, Backend, BackendType) {
     "use strict";
     return function() {

@@ -21,14 +21,12 @@ Module containing certain helper classes providing various logic
 import os
 import re
 import imp
-import sys
 import time
 import random
 import string
 import inspect
 import subprocess
 from celery.schedules import crontab
-from ovs.dal.helpers import DalToolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.interactive import Interactive
 from ovs.extensions.generic.logger import Logger
@@ -101,74 +99,6 @@ class Toolbox(object):
                 Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(fct.__module__, fct.__name__))
             fct(**kwargs)
         return functions_found
-
-    @staticmethod
-    def verify_required_params(required_params, actual_params, verify_keys=False):
-        """
-        Verify whether the actual parameters match the required parameters
-        :param required_params: Required parameters which actual parameters have to meet
-        :type required_params: dict
-        :param actual_params: Actual parameters to check for validity
-        :type actual_params: dict
-        :param verify_keys: Verify whether the passed in keys are actually part of the required keys
-        :type verify_keys: bool
-        :return: None
-        :rtype: NoneType
-        """
-        if not isinstance(required_params, dict) or not isinstance(actual_params, dict):
-            raise RuntimeError('Required and actual parameters must be of type dictionary')
-
-        error_messages = []
-        if verify_keys is True:
-            for key in actual_params:
-                if key not in required_params:
-                    error_messages.append('Specified parameter "{0}" is not valid'.format(key))
-
-        for required_key, key_info in required_params.iteritems():
-            expected_type = key_info[0]
-            expected_value = key_info[1]
-            optional = len(key_info) == 3 and key_info[2] is False
-
-            if optional is True and (required_key not in actual_params or actual_params[required_key] in ('', None)):
-                continue
-
-            if required_key not in actual_params:
-                error_messages.append('Missing required param "{0}" in actual parameters'.format(required_key))
-                continue
-
-            mandatory_or_optional = 'Optional' if optional is True else 'Mandatory'
-            actual_value = actual_params[required_key]
-            if DalToolbox.check_type(actual_value, expected_type)[0] is False:
-                error_messages.append('{0} param "{1}" is of type "{2}" but we expected type "{3}"'.format(mandatory_or_optional, required_key, type(actual_value), expected_type))
-                continue
-
-            if expected_value is None:
-                continue
-
-            if expected_type == list:
-                if type(expected_value) == Toolbox.compiled_regex_type:  # List of strings which need to match regex
-                    for item in actual_value:
-                        if not re.match(expected_value, item):
-                            error_messages.append('{0} param "{1}" has an item "{2}" which does not match regex "{3}"'.format(mandatory_or_optional, required_key, item, expected_value.pattern))
-            elif expected_type == dict:
-                Toolbox.verify_required_params(expected_value, actual_params[required_key])
-            elif expected_type == int or expected_type == float:
-                if isinstance(expected_value, list) and actual_value not in expected_value:
-                    error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
-                if isinstance(expected_value, dict):
-                    minimum = expected_value.get('min', sys.maxint * -1)
-                    maximum = expected_value.get('max', sys.maxint)
-                    if not minimum <= actual_value <= maximum:
-                        error_messages.append('{0} param "{1}" with value "{2}" should be in range: {3} - {4}'.format(mandatory_or_optional, required_key, actual_value, minimum, maximum))
-                    if actual_value in expected_value.get('exclude', []):
-                        error_messages.append('{0} param "{1}" cannot have value {2}'.format(mandatory_or_optional, required_key, actual_value))
-            else:
-                if DalToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
-                    error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
-                elif DalToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
-                    error_messages.append('{0} param "{1}" with value "{2}" does not match regex "{3}"'.format(mandatory_or_optional, required_key, actual_value, expected_value.pattern))
-        if error_messages:
-            raise RuntimeError('Invalid parameters detected\n' + '\n'.join(error_messages))
 
     @staticmethod
     def get_hash(length=16):
@@ -311,39 +241,6 @@ class Toolbox(object):
                 raise
             except:
                 Toolbox.log(logger=logger, messages='Password invalid or could not connect to this node')
-
-    @staticmethod
-    def convert_to_human_readable(size, multiplier=1024, decimals=0):
-        """
-        Convert the specified size (in bytes) to human readable format
-        :param size: Size to be converted
-        :type size: int
-        :param multiplier: Multiplier to use. Either 1000 or 1024
-        :type multiplier: int
-        :param decimals: Amount of decimals returned
-        :type decimals: int
-        :return: Human readable form of the size
-        :rtype: str
-        """
-        Toolbox.verify_required_params(actual_params={'size': size,
-                                                      'decimals': decimals,
-                                                      'multiplier': multiplier},
-                                       required_params={'size': (int, None),
-                                                        'decimals': (int, range(6)),
-                                                        'multiplier': (int, [1000, 1024])})
-
-        units = {1000: ['B', 'KB', 'MB', 'GB', 'TB'],
-                 1024: ['B', 'KiB', 'MiB', 'GiB', 'TiB']}[multiplier]
-
-        counter = 0
-        negative = size < 0
-        size = abs(size)
-        while size >= multiplier and counter < 4:
-            size /= float(multiplier)
-            counter += 1
-
-        size = size * -1 if negative is True else size * 1
-        return '{{0:.{0}f}}{{1}}'.format(decimals).format(size, units[counter])
 
 
 class Schedule(object):

@@ -17,7 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/shared', 'ovs/generic',
-    '../../containers/vdisk', './data'
+    'viewmodels/containers/vdisk/vdisk',
+    './data'
 ], function($, ko, api, shared, generic, VDisk, data) {
     "use strict";
     return function() {

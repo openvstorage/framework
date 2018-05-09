@@ -20,9 +20,6 @@ Celery entry point module
 
 from __future__ import absolute_import
 
-import sys
-sys.path.append('/opt/OpenvStorage')
-
 import os
 import uuid
 import yaml

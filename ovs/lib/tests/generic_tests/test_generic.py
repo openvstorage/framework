@@ -1315,6 +1315,7 @@ class Generic(unittest.TestCase):
         self.volatile._clean()
         self.persistent._clean()
         SystemdMock._clean()
-        Configuration._unittest_data = {}
+        # Clean underlying persistent store
+        Configuration.get_client()._clean()
         ScrubShared._test_hooks = {}
         Logger._logs = {}

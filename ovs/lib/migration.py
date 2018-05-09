@@ -59,6 +59,7 @@ class MigrationController(object):
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+        from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
 
         MigrationController._logger.info('Start out of band migrations...')
         service_manager = ServiceFactory.get_manager()
@@ -83,7 +84,7 @@ class MigrationController(object):
                         continue
 
                     try:
-                        service_manager.regenerate_service(name='ovs-albaproxy', client=root_client, target_name=service_name)
+                        service_manager.regenerate_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY, client=root_client, target_name=service_name)
                         changed_clients.add(root_client)
                     except:
                         MigrationController._logger.exception('Error rebuilding service {0}'.format(service_name))
@@ -150,7 +151,7 @@ class MigrationController(object):
                                                     new_run_file='{0}/{1}.version'.format(ServiceFactory.RUN_FILE_DIR, new_service_name))
 
                 # Register new service and remove old service
-                service_manager.add_service(name='ovs-albaproxy',
+                service_manager.add_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY,
                                             client=root_client,
                                             params=Configuration.get(old_configuration_key),
                                             target_name='ovs-{0}'.format(new_service_name))
@@ -159,14 +160,14 @@ class MigrationController(object):
                 proxy_config_key = '/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)
                 proxy_config = None if Configuration.exists(key=proxy_config_key) is False else Configuration.get(proxy_config_key)
                 if proxy_config is not None:
-                    fragment_cache = proxy_config.get('fragment_cache', ['none', {}])
+                    fragment_cache = proxy_config.get(StorageDriverConfiguration.CACHE_FRAGMENT, ['none', {}])
                     if fragment_cache[0] == 'alba' and fragment_cache[1].get('cache_on_write') is True:  # Accelerated ALBA configured
                         fragment_cache_scrub_info = copy.deepcopy(fragment_cache)
                         fragment_cache_scrub_info[1]['cache_on_read'] = False
                         proxy_scrub_config_key = '/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid)
                         proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
-                        if proxy_scrub_config is not None and proxy_scrub_config['fragment_cache'] == ['none']:
-                            proxy_scrub_config['fragment_cache'] = fragment_cache_scrub_info
+                        if proxy_scrub_config is not None and proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] == ['none']:
+                            proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] = fragment_cache_scrub_info
                             Configuration.set(key=proxy_scrub_config_key, value=proxy_scrub_config)
 
             # Update 'backend_connection_manager' section
@@ -251,6 +252,75 @@ class MigrationController(object):
                 vpool.metadata_store_bits = bits
                 vpool.save()
 
+        #####################################
+        # Update the vPool metadata structure
+        def _update_metadata_structure(metadata):
+            metadata = copy.deepcopy(metadata)
+            cache_structure = {'read': False,
+                               'write': False,
+                               'is_backend': False,
+                               'quota': None,
+                               'backend_info': {'name': None,  # Will be filled in when is_backend is true
+                                                'backend_guid': None,
+                                                'alba_backend_guid': None,
+                                                'policies': None,
+                                                'preset': None,
+                                                'arakoon_config': None,
+                                                'connection_info': {'client_id': None,
+                                                                    'client_secret': None,
+                                                                    'host': None,
+                                                                    'port': None,
+                                                                    'local': None}}
+                               }
+            structure_map = {StorageDriverConfiguration.CACHE_BLOCK: {'read': 'block_cache_on_read',
+                                                                      'write': 'block_cache_on_write',
+                                                                      'quota': 'quota_bc',
+                                                                      'backend_prefix': 'backend_bc_{0}'},
+                             StorageDriverConfiguration.CACHE_FRAGMENT: {'read': 'fragment_cache_on_read',
+                                                                         'write': 'fragment_cache_on_write',
+                                                                         'quota': 'quota_fc',
+                                                                         'backend_prefix': 'backend_aa_{0}'}}
+            if 'arakoon_config' in metadata['backend']:  # Arakoon config should be placed under the backend info
+                metadata['backend']['backend_info']['arakoon_config'] = metadata['backend'].pop('arakoon_config')
+            if 'connection_info' in metadata['backend']:  # Connection info sohuld be placed under the backend info
+                metadata['backend']['backend_info']['connection_info'] = metadata['backend'].pop('connection_info')
+            if 'caching_info' not in metadata:  # Caching info is the new key
+                would_be_caching_info = {}
+                metadata['caching_info'] = would_be_caching_info
+                # Extract all caching data for every storagerouter
+                current_caching_info = metadata['backend'].pop('caching_info')  # Pop to mutate metadata
+                for storagerouter_guid in current_caching_info.iterkeys():
+                    current_cache_data = current_caching_info[storagerouter_guid]
+                    storagerouter_caching_info = {}
+                    would_be_caching_info[storagerouter_guid] = storagerouter_caching_info
+                    for cache_type, cache_type_mapping in structure_map.iteritems():
+                        new_cache_structure = copy.deepcopy(cache_structure)
+                        storagerouter_caching_info[cache_type] = new_cache_structure
+                        for new_structure_key, old_structure_key in cache_type_mapping.iteritems():
+                            if new_structure_key == 'backend_prefix':
+                                # Get possible backend related info
+                                metadata_key = old_structure_key.format(storagerouter_guid)
+                                if metadata_key not in metadata:
+                                    continue
+                                backend_data = metadata.pop(metadata_key)  # Pop to mutate metadata
+                                new_cache_structure['is_backend'] = True
+                                # Copy over the old data
+                                new_cache_structure['backend_info']['arakoon_config'] = backend_data['arakoon_config']
+                                new_cache_structure['backend_info'].update(backend_data['backend_info'])
+                                new_cache_structure['backend_info']['connection_info'].update(backend_data['connection_info'])
+                            else:
+                                new_cache_structure[new_structure_key] = current_cache_data.get(old_structure_key)
+            return metadata
+
+        vpools = VPoolList.get_vpools()
+        for vpool in vpools:
+            try:
+                new_metadata = _update_metadata_structure(vpool.metadata)
+                vpool.metadata = new_metadata
+                vpool.save()
+            except KeyError:
+                MigrationController._logger.exception('Exceptions occurred when updating the metadata for vPool {0}'.format(vpool.name))
+
         ##############################################
         # Always use indent=4 during Configuration set
         def _resave_all_config_entries(config_path='/ovs'):
@@ -281,7 +351,7 @@ class MigrationController(object):
             manifest_cache_size = 500 * 1024 * 1024
             if Configuration.exists(key=_proxy_config_key):
                 _proxy_config = Configuration.get(key=_proxy_config_key)
-                for cache_type in ['block_cache', 'fragment_cache']:
+                for cache_type in [StorageDriverConfiguration.CACHE_BLOCK, StorageDriverConfiguration.CACHE_FRAGMENT]:
                     if cache_type in _proxy_config and _proxy_config[cache_type][0] == 'alba':
                         if _proxy_config[cache_type][1]['manifest_cache_size'] != manifest_cache_size:
                             updated = True
@@ -359,7 +429,7 @@ class MigrationController(object):
                     continue
 
                 try:
-                    service_manager.regenerate_service(name='ovs-albaproxy', client=root_client, target_name=service_name)
+                    service_manager.regenerate_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY, client=root_client, target_name=service_name)
                     changed_clients.add(root_client)
                     ExtensionsToolbox.edit_version_file(client=root_client,
                                                         package_name='alba',
@@ -401,7 +471,7 @@ class MigrationController(object):
                 MigrationController._logger.exception('Integration of stats monkey failed')
 
         ######################################################
-        # Write away cluster id to a file for back-up purposes
+        # Write away cluster ID to a file for back-up purposes
         try:
             cluster_id = Configuration.get(key='/ovs/framework/cluster_id', default=None)
             with open(Configuration.CONFIG_STORE_LOCATION, 'r') as config_file:
@@ -447,7 +517,7 @@ class MigrationController(object):
                         config['ALBA_PKG_NAME'] = alba_pkg_name
                         config['ALBA_VERSION_CMD'] = alba_version_cmd
                         Configuration.set(key=config_key, value=config)
-                        service_manager.regenerate_service(name='ovs-albaproxy',
+                        service_manager.regenerate_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_PROXY,
                                                            client=root_client,
                                                            target_name='ovs-{0}'.format(service.name))
                         changed_clients.add(root_client)
@@ -467,7 +537,7 @@ class MigrationController(object):
                         root_client = sr_client_map[storagedriver.storagerouter_guid]
                         for entry in ['dtl', 'volumedriver']:
                             service_name = '{0}_{1}'.format(entry, vpool.name)
-                            service_template = 'ovs-dtl' if entry == 'dtl' else 'ovs-volumedriver'
+                            service_template = StorageDriverInstaller.SERVICE_TEMPLATE_DTL if entry == 'dtl' else StorageDriverInstaller.SERVICE_TEMPLATE_SD
                             config_key = ServiceFactory.SERVICE_CONFIG_KEY.format(storagedriver.storagerouter.machine_id, service_name)
                             if Configuration.exists(key=config_key):
                                 config = Configuration.get(key=config_key)
@@ -514,7 +584,7 @@ class MigrationController(object):
                                 root_client.file_write(filename=file_path, contents=contents)
 
                         if regenerate is True:
-                            service_manager.regenerate_service(name='ovs-dtl' if file_name.startswith('dtl') else 'ovs-volumedriver',
+                            service_manager.regenerate_service(name=StorageDriverInstaller.SERVICE_TEMPLATE_DTL if file_name.startswith('dtl') else StorageDriverInstaller.SERVICE_TEMPLATE_SD,
                                                                client=root_client,
                                                                target_name='ovs-{0}'.format(file_name.split('.')[0]))  # Leave out .version
                             changed_clients.add(root_client)

@@ -52,6 +52,11 @@ class StorageRouter(DataObject):
                   Dynamic('recovery_domains', list, 60),
                   Dynamic('features', dict, 3600)]
 
+    ALBA_FEATURES = DataObject.enumerator('Alba_features', {'CACHE_QUOTA': 'cache-quota',
+                                                            'BLOCK_CACHE': 'block-cache',
+                                                            'AUTO_CLEANUP': 'auto-cleanup-deleted-namespaces'})
+    STORAGEDRIVER_FEATURES = DataObject.enumerator('Storagedriver_features', {'DIRECTORY_UNLINK': 'directory_unlink'})
+
     def _statistics(self, dynamic):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk.
@@ -166,7 +171,7 @@ class StorageRouter(DataObject):
             volumedriver_edition = PackageFactory.EDITION_ENTERPRISE if volumedriver_version['edition'] == 'ee-' else PackageFactory.EDITION_COMMUNITY
             volumedriver_version_lv = LooseVersion(volumedriver_version['version'])
             volumedriver_features = [feature for feature, version
-                                     in {'directory_unlink': ('6.15.0', None)}.iteritems()
+                                     in {self.STORAGEDRIVER_FEATURES.DIRECTORY_UNLINK: ('6.15.0', None)}.iteritems()
                                      if volumedriver_version_lv >= LooseVersion(version[0])
                                      and (version[1] is None or version[1] == volumedriver_edition)]
 
@@ -175,8 +180,9 @@ class StorageRouter(DataObject):
             alba_edition = PackageFactory.EDITION_ENTERPRISE if alba_version['edition'] == 'ee-' else PackageFactory.EDITION_COMMUNITY
             alba_version_lv = LooseVersion(alba_version['version'])
             alba_features = [feature for feature, version
-                             in {'cache-quota': ('1.4.4', PackageFactory.EDITION_ENTERPRISE),
-                                 'block-cache': ('1.4.0', PackageFactory.EDITION_ENTERPRISE)}.iteritems()
+                             in {self.ALBA_FEATURES.CACHE_QUOTA: ('1.4.4', PackageFactory.EDITION_ENTERPRISE),
+                                 self.ALBA_FEATURES.BLOCK_CACHE: ('1.4.0', PackageFactory.EDITION_ENTERPRISE),
+                                 self.ALBA_FEATURES.AUTO_CLEANUP: ('1.5.27', PackageFactory.EDITION_ENTERPRISE)}.iteritems()
                              if alba_version_lv >= LooseVersion(version[0])
                              and (version[1] is None or version[1] == alba_edition)]
 
@@ -188,4 +194,4 @@ class StorageRouter(DataObject):
             pass
         except Exception:
             StorageRouter._logger.exception('Could not load feature information')
-        return None
+        return {}

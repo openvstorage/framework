@@ -18,7 +18,7 @@ define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/shared', 'ovs/generic',
     './data',
-    '../../containers/backend', '../../containers/backendtype'
+    'viewmodels/containers/backend/backend', 'viewmodels/containers/backend/backendtype'
 ], function($, ko, api, shared, generic, data) {
     "use strict";
     return function() {

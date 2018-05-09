@@ -17,7 +17,7 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/vdisk', 'viewmodels/containers/disk'
+    'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/disk/disk'
 ], function($, ko, generic, api, shared, VDisk, Disk) {
     "use strict";
     return function(guid) {
@@ -105,6 +105,19 @@ define([
                 }
             });
             return updatesFound;
+        });
+        // Feature Computed
+        self.supportsBlockCache = ko.pureComputed(function() {
+            var features = self.features();
+            return features !== undefined && features.alba.features.contains('block-cache')
+        });
+        self.supportsCacheQuota = ko.pureComputed(function() {
+            var features = self.features();
+            return features !== undefined && features.alba.features.contains('cache-quota');
+        });
+        self.isEnterpriseEdition = ko.pureComputed(function() {
+            var features = self.features();
+            return features !== undefined && features.alba.edition === 'enterprise';
         });
 
         // Functions

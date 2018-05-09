@@ -17,7 +17,7 @@
 define([
     'knockout', 'jquery', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../../containers/support/statsmonkey', '../../containers/storagerouter', '../../wizards/statsmonkeyconfigure/index'
+    '../../containers/support/statsmonkey', '../../containers/storagerouter/storagerouter', '../../wizards/statsmonkeyconfigure/index'
 ], function(ko, $, dialog, shared, generic, Refresher, api, StatsMonkeyConfigVM, StorageRouter, StatsMonkeyConfigureWizard) {
     "use strict";
     return function() {

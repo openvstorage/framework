@@ -20,7 +20,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
     var ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
     var hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
     var nameRegex = /^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$/;
-    var vdiskNameRegex = /^[0-9a-zA-Z][\-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$/;
+    var vdiskNameRegex = /^[0-9a-zA-Z][\-_a-zA-Z0-9]+[a-zA-Z0-9]$/;
 
     function getTimestamp() {
         return new Date().getTime();
@@ -476,7 +476,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         }
         if (object1.constructor !== object2.constructor) {
             // They must have the exact same prototype chain, the closest we can do is
-            // test there constructor.
+            // test thie constructor.
             return false;
         }
         for (var p in object1) {
@@ -508,6 +508,124 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
             }
         }
         return true;
+    }
+
+    function sortObject(object, func) {
+        /**
+         * Sorts on objects keys.
+         * By convention, most browsers will retain the order of keys in an object in the order that they were added.
+         * But don't expect it to always work
+         * @param object: object to sort
+         * @param func: sorting function
+         * @returns {{}}
+         */
+        var sorted = {},
+            key, array = [];
+
+        for (key in object) {
+            if (object.hasOwnProperty(key)) {
+                array.push(key);
+            }
+        }
+        array.sort(func);
+        for (key = 0; key < array.length; key++) {
+            sorted[array[key]] = object[array[key]];
+        }
+        return sorted;
+    }
+    function cleanObject(obj, depth, ignoredProps) {
+        // Reset all properties to undefined (props can also be observables)
+        var currentDepth = 0;
+        depth = 0 || depth;
+        // Argument validation
+        if (typeof ignoredProps !== undefined) {
+            if (Object.prototype.toString.call( ignoredProps ) !== '[object Array]') {
+                throw new Error('Ignored props should be an Array')
+            }
+        } else {
+            ignoredProps = []
+        }
+        var props = [];
+        do {
+            var fetchedProps = Object.getOwnPropertyNames(obj)
+                .sort()
+                .filter(function(prop, index, arr) {
+                    return !prop.startsWith('__') &&                        // ignore requirejs props
+                        !ignoredProps.contains(prop) &&                     // Not in ignored props
+                        (typeof obj[prop] !== 'function' ||                 // Only the observables / non-function
+                        (ko.isObservable(obj[prop]) && !ko.isComputed(obj[prop]))) &&
+                        prop !== 'constructor' &&                           // Not the constructor
+                        (index === 0 || prop !== arr[index - 1]) &&         // Not overriding in this prototype
+                        !props.contains(prop)                               // Not overridden in a child
+                });
+            props = props.concat(fetchedProps);
+            currentDepth += 1;  // Might go deeper after here
+        }
+        while (
+            depth >= currentDepth &&
+            (obj = Object.getPrototypeOf(obj))  // Walk-up the prototype chain
+        );
+        $.each(props, function(index, prop) {
+            if (ko.isObservable(obj[prop])) {
+                if (obj[prop].isObservableArray) {  // ObservableArray
+                    obj[prop]([]);
+                } else if (obj[prop].isObservableDictionary) {
+                    obj[prop].removeAll();
+                }
+            } else {
+                obj[prop] = undefined;
+            }
+        })
+    }
+    // Object should already be observable
+    function makeChildrenObservables(observable) {
+        if(!ko.isObservable(observable)) return;
+        // Loop through its children
+        $.each(observable(), function(key, child) {
+            if (!ko.isObservable(child)) {
+                child = ko.observable(child);
+                observable()[key] = child;  // By reference does not work as the data was unwrapped from the observable
+                if (typeof child() === "object") {
+                    makeChildrenObservables(child);
+                }
+            }
+        });
+    }
+    function recursiveSubscribe(observable, func) {
+        /**
+         * Registers a subscribe to all children observables of an object
+         * @param observable: Observable to subscribe to
+         * @param func: Function to fire on change
+         * @return {[]}
+         */
+        var array = [];
+        if(!ko.isObservable(observable)) return array;
+        $.each(observable(), function(key, child) {
+            if (ko.isObservable(child)) {
+                array.push(child.subscribe(func))
+            }
+        });
+    }
+
+    function isObject(o) {
+        return o instanceof Object && o.constructor === Object;
+    }
+
+    function isFunction(functionToCheck) {
+        var getType = {};
+        return functionToCheck && getType.toString.call(functionToCheck) === '[object Function]';
+    }
+    /**
+     * Chain promises more neatly instead of writing .then yourselves
+     * Used the .then(function()) {return new Promise)
+     * All of the data of the previous callback can be used in the next one (eg. chainPromises([api.get('test'), function(testAPIData) { console.log(testAPIData}]
+     * Calling .done on the return value will ensure that all previous chained promises have been completed
+     * @param callbackList: list of callbacks to use
+     */
+    function chainPromises(callbackList) {
+        return callbackList.reduce(function(chain, func){
+            chain ? chain.then(func) : func();
+        }, null)
     }
     function _arrayGetItem(array, prop, index){
         var foundItem = undefined;
@@ -624,6 +742,25 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         return removeElement(this, element);
     };
 
+    String.prototype.format = function (args) {
+			var str = this;
+			return str.replace(String.prototype.format.regex, function(item) {
+				var intVal = parseInt(item.substring(1, item.length - 1));
+				var replace;
+				if (intVal >= 0) {
+					replace = args[intVal];
+				} else if (intVal === -1) {
+					replace = "{";
+				} else if (intVal === -2) {
+					replace = "}";
+				} else {
+					replace = "";
+				}
+				return replace;
+			});
+		};
+    String.prototype.format.regex = new RegExp("{-?[0-9]+}", "g");
+
     return {
         // Vars
         ipRegex: ipRegex,
@@ -640,6 +777,7 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         arrayHasElementWithProperty: arrayHasElementWithProperty,
         ceil: ceil,
         cleanDeviceName: cleanDeviceName,
+        cleanObject: cleanObject,
         crossFiller: crossFiller,
         deg2rad: deg2rad,
         extract: extract,
@@ -654,18 +792,23 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         getTimestamp: getTimestamp,
         ipSort: ipSort,
         isEmpty: isEmpty,
+        isFunction: isFunction,
+        isObject: isObject,
         keys: keys,
         log: log,
         lower: lower,
+        makeChildrenObservables: makeChildrenObservables,
         merge: merge,
         objectEquals: objectEquals,
         padRight: padRight,
+        recursiveSubscribe: recursiveSubscribe,
         removeCookie: removeCookie,
         removeElement: removeElement,
         round: round,
         setCookie: setCookie,
         setDecimals: setDecimals,
         smooth: smooth,
+        sortObject: sortObject,
         tryGet: tryGet,
         trySet: trySet,
         validate: validate,

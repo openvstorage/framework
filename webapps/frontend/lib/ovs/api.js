@@ -20,15 +20,34 @@ define([
     'use strict';
     function call(api, options, type) {
         var querystring = [], key, callData, jqXhr,
-            deferred = $.Deferred(), queryparams, data;
+            deferred = $.Deferred(), queryParams, data, relayParams;
 
         options = options || {};
 
-        queryparams = generic.tryGet(options, 'queryparams', {});
-        queryparams.timestamp = generic.getTimestamp();
-        for (key in queryparams) {
-            if (queryparams.hasOwnProperty(key)) {
-                querystring.push(key + '=' + encodeURIComponent(queryparams[key]));
+        queryParams = options.queryparams;
+        if (queryParams === undefined) { queryParams = {} }
+        relayParams = options.relayParams;
+        if (relayParams === undefined || generic.objectEquals(relayParams, {})) { relayParams = {relay: ''} }
+        // Copy over as we will mutate these objects
+        queryParams = $.extend({}, queryParams);
+        relayParams = $.extend({}, relayParams);
+        if (relayParams.ip !== undefined && [undefined, ''].contains(relayParams.relay)) {
+            // Default relay and clean id and secret
+            relayParams.relay = 'relay/';
+            relayParams.client_id = relayParams.client_id.replace(/\s+/, "");
+            relayParams.client_secret = relayParams.client_secret.replace(/\s+/, "");
+        }
+        if (relayParams.relay && !relayParams.relay.endsWith('/')) { relayParams.relay = relayParams.relay + '/'; }
+        // Add relay params to query params, looping in favor of extending because of the warning
+        $.each(relayParams, function(key, value) {
+            if (key === 'relay') { return true; }
+            if (key in queryParams) { console.warn('Relay information is overruling the query param {}'.format([key])) }
+            queryParams[key] = value;
+        });
+        queryParams.timestamp = generic.getTimestamp();
+        for (key in queryParams) {
+            if (queryParams.hasOwnProperty(key)) {
+                querystring.push(key + '=' + encodeURIComponent(queryParams[key]));
             }
         }
 
@@ -47,7 +66,7 @@ define([
         }
         jqXhr = function(log) {
             var start = generic.getTimestamp(),
-                call = '/api/' + api + (api === '' ? '?' : '/?') + querystring.join('&');
+                call = '/api/' + relayParams.relay + api + (api === '' ? '?' : '/?') + querystring.join('&');
             return $.ajax(call, callData)
                 .then(function(data) {
                     var timing = generic.getTimestamp() - start;

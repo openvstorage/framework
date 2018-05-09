@@ -17,12 +17,13 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../../containers/vpool', '../../containers/storagedriver', '../../containers/storagerouter', '../../containers/vdisk',
-    '../../wizards/addvpool/index', '../../wizards/createhprmconfigs/index'
+    'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
+    'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vdisk/vdisk',
+    'viewmodels/wizards/addvpool/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index'
 ], function($, app, dialog, ko, router,
             shared, generic, Refresher, api,
             VPool, StorageDriver, StorageRouter, VDisk,
-            ExtendVPool, CreateHPRMConfigsWizard) {
+            ExtendVPool, CreateHPRMConfigsWizard, ReconfigureVPool) {
     "use strict";
     return function() {
         var self = this;
@@ -64,6 +65,36 @@ define([
         self.updatingStorageRouters = ko.observable(false);
         self.vPool                  = ko.observable();
 
+        // Computed
+        self.expanded = ko.computed({
+            write: function(value) {
+                $.each(self.storageRouters(), function(index, storagerouter) {
+                    storagerouter.expanded(value);
+                });
+            },
+            read: function() {
+                var expanded = false;
+                $.each(self.storageRouters(), function(index, storagerouter) {
+                    expanded |= storagerouter.expanded();  // Bitwise or, |= is correct.
+                });
+                return expanded;
+            }
+        });
+        self.anyCollapsed = ko.computed(function() {
+            /**
+             * Check if any node is collapsed
+             * Different than the expanded check in the way this will return true when any are collapsed as opposed to all
+              */
+            var collapsed = false;
+            $.each(self.storageRouters(), function(index, storagerouter) {
+                if (storagerouter.expanded() === false) {
+                    collapsed = true;
+                    return false;
+                }
+            });
+            return collapsed;
+        });
+
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
@@ -73,12 +104,12 @@ define([
                     self.loadStorageRouters(),
                     self.loadStorageDrivers()
                 ])
-                    .fail(function(error) {
-                        if (error !== undefined && error.status === 404) {
-                            router.navigateBack();
-                        }
-                    })
-                    .always(deferred.resolve);
+                .fail(function(error) {
+                    if (error !== undefined && error.status === 404) {
+                        router.navigateBack();
+                    }
+                })
+                .always(deferred.resolve);
             }).promise();
         };
         self.loadStorageRouters = function() {
@@ -120,33 +151,33 @@ define([
                     self.loadStorageDriversHandle = api.get('storagedrivers', {
                         queryparams: {
                             vpool_guid: self.vPool().guid(),
-                            contents: 'storagerouter,vpool_backend_info,vdisks_guids,alba_proxies'
+                            contents: 'storagerouter,vpool_backend_info,vdisks_guids,alba_proxies,proxy_summary'
                         }
                     })
-                        .done(function(data) {
-                            var guids = [], sddata = {}, map = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                sddata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.storageDrivers,
-                                function(guid) {
-                                    return new StorageDriver(guid);
-                                }, 'guid'
-                            );
-                            $.each(self.storageDrivers(), function(index, storageDriver) {
-                                if (sddata.hasOwnProperty(storageDriver.guid())) {
-                                    storageDriver.fillData(sddata[storageDriver.guid()]);
-                                }
-                                map[storageDriver.storageRouterGuid()] = storageDriver;
-                            });
-                            self.srSDMap(map);
-                            deferred.resolve();
-                        })
-                        .fail(function() {
-                            deferred.reject();
+                    .done(function(data) {
+                        var guids = [], sddata = {}, map = {};
+                        $.each(data.data, function(index, item) {
+                            guids.push(item.guid);
+                            sddata[item.guid] = item;
                         });
+                        generic.crossFiller(
+                            guids, self.storageDrivers,
+                            function(guid) {
+                                return new StorageDriver(guid);
+                            }, 'guid'
+                        );
+                        $.each(self.storageDrivers(), function(index, storageDriver) {
+                            if (sddata.hasOwnProperty(storageDriver.guid())) {
+                                storageDriver.fillData(sddata[storageDriver.guid()]);
+                            }
+                            map[storageDriver.storageRouterGuid()] = storageDriver;
+                        });
+                        self.srSDMap(map);
+                        deferred.resolve();
+                    })
+                    .fail(function() {
+                        deferred.reject();
+                    });
                 } else {
                     deferred.resolve();
                 }
@@ -183,12 +214,45 @@ define([
         self.addStorageRouter = function(sr) {
             self.updatingStorageRouters(true);
             if (self.vPool().extensible()) {
-                var deferred = $.Deferred(),
-                    wizard = new ExtendVPool({
+                var wizard = new ExtendVPool({
+                    modal: true,
+                    vPool: self.vPool(),
+                    storageRouter: sr});
+                // Setup listener for when the Modal is closed
+                wizard.closing.always(function() {
+                    self.updatingStorageRouters(false);
+                });
+                wizard.completed.always(function() {
+                    self.updatingStorageRouters(false);
+                });
+                dialog.show(wizard);
+            } else {
+                var reasons = self.vPool().notExtensibleReasons(),
+                    message = $.t('ovs:wizards.extend_vpool.prohibited.message', {name: self.vPool().name(), multi: reasons.length === 1 ? '' : 's'});
+                $.each(reasons, function(index, reason) {
+                    message += '<li>' + $.t('ovs:wizards.extend_vpool.prohibited.reasons.' + reason) + '</li>';
+                });
+                message += '</ul>';
+                app.showMessage(
+                    message,
+                    $.t('ovs:wizards.extend_vpool.prohibited.title', {name: self.vPool().name()}),
+                    [$.t('ovs:generic.ok')]
+                )
+                .always(function() {
+                    self.updatingStorageRouters(false);
+                });
+            }
+        };
+        self.reconfigureStorageRouter = function(sr, sd) {
+            self.updatingStorageRouters(true);
+            if (self.srSDMap().hasOwnProperty(sr.guid())) {
+                var deferred = $.Deferred();
+                var wizard = new ReconfigureVPool({
                         modal: true,
                         completed: deferred,
                         vPool: self.vPool(),
-                        storageRouter: sr
+                        storageRouter: sr,
+                        storageDriver: sd
                     });
                 wizard.closing.always(function() {
                     deferred.resolve();
@@ -197,21 +261,6 @@ define([
                 deferred.always(function() {
                     self.updatingStorageRouters(false);
                 });
-            } else {
-                var reasons = self.vPool().notExtensibleReasons(),
-                    message = $.t('ovs:wizards.extend_vpool.prohibited.message', {name: self.vPool().name(), multi: reasons.length === 1 ? '' : 's'});
-                $.each(reasons, function(index, reason) {
-                    message += '<li>' + $.t('ovs:wizards.extend_vpool.prohibited.reasons.' + reason) + '</li>';
-                }) ;
-                message += '</ul>';
-                app.showMessage(
-                    message,
-                    $.t('ovs:wizards.extend_vpool.prohibited.title', {name: self.vPool().name()}),
-                    [$.t('ovs:generic.ok')]
-                )
-                    .always(function() {
-                        self.updatingStorageRouters(false);
-                    });
             }
         };
         self.generateHPRMConfigFiles = function(sr) {

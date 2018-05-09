@@ -64,6 +64,37 @@ class SSHClient(_SSHClient):
                                         cached=cached,
                                         timeout=timeout)
 
+    @staticmethod
+    def get_clients(endpoints, user_names=None, raise_error=False):
+        """
+        Retrieve a list of SSHClient instances
+        :param endpoints: List of StorageRouters or IPs
+        :type endpoints: list
+        :param user_names: User names for which to establish the connections
+        :type user_names: list
+        :param raise_error: Raise exception if any endpoint is unreachable
+        :type raise_error: bool
+        :return: Dictionary with SSHClients for the specified endpoints and user names
+        :rtype: dict
+        """
+        if user_names is None or len(user_names) == 0:
+            user_names = [None]
+
+        clients = {'offline': []}
+        for endpoint in endpoints:
+            for user_name in user_names:
+                try:
+                    client = SSHClient(endpoint=endpoint, username=user_name)
+                    if endpoint not in clients:
+                        clients[endpoint] = {}
+                    clients[endpoint][client.username] = client
+                except (UnableToConnectException, NotAuthenticatedException):
+                    clients['offline'].append(endpoint)
+                    if raise_error is True:
+                        raise
+                    break
+        return clients
+
     @classmethod
     def _check_storagerouter(cls, storagerouter, refresh=True):
         """

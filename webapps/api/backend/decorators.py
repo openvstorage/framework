@@ -32,6 +32,7 @@ from rest_framework.request import Request
 from api.backend.toolbox import ApiToolbox
 from api.helpers import OVSResponse
 from ovs.dal.datalist import DataList
+from ovs.dal.dataobject import DataObject
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -407,14 +408,13 @@ def return_list(object_type, default_sort=None):
 
 def return_object(object_type, mode=None):
     """
-    Object decorator
+    Object decorator to return a serialized Hybrid
     """
 
     def wrap(f):
         """
         Wrapper function
         """
-
         return_status = status.HTTP_200_OK
         if mode == 'accepted':
             return_status = status.HTTP_202_ACCEPTED
@@ -440,6 +440,10 @@ def return_object(object_type, mode=None):
 
             start = time.time()
             obj = f(*args, **kwargs)
+            if not isinstance(obj, DataObject):
+                raise TypeError('Returned object is not a hybrid')
+            if not isinstance(obj, object_type):
+                raise TypeError('Returned Hybrid is not of type {0}'.format(str(object_type)))
             timings['fetch'] = [time.time() - start, 'Fetching data']
 
             obj.reset_timings()
@@ -633,3 +637,33 @@ def log(log_slow=True):
         return new_function
 
     return wrap
+
+#####################
+# Django Decorators #
+#####################
+
+
+def extended_action(methods=None, detail=None, url_path=None, url_name=None, **kwargs):
+    """
+    Mark a ViewSet method as a routable action.
+
+    Set the `detail` boolean to determine if this action should apply to
+    instance/detail requests or collection/list requests.
+
+    See: https://github.com/encode/django-rest-framework/blob/master/docs/api-guide/viewsets.md#marking-extra-actions-for-routing
+    Decorator to mark a 'post' action. Decorator from version 3.8.2 to use for the internal router
+    """
+    methods = ['get'] if (methods is None) else methods
+    methods = [method.lower() for method in methods]
+
+    assert detail is not None, ( "@action() missing required argument: 'detail'" )
+
+    def decorator(func):
+        func.bind_to_methods = methods
+        func.detail = detail
+        func.url_path = url_path if url_path else func.__name__
+        func.url_name = url_name if url_name else func.__name__.replace('_', '-')
+        func.kwargs = kwargs
+        return func
+    return decorator
+

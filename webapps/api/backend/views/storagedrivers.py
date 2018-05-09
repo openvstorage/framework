@@ -21,7 +21,7 @@ StorageDriver API module
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from api.backend.decorators import load, log, required_roles, return_list, return_object, return_task
+from api.backend.decorators import load, log, required_roles, return_list, return_object, return_task, return_simple
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagedriverlist import StorageDriverList
@@ -74,3 +74,24 @@ class StorageDriverViewSet(viewsets.ViewSet):
         :type storagedriver: StorageDriver
         """
         return StorageDriverController.refresh_configuration.delay(storagedriver_guid=storagedriver.guid)
+
+    @action()
+    @log()
+    @required_roles(['read'])
+    @return_simple()
+    @load(StorageDriver)
+    def calculate_update_impact(self, storagedriver, vpool_updates, storagedriver_updates):
+        """
+        Calculates what impact the proposed update configuration would have
+        :param storagedriver: Storagedriver linked with the call
+        :type storagedriver: StorageDriver
+        :param vpool_updates: Updates to be done to the vpool
+        :type vpool_updates: dict
+        :param storagedriver_updates: Updates to be done to the storagedriver
+        :type storagedriver_updates: dict
+        :return: Data on what actions would be taken
+        :rtype: object
+        """
+        # TODO: Chuffie, dit is hier voor uw edit vPool i guess?
+        vpool_updates.update(storagedriver_updates)
+        return vpool_updates

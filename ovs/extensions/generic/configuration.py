@@ -107,7 +107,7 @@ class Configuration(_Configuration):
                          'arakoon_clusters': {},
                          'stores': {'persistent': 'pyrakoon',
                                     'volatile': 'memcache'},
-                         'logging': {'type': 'console', 'level': 'INFO'},
+                         'logging': {'type': 'console', 'level': 'DEBUG'},
                          'scheduling/celery': {'ovs.stats_monkey.run_all': None,  # Disable stats monkey scheduled task by default
                                                'alba.stats_monkey.run_all': None}})
         if logging_target is not None:

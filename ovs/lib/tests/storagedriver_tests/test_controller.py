@@ -38,4 +38,4 @@ class SDControllerTest(unittest.TestCase):
                      None: {'backoff': 2 * 1024 ** 3,  # Invalid size, return default
                             'trigger': 1 * 1024 ** 3}}
         for size, gap_config in scenarios.iteritems():
-            self.assertDictEqual(StorageDriverController.generate_backoff_gap_settings(size), gap_config)
+            self.assertDictEqual(StorageDriverController.calculate_trigger_and_backoff_gap(size), gap_config)

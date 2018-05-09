@@ -25,6 +25,7 @@ from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 
@@ -71,26 +72,24 @@ class MonitoringController(object):
         """
         MonitoringController._logger.info('Starting vDisk caching quota verification...')
         alba_guid_size_map = {}
+        vdisk_cache_quota_mapping = {StorageDriverConfiguration.CACHE_BLOCK: 'block',
+                                     StorageDriverConfiguration.CACHE_FRAGMENT: 'fragment'}
         for storagedriver in StorageDriverList.get_storagedrivers():
             storagedriver.invalidate_dynamics(['vpool_backend_info', 'vdisks_guids'])
-
-            for cache_type in [['cache_quota_fc', 'backend_info', 'connection_info', 'fragment'],
-                               ['cache_quota_bc', 'block_cache_backend_info', 'block_cache_connection_info', 'block']]:
-                cache_quota = storagedriver.vpool_backend_info[cache_type[0]]
-                backend_info = storagedriver.vpool_backend_info[cache_type[1]]
-                connection_info = storagedriver.vpool_backend_info[cache_type[2]]
-                if backend_info is None or connection_info is None:
+            for cache_type, cache_type_data in storagedriver.vpool_backend_info['caching_info'].iteritems():
+                cache_quota = cache_type_data['quota']
+                backend_info = cache_type_data['backend_info']
+                if backend_info is None:
+                    continue
+                connection_info = backend_info.get('connection_info', None)
+                if connection_info is None:
                     continue
 
                 alba_backend_name = backend_info['name']
                 alba_backend_host = connection_info['host']
                 alba_backend_guid = backend_info['alba_backend_guid']
                 if alba_backend_guid not in alba_guid_size_map:
-                    ovs_client = OVSClient(ip=alba_backend_host,
-                                           port=connection_info['port'],
-                                           credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                           version=6,
-                                           cache_store=VolatileFactory.get_client())
+                    ovs_client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
                     try:
                         alba_guid_size_map[alba_backend_guid] = {'name': alba_backend_name,
                                                                  'backend_ip': alba_backend_host,
@@ -102,7 +101,7 @@ class MonitoringController(object):
 
                 for vdisk_guid in storagedriver.vdisks_guids:
                     vdisk = VDisk(vdisk_guid)
-                    vdisk_cq = vdisk.cache_quota.get(cache_type[3]) if vdisk.cache_quota is not None else None
+                    vdisk_cq = vdisk.cache_quota.get(vdisk_cache_quota_mapping[cache_type]) if vdisk.cache_quota is not None else None
                     if vdisk_cq is None:
                         alba_guid_size_map[alba_backend_guid]['requested_size'] += cache_quota if cache_quota is not None else 0
                     else:

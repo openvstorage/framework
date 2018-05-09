@@ -18,59 +18,65 @@ define([
     'durandal/activator', 'plugins/dialog', 'knockout', 'jquery', 'ovs/generic'
 ], function(activator, dialog, ko, $, generic) {
     "use strict";
-    return function(parent) {
+    /**
+     * Returns a constructor which can handle stepping through a multi-view wizard
+     * Wizards with multiple steps can inherit from this object to use multiple steps (inherit using .call(this)
+     */
+    return function() {
+        var self = this;
         // Observables
-        parent.title       = ko.observable();
-        parent.step        = ko.observable(0);
-        parent.modal       = ko.observable(false);
-        parent.running     = ko.observable(false);
-        parent.steps       = ko.observableArray([]);
-        parent.loadingNext = ko.observable(false);
-        parent.id          = ko.observable(generic.getHash());
+        self.title       = ko.observable();
+        self.step        = ko.observable(0);
+        self.modal       = ko.observable(false);
+        self.running     = ko.observable(false);
+        self.steps       = ko.observableArray([]);
+        self.loadingNext = ko.observable(false);
+        self.id          = ko.observable(generic.getHash());
 
         // Deferreds
-        parent.closing   = $.Deferred();
-        parent.finishing = $.Deferred();
+        self.closing   = $.Deferred();  // Track if the wizard is closing
+        self.finishing = $.Deferred();  // Track if the wizard is finishing
+        self.completed = $.Deferred();  // Track if the final steps finish has been completed
 
         // Builded variable
-        parent.activeStep = activator.create();
+        self.activeStep = activator.create();
 
         // Computed
-        parent.stepsLength = ko.computed(function() {
-            return parent.steps().length;
+        self.stepsLength = ko.computed(function() {
+            return self.steps().length;
         });
-        parent.hasPrevious = ko.computed(function() {
-            if (parent.running()) {
+        self.hasPrevious = ko.computed(function() {
+            if (self.running()) {
                 return false;
             }
-            return parent.step() > 0;
+            return self.step() > 0;
         });
-        parent.hasNext = ko.computed(function() {
-            return parent.step() < parent.stepsLength() - 1 && parent.stepsLength() > 1;
+        self.hasNext = ko.computed(function() {
+            return self.step() < self.stepsLength() - 1 && self.stepsLength() > 1;
         });
-        parent.canNext = ko.computed(function() {
-            if (parent.running()) {
+        self.canNext = ko.computed(function() {
+            if (self.running()) {
                 return false;
             }
-            if (parent.hasNext()) {
-                return parent.canContinue().value === true;
+            if (self.hasNext()) {
+                return self.canContinue().value === true;
             }
             return false;
         });
-        parent.hasFinish = ko.computed(function() {
-            return parent.step() === parent.stepsLength() - 1;
+        self.hasFinish = ko.computed(function() {
+            return self.step() === self.stepsLength() - 1;
         });
-        parent.canFinish = ko.computed(function() {
-            if (parent.running()) {
+        self.canFinish = ko.computed(function() {
+            if (self.running()) {
                 return false;
             }
-            if (parent.hasFinish()) {
-                return parent.canContinue().value === true;
+            if (self.hasFinish()) {
+                return self.canContinue().value === true;
             }
             return false;
         });
-        parent.canContinue = ko.computed(function() {
-            var step = parent.steps()[parent.step()];
+        self.canContinue = ko.computed(function() {
+            var step = self.steps()[self.step()];
             if (step !== undefined) {
                 return step.canContinue();
             }
@@ -78,59 +84,73 @@ define([
         });
 
         // Functions
-        parent.next = function() {
-            if (parent.step() < parent.stepsLength() ) {
-                var step = parent.steps()[parent.step()],
-                    chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
-                parent.loadingNext(true);
-                $.Deferred(function(deferred) {
-                    chainDeferred.resolve();
-                    if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
-                        chainPromise = chainPromise.then(step.preValidate);
-                    }
-                    if (step.hasOwnProperty('next') && step.next && step.next.call) {
-                        chainPromise = chainPromise.then(step.next);
-                    }
-                    chainPromise.done(deferred.resolve)
-                        .fail(deferred.reject);
-                }).promise()
+        /**
+         * Proceed to the next step (hasNext and canNext computed will check if it is possible)
+         * Before proceeding:
+         *  - Calls the preValidate function (if the step has one) and waits for the deferred to resolve
+         * After activating next:
+         *  - Calls the shouldSkip function (if the step to transition to has one) and waits for the deferred to resolve. If true, the next step will be called
+         */
+        self.next = function() {
+            if (self.step() < self.stepsLength() ) {
+                var step = self.steps()[self.step()];
+                // Build the promise chain
+                var chainPromise = $.Deferred().resolve().promise();
+                self.loadingNext(true);
+                if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
+                    // Return the pre-validate promise which will resolve or reject
+                    chainPromise.then(function() { return step.preValidate() })
+                }
+                if (step.hasOwnProperty('next') && step.next && step.next.call) {
+                    // Return the next promise which will resolve or reject
+                    chainPromise.then(function() {
+                        return step.next()
+                    })
+                }
+                // Handle finishing of the chain
+                chainPromise
                     .done(function() {
                         var next = true;
                         while (next) {
-                            parent.step(parent.step() + 1);
-                            var step = parent.steps()[parent.step()];
+                            self.step(self.step() + 1);
+                            var step = self.steps()[self.step()];
                             if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
                                 step.shouldSkip()
-                                    .done(function(skip) {
-                                        next = skip === true && parent.step() < parent.stepsLength() - 1;
-                                    })
-                                    .fail(function() {
-                                        next = false;
-                                    });
+                                    .done(function(skip) { next = skip === true && self.step() < self.stepsLength() - 1; })
+                                    .fail(function() { next = false; });
                             } else {
                                 next = false;
                             }
                         }
-                        parent.activateStep();
+                        self.activateStep();
                     })
                     .always(function() {
-                        parent.loadingNext(false);
+                        self.loadingNext(false);
                     });
             }
         };
-        parent.activateStep = function() {
-            parent.activeStep(parent.steps()[parent.step()]);
+        /**
+         * Activate a step
+         * Uses the Durandal Activator to maintain the steps lifecycle
+         */
+        self.activateStep = function() {
+            self.activeStep(self.steps()[self.step()]);
         };
-        parent.previous = function() {
-            if (parent.step() > 0) {
+        /**
+         * Activates a previous steps when possible
+         * After activating previous:
+         *  - Calls the shouldSkip function (if the step to transition to has one) and waits for the deferred to resolve. If true, the previous step will be called
+         */
+        self.previous = function() {
+            if (self.step() > 0) {
                 var next = true;
                 while (next) {
-                    parent.step(parent.step() - 1);
-                    var step = parent.steps()[parent.step()];
+                    self.step(self.step() - 1);
+                    var step = self.steps()[self.step()];
                     if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
                         step.shouldSkip()
                             .done(function (skip) {
-                                next = skip === true && parent.step() > 0;
+                                next = skip === true && self.step() > 0;
                             })
                             .fail(function() {
                                 next = false;
@@ -139,66 +159,108 @@ define([
                         next = false;
                     }
                 }
-                parent.activateStep();
+                self.activateStep();
             }
         };
-        parent.close = function(success) {
-            dialog.close(parent, {
+        /**
+         * Closes the current modal
+         * @param success: Indicator to whether or not the wizard closed with success
+         * @type success: bool
+         */
+        self.close = function(success) {
+            dialog.close(self, {
                 success: success,
                 data: success ? {} : undefined
             });
-            parent.closing.resolve(success);
+            self.closing.resolve(success);
         };
-        parent.finish = function() {
-            parent.running(true);
-            var step = parent.steps()[parent.step()],
-                chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
-            $.Deferred(function(deferred) {
-                chainDeferred.resolve();
-                if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
-                    chainPromise = chainPromise.then(function() {
-                        return $.Deferred(function (prevalidateDeferred) {
-                            step.preValidate()
-                                .fail(function() {
-                                    prevalidateDeferred.reject({ abort: true, data: undefined });
-                                })
-                                .done(prevalidateDeferred.resolve);
-                        }).promise();
-                    });
-                }
+        /**
+         *  Finish and close the wizard
+         *  Before proceeding:
+         *  - Calls the preValidate function (if the step has one) and waits for the deferred to resolve
+         *  - Calls the finish function and track the result of the finish within the completed deferred
+         *  The wizard can wait for the finish to completely resolve. To enable this behaviour, the finish step should
+         *  return [promise, true]. The first item is the promise, the second item is a bool whether to wait or not
+         *  Not waiting for the result of the given promise means that the finish will never be unsuccessfully closed, regardless of the result
+         *  The result can still be fetched from the completed property
+         */
+        self.finish = function() {
+            self.running(true);
+            var step = self.steps()[self.step()];
+            // Build the promise chain, immediately resolve the deferred to kick off all the chained promises
+            var chainPromise = $.Deferred().resolve().promise();
+            if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
                 chainPromise.then(function() {
-                        return $.Deferred(function (finishDeferred) {
-                            step.finish()
-                                .fail(function(data) {
-                                    finishDeferred.reject({ abort: false, data: data });
-                                })
-                                .done(finishDeferred.resolve);
-                        }).promise();
+                    // Return the pre-validate promise which will resolve or reject itself and mutate the data to use in our finish
+                    return step.preValidate()
+                        .then(function(data) {
+                            return data
+                        }, function(error) {
+                            return {
+                                abort: true,
+                                data: error
+                            }
+                        })
+                });
+            }
+            // Track finishing of the step into the 'completed' deferred as the wizard should close asap
+            var finish_result = step.finish();
+            var finish_wait = undefined;
+            var finish_promise = undefined;
+            // Determine what we are dealing with
+            if(Array.isArray(finish_result)){
+                // var [finish_promise, finish_wait] = finish_result in ES6 :(
+                finish_promise = finish_result[0];
+                finish_wait = finish_result[1];
+            } else{
+                finish_promise = finish_result;
+                finish_wait = false;
+            }
+            // Add a handler to the promise to update our completed promise
+            // Since the callbacks to a deferred respect the order in which they were added, the registers on the self.completed will fire once resolve would be called
+            // This is why resolve is called with the data from the returned function
+            finish_promise.then(function(data) {
+                self.completed.resolve(data)
+            }, function(error) {
+                self.completed.reject(error)
+            });
+            // Add the step finish to the chain
+            chainPromise.then(function() {
+                if (finish_wait === true) {
+                    return finish_promise.then(function(data) {
+                        return data
+                    }, function(error) {
+                        return {
+                            abort:false,
+                            data: error
+                        }
                     })
-                    .done(deferred.resolve)
-                    .fail(deferred.reject);
-            }).promise()
+                }
+                // No need to wait, returning empty promise to the chain
+                return $.when();
+            })
+                // Handle finishing of the chain
                 .done(function(data) {
-                    dialog.close(parent, {
+                    dialog.close(self, {
                         success: true,
                         data: data
                     });
-                    parent.finishing.resolve(true);
+                    self.finishing.resolve(true);
                 })
                 .fail(function(data) {
                     if (data.abort === false) {
-                        dialog.close(parent, {
+                        dialog.close(self, {
                             success: false,
                             data: data.data
                         });
-                        parent.finishing.resolve(false);
+                        self.finishing.resolve(false);
                     }
                 })
                 .always(function() {
-                    window.setTimeout(function() { parent.running(false); }, 500);
+                    window.setTimeout(function() { self.running(false); }, 500);
                 });
         };
-        parent.getView = function() {
+        self.getView = function() {
             return 'views/wizards/index.html';
         };
     };

@@ -31,6 +31,7 @@ from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -66,10 +67,10 @@ class NodeInstallationController(object):
         :return: None
         """
         Toolbox.log(logger=NodeInstallationController._logger, messages='Open vStorage Setup', boxed=True)
-        Toolbox.verify_required_params(actual_params={'node_type': node_type,
-                                                      'execute_rollback': execute_rollback},
-                                       required_params={'node_type': (str, ['master', 'extra'], False),
-                                                        'execute_rollback': (bool, None)})
+        ExtensionsToolbox.verify_required_params(actual_params={'node_type': node_type,
+                                                                'execute_rollback': execute_rollback},
+                                                 required_params={'node_type': (str, ['master', 'extra'], False),
+                                                                  'execute_rollback': (bool, None)})
 
         rdma = None
         config = None
@@ -102,16 +103,16 @@ class NodeInstallationController(object):
                 if len(errors) > 0:
                     raise ValueError('\nErrors found while verifying pre-configuration:\n - {0}\n\nAllowed keys:\n - {1}'.format('\n - '.join(errors), '\n - '.join(expected_keys)))
 
-                Toolbox.verify_required_params(actual_params=config,
-                                               required_params={'cluster_ip': (str, Toolbox.regex_ip, False),
-                                                                'enable_heartbeats': (bool, None, False),
-                                                                'external_config': (str, None, False),
-                                                                'logging_target': (dict, None, False),
-                                                                'master_ip': (str, Toolbox.regex_ip),
-                                                                'master_password': (str, None),
-                                                                'node_type': (str, ['master', 'extra'], False),
-                                                                'rdma': (bool, None, False),
-                                                                'rollback': (bool, None, False)})
+                ExtensionsToolbox.verify_required_params(actual_params=config,
+                                                         required_params={'cluster_ip': (str, Toolbox.regex_ip, False),
+                                                                          'enable_heartbeats': (bool, None, False),
+                                                                          'external_config': (str, None, False),
+                                                                          'logging_target': (dict, None, False),
+                                                                          'master_ip': (str, Toolbox.regex_ip),
+                                                                          'master_password': (str, None),
+                                                                          'node_type': (str, ['master', 'extra'], False),
+                                                                          'rdma': (bool, None, False),
+                                                                          'rollback': (bool, None, False)})
 
                 # Required fields
                 master_ip = config['master_ip']
@@ -536,7 +537,7 @@ class NodeInstallationController(object):
 
             # Try to trigger setups from possibly installed other packages
             if root_client.run(['which', 'asd-manager'], allow_nonzero=True) != '':
-                sys.path.append('/opt/asd-manager/')
+                sys.path.append('/opt/asd-manager')
                 from source.asdmanager import setup
                 Toolbox.log(logger=NodeInstallationController._logger, messages='\nA local ASD Manager was detected for which the setup will now be launched.\n')
                 setup()
