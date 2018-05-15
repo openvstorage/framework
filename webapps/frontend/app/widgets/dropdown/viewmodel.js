@@ -26,7 +26,8 @@ define([
         self.text          = undefined;
         self.unique        = generic.getTimestamp().toString();
 
-        self.itemsSubscription = undefined;
+        self.subscriptions = [];
+
         // Observables
         self.key            = ko.observable();
         self.keyIsFunction  = ko.observable(false);
@@ -133,9 +134,9 @@ define([
                 self.items = settings.items;
             } else if (ko.isObservable(settings.items)) {  // Handle the case where it would be an observable / computed so updates can be pushed
                 self.items(settings.items());
-                self.itemsSubscription = settings.items.subscribe(function(newValue){
+                self.subscriptions.push(settings.items.subscribe(function(newValue){
                     self.items(newValue)
-                })
+                }))
             } else {
                 self.items(settings.items)  // Can be a normal array / computed / observable
             }
@@ -153,7 +154,7 @@ define([
             self.key(generic.tryGet(settings, 'key', undefined));
             self.small(generic.tryGet(settings, 'small', false));
             self.keyIsFunction(generic.tryGet(settings, 'keyisfunction', false));
-            self.free(generic.tryGet(settings, 'free', false));
+            self.free(generic.tryGet(settings, 'free', false));  // Check if user can input items into the dropdown
             self.emptyIsLoading(generic.tryGet(settings, 'emptyisloading', true));
             if (self.free()) {
                 if (!settings.hasOwnProperty('defaultfree')) {
@@ -170,14 +171,15 @@ define([
                 self.multi(true);
             } else if (self.target() === undefined && self.items().length > 0) {
                 var foundDefault = false;
+                var hasDefaultRegex = settings.hasOwnProperty('defaultRegex');
                 $.each(self.items(), function(index, item) {
-                    if (settings.hasOwnProperty('defaultRegex')) {
+                    if (hasDefaultRegex) {
                         if (self.text(item).match(settings.defaultRegex) !== null) {
                             self.target(item);
                             foundDefault = true;
-                            return false;
+                            return false; // Break
                         }
-                        return true;
+                        return true;  // Continue
                     }
                     if (item === undefined) {
                         foundDefault = true;
@@ -195,13 +197,48 @@ define([
             if (!ko.isComputed(self.target)) {
                 self.target.valueHasMutated();
             }
+            // Enforce that the items in the list must be available in options. Otherwise clear the current target
+            self.subscriptions.push(self.items.subscribe(function(newValue){
+                // Check if current target is still in the list of options. If not, reset
+                var extractKey = function(item) {
+                    var key = self.key();
+                    var ret = item;
+                    if (key && item) {
+                        var valueOfKey = item[key];
+                        if (self.keyIsFunction()) {
+                            valueOfKey = valueOfKey() // Unpack
+                        }
+                        ret = valueOfKey
+                    }
+                    return ret;
+                };
+                var convertToKeyList = function(list) {
+                    return list.map(function(item) {
+                        return extractKey(item)
+                    })
+                };
+                var options = convertToKeyList(newValue);
+                var targetValue = self.target();
+                if (self.multi()) {
+                    self.target(targetValue.filter(function(value) {
+                        return options.contains(extractKey(value))
+                    }));
+                } else {
+                    if (!options.contains(extractKey(targetValue))) {
+                        if (options.length > 0) {
+                            self.target(self.items()[0])
+                        } else {
+                            self.target(undefined)
+                        }
+                    }
+                }
+            }));
         };
         self.deactivate = function() {
             // Dispose of the subscriptions
-            if (self.itemsSubscription !== undefined) {
-                self.itemsSubscription.dispose();
-            }
-
+            $.each(self.subscriptions, function(index, subscription){
+                subscription.dispose()
+            })
         }
     };
 });
