@@ -15,11 +15,15 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic'
-], function($, ko, generic) {
+    'jquery', 'knockout',
+    'ovs/generic',
+    'viewmodels/containers/shared/base_container'
+], function($, ko,
+            generic,
+            BaseContainer) {
     "use strict";
 
-    return function(data) {
+     function StatsMonkey(data) {
         var self = this;
 
         self.host        = ko.observable().extend({regex: generic.ipRegex});
@@ -31,6 +35,8 @@ define([
         self.transport   = ko.observable();
         self.transports  = ko.observableArray(['influxdb', 'redis']);
         self.environment = ko.observable().extend({removeWhiteSpaces: null});
+
+        BaseContainer.call(this);
 
         // Default data: required to set the mappedProperties for ko.mapping
         var vmData = $.extend({
@@ -102,4 +108,6 @@ define([
             return { value: reasons.length === 0, reasons: reasons, fields: fields };
         }
     }
+    StatsMonkey.prototype = $.extend({}, BaseContainer.prototype);
+    return StatsMonkey
 });

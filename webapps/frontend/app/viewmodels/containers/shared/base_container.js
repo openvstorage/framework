@@ -22,8 +22,8 @@ define([
     var IDKeys = ['guid', 'id'];
     // @Todo figure something out to map guid updates to a different model and to reset that model when the guid changes
     // Example: storagerouter_guid -> changed because of updating mapping trigger -> reset this.storagerouter and load in new guid
-    // The basemodel should overrule his update to check these changed
-    function BaseModel()  {
+    // The BaseContainer should overrule his update to check these changed
+    function BaseContainer()  {
         var self = this;
 
         // Variables
@@ -36,7 +36,7 @@ define([
             });
         });
     }
-    BaseModel.prototype = {
+    BaseContainer.prototype = {
         /**
          * Disposes all possible subscriptions (Events/subscriptions/...)
          * Ideally called in the deactivator
@@ -88,5 +88,5 @@ define([
             ko.mapping.fromJS(data, this)
         }
     };
-    return BaseModel;
+    return BaseContainer;
 });
