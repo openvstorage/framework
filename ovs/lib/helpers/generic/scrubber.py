@@ -684,7 +684,7 @@ class StackWorker(ScrubShared):
                         scrub_proxy_config['port'] = port
                         scrub_proxy_config['transport'] = 'tcp'
                         scrub_proxy_configs.append(scrub_proxy_config)
-                        Configuration.set(scrub_proxy_config_key, json.dumps(scrub_config, indent=4), raw=True)
+                        Configuration.set(scrub_proxy_config_key, json.dumps(scrub_proxy_config, indent=4), raw=True)
                         params = {'VPOOL_NAME': self.vpool.name,
                                   'LOG_SINK': LogHandler.get_sink_path(alba_proxy_service),
                                   'CONFIG_PATH': Configuration.get_configuration_path(scrub_proxy_config_key)}
@@ -694,7 +694,7 @@ class StackWorker(ScrubShared):
                         if 'post_single_proxy_deployment' in self._test_hooks:
                             self._test_hooks['post_single_proxy_deployment'](self, alba_proxy_service)
 
-                        self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(alba_proxy_service, scrub_config)))
+                        self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(alba_proxy_service, scrub_proxy_config)))
                 # Backend config is tied to the proxy, so only need to register while the proxy has to be deployed
                 self._logger.info(self._format_message('Setting up backend config'))
                 backend_config = copy.deepcopy(self.backend_connection_manager_config)
