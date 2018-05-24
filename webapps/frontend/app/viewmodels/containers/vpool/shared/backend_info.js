@@ -18,23 +18,23 @@ define([
     'jquery', 'knockout',
     'ovs/generic',
     'viewmodels/containers/shared/base_container'
-], function($, ko, generic, BaseModel) {
+], function($, ko, generic, BaseContainer) {
     "use strict";
     // Caching data viewModel which is parsed from JS
     // Return a constructor for a nested viewModel
     var backendInfoMapping = {
         'connection_info': {
             create: function (options) {
-                if (options.data !== null) return new connectionInfoViewModel(options.data);
+                if (options.data !== null) return new ConnectionInfoViewModel(options.data);
             }
         }
     };
     var connectionInfoMapping = {};
-    var backendInfoViewModel = function(data) {
+    function BackendInfoViewModel(data) {
         var self = this;
 
         // Inherit from base
-        BaseModel.call(self);
+        BaseContainer.call(self);
 
         // Observables (This will ensure that these observables are present even if the data is missing them)
         self.name                = ko.observable();
@@ -73,12 +73,13 @@ define([
         self.isLocalBackend = ko.pureComputed(function() {
             return self.connection_info.isLocalBackend()
         });
-    };
-    var connectionInfoViewModel = function(data) {
+    }
+    BackendInfoViewModel.prototype = $.extend({}, BaseContainer.prototype);
+    function ConnectionInfoViewModel(data) {
         var self = this;
 
         // Inherit from base
-        BaseModel.call(self);
+        BaseContainer.call(self);
 
         // Observables
         self.client_id      = ko.observable().extend({removeWhiteSpaces: null});
@@ -124,6 +125,7 @@ define([
             });
             return hasRemoteInfo;
         });
-    };
-    return backendInfoViewModel;
+    }
+    ConnectionInfoViewModel.prototype = $.extend({}, BaseContainer.prototype);
+    return BackendInfoViewModel;
 });

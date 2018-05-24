@@ -17,7 +17,7 @@
 define([
     'jquery', 'knockout', 'durandal/app', 'ovs/generic',
     'viewmodels/containers/shared/base_container', 'viewmodels/services/storagedriver'
-], function($, ko, app, generic, BaseModel, storageDriverService) {
+], function($, ko, app, generic, BaseContainer, storageDriverService) {
     "use strict";
     // Configuration viewModel which is parsed from JS
     // Return a constructor for a nested viewModel
@@ -37,7 +37,7 @@ define([
     var ConfigurationViewModel = function(data) {
         var self = this;
         // Inherit
-        BaseModel.call(self);
+        BaseContainer.call(self);
 
         // Properties
         self._advancedSettings  = undefined;  // Used for caching
@@ -128,12 +128,16 @@ define([
         // Bind the data into this
         ko.mapping.fromJS(vmData, configurationMapping, self);
     };
+    ConfigurationViewModel.prototype = $.extend({}, BaseContainer.prototype);
+
     var MDSConfigModel = function(data) {
         var self = this;
         // Observables (This will ensure that these observables are present even if the data is missing them)
         self.mds_maxload        = ko.observable();
         self.mds_tlogs          = ko.observable();
         self.mds_safety         = ko.observable().extend({ numeric: {min: 1, max: 5}});
+
+        BaseContainer.call(self);
 
         // Default data
         var vmData = $.extend({
@@ -142,12 +146,13 @@ define([
 
         ko.mapping.fromJS(vmData, {}, self);
     };
+    MDSConfigModel.prototype = $.extend({}, BaseContainer.prototype);
 
     var AdvancedConfigModel = function(data) {
         var self = this;
 
         // Inherit
-        BaseModel.call(self);
+        BaseContainer.call(self);
 
         // Properties
         var eventTriggeredUpdate = false;  // Keep track if the update happens because of direct editing or through the advancedSettings computed
@@ -209,5 +214,7 @@ define([
             // self.non_disposable_scos_factor(newSettings.non_disposable_scos_factor);
        }
     };
+    AdvancedConfigModel.prototype = $.extend({}, BaseContainer.prototype);
+
     return ConfigurationViewModel;
 });

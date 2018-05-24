@@ -16,13 +16,13 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <span>
-    <span data-bind="if: item() !== undefined || undefinedLoading()">
+    <span data-bind="if: itemHasValue">
         <span data-bind="visible: !isLoaded()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
         <span data-bind="if: isLoaded()">
             <span data-part="lazy-entry" data-bind="text: item"></span>
         </span>
     </span>
-    <span data-bind="if: item() === undefined && !undefinedLoading()">
+    <span data-bind="if: itemIsUndefined">
         <span data-part="lazy-entry-undefined"></span>
     </span>
 </span>

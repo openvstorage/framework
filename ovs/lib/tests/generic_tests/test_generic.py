@@ -49,6 +49,8 @@ class Generic(unittest.TestCase):
     """
     This test class will validate the various scenarios of the Generic logic
     """
+    _logger = Logger('unittest')
+
     def setUp(self):
         """
         (Re)Sets the stores on every test

@@ -106,6 +106,10 @@ define([
             });
             return updatesFound;
         });
+        self.pageHash = ko.pureComputed(function() {
+            // Returns the hashed URL to this objects own page
+            return shared.routing.loadHash('storagerouter-detail', { guid: self.guid()})
+        });
         // Feature Computed
         self.supportsBlockCache = ko.pureComputed(function() {
             var features = self.features();
