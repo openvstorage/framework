@@ -59,25 +59,6 @@ define([
         });
 
         // Functions
-        /**
-         * Return a JSON representation of this object
-         * Will respect the mapping applied to the viewModel
-         * @return {string|*}
-         */
-        self.toJSON = function(){
-            return ko.toJSON(self.toJS())
-        };
-        /**
-         * return a javascript Object from this object
-         * Will respect the mapping applied to the viewModel
-         * @return {object}
-         */
-        self.toJS = function() {
-            return ko.mapping.toJS(self)
-        };
-        self.update = function(data) {
-            ko.mapping.fromJS(data, self)
-        };
         self.validate = function() {
             var fields = [];
             var reasons = [];
