@@ -18,6 +18,7 @@
 Scrubber Module
 """
 import os
+import copy
 import json
 import time
 import uuid
@@ -73,7 +74,7 @@ class ScrubShared(object):
 
         self._key = None
         self._log = None  # To be overruled
-        # used to lock SSHClient usage. SSHClient should be locked as Paramiko will fork the SSHProcess causing some issues in multithreading context
+        # Used to lock SSHClient usage. SSHClient should be locked as Paramiko will fork the SSHProcess causing some issues in multithreading context
         self._client_lock = file_mutex('{0}_client_lock'.format(self._SCRUB_NAMESPACE))
         self._client_cluster_lock = volatile_mutex('{0}_client_cluster_lock'.format(self._SCRUB_NAMESPACE), wait=5 * 60)
 
@@ -400,20 +401,33 @@ class StackWorker(ScrubShared):
         self.stack_id = str(uuid.uuid4())
         self.storagerouter = scrub_info['storagerouter']
         self.partition_guid = scrub_info['partition_guid']
+
+        self._log = 'Scrubber {0} - vPool {1} - StorageRouter {2} - Stack {3}'.format(self.job_id, self.vpool.name,
+                                                                                      self.storagerouter.name,
+                                                                                      self.stack_number)
+
         # Both the proxy and scrub directory are bound to the scrub location and both will be re-used
-        self.alba_proxy_service = 'ovs-albaproxy_{0}_{1}_{2}_scrub'.format(self.vpool.name, self.storagerouter.name, self.partition_guid)
+        self.backend_connection_manager_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
+        proxy_amount_key = '/ovs/framework/hosts/{0}/config|scrub_proxy_amount'.format(self.storagerouter.machine_id)
+        proxy_amount = Configuration.get(key=proxy_amount_key, default=1)
+        if proxy_amount <= 0:
+            raise ValueError('{0} - Incorrect amount of proxies. Expected at least 1, found {1}'.format(self._log, proxy_amount))
+        if self.backend_connection_manager_config.get('backend_type') != 'MULTI':
+            self._logger.warning('{0} - {1} amount of proxies were request but the backend_connection_manager config only supports 1 proxy'.format(self._log, proxy_amount))
+            proxy_amount = 1
+        self.alba_proxy_services = ['ovs-albaproxy_{0}_{1}_{2}_scrub_{3}'.format(self.vpool.name, self.storagerouter.name, self.partition_guid, i)
+                                    for i in xrange(0, proxy_amount)]
+        self.scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}_{{0}}'.format(vpool.guid, self.partition_guid)  # Formatted with the number of the proxy
         self.scrub_directory = '{0}/scrub_work_{1}_{2}_{3}'.format(scrub_info['scrub_path'], vpool.name, self.storagerouter.name, self.partition_guid)
-        self.scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, self.partition_guid)
         self.backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, self.partition_guid)
         self.lock_time = 5 * 60
-        self.lock_key = 'ovs_albaproxy_scrub_{0}'.format(self.alba_proxy_service)
         self.registered_proxy = False
         self.registering_data = {'job_id': self.job_id, 'stack_id': self.stack_id}  # Data to register within Arakoon about this StackWorker
         self.registering_data.update(self.worker_context)
 
-        self._log = 'Scrubber {0} - vPool {1} - StorageRouter {2} - Stack {3}'.format(self.job_id, self.vpool.name, self.storagerouter.name, self.stack_number)
-        self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_service)
-        self._state_key = '{0}_state'.format(self._key)
+        # Always at least 1 proxy service. Using that name to register items under
+        self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_services[0])
+        self._state_key = '{0}_state'.format(self._key)  # Key with the combined state for all proxies
 
     def deploy_stack_and_scrub(self):
         """
@@ -429,7 +443,7 @@ class StackWorker(ScrubShared):
             return
 
         # Deploy a proxy
-        self._deploy_proxy()
+        self._deploy_proxies()
 
         # Execute the actual scrubbing
         threads = []
@@ -441,7 +455,7 @@ class StackWorker(ScrubShared):
 
         amount_threads = max(amount_threads, 1)  # Make sure amount_threads is at least 1
         amount_threads = min(min(self.queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
-        self._logger.info('{0} - Spawning {1} threads for proxy service {2}'.format(self._log, amount_threads, self.alba_proxy_service))
+        self._logger.info('{0} - Spawning {1} threads for proxy services {2}'.format(self._log, amount_threads, ', '.join(self.alba_proxy_services)))
         for index in range(amount_threads):
             # Name the threads for unit testing purposes
             thread = Thread(name='execute_scrub_{0}_{1}_{2}'.format(self.vpool.guid, self.partition_guid, index),
@@ -453,7 +467,7 @@ class StackWorker(ScrubShared):
             thread.join()
 
         # Delete the proxy again
-        self._remove_proxy()
+        self._remove_proxies()
 
     def _execute_scrub(self, thread_number):
         """
@@ -560,7 +574,7 @@ class StackWorker(ScrubShared):
             special['relevant_work_items'] = relevant_work_items
             return relevant_work_items, fetched_work_items
 
-        self._logger.info('{0} - Registering usage of {1}'.format(self._log, self.alba_proxy_service))
+        self._logger.info('{0} - Registering usage of {1}'.format(self._log, ', '.join(self.alba_proxy_services)))
 
         # Attempt to save with all fetched data during work generation, expect the current key to not have changed
         self._safely_store(self._key, get_value_and_expected_value=_get_value_and_expected_value, logging_start=self._log)
@@ -570,7 +584,7 @@ class StackWorker(ScrubShared):
     def _unregister_proxy_usage(self):
         """
         Unregisters that this worker is using this proxy
-        :return: The remaining data entires
+        :return: The remaining data entries
         :rtype: list
         """
         # Keep it pure (for now)
@@ -587,15 +601,15 @@ class StackWorker(ScrubShared):
             special['relevant_work_items'] = relevant_work_items
             return relevant_work_items, fetched_work_items
 
-        self._logger.info('{0} - Unregistering usage of {1}'.format(self._log, self.alba_proxy_service))
+        self._logger.info('{0} - Unregistering usage of {1}'.format(self._log, ', '.join(self.alba_proxy_services)))
 
         if self.registered_proxy is True:
             # Attempt to save with all fetched data during work generation, expect the current key to not have changed
             self._safely_store(self._key,
                                get_value_and_expected_value=_get_value_and_expected_value,
-                               logging_start='{0} - Unregistering proxy {1}'.format(self._log, self.alba_proxy_service),
+                               logging_start='{0} - Unregistering proxies {1}'.format(self._log, ', '.join(self.alba_proxy_services)),
                                max_retries=self.stacks_to_spawn)
-        self._logger.info(self._format_message('Successfully unregistered proxy {0}'.format(self.alba_proxy_service)))
+        self._logger.info(self._format_message('Successfully unregistered proxies {0}'.format(', '.join(self.alba_proxy_services))))
         return special['relevant_work_items']
 
     def _long_poll_proxy_state(self, states, timeout=None):
@@ -622,11 +636,12 @@ class StackWorker(ScrubShared):
                     return current_state
                 if time.time() - start > timeout:
                     raise RuntimeError('Long polling for the state has timed out')
-                self._logger.debug(self._format_message('Proxy {0}\'s state does not match any in  \'{1}\'  (Current: {2})'.format(self.alba_proxy_service, states, current_state)))
+                self._logger.debug(self._format_message('Proxies {0{ their state does not match any in  \'{1}\'  (Current: {2})'
+                                                        .format(', '.join(self.alba_proxy_services), states, current_state)))
                 time.sleep(1)
         return None
 
-    def _set_proxy_state(self, state):
+    def _set_proxies_state(self, state):
         """
         Sets the state of the proxy
         :param state: State of key
@@ -634,7 +649,7 @@ class StackWorker(ScrubShared):
         """
         self._persistent.set(self._state_key, state)
 
-    def _deploy_proxy(self):
+    def _deploy_proxies(self):
         """
         Deploy a scrubbing proxy
         - Validates if a proxy is already present
@@ -645,16 +660,17 @@ class StackWorker(ScrubShared):
         if 'pre_proxy_deployment' in self._test_hooks:
             self._test_hooks['pre_proxy_deployment'](self)
 
-        self._logger.info(self._format_message('Checking for ALBA proxy {0} deployment'.format(self.alba_proxy_service)))
+        self._logger.info(self._format_message('Checking for ALBA proxies {0} deployment'.format(', '.join(self.alba_proxy_services))))
         registered_users = self._register_proxy_usage()
         self._logger.info(self._format_message('Current registered users: {0}'.format(registered_users)))
         try:
             if len(registered_users) == 1:
                 alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
                 # First to register, allowed to deploy the proxy
-                self._logger.info(self._format_message('Deploying ALBA proxy {0}'.format(self.alba_proxy_service)))
+                self._logger.info(self._format_message('Deploying ALBA proxies {0}'.format(', '.join(self.alba_proxy_services))))
                 # Check the proxy status - could be that it is removing
-                self._set_proxy_state('deploying')
+                self._set_proxies_state('deploying')
+                scrub_proxy_configs = []
                 with self._client_cluster_lock:
                     self._logger.info(self._format_message('Creating directory {0}'.format(self.scrub_directory)))
                     client = SSHClient(self.storagerouter, 'root', cached=False)  # Explicitly request a new connection here
@@ -662,30 +678,49 @@ class StackWorker(ScrubShared):
                     client.dir_chmod(self.scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
                     machine_id = System.get_my_machine_id(client)
                     port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
-                    port = System.get_free_ports(selected_range=port_range, amount=1, client=client)[0]
-                    scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(self.vpool.guid))
-                    scrub_config['port'] = port
-                    scrub_config['transport'] = 'tcp'
-                    Configuration.set(self.scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
-                    params = {'VPOOL_NAME': self.vpool.name,
-                              'LOG_SINK': Logger.get_sink_path(self.alba_proxy_service),
-                              'CONFIG_PATH': Configuration.get_configuration_path(self.scrub_config_key),
-                              'ALBA_PKG_NAME': alba_pkg_name,
-                              'ALBA_VERSION_CMD': alba_version_cmd}
-                    self._service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=self.alba_proxy_service)
-                    self._service_manager.start_service(name=self.alba_proxy_service, client=client)
-                self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(self.alba_proxy_service, scrub_config)))
+                    ports = System.get_free_ports(selected_range=port_range, amount=len(self.alba_proxy_services), client=client)
+                    scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(self.vpool.guid)).copy()
+                    for alba_proxy_index, alba_proxy_service in enumerate(self.alba_proxy_services):
+                        port = ports[alba_proxy_index]
+                        scrub_proxy_config_key = self.scrub_config_key.format(alba_proxy_index)
+                        scrub_proxy_config = scrub_config.copy()
+                        scrub_proxy_config['port'] = port
+                        scrub_proxy_config['transport'] = 'tcp'
+                        scrub_proxy_configs.append(scrub_proxy_config)
+                        Configuration.set(scrub_proxy_config_key, json.dumps(scrub_proxy_config, indent=4), raw=True)
+                        params = {'VPOOL_NAME': self.vpool.name,
+                                  'LOG_SINK': Logger.get_sink_path(alba_proxy_service),
+                                  'CONFIG_PATH': Configuration.get_configuration_path(scrub_proxy_config_key)}
+                        self._service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
+                        self._service_manager.start_service(name=alba_proxy_service, client=client)
+
+                        if 'post_single_proxy_deployment' in self._test_hooks:
+                            self._test_hooks['post_single_proxy_deployment'](self, alba_proxy_service)
+
+                        self._logger.info(self._format_message('Deployed ALBA proxy {0} (Config: {1})'.format(alba_proxy_service, scrub_proxy_config)))
                 # Backend config is tied to the proxy, so only need to register while the proxy has to be deployed
                 self._logger.info(self._format_message('Setting up backend config'))
-                backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
+                backend_config = copy.deepcopy(self.backend_connection_manager_config)
                 if backend_config.get('backend_type') != 'MULTI':
+                    scrub_proxy_config = scrub_proxy_configs[0]  # Only 1 proxy would be deployed
                     backend_config['alba_connection_host'] = '127.0.0.1'
-                    backend_config['alba_connection_port'] = scrub_config['port']
+                    backend_config['alba_connection_port'] = scrub_proxy_config['port']
                 else:
-                    for value in backend_config.itervalues():
-                        if isinstance(value, dict):
-                            value['alba_connection_host'] = '127.0.0.1'
-                            value['alba_connection_port'] = scrub_config['port']
+                    # Iterate all proxy configs from the VPool and adjust the socket
+                    proxy_config_template = None
+                    for key in backend_config.copy().iterkeys():
+                        # Proxy keys are currently set to to a stringified integer value
+                        if key.isdigit():
+                            # Remove all proxy configurations of the VPool to replace it with the scrubber ones
+                            proxy_config = backend_config.pop(key)
+                            if proxy_config_template is None:
+                                proxy_config_template = proxy_config
+                    # Build up config for our purposes
+                    for index, scrub_proxy_config in enumerate(scrub_proxy_configs):
+                        proxy_config = proxy_config_template.copy()
+                        proxy_config.update({'alba_connection_host': '127.0.0.1',
+                                             'alba_connection_port': scrub_proxy_config['port']})
+                        backend_config[str(index)] = proxy_config
                 # Copy backend connection manager information in separate key
                 Configuration.set(self.backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
                 self._logger.info(self._format_message('Backend config was set up'))
@@ -693,23 +728,23 @@ class StackWorker(ScrubShared):
                 if 'post_proxy_deployment' in self._test_hooks:
                     self._test_hooks['post_proxy_deployment'](self)
 
-                self._set_proxy_state('deployed')
+                self._set_proxies_state('deployed')
             else:
                 # Long polling for the status
-                self._logger.info(self._format_message('Re-using existing proxy service {0}'.format(self.alba_proxy_service)))
-                self._logger.info(self._format_message('Waiting for proxy service {0} to be deployed by another worker'.format(self.alba_proxy_service)))
+                self._logger.info(self._format_message('Re-using existing proxy services {0}'.format(', '.join(self.alba_proxy_services))))
+                self._logger.info(self._format_message('Waiting for proxy services {0} to be deployed by another worker'.format(', '.join(self.alba_proxy_services))))
                 proxy_state = self._long_poll_proxy_state(states=['deployed', 'removed'])
                 if proxy_state == 'removed':  # A different worker has tried to remove and might or might not have succeeded
-                        raise RuntimeError(self._format_message('Proxy service {0} deployment failed with another worker'.format(self.alba_proxy_service)))
-                self._logger.info(self._format_message('Proxy service {0} was deployed'.format(self.alba_proxy_service)))
+                        raise RuntimeError(self._format_message('Proxy services {0} deployment failed with another worker'.format(', '.join(self.alba_proxy_services))))
+                self._logger.info(self._format_message('Proxy services {0} was deployed'.format(', '.join(self.alba_proxy_services))))
         except Exception:
-            message = '{0} - An error occurred deploying ALBA proxy {1}'.format(self._log, self.alba_proxy_service)
+            message = '{0} - An error occurred deploying ALBA proxies {1}'.format(self._log, ', '.join(self.alba_proxy_services))
             self.error_messages.append(message)
             self._logger.exception(message)
-            self._remove_proxy(force=True)
+            self._remove_proxies(force=True)
             raise  # No proxy could be set so no scrubbing could happen for this worker
 
-    def _remove_proxy(self, force=False):
+    def _remove_proxies(self, force=False):
         """
         Removes the proxy that was used
         :param force: Force removal. This will skip all the check of registered user.
@@ -720,32 +755,50 @@ class StackWorker(ScrubShared):
         proxy_users = self._unregister_proxy_usage()  # Always unregister the usage
         if force is False:
             if len(proxy_users) > 0:
-                self._logger.info('{0} - Cannot remove service {1} as it is still in use by others'.format(self._log, self.alba_proxy_service))
+                self._logger.info('{0} - Cannot remove services {1} as it is still in use by others'.format(self._log, ', '.join(self.alba_proxy_services)))
                 return
+        removal_errors = []
         try:
             # No longer using the proxy as we want to remove it
-            self._set_proxy_state('removing')
+            self._set_proxies_state('removing')
             with self._client_cluster_lock:
                 self._logger.info(self._format_message('Removing directory {0}'.format(self.scrub_directory)))
                 client = SSHClient(self.storagerouter, 'root', cached=False)  # Explicitly ask for a new connection here
                 client.dir_delete(self.scrub_directory)
-                self._logger.info(self._format_message('Removing service {0}'.format(self.alba_proxy_service)))
-                if self._service_manager.has_service(self.alba_proxy_service, client=client) is True:
-                    if self._service_manager.get_service_status(name=self.alba_proxy_service, client=client) == 'active':
-                        self._service_manager.stop_service(self.alba_proxy_service, client=client)
-                    self._service_manager.remove_service(self.alba_proxy_service, client=client)
-            if Configuration.exists(self.scrub_config_key):
-                Configuration.delete(self.scrub_config_key)
-            self._logger.info('{0} - Removed service {1}'.format(self._log, self.alba_proxy_service))
+                self._logger.info(self._format_message('Removing services {0}'.format(', '.join(self.alba_proxy_services))))
+                for alba_proxy_index, alba_proxy_service in enumerate(self.alba_proxy_services):
+                    proxy_scrub_config_key = self.scrub_config_key.format(alba_proxy_index)
+                    try:
+                        if self._service_manager.has_service(alba_proxy_service, client=client) is True:
+                            if self._service_manager.get_service_status(name=alba_proxy_service, client=client) == 'active':
+                                self._service_manager.stop_service(alba_proxy_service, client=client)
+                            self._service_manager.remove_service(alba_proxy_service, client=client)
+                            self._logger.info('{0} - Removed service {1}'.format(self._log, alba_proxy_service))
+                    except Exception:
+                        message = '{0} - Removing service {1} failed'.format(self._log, alba_proxy_service)
+                        removal_errors.append(message)
+                        self._logger.exception(message)
+                    try:
+                        if Configuration.exists(proxy_scrub_config_key):
+                            Configuration.delete(proxy_scrub_config_key)
+                    except Exception:
+                        message = '{0} - Removing the config of service {1} failed'.format(self._log, alba_proxy_service)
+                        removal_errors.append(message)
+                        self._logger.exception(message)
+            if len(removal_errors) > 0:
+                message = '{0} - Errors while removing services {1}: \n - {2}'.format(self._log, ', '.join(self.alba_proxy_services), '\n - '.join(removal_errors))
+                self._logger.error(message)
+                raise RuntimeError(message)
+            self._logger.info('{0} - Removed services {1}'.format(self._log, ', '.join(self.alba_proxy_services)))
         except Exception:
-            message = '{0} - Removing service {1} failed'.format(self._log, self.alba_proxy_service)
-            self.error_messages.append(message)
+            message = '{0} - Removing services {1} failed'.format(self._log, ', '.join(self.alba_proxy_services))
+            removal_errors.append(message)
             self._logger.exception(message)
             raise
         finally:
             # Not sure if this is the right call. Proxy deployment/removal errors should be looked after
             # This will cause the next proxy setup to fail as the service already exists and that one will attempt to clean up again
-            self._set_proxy_state('removed')
+            self._set_proxies_state('removed')
 
 
 class Scrubber(ScrubShared):
