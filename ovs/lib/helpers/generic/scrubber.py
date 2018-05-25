@@ -690,7 +690,9 @@ class StackWorker(ScrubShared):
                         Configuration.set(scrub_proxy_config_key, json.dumps(scrub_proxy_config, indent=4), raw=True)
                         params = {'VPOOL_NAME': self.vpool.name,
                                   'LOG_SINK': Logger.get_sink_path(alba_proxy_service),
-                                  'CONFIG_PATH': Configuration.get_configuration_path(scrub_proxy_config_key)}
+                                  'CONFIG_PATH': Configuration.get_configuration_path(scrub_proxy_config_key),
+                                  'ALBA_PKG_NAME': alba_pkg_name,
+                                  'ALBA_VERSION_CMD': alba_version_cmd}
                         self._service_manager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
                         self._service_manager.start_service(name=alba_proxy_service, client=client)
 
