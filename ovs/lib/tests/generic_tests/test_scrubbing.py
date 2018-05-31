@@ -64,7 +64,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vdisk = structure['vdisks'][1]
         storagerouter = structure['storagerouters'][1]
         vpool = structure['vpools'][1]
@@ -108,8 +107,8 @@ class Generic(unittest.TestCase):
             GenericController.execute_scrub(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter.guid,
                                             manual=True)
         # Only one stack would be deployed (one scrub location) and only one thread (one vDisk)
-        expected_log = 'Scrubber unittest - vPool {0} - StorageRouter {1} - Stack 0 - Scrubbing thread 0 - vDisk {2} - Scrubbing failed'.format(
-            vpool.name, storagerouter.name, vdisk.name)
+        expected_log = 'Scrubber unittest - vPool {0} - StorageRouter {1} - Stack 0 - Scrubbing thread 0 - vDisk {2} with volume id {3} - Scrubbing failed'.format(
+            vpool.name, storagerouter.name, vdisk.name, vdisk.volume_id)
         self.assertIn(member=expected_log,
                       container=raise_info.exception.message)
 
@@ -138,7 +137,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouter_1 = structure['storagerouters'][1]
@@ -237,7 +235,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2, 3, 4, 5],
              'storagedrivers': [(1, 1, 1), (2, 2, 1), (3, 3, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
@@ -289,7 +286,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2, 3, 4],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vpool = structure['vpools'][1]
         vpools = structure['vpools']
         vdisks = structure['vdisks']
@@ -351,7 +347,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
@@ -451,7 +446,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
@@ -533,7 +527,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
         # Amount of actual threads calculation:
@@ -598,7 +591,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
         vpools = structure['vpools']
@@ -709,7 +701,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
         vpools = structure['vpools']
@@ -812,7 +803,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vdisks = structure['vdisks']
         proxy_names, thread_names, vdisk_namespaces = self.generate_scrub_related_info(structure)
         # Amount of actual threads calculation:
@@ -918,7 +908,6 @@ class Generic(unittest.TestCase):
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 1), (4, 2, 2)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
-        self._prepare_scrubbing(structure)
         vpools = structure['vpools']
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
@@ -1011,35 +1000,3 @@ class Generic(unittest.TestCase):
     def _print_message(self, message):
         if self.debug is True:
             print message
-
-    @classmethod
-    def _prepare_scrubbing(cls, dal_structure):
-        """
-        Prepare everything related to scrubbing
-        - Setup worker services
-        - Setup System.get_my_storagerouter
-        :param dal_structure: The built DAL structure for the case
-        :return: None
-        :rtype: NoneType
-        """
-        storagerouter = dal_structure['storagerouters'][1]
-        # New scrubbing code changes requires local Storagerouter to be available
-        System._machine_id['none'] = System._machine_id[storagerouter.ip]
-        # Setup worker information
-        cls._setup_worker_service(dal_structure['storagerouters'].values())
-
-    @staticmethod
-    def _setup_worker_service(storagerouters):
-        """
-        Sets mocked ovs-worker service
-        :param storagerouters: StorageRouter to setup workers for
-        :type storagerouters: list
-        :return: None
-        :rtype: NoneType
-        """
-        service_name = 'ovs-workers'
-        service_manager = ServiceFactory.get_manager()
-        for storagerouter in storagerouters:
-            client = SSHClient(storagerouter, 'root')
-            service_manager.add_service(service_name, client)
-            service_manager.start_service(service_name, client)
