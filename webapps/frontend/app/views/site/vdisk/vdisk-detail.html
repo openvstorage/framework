@@ -15,7 +15,7 @@ in the LICENSE.txt file of the Open vStorage OSE distribution.
 Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
-<section data-bind="with: vDisk()">
+<section data-bind="with: vDisk">
     <ol class="breadcrumb">
         <li data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
             <a data-part="lazy-entry"
@@ -39,56 +39,56 @@ but WITHOUT ANY WARRANTY of any kind.
                         data-bind="click: function() { $root.snapshot(); },
                                    enable: loaded(),
                                    tooltip: 'ovs:vdisks.detail.snapshot',
-                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.shared.pluginData().vdiskDetail.blockedActions().contains('snapshot')">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.data.blocked_actions().contains('snapshot')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-rollback" style="color: #428bca;"
                         data-bind="click: function() { $root.rollback(); },
                                    tooltip: 'ovs:vdisks.detail.rollback',
-                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.shared.pluginData().vdiskDetail.blockedActions().contains('rollback')">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.data.blocked_actions().contains('rollback')">
                     <span class="fa hand fa-flip-horizontal" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-clone" style="color: #428bca;"
                         data-bind="click: function() { $root.clone(); },
                                    tooltip: 'ovs:vdisks.detail.clone',
-                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.shared.pluginData().vdiskDetail.blockedActions().contains('clone')">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.data.blocked_actions().contains('clone')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.clone"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-move" style="color: #428bca;"
                         data-bind="click: function() { $root.move(); },
                                    tooltip: 'ovs:vdisks.detail.move',
-                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.shared.pluginData().vdiskDetail.blockedActions().contains('move')">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.data.blocked_actions().contains('move')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.move"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-scrub" style="color: #428bca;"
                         data-bind="click: function() { $root.scrub(); },
                                    tooltip: 'ovs:vdisks.detail.scrub',
-                                   enable: $root.shared.user.roles().contains('manage') && $root.canBeModified() && !$root.shared.pluginData().vdiskDetail.blockedActions().contains('scrub')">
+                                   enable: $root.shared.user.roles().contains('manage') && $root.canBeModified() && !$root.data.blocked_actions().contains('scrub')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.scrub"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-set-as-template" style="color: #428bca;"
                         data-bind="click: function() { $root.setAsTemplate(); },
                                    tooltip: $root.tooltipSetAsTemplate(),
-                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.shared.pluginData().vdiskDetail.blockedActions().contains('set_as_template')">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified() && !$root.data.blocked_actions().contains('set_as_template')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.set_as_template"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-restart" style="color: #428bca;"
                         data-bind="click: function() { $root.restartVDisk(); },
                                    tooltip: 'ovs:vdisks.detail.restart',
-                                   enable: $root.shared.user.roles().contains('manage') && liveStatus() !== 'RUNNING' && !$root.restarting() && !$root.shared.pluginData().vdiskDetail.blockedActions().contains('restart')">
+                                   enable: $root.shared.user.roles().contains('manage') && liveStatus() !== 'RUNNING' && !$root.restarting() && !$root.data.blocked_actions().contains('restart')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-delete" style="color: #428bca;"
                         data-bind="click: function() { $root.removeVDisk(); },
                                    tooltip: childrenGuids().length === 0 ? 'ovs:vdisks.detail.remove' : 'ovs:vdisks.detail.has_children',
-                                   enable: $root.shared.user.roles().contains('manage') && !$root.convertingToTemplate() && !$root.removing() && !$root.shared.pluginData().vdiskDetail.blockedActions().contains('remove')">
+                                   enable: $root.shared.user.roles().contains('manage') && !$root.convertingToTemplate() && !$root.removing() && !$root.data.blocked_actions().contains('remove')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                 </button>
                 <!-- Additional buttons for plugins -->
@@ -178,7 +178,14 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <!-- Additional details for plugins -->
             <!-- ko foreach: shared.hooks.pages['vdisk-detail'] -->
-                <div class="tab-pane active" id="plugin_general_info" data-bind="compose: $data.activator, visible: $data.info.type === 'detail-general'"></div>
+                <!--<span data-bind="text: Object.keys($data), visible:$data.info.type === 'detail-general'"></span>-->
+                <!--<span data-bind="text: Object.keys($data.module), visible:$data.info.type === 'detail-general'"></span>-->
+                <!--<span data-bind="text: typeof $data.activator, visible:$data.info.type === 'detail-general'"></span>-->
+                <!--<span data-bind="compose: $data.activator(), visible:$data.info.type === 'detail-general'"></span>-->
+
+                <!-- ko if: $data.info.type === 'detail-general'-->
+                    <div class="tab-pane active" id="plugin_general_info" data-bind="compose: $data.activator(), visible: $data.info.type === 'detail-general'"></div>
+                 <!-- /ko -->
             <!-- /ko -->
         </div>
     </div>

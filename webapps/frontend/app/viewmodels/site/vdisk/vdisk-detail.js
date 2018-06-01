@@ -19,11 +19,13 @@ define([
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/vpool/vpool',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/domain/domain',
-    'viewmodels/wizards/clone/index', 'viewmodels/wizards/vdiskmove/index', 'viewmodels/wizards/rollback/index', 'viewmodels/wizards/snapshot/index'
+    'viewmodels/wizards/clone/index', 'viewmodels/wizards/vdiskmove/index', 'viewmodels/wizards/rollback/index', 'viewmodels/wizards/snapshot/index',
+    './vdisk-detail-data'
 ], function(
     $, app, dialog, ko, router, shared, generic, Refresher, api,
     VDisk, VPool, StorageRouter, Domain,
-    CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard
+    CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard,
+    vdiskDetailData
 ) {
     "use strict";
     return function() {
@@ -50,6 +52,8 @@ define([
             { key: 'serverIp',   value: $.t('ovs:vdisks.detail.server_ip'),   width: 150       },
             { key: 'serverPort', value: $.t('ovs:vdisks.detail.server_port'), width: undefined }
         ];
+        self.vDisk                = {};
+
 
         // Observables
         self.convertingToTemplate = ko.observable(false);
@@ -57,7 +61,6 @@ define([
         self.snapshotsInitialLoad = ko.observable(true);
         self.removing             = ko.observable(false);
         self.restarting           = ko.observable(false);
-        self.vDisk                = ko.observable();
 
         // Handles
         self.loadDomainHandle        = undefined;
@@ -65,48 +68,40 @@ define([
 
         // Functions
         self.load = function() {
-            return $.Deferred(function (deferred) {
-                self.vDisk().load()
-                    .then(function() {
-                        if (self.vDisk().isVTemplate()) {
-                            router.navigateBack();
-                            return deferred.reject();
-                        }
-                        if (self.shared.pluginData().vdiskDetail.iscsi.vdisk === undefined) {
-                            var pluginData = self.shared.pluginData();
-                            pluginData.vdiskDetail.iscsi.vdisk = self.vDisk;
-                            self.shared.pluginData(pluginData);
-                        }
-                    })
-                    .then(self.loadStorageRouters)
-                    .then(self.loadDomains)
-                    .then(function() {
-                        self.snapshotsInitialLoad(false);
-                        var sr, pool, vdisk = self.vDisk(),
-                            storageRouterGuid = vdisk.storageRouterGuid(),
-                            vPoolGuid = vdisk.vpoolGuid();
-                        if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
-                            sr = new StorageRouter(storageRouterGuid);
-                            sr.load('features');
-                            vdisk.storageRouter(sr);
-                        }
-                        if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
-                            pool = new VPool(vPoolGuid);
-                            pool.load('configuration');
-                            vdisk.vpool(pool);
-                        }
-                    })
-                    .fail(function(error) {
-                        if (error !== undefined && error.status === 404) {
-                            router.navigateBack();
-                        }
-                    })
-                    .always(deferred.resolve);
-            }).promise();
+            return self.vDisk.load()
+                .then(function() {
+                    if (self.vDisk.isVTemplate()) {
+                        router.navigateBack();
+                        throw new Error('vDisk is a template. Not loading')
+                    }
+                })
+                .then(self.loadStorageRouters)
+                .then(self.loadDomains)
+                .then(function() {
+                    self.snapshotsInitialLoad(false);
+                    var sr, pool, vdisk = self.vDisk,
+                        storageRouterGuid = vdisk.storageRouterGuid(),
+                        vPoolGuid = vdisk.vpoolGuid();
+                    if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
+                        sr = new StorageRouter(storageRouterGuid);
+                        sr.load('features');
+                        vdisk.storageRouter(sr);
+                    }
+                    if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
+                        pool = new VPool(vPoolGuid);
+                        pool.load('configuration');
+                        vdisk.vpool(pool);
+                    }
+                }, function(error) {
+                    if (error !== undefined && error.status === 404) {
+                        router.navigateBack();
+                    }
+                    throw new Error(error)
+                })
         };
         self.loadDomains = function() {
             return $.Deferred(function(deferred) {
-                var vdisk = self.vDisk();
+                var vdisk = self.vDisk;
                 if (vdisk !== undefined && generic.xhrCompleted(self.loadDomainHandle)) {
                     self.loadDomainHandle = api.get('domains', { queryparams: {
                         sort: 'name',
@@ -116,7 +111,7 @@ define([
                         .done(function(data) {
                             var guids = [], ddata = {}, domainsPresent = false;
                             $.each(data.data, function(index, item) {
-                                if (item.storage_router_layout.regular.contains(self.vDisk().storageRouterGuid())) {
+                                if (item.storage_router_layout.regular.contains(self.vDisk.storageRouterGuid())) {
                                     domainsPresent = true;
                                     if (item.storage_router_layout.regular.length > 1) {
                                         guids.push(item.guid);
@@ -129,7 +124,7 @@ define([
                                 }
                             });
 
-                            self.vDisk().domainsPresent(domainsPresent);
+                            self.vDisk.domainsPresent(domainsPresent);
                             generic.crossFiller(
                                 guids, self.domains,
                                 function(guid) {
@@ -145,7 +140,7 @@ define([
                                     domain.fillData(ddata[domain.guid()]);
                                 }
                             });
-                            self.vDisk().dtlTargets(guids);
+                            self.vDisk.dtlTargets(guids);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
@@ -159,7 +154,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
                     self.loadStorageRouterHandle = api.get('storagerouters')
                         .done(function (data) {
-                            self.vDisk().storageRouterGuids(data.data);
+                            self.vDisk.storageRouterGuids(data.data);
                         })
                         .always(deferred.resolve());
                 }
@@ -172,24 +167,24 @@ define([
             return generic.formatBytes(value);
         };
         self.rollback = function() {
-            if (self.vDisk() !== undefined) {
+            if (self.vDisk !== undefined) {
                 dialog.show(new RollbackWizard({
                     modal: true,
-                    guid: self.vDisk().guid()
+                    guid: self.vDisk.guid()
                 }));
             }
         };
         self.snapshot = function() {
-            if (self.vDisk() !== undefined) {
+            if (self.vDisk !== undefined) {
                 dialog.show(new SnapshotWizard({
                     modal: true,
-                    guid: self.vDisk().guid()
+                    guid: self.vDisk.guid()
                 }));
             }
         };
         self.setAsTemplate = function() {
             if (self.canSetAsTemplate() === true) {
-                var vd = self.vDisk();
+                var vd = self.vDisk;
                 self.convertingToTemplate(true);
                 app.showMessage(
                         $.t('ovs:vdisks.set_as_template.warning'),
@@ -228,24 +223,24 @@ define([
             }
         };
         self.clone = function() {
-            if (self.vDisk() !== undefined) {
+            if (self.vDisk !== undefined) {
                 dialog.show(new CloneWizard({
                     modal: true,
-                    vdisk: self.vDisk()
+                    vdisk: self.vDisk
                 }));
             }
         };
         self.move = function() {
-            if (self.vDisk() !== undefined) {
+            if (self.vDisk !== undefined) {
                 dialog.show(new MoveWizard({
                     modal: true,
-                    vdisk: self.vDisk()
+                    vdisk: self.vDisk
                 }));
             }
         };
         self.scrub = function() {
-            if (self.vDisk() !== undefined) {
-                var vd = self.vDisk();
+            if (self.vDisk !== undefined) {
+                var vd = self.vDisk;
                 app.showMessage(
                         $.t('ovs:vdisks.scrub.title_message', {vdisk: vd.name()}),
                         $.t('ovs:vdisks.scrub.title', {vdisk: vd.name()}),
@@ -277,13 +272,13 @@ define([
             }
         };
         self.saveConfiguration = function() {
-            if (self.vDisk() !== undefined) {
-                var vd = self.vDisk(), new_config = $.extend({}, vd.configuration());
+            if (self.vDisk !== undefined) {
+                var vd = self.vDisk, new_config = $.extend({}, vd.configuration());
                 if (!isNaN(new_config.cache_quota)) {
                     new_config.cache_quota *= Math.pow(1024, 3);
                 } else {
                     // Update current configuration to default value stored in vPool, otherwise 'Save' button will be enabled after saving
-                    var quota = vd.vpool().metadata().caching_info[self.vDisk().storageRouterGuid()].quota;
+                    var quota = vd.vpool().metadata().caching_info[self.vDisk.storageRouterGuid()].quota;
                     vd.configuration().cache_quota = quota / Math.pow(1024.0, 3);
                 }
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
@@ -322,7 +317,7 @@ define([
                         $.t('ovs:vdisks.remove_snapshot.started'),
                         $.t('ovs:vdisks.remove_snapshot.started_msg', {what: snapshotid})
                     );
-                    api.post('vdisks/' + self.vDisk().guid() + '/remove_snapshot', {
+                    api.post('vdisks/' + self.vDisk.guid() + '/remove_snapshot', {
                         data: { snapshot_id: snapshotid }
                     })
                         .then(self.shared.tasks.wait)
@@ -345,8 +340,8 @@ define([
             }});
         };
         self.removeVDisk = function() {
-            if (self.vDisk() !== undefined && self.vDisk().childrenGuids().length === 0) {
-                var vd = self.vDisk();
+            if (self.vDisk !== undefined && self.vDisk.childrenGuids().length === 0) {
+                var vd = self.vDisk;
                 self.removing(true);
                 app.showMessage(
                         $.t('ovs:vdisks.remove_vdisk.title_msg', {what: vd.name()}),
@@ -385,8 +380,8 @@ define([
             }
         };
         self.restartVDisk = function() {
-            if (self.vDisk() !== undefined && self.vDisk().liveStatus() !== 'RUNNING') {
-                var vd = self.vDisk();
+            if (self.vDisk !== undefined && self.vDisk.liveStatus() !== 'RUNNING') {
+                var vd = self.vDisk;
                 self.restarting(true);
                 app.showMessage(
                         $.t('ovs:vdisks.restart_vdisk.title_msg', {what: vd.name()}),
@@ -426,86 +421,81 @@ define([
 
         // Computed
         self.canBeModified = ko.pureComputed(function() {
-            if (self.vDisk() === undefined) {
+            if (self.vDisk === undefined) {
                 return false;
             }
-            return !self.convertingToTemplate() && !self.removing() && !self.restarting() && self.vDisk().liveStatus() === 'RUNNING';
+            return !self.convertingToTemplate() && !self.removing() && !self.restarting() && self.vDisk.liveStatus() === 'RUNNING';
         });
         self.canSetAsTemplate = ko.pureComputed(function() {
-            if (self.vDisk() === undefined) {
+            if (self.vDisk === undefined) {
                 return false;
             }
-            return self.vDisk().parentVDiskGuid() === null && self.vDisk().childrenGuids().length === 0;
+            return self.vDisk.parentVDiskGuid() === null && self.vDisk.childrenGuids().length === 0;
         });
         self.tooltipSetAsTemplate = ko.pureComputed(function(){
-            if (self.vDisk() === undefined) {
+            if (self.vDisk === undefined) {
                 return '';
             }
-            if (self.vDisk().childrenGuids().length > 0) {
+            if (self.vDisk.childrenGuids().length > 0) {
                 return $.t('ovs:vdisks.detail.has_children');
             }
-            if (self.vDisk().parentVDiskGuid() !== null) {
+            if (self.vDisk.parentVDiskGuid() !== null) {
                 return $.t('ovs:vdisks.detail.is_clone');
             }
             return $.t('ovs:vdisks.detail.set_as_template');
         });
         self.equalsDefaultCacheQuota = ko.pureComputed(function() {
             var allFalse = {fragment: false, block: false};
-            if (self.vDisk() === undefined || self.vDisk().configuration() === undefined) {
+            if (self.vDisk === undefined || self.vDisk.configuration() === undefined) {
                 return allFalse;
             }
-            var vPool = self.vDisk().vpool();
+            var vPool = self.vDisk.vpool();
             if (vPool === undefined || vPool.metadata() === undefined) {
                 return allFalse;
             }
-            if (vPool.metadata().caching_info.hasOwnProperty(self.vDisk().storageRouterGuid())) {
-                var cachingInfo = vPool.metadata().caching_info[self.vDisk().storageRouterGuid()];
+            if (vPool.metadata().caching_info.hasOwnProperty(self.vDisk.storageRouterGuid())) {
+                var cachingInfo = vPool.metadata().caching_info[self.vDisk.storageRouterGuid()];
                 var vPoolFragment = generic.tryGet(cachingInfo.fragment_cache, 'quota', null);
                 var vPoolBlock = generic.tryGet(cachingInfo.block_cache, 'quota', null);
-                var vDiskFragment = self.vDisk().fragmentCQ() !== undefined && self.vDisk().fragmentCQ() !== '' ? Math.round(self.vDisk().fragmentCQ() * Math.pow(1024.0, 3)) : null;
-                var vDiskBlock = self.vDisk().blockCQ() !== undefined && self.vDisk().blockCQ() !== '' ? Math.round(self.vDisk().blockCQ() * Math.pow(1024.0, 3)) : null;
+                var vDiskFragment = self.vDisk.fragmentCQ() !== undefined && self.vDisk.fragmentCQ() !== '' ? Math.round(self.vDisk.fragmentCQ() * Math.pow(1024.0, 3)) : null;
+                var vDiskBlock = self.vDisk.blockCQ() !== undefined && self.vDisk.blockCQ() !== '' ? Math.round(self.vDisk.blockCQ() * Math.pow(1024.0, 3)) : null;
                 return {fragment: vPoolFragment === vDiskFragment, block: vPoolBlock === vDiskBlock};
             }
             return allFalse;
         });
         self.hasCacheQuota = ko.pureComputed(function() {
-            if (self.vDisk() !== undefined && self.vDisk().storageRouter() !== undefined && self.vDisk().storageRouter().features() !== undefined) {
-                var features = self.vDisk().storageRouter().features();
+            if (self.vDisk !== undefined && self.vDisk.storageRouter() !== undefined && self.vDisk.storageRouter().features() !== undefined) {
+                var features = self.vDisk.storageRouter().features();
                 return features.alba.features !== undefined && features.alba.features.contains('cache-quota');
             }
             return false;
         });
         self.hasBlockCache = ko.pureComputed(function() {
-            if (self.vDisk() !== undefined && self.vDisk().storageRouter() !== undefined && self.vDisk().storageRouter().features() !== undefined) {
-                var features = self.vDisk().storageRouter().features();
+            if (self.vDisk !== undefined && self.vDisk.storageRouter() !== undefined && self.vDisk.storageRouter().features() !== undefined) {
+                var features = self.vDisk.storageRouter().features();
                 return features.alba.features !== undefined && features.alba.features.contains('block-cache');
             }
             return false;
         });
 
         // Durandal
-        self.activate = function(mode, guid) {
-            self.vDisk(new VDisk(guid));
-            var pluginData = self.shared.pluginData();
-            pluginData.vdiskDetail = {
-                iscsi: {
-                    vdisk: self.vDisk,
-                    iscsiNodes: ko.observableArray([]),
-                    iscsiNodesLoaded: ko.observable(false)
-                },
-                blockedActions: ko.observableArray([])
-            };
-            self.shared.pluginData(pluginData);
-            $.each(shared.hooks.pages, function(pageType, pages) {
-                if (pageType === 'vdisk-detail') {
-                    $.each(pages, function(index, page) {
-                        page.activator.activateItem(page.module);
-                    })
-                }
-            });
-            self.refresher.init(self.load, 5000);
-            self.refresher.run();
-            self.refresher.start();
+        self.activate = function (mode, guid) {
+                    $.each(shared.hooks.pages, function (pageType, pages) {
+                        if (pageType === 'vdisk-detail') {
+                            $.each(pages, function (index, page) {
+                                // Load in the activators for the plugins
+                                page.activator.activateItem(page.module).fail(function(error){console.error(error)})
+                            })
+                        }
+                    });
+                    // Creating a new data will evit an event which will trigger in the loaded plugins
+                    self.data = new vdiskDetailData.constructor();
+                    self.vDisk = self.data.vdisk;  // The view binding happens after the activate. Reference the same vdisk object as in the shared data
+                    self.vDisk.guid(guid)  // Set the guid of the vdisk which is fetched from the router;
+                    self.refresher.init(self.load, 5000);
+                    self.refresher.run();
+                    self.refresher.start();
+
         };
         self.deactivate = function() {
             $.each(shared.hooks.pages, function(pageType, pages) {

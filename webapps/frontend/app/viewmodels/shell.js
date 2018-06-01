@@ -18,7 +18,9 @@ define([
     'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
     'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications'
-], function($, router, system, activator, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
+], function($, router, system, activator, bootstrap, i18n,
+            shared, routing, Messaging, generic, Tasks,
+            Authentication, api, cssLoader, notifications) {
     "use strict";
     // Initially load in all routes
     router.map(routing.mainRoutes)
@@ -29,12 +31,11 @@ define([
         var self = this;
 
         self._translate = function() {
-            return $.Deferred(function(deferred) {
+            return $.when().then(function() {
                 i18n.setLng(self.shared.language, function() {
                     $('html').i18n(); // Force retranslation of complete UI
-                    deferred.resolve();
                 });
-            }).promise();
+            })
         };
 
         self.shared = shared;
@@ -133,12 +134,13 @@ define([
                                     moduleHandler.then(function() {
                                         // Load in hooks
                                         return $.Deferred(function(moduleDeferred) {
-                                            require(['ovs/hooks/' + plugin], function(hook) { // webapps/frontend/lib/ovs/hooks
+                                            // shared.pluginData[plugin] = {};   // Add a plugin key to the shared.pluginData value
+                                            require(['ovs/hooks/' + plugin], function (hook) { // webapps/frontend/lib/ovs/hooks
                                                 routing.extraRoutes.push(hook.routes);
                                                 routing.routePatches.push(hook.routePatches);
-                                                $.each(hook.dashboards, function(index, dashboard) {
+                                                $.each(hook.dashboards, function (index, dashboard) {
                                                     system.acquire('viewmodels/site/' + dashboard)
-                                                        .then(function(module) {
+                                                        .then(function (module) {
                                                             var moduleInstance = new module();
                                                             shared.hooks.dashboards.push({
                                                                 module: moduleInstance,
@@ -146,12 +148,12 @@ define([
                                                             });
                                                         });
                                                 });
-                                                $.each(hook.wizards, function(wizard, moduleName) {
+                                                $.each(hook.wizards, function (wizard, moduleName) {
                                                     if (!shared.hooks.wizards.hasOwnProperty(wizard)) {
                                                         shared.hooks.wizards[wizard] = [];
                                                     }
                                                     system.acquire('viewmodels/wizards/' + wizard + '/' + moduleName)
-                                                        .then(function(module) {
+                                                        .then(function (module) {
                                                             var moduleInstance = new module();
                                                             shared.hooks.wizards[wizard].push({
                                                                 name: moduleName,
@@ -160,11 +162,11 @@ define([
                                                             });
                                                         });
                                                 });
-                                                $.each(hook.pages, function(page, pageInfo) {
+                                                $.each(hook.pages, function (page, pageInfo) {
                                                     if (!shared.hooks.pages.hasOwnProperty(page)) {
                                                         shared.hooks.pages[page] = [];
                                                     }
-                                                    $.each(pageInfo, function(index, info) {
+                                                    $.each(pageInfo, function (index, info) {
                                                         var moduleName;
                                                         if (typeof info === 'string') {
                                                             moduleName = info;
@@ -173,7 +175,8 @@ define([
                                                             moduleName = info.module;
                                                         }
                                                         system.acquire('viewmodels/site/' + moduleName)
-                                                            .then(function(module) {
+                                                            .then(function (module) {
+                                                                console.log('viewmodels/site/' + moduleName)
                                                                 var moduleInstance = new module();
                                                                 shared.hooks.pages[page].push({
                                                                     info: info,
@@ -181,7 +184,10 @@ define([
                                                                     module: moduleInstance,
                                                                     activator: activator.create()
                                                                 });
-                                                            });
+                                                            },
+                                                                function(error) {
+                                                            console.log(error)
+                                                        });
                                                     });
 
                                                 });

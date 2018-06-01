@@ -16,9 +16,12 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/vdisk/edgeclient'
-], function($, ko, generic, api, shared, EdgeClient) {
+    'ovs/generic', 'ovs/shared',
+    'viewmodels/containers/vdisk/edgeclient',
+    'viewmodels/services/vdisk'
+], function($, ko, generic, shared,
+            EdgeClient,
+            vdiskService) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -335,7 +338,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 if (generic.xhrCompleted(self.loadHandle)) {
-                    self.loadHandle = api.get('vdisks/' + self.guid())
+                    self.loadHandle = vdiskService.loadVDisk(self.guid())
                         .done(function(data) {
                             self.fillData(data);
                             deferred.resolve();
@@ -355,8 +358,7 @@ define([
             }
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadConfigHandle)) {
-                    self.loadConfigHandle = api.get('vdisks/' + self.guid() + '/get_config_params')
-                        .then(self.shared.tasks.wait)
+                    self.loadConfigHandle = vdiskService.loadConfigHandle(self.guid())
                         .done(function (data) {
                             if (data.hasOwnProperty('pagecache_ratio')) {
                                 delete data['pagecache_ratio'];
