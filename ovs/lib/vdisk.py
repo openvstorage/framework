@@ -565,7 +565,12 @@ class VDiskController(object):
                 if backwards_compat is True:
                     results[vdisk_guid] = [False, ex.message]
                 continue
+            if vdisk.being_scrubbed:
+                results[vdisk_guid].update({'success': False,
+                                            'error': 'VDisk is being scrubbed. Unable to remove snapshots at this time'})
+                continue
 
+            # @todo place a lock that snapshot deletion is happening - scrubber should wait for this lock to resolve
             for snapshot_id in snapshot_ids:
                 try:
                     vdisk.invalidate_dynamics(['snapshot_ids'])

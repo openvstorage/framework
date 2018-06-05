@@ -27,7 +27,6 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Dynamic, Property, Relation
-from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient,\
                                                        SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
@@ -64,7 +63,6 @@ class VDisk(DataObject):
                   Dynamic('storagerouter_guid', str, 15),
                   Dynamic('is_vtemplate', bool, 60),
                   Dynamic('edge_clients', list, 30),
-                  Dynamic('scrubbing_info', dict, 15),
                   Dynamic('being_scrubbed', bool, 5)]
     _fixed_properties = ['storagedriver_client', 'objectregistry_client', 'fsmetadata_client']
 
@@ -437,54 +435,14 @@ class VDisk(DataObject):
                 self._fsmetadata_client = FSMetaDataClient.load(self.vpool)
             self._frozen = True
 
-    def _scrubbing_info(self):
-        """
-        Retrieve information about the Scrubber handling this vdisk
-        Calling this dynamic is expensive! It will check the connection towards other Framework nodes to see which
-        ovs-workers are running. It will then check if the entries stored under the scrubbing keys are valid
-        (using the current workers context). This might take a while.
-        The reason for this flow is that the worker can be shot mid-scrubbing so the entry could become stale (who'd update it?)
-        :return: Dict with possible scrubbing information
-        :rtype: dict
-        """
-        try:
-            from ovs.lib.helpers.generic.scrubber import Scrubber, StackWorkHandler
-            scrubber = Scrubber()
-            stack_work_handler = StackWorkHandler(vpool=self.vpool, vdisks=[], worker_contexts=scrubber.worker_contexts, job_id=scrubber.job_id)
-            relevant_work_items, fetched_work_items = stack_work_handler._get_pending_scrub_work()
-            for item in relevant_work_items:
-                if item['vdisk_guid'] == self.guid:
-                    job_id = item.get('job_id')  # Not an option from the start. Check if available
-                    if job_id:
-                        job_info = Configuration.get('{0}/{1}/job_info'.format(Scrubber._SCRUB_KEY, job_id))
-                        item.update({'job_info': job_info})
-                    return item
-        except Exception:
-            self._logger.exception('Unable to retrieve scrubbing info')
-        return {}
-
-    def _being_scrubbed(self, allow_raise=False):
+    def _being_scrubbed(self):
         """
         Return True when the vDisk is currently being scrubbed
-        Calling this dynamic is expensive! It will check the connection towards other Framework nodes to see which
-        ovs-workers are running. It will then check if the entries stored under the scrubbing keys are valid
-        (using the current workers context). This might take a while.
-        The reason for this flow is that the worker can be shot mid-scrubbing so the entry could become stale (who'd update it?)
-        :param allow_raise: Allow the exception to be raised.
-        :type allow_raise: bool
+        Relies on the scrubbing_information property set by the scrubber. The expiration is checked in case the worker
+        would get killed before clearing the vdisk data.
+        The scrubber updates the entry every 5 seconds with a new expiration time
         :return: True when the vDisk is currently being scrubbed
         :rtype: bool
         """
-        try:
-            from ovs.lib.helpers.generic.scrubber import Scrubber, StackWorkHandler
-            scrubber = Scrubber()
-            stack_work_handler = StackWorkHandler(vpool=self.vpool, vdisks=[], worker_contexts=scrubber.worker_contexts, job_id=scrubber.job_id)
-            relevant_work_items, fetched_work_items = stack_work_handler._get_current_scrubbed_items()
-            for item in relevant_work_items:
-                if item['vdisk_guid'] == self.guid:
-                    return True
-        except Exception:
-            self._logger.exception('Unable to retrieve scrubbing info')
-            if allow_raise:
-                raise
-        return False
+        now = time.time()
+        return self.scrubbing_information is not None and now < self.scrubbing_information['expires']

@@ -43,14 +43,9 @@ from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs_extensions.storage.exceptions import AssertException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.lib.helpers.repeatingtimer import RepeatingTimer
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
-
-
-class BeingScrubbedException(Exception):
-    """
-    Raised when a vdisk is already being scrubbed
-    """
 
 
 class ScrubShared(object):
@@ -59,6 +54,7 @@ class ScrubShared(object):
     """
     # Test hooks for unit tests
     _test_hooks = {}
+    _unittest_data = {'setup': False}
 
     _logger = LogHandler.get('lib', name='generic tasks scrub')
 
@@ -382,100 +378,42 @@ class StackWorkHandler(ScrubShared):
         self._logger.info(self._format_message('Successfully unregistered vDisk {0}'.format(vdisk_guid)))
         return special['relevant_work_items']
 
-    def _register_vdisk_for_scrub(self, vdisk_guid):
-        """
-        Adds the vDisk guid to the `currently being scrubbed` list
-        :param vdisk_guid: Guid of the vDisk to add
-        :return: List of values to save and a list of expected values for saving
-        :rtype tuple(list, list)
-        :raises BeingScrubbedException: When the VDisk is already being scrubbed (should be blocked by the volatilemutex)
-        """
-        # Fetch data
-        relevant_work_items, fetched_work_items = self._get_current_scrubbed_items()
-        registered_vdisks = [item['vdisk_guid'] for item in relevant_work_items]
-        if vdisk_guid in registered_vdisks:
-            raise BeingScrubbedException('vDisk with guid {0} is already being scrubbed'.format(vdisk_guid))
-        relevant_work_items.append(self._wrap_data(vdisk_guid))
-        return relevant_work_items, fetched_work_items
-
-    def register_vdisk_for_scrub(self, vdisk_guid, retries=25):
+    def register_vdisk_for_scrub(self, vdisk_guid):
         """
         Register that a vDisk is being actively scrubbed
         :param vdisk_guid: Guid of the vDisk to register
         :type vdisk_guid: basestring
-        :param retries: Amount of retries to do
-        :type retries: int
-        :return: Remaining items
-        :rtype: list
+        :return: The loop instance keeping the information up to date
+        :rtype: RepeatingTimer
         """
-        # Keep it pure
-        special = {'relevant_work_items': None}
+        def _update_vdisk_scrubbing_info():
+            data = self._wrap_data(vdisk_guid)
+            now = time.time()
+            expires = now + 30
+            data.update({'expires': expires, 'time_set': now})
+            vdisk.scrubbing_information = data
+            vdisk.save()
 
-        def _get_value_and_expected_value():
-            relevant_work_items, fetched_work_items = self._register_vdisk_for_scrub(vdisk_guid)
-            special['relevant_work_items'] = relevant_work_items
-            return relevant_work_items, fetched_work_items
-        log_start = '{0} - Registering scrubbing of vDisk {1}'.format(self._log, vdisk_guid)
-        self._logger.info(log_start)
-        # Attempt to save with all fetched data during work generation, expect the current key to not have changed
-        self._safely_store(self._key_active_scrub,
-                           get_value_and_expected_value=_get_value_and_expected_value,
-                           logging_start=log_start,
-                           max_retries=retries)
-        self._logger.info(self._format_message(
-            'Successfully registered scrubbing of vDisk {0}'.format(vdisk_guid)))
-        return special['relevant_work_items']
+        vdisk = VDisk(vdisk_guid)
+        rt = RepeatingTimer(5, _update_vdisk_scrubbing_info)
+        rt.start()
+        return rt
 
-    def _unregister_vdisk_for_scrub(self, vdisk_guid):
+
+    def unregister_vdisk_for_scrub(self, vdisk_guid, update_timer):
         """
-        Removes the vDisk guid to the `currently being scrubbed` list
-        :param vdisk_guid: Guid of the vDisk to add
-        :type vdisk_guid: str
-        :return: List of values to save and a list of expected values for saving
-        :rtype tuple(list, list)
+        Register that a vDisk is being actively scrubbed
+        :param vdisk_guid: Guid of the vDisk to register
+        :type vdisk_guid: basestring
+        :return: None
+        :rtype: NoneType
         """
-        # Fetch data
-        relevant_work_items, fetched_work_items = self._get_current_scrubbed_items()
-        item_to_remove = self._wrap_data(vdisk_guid)
-        try:
-            self._logger.info(self._format_message('Unregister vDisk {0}'.format(vdisk_guid)))
-            relevant_work_items.remove(item_to_remove)
-        except ValueError:
-            # Indicates a race condition
-            message = 'The registering data ({0}) is not in the list. Something must have removed it!'.format(item_to_remove)
-            self._logger.exception(self._format_message(message))
-            raise ValueError(message)
-        return relevant_work_items, fetched_work_items
+        def _wipe_vdisk_scrubbing_info():
+            vdisk.scrubbing_information = None
+            vdisk.save()
 
-    def unregister_vdisk_for_scrub(self, vdisk_guid, retries=25):
-        """
-        Register that the vdisk is no longer being scrubbed
-        :param vdisk_guid: Guid of the vDisk that is no longer being scrubbed
-        :type vdisk_guid: str
-        :param retries: Number of retries before giving up saving
-        :type retries: int
-        :return: Remaining items
-        :rtype: list
-        """
-        # Keep it pure
-        special = {'relevant_work_items': None}
-
-        def _get_value_and_expected_value():
-            relevant_work_items, fetched_work_items = self._unregister_vdisk_for_scrub(vdisk_guid)
-            special['relevant_work_items'] = relevant_work_items
-            return relevant_work_items, fetched_work_items
-
-        log_start = '{0} - Unregistering scrubbing of vDisk {1}'.format(self._log, vdisk_guid)
-        self._logger.info(log_start)
-        # Attempt to save with all fetched data during work generation, expect the current key to not have changed
-        self._safely_store(self._key_active_scrub,
-                           get_value_and_expected_value=_get_value_and_expected_value,
-                           logging_start=log_start,
-                           max_retries=retries)
-        self._logger.info(self._format_message(
-            'Successfully unregistered scrubbing of vDisk {0}'.format(vdisk_guid)))
-        return special['relevant_work_items']
-
+        vdisk = VDisk(vdisk_guid)
+        update_timer.cancel()
 
 class StackWorker(ScrubShared):
     """
@@ -607,7 +545,6 @@ class StackWorker(ScrubShared):
             # Empty the queue with vDisks to scrub
             with remote(self.storagerouter.ip, [VDisk]) as rem:
                 while True:
-                    vdisk = None
                     vdisk_guid = self.queue.get(False)  # Raises Empty Exception when queue is empty, so breaking the while True loop
                     volatile_key = 'ovs_scrubbing_vdisk_{0}'.format(vdisk_guid)
                     try:
@@ -631,14 +568,10 @@ class StackWorker(ScrubShared):
                             continue
 
                         # Register that the disk is being scrubbed
+                        registrator = self.stack_work_handler.register_vdisk_for_scrub(vdisk_guid)
                         try:
-                            try:
-                                self.stack_work_handler.register_vdisk_for_scrub(vdisk_guid)
-                            except BeingScrubbedException:
-                                # Extra fail-safe if the volatile mutex might have failed and the previous registration check also
-                                self._logger.warning('{0} - Skipping because vDisk is already being scrubbed'.format(vdisk_log, vdisk.name))
-                                continue
-
+                            if 'post_vdisk_scrub_registration' in self._test_hooks:
+                                self._test_hooks['post_vdisk_scrub_registration'](self, vdisk_guid)
                             # Do the actual scrubbing
                             with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
                                 self._logger.info('{0} - Retrieve and apply scrub work'.format(vdisk_log, vdisk.name))
@@ -654,17 +587,13 @@ class StackWorker(ScrubShared):
                                 else:
                                     self._logger.info('{0} - No scrubbing required'.format(vdisk_log, vdisk.name))
                         finally:
-                            try:
-                                self.stack_work_handler.unregister_vdisk_for_scrub(vdisk_guid)
-                            except Exception:
-                                message = '{0} - Unable to register that the vDisk is no longer being scrubbed'.format(vdisk_log)
-                                self.error_messages.append(message)
-                                self._logger.exception(message)
+                            self.stack_work_handler.unregister_vdisk_for_scrub(vdisk_guid, registrator)
+                            if 'post_vdisk_scrub_unregistration' in self._test_hooks:
+                                self._test_hooks['post_vdisk_scrub_unregistration'](self, vdisk_guid)
                     except Exception:
-                        if vdisk is None:
-                            message = '{0} - vDisk with guid {1} could not be found'.format(log, vdisk_guid)
-                        else:
-                            message = '{0} - vDisk {1} - Scrubbing failed'.format(log, vdisk.name)
+                        vdisk = VDisk(vdisk_guid)
+                        vdisk_log = '{0} - vDisk {1} with volume id {2}'.format(log, vdisk.name, vdisk.volume_id)
+                        message = '{0} - Scrubbing failed'.format(vdisk_log, vdisk.name)
                         self.error_messages.append(message)
                         self._logger.exception(message)
                     finally:
@@ -976,7 +905,7 @@ class Scrubber(ScrubShared):
 
         super(Scrubber, self).__init__(task_id or str(uuid.uuid4()))
 
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if os.environ.get('RUNNING_UNITTESTS') == 'True' and not ScrubShared._unittest_data['setup']:
             self.setup_for_unittests()
 
         self.task_id = task_id  # Be able to differentiate between directly executed ones for debugging purposes
@@ -1008,8 +937,6 @@ class Scrubber(ScrubShared):
         """
         # Setup System
         storagerouter = StorageRouterList.get_storagerouters()[0]
-        if System._machine_id.get('none'):
-            return
         System._machine_id['none'] = System._machine_id[storagerouter.ip]
 
         # Setup the worker service for all storagerouters
@@ -1017,8 +944,10 @@ class Scrubber(ScrubShared):
         service_manager = ServiceFactory.get_manager()
         for storagerouter in StorageRouterList.get_storagerouters():
             client = SSHClient(storagerouter, 'root')
-            service_manager.add_service(service_name, client)
-            service_manager.start_service(service_name, client)
+            if not service_manager.has_service(service_name, client):
+                service_manager.add_service(service_name, client)
+                service_manager.start_service(service_name, client)
+        ScrubShared._unittest_data['setup'] = True
 
     def build_clients(self):
         """
