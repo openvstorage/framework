@@ -395,25 +395,27 @@ class StackWorkHandler(ScrubShared):
             vdisk.save()
 
         vdisk = VDisk(vdisk_guid)
-        rt = RepeatingTimer(5, _update_vdisk_scrubbing_info)
+        rt = RepeatingTimer(5, _update_vdisk_scrubbing_info, wait_for_first_run=True)
         rt.start()
         return rt
 
-
-    def unregister_vdisk_for_scrub(self, vdisk_guid, update_timer):
+    @staticmethod
+    def unregister_vdisk_for_scrub(vdisk_guid, update_timer):
         """
         Register that a vDisk is being actively scrubbed
         :param vdisk_guid: Guid of the vDisk to register
         :type vdisk_guid: basestring
+        :param update_timer: Updating timer instance
+        :type update_timer: RepeatingTimer
         :return: None
         :rtype: NoneType
         """
-        def _wipe_vdisk_scrubbing_info():
-            vdisk.scrubbing_information = None
-            vdisk.save()
-
         vdisk = VDisk(vdisk_guid)
         update_timer.cancel()
+        update_timer.join()
+        vdisk.scrubbing_information = None
+        vdisk.save()
+
 
 class StackWorker(ScrubShared):
     """
@@ -776,6 +778,7 @@ class StackWorker(ScrubShared):
                             proxy_config = backend_config.pop(key)
                             if proxy_config_template is None:
                                 proxy_config_template = proxy_config
+                    # @todo remove cache polcies from proxies
                     # Build up config for our purposes
                     for index, scrub_proxy_config in enumerate(scrub_proxy_configs):
                         proxy_config = proxy_config_template.copy()
@@ -783,6 +786,7 @@ class StackWorker(ScrubShared):
                                              'alba_connection_port': scrub_proxy_config['port']})
                         backend_config[str(index)] = proxy_config
                 # Copy backend connection manager information in separate key
+                # @todo different retries period because why proxies when you can increase retries ./shrug
                 Configuration.set(self.backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
                 self._logger.info(self._format_message('Backend config was set up'))
 

@@ -17,26 +17,28 @@
 """
 Repeated Timer module
 """
-from threading import Timer
+from threading import _Timer
 
 
-class RepeatingTimer(Timer):
+class RepeatingTimer(_Timer):
     """
     RepeatedTimer class. Used to run a function every x seconds
     Does not handle any concurrency: just runs the function on a timeloop
     """
-    def __init__(self, interval, func, *args, **kwargs):
+    def __init__(self, interval, func, wait_for_first_run=False, *args, **kwargs):
         """
         Initialize a new RepeatedTimer
         :param interval: Number of seconds between each execution
         :type interval: float
         :param func: The callback function
         :type func: callable
-        :param run_instantly_on_start: Run the passed function instantly on start and wait for it to complete
-        :type run_instantly_on_start: bool
+        :param wait_for_first_run: Run the passed function on start and wait for it to complete
+        :type wait_for_first_run: bool
         :param args: Arguments to pass on to the function
         :param kwargs: Keyword arguments to pass on to the function
         """
+        self.wait_for_first_run = wait_for_first_run
+        self.ran_on_start = False
         super(RepeatingTimer, self).__init__(interval, func, *args, **kwargs)
 
     def run(self):
@@ -45,3 +47,8 @@ class RepeatingTimer(Timer):
             self.function(*self.args, **self.kwargs)
 
         self.finished.set()
+
+    def start(self):
+        if self.wait_for_first_run and not self.ran_on_start:
+            self.function(*self.args, **self.kwargs)
+        super(RepeatingTimer, self).start()
