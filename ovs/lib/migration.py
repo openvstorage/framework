@@ -308,7 +308,7 @@ class MigrationController(object):
                 MigrationController._logger.exception('Updating default configuration values failed for StorageDriver {0}'.format(storagedriver.storagedriver_id))
 
         ####################################################
-        # Adding proxy fail fast as env variable for proxies
+        # Remove proxy fail fast as env variable for proxies
         changed_clients = set()
         for storagerouter in StorageRouterList.get_storagerouters():
             root_client = sr_client_map[storagerouter.guid]
@@ -325,7 +325,7 @@ class MigrationController(object):
 
                 if not root_client.file_exists(path):
                     continue
-                if check in root_client.file_read(path):
+                if check not in root_client.file_read(path):
                     continue
 
                 try:
