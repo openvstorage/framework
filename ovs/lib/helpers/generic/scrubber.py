@@ -405,9 +405,9 @@ class StackWorker(ScrubShared):
                                                                                       self.stack_number)
 
         # Both the proxy and scrub directory are bound to the scrub location and both will be re-used
-        self.backend_connection_manager_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id))
+        self.backend_connection_manager_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config|backend_connection_manager'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id))
         # Allow a custom one to be inserted
-        self.backend_connection_manager_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config_scrub'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id), default=self.backend_connection_manager_config)['backend_connection_manager']
+        self.backend_connection_manager_config.update(Configuration.get('ovs/vpools/{0}/scrub/tweaks|backend_connection_manager'.format(self.vpool.guid), default={}))
         proxy_amount_key = '/ovs/framework/hosts/{0}/config|scrub_proxy_amount'.format(self.storagerouter.machine_id)
         proxy_amount = Configuration.get(key=proxy_amount_key, default=1)
         if proxy_amount <= 0:
@@ -514,7 +514,7 @@ class StackWorker(ScrubShared):
                             continue
 
                         # Fetch the generic lease
-                        lease_interval = Configuration.get('/ovs/volumedriver/intervals|locked_lease'.format(self.vpool.guid), default=None)
+                        lease_interval = Configuration.get('/ovs/volumedriver/intervals|locked_lease', default=5)
                         # Lease per vpool
                         lease_interval = Configuration.get('/ovs/vpools/{0}/scrub/tweaks|locked_lease_interval'.format(self.vpool.guid), default=lease_interval)
                         # Do the actual scrubbing
