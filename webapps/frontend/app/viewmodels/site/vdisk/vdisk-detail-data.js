@@ -54,6 +54,7 @@ define(['jquery', 'knockout',
         }, data || {});
         ko.mapping.fromJS(vmData, viewModelMapping, self);
         subscriberService.trigger('shared_data:create', self);
+
     }
 
     var functions = {

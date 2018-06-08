@@ -43,8 +43,35 @@ define([
         self.loadConfigHandle = function (guid) {
             return api.get('vdisks/' + guid + '/get_config_params')
                 .then(self.shared.tasks.wait)
-
         };
+        self.setConfigHandle = function (guid, new_config_params) {
+                return api.post('vdisks/' + guid + '/set_config_params', {
+                    data: { new_config_params: new_config_params}
+                })
+                .then(self.shared.tasks.wait)
+        };
+        self.setAsTemplate = function (guid){
+            return api.post('vdisks/' + guid + '/set_as_template')
+                .then(self.shared.tasks.wait)
+        };
+
+        self.scrub = function (guid){
+            return api.post('vdisks/' + guid + '/scrub')
+                .then(self.shared.tasks.wait)
+        };
+        self.removeSnapshot = function (guid, snapshotid){
+            return api.post('vdisks/' + guid + '/remove_snapshot', {
+                    data: { snapshot_id: snapshotid }
+                }).then(self.shared.tasks.wait)
+        };
+        self.removeVDisk = function (guid){
+            return api.del('vdisks/' + guid)
+                .then(self.shared.tasks.wait)
+        };
+        self.restart = function (guid){
+            return api.post('vdisks/' + vd.guid() + '/restart')
+                .then(self.shared.tasks.wait)
+        }
     }
     return new VDiskService();
 

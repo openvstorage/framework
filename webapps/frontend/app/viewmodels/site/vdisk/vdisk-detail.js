@@ -16,16 +16,19 @@
 /*global define */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/pluginloader',
     'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/vpool/vpool',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/domain/domain',
     'viewmodels/wizards/clone/index', 'viewmodels/wizards/vdiskmove/index', 'viewmodels/wizards/rollback/index', 'viewmodels/wizards/snapshot/index',
-    './vdisk-detail-data'
+    './vdisk-detail-data',
+    'viewmodels/services/domain', 'viewmodels/services/storagerouter', 'viewmodels/services/vdisk'
 ], function(
-    $, app, dialog, ko, router, shared, generic, Refresher, api,
+    $, app, dialog, ko, router,
+    shared, generic, Refresher, pluginLoader,
     VDisk, VPool, StorageRouter, Domain,
     CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard,
-    vdiskDetailData
+    vdiskDetailData,
+    domainService, storagerouterService, vDiskService
 ) {
     "use strict";
     return function() {
@@ -53,6 +56,7 @@ define([
             { key: 'serverPort', value: $.t('ovs:vdisks.detail.server_port'), width: undefined }
         ];
         self.vDisk                = {};
+        self.vDiskString          = 'vdisk-detail';
 
 
         // Observables
@@ -103,11 +107,11 @@ define([
             return $.Deferred(function(deferred) {
                 var vdisk = self.vDisk;
                 if (vdisk !== undefined && generic.xhrCompleted(self.loadDomainHandle)) {
-                    self.loadDomainHandle = api.get('domains', { queryparams: {
+                    self.loadDomainHandle = domainService.loadDomains({
                         sort: 'name',
                         contents: 'storage_router_layout',
                         vdisk_guid: vdisk.guid()
-                    }})
+                    })
                         .done(function(data) {
                             var guids = [], ddata = {}, domainsPresent = false;
                             $.each(data.data, function(index, item) {
@@ -152,7 +156,7 @@ define([
         self.loadStorageRouters = function() {
             return $.Deferred(function (deferred) {
                 if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
-                    self.loadStorageRouterHandle = api.get('storagerouters')
+                    self.loadStorageRouterHandle = storagerouterService.loadStorageRouters()
                         .done(function (data) {
                             self.vDisk.storageRouterGuids(data.data);
                         })
@@ -197,8 +201,7 @@ define([
                                 $.t('ovs:vdisks.set_as_template.started'),
                                 $.t('ovs:vdisks.set_as_template.started_msg', {what: vd.name()})
                             );
-                            api.post('vdisks/' + vd.guid() + '/set_as_template')
-                                .then(self.shared.tasks.wait)
+                            vDiskService.setAsTemplate(vd.guid())
                                 .done(function() {
                                     generic.alertSuccess(
                                         $.t('ovs:vdisks.set_as_template.success'),
@@ -252,8 +255,7 @@ define([
                                 $.t('ovs:vdisks.scrub.started_title'),
                                 $.t('ovs:vdisks.scrub.started_message', {vdisk: vd.name()})
                             );
-                            api.post('vdisks/' + vd.guid() + '/scrub')
-                                .then(self.shared.tasks.wait)
+                            vDiskService.scrub(vd.guid())
                                 .done(function() {
                                     generic.alertSuccess(
                                         $.t('ovs:vdisks.scrub.success_title'),
@@ -281,10 +283,7 @@ define([
                     var quota = vd.vpool().metadata().caching_info[self.vDisk.storageRouterGuid()].quota;
                     vd.configuration().cache_quota = quota / Math.pow(1024.0, 3);
                 }
-                api.post('vdisks/' + vd.guid() + '/set_config_params', {
-                    data: { new_config_params: new_config }
-                })
-                    .then(self.shared.tasks.wait)
+                vDiskService.setConfigHandle(vd.guid(), new_config)
                     .done(function () {
                         generic.alertSuccess(
                             $.t('ovs:vdisks.save_config.success'),
@@ -317,10 +316,7 @@ define([
                         $.t('ovs:vdisks.remove_snapshot.started'),
                         $.t('ovs:vdisks.remove_snapshot.started_msg', {what: snapshotid})
                     );
-                    api.post('vdisks/' + self.vDisk.guid() + '/remove_snapshot', {
-                        data: { snapshot_id: snapshotid }
-                    })
-                        .then(self.shared.tasks.wait)
+                    vDiskService.removeSnapshot(self.vDisk.guid(), snapshotid)
                         .done(function () {
                             generic.alertSuccess(
                                 $.t('ovs:vdisks.remove_snapshot.success'),
@@ -340,83 +336,84 @@ define([
             }});
         };
         self.removeVDisk = function() {
-            if (self.vDisk !== undefined && self.vDisk.childrenGuids().length === 0) {
-                var vd = self.vDisk;
-                self.removing(true);
-                app.showMessage(
-                        $.t('ovs:vdisks.remove_vdisk.title_msg', {what: vd.name()}),
-                        $.t('ovs:generic.are_you_sure'),
-                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
-                    )
-                    .done(function(answer) {
-                        if (answer === $.t('ovs:generic.yes')) {
-                            generic.alertInfo(
-                                $.t('ovs:vdisks.remove_vdisk.started'),
-                                $.t('ovs:vdisks.remove_vdisk.started_msg', {what: vd.name()})
-                            );
-                            api.del('vdisks/' + vd.guid())
-                                .then(self.shared.tasks.wait)
-                                .done(function() {
-                                    generic.alertSuccess(
-                                        $.t('ovs:vdisks.remove_vdisk.success'),
-                                        $.t('ovs:vdisks.remove_vdisk.success_msg', {what: vd.name()})
-                                    );
-                                    router.navigateBack();
-                                })
-                                .fail(function(error) {
-                                    error = generic.extractErrorMessage(error);
-                                    generic.alertError(
-                                        $.t('ovs:generic.error'),
-                                        $.t('ovs:vdisks.remove_vdisk.failed_msg', {what: vd.name(), why: error})
-                                    );
-                                })
-                                .always(function() {
-                                    self.removing(false);
-                                });
-                        } else {
-                            self.removing(false);
-                        }
-                    });
+            if (self.vDisk === undefined || self.vDisk.childrenGuids().length !== 0) {
+                return false
             }
+            var vd = self.vDisk;
+            self.removing(true);
+            app.showMessage(
+                    $.t('ovs:vdisks.remove_vdisk.title_msg', {what: vd.name()}),
+                    $.t('ovs:generic.are_you_sure'),
+                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                )
+                .done(function(answer) {
+                    if (answer !== $.t('ovs:generic.yes')) {
+                        self.removing(false)
+                    }
+                    generic.alertInfo(
+                        $.t('ovs:vdisks.remove_vdisk.started'),
+                        $.t('ovs:vdisks.remove_vdisk.started_msg', {what: vd.name()})
+                    );
+                    vDiskService.removeVDisk(vd.guid())
+                        .done(function() {
+                            generic.alertSuccess(
+                                $.t('ovs:vdisks.remove_vdisk.success'),
+                                $.t('ovs:vdisks.remove_vdisk.success_msg', {what: vd.name()})
+                            );
+                            router.navigateBack();
+                        })
+                        .fail(function(error) {
+                            error = generic.extractErrorMessage(error);
+                            generic.alertError(
+                                $.t('ovs:generic.error'),
+                                $.t('ovs:vdisks.remove_vdisk.failed_msg', {what: vd.name(), why: error})
+                            );
+                        })
+                        .always(function() {
+                            self.removing(false);
+                        });
+                });
+
         };
         self.restartVDisk = function() {
-            if (self.vDisk !== undefined && self.vDisk.liveStatus() !== 'RUNNING') {
-                var vd = self.vDisk;
-                self.restarting(true);
-                app.showMessage(
-                        $.t('ovs:vdisks.restart_vdisk.title_msg', {what: vd.name()}),
-                        $.t('ovs:generic.are_you_sure'),
-                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
-                    )
-                    .done(function(answer) {
-                        if (answer === $.t('ovs:generic.yes')) {
-                            generic.alertInfo(
-                                $.t('ovs:vdisks.restart_vdisk.started'),
-                                $.t('ovs:vdisks.restart_vdisk.started_msg', {what: vd.name()})
-                            );
-                            api.post('vdisks/' + vd.guid() + '/restart')
-                                .then(self.shared.tasks.wait)
-                                .done(function() {
-                                    generic.alertSuccess(
-                                        $.t('ovs:vdisks.restart_vdisk.success'),
-                                        $.t('ovs:vdisks.restart_vdisk.success_msg', {what: vd.name()})
-                                    );
-                                })
-                                .fail(function(error) {
-                                    error = generic.extractErrorMessage(error);
-                                    generic.alertError(
-                                        $.t('ovs:generic.error'),
-                                        $.t('ovs:vdisks.restart_vdisk.failed_msg', {what: vd.name(), why: error})
-                                    );
-                                })
-                                .always(function() {
-                                    self.restarting(false);
-                                });
-                        } else {
-                            self.restarting(false);
-                        }
-                    });
+            if (self.vDisk === undefined || self.vDisk.liveStatus() === 'RUNNING') {
+                return false;
             }
+            var vd = self.vDisk;
+            self.restarting(true);
+            app.showMessage(
+                    $.t('ovs:vdisks.restart_vdisk.title_msg', {what: vd.name()}),
+                    $.t('ovs:generic.are_you_sure'),
+                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                )
+                .done(function(answer) {
+                    if (answer !== $.t('ovs:generic.yes')) {
+                        self.restarting(false);
+                    }
+                    generic.alertInfo(
+                        $.t('ovs:vdisks.restart_vdisk.started'),
+                        $.t('ovs:vdisks.restart_vdisk.started_msg', {what: vd.name()})
+                    );
+                    vDiskService.restart(vd.guid())
+                        .done(function() {
+                            generic.alertSuccess(
+                                $.t('ovs:vdisks.restart_vdisk.success'),
+                                $.t('ovs:vdisks.restart_vdisk.success_msg', {what: vd.name()})
+                            );
+                        })
+                        .fail(function(error) {
+                            error = generic.extractErrorMessage(error);
+                            generic.alertError(
+                                $.t('ovs:generic.error'),
+                                $.t('ovs:vdisks.restart_vdisk.failed_msg', {what: vd.name(), why: error})
+                            );
+                        })
+                        .always(function() {
+                            self.restarting(false);
+                        });
+
+            });
+
         };
 
         // Computed
@@ -464,47 +461,44 @@ define([
             return allFalse;
         });
         self.hasCacheQuota = ko.pureComputed(function() {
-            if (self.vDisk !== undefined && self.vDisk.storageRouter() !== undefined && self.vDisk.storageRouter().features() !== undefined) {
+            if (self.vDisk === undefined || self.vDisk.storageRouter() === undefined || self.vDisk.storageRouter().features() === undefined) {
+                return false;
+            } else {
                 var features = self.vDisk.storageRouter().features();
                 return features.alba.features !== undefined && features.alba.features.contains('cache-quota');
             }
-            return false;
         });
         self.hasBlockCache = ko.pureComputed(function() {
-            if (self.vDisk !== undefined && self.vDisk.storageRouter() !== undefined && self.vDisk.storageRouter().features() !== undefined) {
+            if (self.vDisk === undefined || self.vDisk.storageRouter() === undefined || self.vDisk.storageRouter().features() === undefined) {
+                return false;
+            } else {
                 var features = self.vDisk.storageRouter().features();
                 return features.alba.features !== undefined && features.alba.features.contains('block-cache');
             }
-            return false;
         });
 
         // Durandal
         self.activate = function (mode, guid) {
-                    $.each(shared.hooks.pages, function (pageType, pages) {
-                        if (pageType === 'vdisk-detail') {
-                            $.each(pages, function (index, page) {
-                                // Load in the activators for the plugins
-                                page.activator.activateItem(page.module).fail(function(error){console.error(error)})
-                            })
-                        }
+                    var plugin_pages = pluginLoader.get_plugin_pages(self.vDiskString, guid);
+                    $.each(plugin_pages, function(index, page) {
+                        pluginLoader.activate_page(page)
                     });
+
                     // Creating a new data will evit an event which will trigger in the loaded plugins
                     self.data = new vdiskDetailData.constructor();
                     self.vDisk = self.data.vdisk;  // The view binding happens after the activate. Reference the same vdisk object as in the shared data
-                    self.vDisk.guid(guid)  // Set the guid of the vdisk which is fetched from the router;
+                    self.vDisk.guid(guid);  // Set the guid of the vdisk which is fetched from the router;
                     self.refresher.init(self.load, 5000);
                     self.refresher.run();
                     self.refresher.start();
 
         };
         self.deactivate = function() {
-            $.each(shared.hooks.pages, function(pageType, pages) {
-                if (pageType === 'vdisk-detail') {
-                    $.each(pages, function(index, page) {
-                        page.activator.deactivateItem(page.module);
-                    });
-                }
+            var pages = pluginLoader.get_plugin_pages(self.vDiskString, self.vDisk.guid())
+            $.each(pages, function (pageType, page) {
+                pluginLoader.deactivate_page(page)
             });
+
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
