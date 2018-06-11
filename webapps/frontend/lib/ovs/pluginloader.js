@@ -16,22 +16,12 @@
 /*global define, window */
 define(['jquery', 'knockout',
     'durandal/system', 'durandal/activator',
-    'ovs/routing', 'ovs/shared'
+    'ovs/routing', 'ovs/shared', 'ovs/viewcache'
 ], function ($, ko,
              system, activator,
-             routing, shared) {
+             routing, shared, viewcache) {
     "use strict";
 
-    var cache = {};
-    function ViewCache(){
-        var self = this;
-    }
-    ViewCache.prototype = {
-        hasPageCached: function(page, identifier){
-            var self = this;
-            return page in cache
-        }
-    };
     function PluginLoader() {
         var self = this;
         self.pages = {};
@@ -43,7 +33,6 @@ define(['jquery', 'knockout',
         load_hooks: function (plugin) {
             var self = this;
             return $.when().then(function () {
-                // shared.pluginData[plugin] = {};   // Add a plugin key to the shared.pluginData value
                 // Requirejs works with callbacks. To chain it, wrap it up
                 return $.Deferred(function (moduleLoadingDeferred){
                     require(['ovs/hooks/' + plugin], function (hook) { // webapps/frontend/lib/ovs/hooks
@@ -114,14 +103,22 @@ define(['jquery', 'knockout',
         get_plugin_pages: function (plugin_name, identifier) {
             var self = this;
             var out = [];
+            var cache = viewcache.get_cached_page(plugin_name, identifier);
+            if (cache){
+                return cache
+            }
+
             $.each(self.pages, function (pageType, pages) {
                 if (pageType === plugin_name) {
                     $.each(pages, function (index, page) {
                         // Load in the activators for the plugins
                         out.push(page)
+                        // todo implement how to fetch new view
+                        // self.activate_page(page)
                     })
                 }
             });
+            viewcache.put_cached_page(plugin_name, identifier, out);
             return out
         },
         activate_page: function (page) {
