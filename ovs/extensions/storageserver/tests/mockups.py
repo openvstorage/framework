@@ -311,11 +311,11 @@ class StorageRouterClient(object):
         _ = req_timeout_secs
         return [volume_id for volume_id in StorageRouterClient.volumes[self.vpool_guid].iterkeys()]
 
-    def make_locked_client(self, volume_id, req_timeout_secs=None):
+    def make_locked_client(self, volume_id, req_timeout_secs=None, update_interval_secs=None):
         """
         Retrieve a mocked locked client connection for the specified volume
         """
-        _ = self, req_timeout_secs
+        _ = self, req_timeout_secs, update_interval_secs
         return LockedClient(volume_id)
 
     def set_manual_dtl_config(self, volume_id, config, req_timeout_secs=None):
