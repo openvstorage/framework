@@ -17,12 +17,12 @@
 define([
     'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
-    'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications', 'ovs/pluginloader',
-    'viewmodels/services/user'
+    'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/notifications', 'ovs/pluginloader',
+    'viewmodels/services/user', 'viewmodels/services/misc'
 ], function ($, router, system, activator, bootstrap, i18n,
              shared, routing, Messaging, generic, Tasks,
-             Authentication, api, cssLoader, notifications, pluginLoader,
-             userService) {
+             Authentication, cssLoader, notifications, pluginLoader,
+             userService, miscService) {
     "use strict";
     // Initially load in all routes
     router.map(routing.mainRoutes)
@@ -43,7 +43,7 @@ define([
         self.shared = shared;
         self.router = router;
         self.compositionComplete = function () {
-            return api.get('branding')
+            return miscService.branding()
                 .then(function (brandings) {
                     var i, brand, css;
                     for (i = 0; i < brandings.length; i += 1) {
@@ -67,7 +67,7 @@ define([
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
             self.shared.authentication.onLoggedIn.push(function () {
                 return $.when().then(function() {
-                    return api.get('')
+                    return miscService.metadata()
                         .then(function (metadata) {
                                 if (!metadata.authenticated) {
                                     // This shouldn't be the case, but is checked anyway.
@@ -114,7 +114,7 @@ define([
                 self.shared.authentication.accessToken(token);
             }
             return $.when().then(function() {
-                    return api.get('')
+                    return miscService.metadata()
                         // @todo handle failures - do a promise retry and swallow error on x'th retry
                         .then(function (metadata) {
                             var metadataPromises = [], backendsActive = false;
