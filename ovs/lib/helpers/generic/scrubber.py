@@ -43,7 +43,7 @@ from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs_extensions.storage.exceptions import AssertException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.lib.helpers.repeatingtimer import RepeatingTimer
+from ovs_extensions.generic.repeatingtimer import RepeatingTimer
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
 
@@ -399,20 +399,19 @@ class StackWorkHandler(ScrubShared):
         rt.start()
         return rt
 
-    @staticmethod
-    def unregister_vdisk_for_scrub(vdisk_guid, update_timer):
+    def unregister_vdisk_for_scrub(self, vdisk_guid, registering_thread):
         """
         Register that a vDisk is being actively scrubbed
         :param vdisk_guid: Guid of the vDisk to register
         :type vdisk_guid: basestring
-        :param update_timer: Updating timer instance
-        :type update_timer: RepeatingTimer
-        :return: None
-        :rtype: NoneType
+        :param registering_thread: The thread registering scrub data onto the vdisk
+        :type registering_thread: RepeatingTimer
+        :return: The loop instance keeping the information up to date
+        :rtype: RepeatedTimer
         """
+        registering_thread.cancel()
+        registering_thread.join()
         vdisk = VDisk(vdisk_guid)
-        update_timer.cancel()
-        update_timer.join()
         vdisk.scrubbing_information = None
         vdisk.save()
 
@@ -778,7 +777,6 @@ class StackWorker(ScrubShared):
                             proxy_config = backend_config.pop(key)
                             if proxy_config_template is None:
                                 proxy_config_template = proxy_config
-                    # @todo remove cache polcies from proxies
                     # Build up config for our purposes
                     for index, scrub_proxy_config in enumerate(scrub_proxy_configs):
                         proxy_config = proxy_config_template.copy()
@@ -786,7 +784,6 @@ class StackWorker(ScrubShared):
                                              'alba_connection_port': scrub_proxy_config['port']})
                         backend_config[str(index)] = proxy_config
                 # Copy backend connection manager information in separate key
-                # @todo different retries period because why proxies when you can increase retries ./shrug
                 Configuration.set(self.backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
                 self._logger.info(self._format_message('Backend config was set up'))
 

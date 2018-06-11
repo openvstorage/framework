@@ -445,4 +445,4 @@ class VDisk(DataObject):
         :rtype: bool
         """
         now = time.time()
-        return self.scrubbing_information is not None and now < self.scrubbing_information['expires']
+        return self.scrubbing_information is not None and self.scrubbing_information['expires'] < now

@@ -128,6 +128,10 @@ class GenericController(object):
         # Place all snapshots in bucket_chains
         bucket_chains = []
         for vdisk in VDiskList.get_vdisks():
+            vdisk.invalidate_dynamics('being_scrubbed')
+            if vdisk.being_scrubbed:
+                continue
+
             if vdisk.info['object_type'] in ['BASE']:
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:
@@ -177,13 +181,11 @@ class GenericController(object):
                                            s['timestamp'] != oldest['timestamp']]
 
         # Delete obsolete snapshots
-        # @todo acquire lock -> on error skip delete & add error message
         for bucket_chain in bucket_chains:
             for bucket in bucket_chain:
                 for snapshot in bucket['snapshots']:
                     VDiskController.delete_snapshot(vdisk_guid=snapshot['vdisk_guid'],
                                                     snapshot_id=snapshot['snapshot_id'])
-        # @todo sync with backend to release a lock on the scrubber
         GenericController._logger.info('Delete snapshots finished')
 
     @staticmethod
