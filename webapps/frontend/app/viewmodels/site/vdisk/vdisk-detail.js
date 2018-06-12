@@ -479,8 +479,8 @@ define([
 
         // Durandal
         self.activate = function (mode, guid) {
-                    var plugin_pages = pluginLoader.get_plugin_pages(self.vDiskString, guid);
-                    $.each(plugin_pages, function(index, page) {
+                    self.plugin_pages = pluginLoader.get_plugin_pages(self.vDiskString, guid);
+                    $.each(self.plugin_pages, function(index, page) {
                         pluginLoader.activate_page(page)
                     });
 

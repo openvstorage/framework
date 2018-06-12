@@ -92,7 +92,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                 </button>
                 <!-- Additional buttons for plugins -->
-                <!-- ko foreach: shared.hooks.pages['vdisk-detail'] -->
+                <!-- ko foreach: $root.plugin_pages -->
                     <div data-bind="compose: $data.activator, visible: $data.info.type === 'detail-button'" style="display: inline-block; margin-left: 20px;"></div>
                 <!-- /ko -->
             </li>
@@ -177,7 +177,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </table>
             </div>
             <!-- Additional details for plugins -->
-            <!-- ko foreach: shared.hooks.pages['vdisk-detail'] -->
+            <!-- ko foreach: $root.plugin_pages -->
                 <!--<span data-bind="text: Object.keys($data), visible:$data.info.type === 'detail-general'"></span>-->
                 <!--<span data-bind="text: Object.keys($data.module), visible:$data.info.type === 'detail-general'"></span>-->
                 <!--<span data-bind="text: typeof $data.activator, visible:$data.info.type === 'detail-general'"></span>-->
@@ -249,7 +249,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     </table>
                 </div>
                 <!-- Additional table info for plugins -->
-                <!-- ko foreach: shared.hooks.pages['vdisk-detail'] -->
+                <!-- ko foreach: $root.plugin_pages -->
                     <div class="tab-pane active" id="plugin_information" data-bind="compose: $data.activator, visible: $data.info.type === 'detail-tab-edge'"></div>
                 <!-- /ko -->
             </div>

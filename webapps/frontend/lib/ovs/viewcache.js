@@ -18,28 +18,44 @@ define(['jquery'
 ], function ($) {
     "use strict";
 
+    var genericID = 'generic_{0}'.format([Math.random()]);
     function ViewCache() {
         var self = this;
         self.cache = {};
     }
 
     var functions = {
-        get_cached_page: function(plugin_name, guid){
+        get: function(plugin_name, guid){
+            guid = guid || genericID;
             var self = this;
             if (self.cache.hasOwnProperty(plugin_name) && self.cache[plugin_name].hasOwnProperty(guid)){
                 return self.cache[plugin_name][guid]
             }
-            return null
+            return []
         },
-        put_cached_page: function(plugin_name, guid, page){
+        get_by_page: function(page, guid) {
+            var self = this;
+            return Object.keys(self.cache).reduce(function(acc, cur){
+                // Acc is the list passed. cur is the key of the object
+                acc = acc.concat(self.get(cur, guid).filter(function(item) {
+                    return item.page === page
+                }));
+                return acc
+            }, [])
+        },
+        put: function(plugin_name, page, guid){
+            guid = guid || genericID;
             var self = this;
             if (!self.cache.hasOwnProperty(plugin_name)){
                 self.cache[plugin_name] = {}
             }
-            self.cache[plugin_name][guid] = page
+            if (!self.cache[plugin_name].hasOwnProperty(guid)){
+                self.cache[plugin_name][guid] = []
+            }
+            self.cache[plugin_name][guid].push(page);
         }
     };
 
     ViewCache.prototype = $.extend({}, functions);
-        return new ViewCache();
+    return new ViewCache();
 });

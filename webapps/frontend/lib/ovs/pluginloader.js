@@ -43,10 +43,13 @@ define(['jquery', 'knockout',
                             systemLoaders.push(system.acquire('viewmodels/site/' + dashboard)
                                 .then(function (module) {
                                     var moduleInstance = new module();
-                                    self.dashboards.push({
+                                    var view = {
                                         module: moduleInstance,
-                                        activator: activator.create()
-                                    });
+                                        module_constructor: module,
+                                        activator: activator.create(),
+                                        type: 'dashboard'
+                                    };
+                                    self.dashboards.push(view);
                                 }));
                         });
                         $.each(hook.wizards, function (wizard, moduleName) {
@@ -56,11 +59,14 @@ define(['jquery', 'knockout',
                             systemLoaders.push(system.acquire('viewmodels/wizards/' + wizard + '/' + moduleName)
                                 .then(function (module) {
                                     var moduleInstance = new module();
-                                    shared.hooks.wizards[wizard].push({
+                                    var view = {
                                         name: moduleName,
                                         module: moduleInstance,
-                                        activator: activator.create()
-                                    });
+                                        module_constructor: module,
+                                        activator: activator.create(),
+                                        type: 'wizard'
+                                    };
+                                    shared.hooks.wizards[wizard].push(view);
                                 }));
                         });
                         $.each(hook.pages, function (page, pageInfo) {
@@ -79,12 +85,18 @@ define(['jquery', 'knockout',
                                     .then(function (module) {
                                         // Always returns the same instance when item would get activated!
                                         var moduleInstance = new module();
-                                        self.pages[page].push({
+                                        var view = {
                                             info: info,
                                             name: moduleName,
                                             module: moduleInstance,
-                                            activator: activator.create()
-                                        });
+                                            activator: activator.create(),
+                                            module_constructor: module,
+                                            type: 'page',
+                                            page: page,
+                                            plugin: plugin
+                                        };
+                                        self.pages[page].push(plugin, view);  // Used in shell js
+                                        viewcache.put(plugin, view)
                                     }));
                             });
                         });
@@ -98,28 +110,26 @@ define(['jquery', 'knockout',
                 return self;
             })
         },
-        add_page: function () {
-        },
-        get_plugin_pages: function (plugin_name, identifier) {
+        get_plugin_pages: function (page, identifier) {
             var self = this;
             var out = [];
-            var cache = viewcache.get_cached_page(plugin_name, identifier);
-            if (cache){
-                return cache
+            var cachedPages = viewcache.get_by_page(page, identifier);
+            if (cachedPages.length > 0){
+                return cachedPages
             }
-
-            $.each(self.pages, function (pageType, pages) {
-                if (pageType === plugin_name) {
-                    $.each(pages, function (index, page) {
-                        // Load in the activators for the plugins
-                        out.push(page)
-                        // todo implement how to fetch new view
-                        // self.activate_page(page)
-                    })
+            // Need new module instances
+            var standardPages = viewcache.get_by_page(page); // Loaded on boot time
+            return standardPages.reduce(function(acc, cur) {
+                if (cur.type !== 'page') {
+                    return acc // Continue
                 }
-            });
-            viewcache.put_cached_page(plugin_name, identifier, out);
-            return out
+                var module_constructor = cur['module_constructor'];
+                var module_instance = new module_constructor();
+                var new_page = $.extend({}, cur, {'module': module_instance, 'activator': activator.create()});
+                viewcache.put(new_page['plugin'], new_page, identifier);
+                acc.push(new_page);
+                return acc;
+            }, []);
         },
         activate_page: function (page) {
             page.activator.activateItem(page.module).fail(function (error) {

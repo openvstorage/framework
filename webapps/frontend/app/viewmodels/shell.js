@@ -127,7 +127,7 @@ define([
                                             translationDeferred.resolve();
                                         });
                                     }).promise();
-                                    metadataPromises.push(pluginLoader.load_hooks(plugin).then(function(loader){
+                                    metadataPromises.push(pluginLoader.load_hooks(plugin).then(function(){
                                         // Plugins are loaded here
                                         $.extend(self.shared.hooks.wizards, pluginLoader.wizards);
                                         $.extend(self.shared.hooks.dashboards, pluginLoader.dashboards);
