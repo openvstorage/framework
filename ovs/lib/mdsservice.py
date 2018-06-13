@@ -31,7 +31,7 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
-from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, SRCObjectNotFoundException, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.mds.shared import MDSShared
 from ovs.lib.helpers.mds.safety import SafetyEnsurer

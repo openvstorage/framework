@@ -20,8 +20,8 @@ MDS Safety module
 
 import math
 import time
-import collections
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.configuration import Configuration
@@ -56,10 +56,8 @@ class SafetyEnsurer(MDSShared):
         self.mds_client_timeout = Configuration.get('ovs/vpools/{0}/mds_config|mds_client_connection_timeout'.format(self.vdisk.vpool_guid), default=120)
         self.tlogs, self.safety, self.max_load = self.get_mds_config()
         # Filled in by functions
+        self.metadata_backend_config_start = {}
         # Layout related
-        self.primary_storagerouters = set()
-        self.secondary_storagerouters = set()
-
         self.mds_layout = {'primary': {'used': [],
                                        'loads': {},
                                        'available': []},
@@ -84,6 +82,7 @@ class SafetyEnsurer(MDSShared):
         :rtype: NoneType
         """
         self.vdisk.invalidate_dynamics(['info', 'storagerouter_guid'])
+
         if self.vdisk.storagerouter_guid is None:
             raise SRCObjectNotFoundException(
                 'Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any StorageRouter'.format(self.vdisk.name, self.vdisk.guid))
@@ -95,6 +94,7 @@ class SafetyEnsurer(MDSShared):
         if self.vdisk.info['live_status'] != VDisk.STATUSES.RUNNING:
             raise RuntimeError('vDisk {0} is not {1}, cannot update MDS configuration'.format(self.vdisk.guid, VDisk.STATUSES.RUNNING))
 
+        self.metadata_backend_config_start = self.vdisk.info['metadata_backend_config']
         if self.vdisk.info['metadata_backend_config'] == {}:
             raise RuntimeError('Configured MDS layout for vDisk {0} could not be retrieved}, cannot update MDS configuration'.format(self.vdisk.guid))
 
@@ -104,13 +104,7 @@ class SafetyEnsurer(MDSShared):
         :return: A dict wth sockets as key, service as value
         :rtype: Dict[str, ovs.dal.hybrids.j_mdsservice.MDSService
         """
-        # Sorted was added merely for unittests, because they rely on specific order of services and their ports
-        # Default sorting behavior for relations used to be based on order in which relations were added
-        # Now sorting is based on guid (DAL speedup changes)
-        service_per_key = collections.OrderedDict()  # OrderedDict to keep the ordering in the dict
-        for service in sorted([mds.service for mds in self.vdisk.vpool.mds_services], key=lambda k: k.ports):
-            service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.ports[0])] = service
-        return service_per_key
+        return super(SafetyEnsurer, self).map_mds_services_by_socket(self.vdisk)
 
     def get_primary_and_secondary_storagerouters(self):
         # type: () -> Tuple[Set[StorageRouter], Set[StorageRouter]]
@@ -120,11 +114,7 @@ class SafetyEnsurer(MDSShared):
         :rtype: Tuple[Set[StorageRouter], Set[StorageRouter]]
         """
         # Create a pool of StorageRouters being a part of the primary and secondary domains of this StorageRouter
-        if self.primary_storagerouters and self.secondary_storagerouters:
-            return self.primary_storagerouters and self.secondary_storagerouters
-
         vdisk = self.vdisk
-        excluded_storagerouters = self.excluded_storagerouters
 
         vdisk_storagerouter = StorageRouter(vdisk.storagerouter_guid)
         primary_domains = [junction.domain for junction in vdisk_storagerouter.domains if junction.backup is False]
@@ -141,11 +131,11 @@ class SafetyEnsurer(MDSShared):
             primary_storagerouters = set(StorageRouterList.get_storagerouters())
 
         # Remove all excluded StorageRouters from primary StorageRouters
-        primary_storagerouters = primary_storagerouters.difference(excluded_storagerouters)
+        primary_storagerouters = primary_storagerouters.difference(self.excluded_storagerouters)
 
         # Remove all StorageRouters from secondary which are present in primary, all excluded
         secondary_storagerouters = secondary_storagerouters.difference(primary_storagerouters)
-        secondary_storagerouters = secondary_storagerouters.difference(excluded_storagerouters)
+        secondary_storagerouters = secondary_storagerouters.difference(self.excluded_storagerouters)
 
         # Make sure to only use the StorageRouters related to the current vDisk's vPool
         related_storagerouters = [sd.storagerouter for sd in vdisk.vpool.storagedrivers if sd.storagerouter is not None]
@@ -161,11 +151,8 @@ class SafetyEnsurer(MDSShared):
             self._logger.debug('vDisk {0} - Primary StorageRouter {1} with IP {2}'.format(vdisk.guid, primary_storagerouter.name, primary_storagerouter.ip))
         for secondary_storagerouter in secondary_storagerouters:
             self._logger.debug('vDisk {0} - Secondary StorageRouter {1} with IP {2}'.format(vdisk.guid, secondary_storagerouter.name, secondary_storagerouter.ip))
-        for excluded_storagerouter in excluded_storagerouters:
+        for excluded_storagerouter in self.excluded_storagerouters:
             self._logger.debug('vDisk {0} - Excluded StorageRouter {1} with IP {2}'.format(vdisk.guid, excluded_storagerouter.name, excluded_storagerouter.ip))
-
-        self.primary_storagerouters.update(primary_storagerouters)
-        self.secondary_storagerouters.update(secondary_storagerouters)
 
         return primary_storagerouters, secondary_storagerouters
 
@@ -187,14 +174,13 @@ class SafetyEnsurer(MDSShared):
         :return: All reconfiguration reasons
         :rtype: List[str]
         """
-
         services_by_socket = self.map_mds_services_by_socket()
         primary_storagerouters, secondary_storagerouters = self.get_primary_and_secondary_storagerouters()
         vdisk_storagerouter = StorageRouter(self.vdisk.storagerouter_guid)
 
         current_service_ips = []
         reconfigure_reasons = set()
-        for index, config in enumerate(self.vdisk.info['metadata_backend_config']):  # Ordered MASTER, SLAVE(S)
+        for index, config in enumerate(self.metadata_backend_config_start):  # Ordered MASTER, SLAVE(S)
             config_key = '{0}:{1}'.format(config['ip'], config['port'])
             service = services_by_socket.get(config_key)
             if service is None:
@@ -284,7 +270,7 @@ class SafetyEnsurer(MDSShared):
             if slave_service in self.mds_layout['secondary']['used']:
                 secondary = True
 
-        self._logger.info('vDisk {0} - Current configuration: {1}'.format(self.vdisk.guid, self.vdisk.info['metadata_backend_config']))
+        self._logger.info('vDisk {0} - Current configuration: {1}'.format(self.vdisk.guid, self.metadata_backend_config_start))
 
         return reconfigure_reasons
 
@@ -453,6 +439,7 @@ class SafetyEnsurer(MDSShared):
         - Deploys the services
         - Notifies the Storagerouter
         :param new_services: List of new services to be used in the reconfiguration (Master and slaves)
+        Note the order matters here! First the master, then slaves in primary domain, then slaves in secondary domain
         :type new_services: List[Service]
         :param previous_master_service: Previous master service incase the master should be switched around (None if no previous master)
         :type previous_master_service: Service
@@ -572,7 +559,14 @@ class SafetyEnsurer(MDSShared):
                 self._logger.critical('{0} - Failed to demote service {1}:{2} to SLAVE'.format(log_start, service.storagerouter.ip, service.ports[0]))
                 raise
 
+    def catchup_mds_slaves(self):
+        # type: () -> None
+        """
+        Performs a catchup for MDS slaves if their tlogs behind reach a certain threshold
+        """
+
     def ensure_safety(self):
+        # type: () -> None
         """
         Ensures (or tries to ensure) the safety of a given vDisk.
         Assumptions:
@@ -602,11 +596,7 @@ class SafetyEnsurer(MDSShared):
         self._logger.info('vDisk {0} - Start checkup for vDisk {1}'.format(vdisk.guid, vdisk.name))
         self.validate_vdisk()
 
-        mds_config = Configuration.get('/ovs/vpools/{0}/mds_config'.format(vdisk.vpool_guid))
-        tlogs = mds_config['mds_tlogs']
-        safety = mds_config['mds_safety']
-        max_load = mds_config['mds_maxload']
-        self._logger.debug('vDisk {0} - Safety: {1}, Max load: {2}%, Tlogs: {3}'.format(vdisk.guid, safety, max_load, tlogs))
+        self._logger.debug('vDisk {0} - Safety: {1}, Max load: {2}%, Tlogs: {3}'.format(vdisk.guid, self.safety, self.max_load, self.tlogs))
 
         vdisk.reload_client('storagedriver')
         vdisk.reload_client('objectregistry')
@@ -639,7 +629,7 @@ class SafetyEnsurer(MDSShared):
 
         service_string = ', '.join(["{{'ip': '{0}', 'port': {1}}}".format(service.storagerouter.ip, service.ports[0]) for service in new_services])
         self._logger.debug('vDisk {0} - Configuration after SLAVE calculation: [{1}]'.format(vdisk.guid, service_string))
-        if new_services == [self.master_service] + self.slave_services and len(new_services) == len(vdisk.info['metadata_backend_config']):
+        if new_services == [self.master_service] + self.slave_services and len(new_services) == len(self.metadata_backend_config_start):
             self._logger.info('vDisk {0} - Could not calculate a better MDS layout. Nothing to update'.format(vdisk.guid))
             self._sync_vdisk_to_reality(vdisk)
             return

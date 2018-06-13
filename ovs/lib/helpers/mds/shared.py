@@ -255,3 +255,19 @@ class MDSShared(object):
                 mds_service.delete()  # Must be removed before the service
                 service.delete()
         return mds_service
+
+    @staticmethod
+    def map_mds_services_by_socket(vdisk):
+        """
+        Maps the mds services related to the vpool by their socket
+        :param vdisk: VDisk object to
+        :return: A dict wth sockets as key, service as value
+        :rtype: Dict[str, ovs.dal.hybrids.j_mdsservice.MDSService
+        """
+        # Sorted was added merely for unittests, because they rely on specific order of services and their ports
+        # Default sorting behavior for relations used to be based on order in which relations were added
+        # Now sorting is based on guid (DAL speedup changes)
+        service_per_key = collections.OrderedDict()  # OrderedDict to keep the ordering in the dict
+        for service in sorted([mds.service for mds in vdisk.vpool.mds_services], key=lambda k: k.ports):
+            service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.ports[0])] = service
+        return service_per_key
