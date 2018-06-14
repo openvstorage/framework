@@ -21,16 +21,19 @@ MDS Catchup module
 import time
 import collections
 from random import randint
-from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.hybrids.service import Service
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs_extensions.storage.exceptions import AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient
 from ovs.lib.helpers.mds.shared import MDSShared
 from ovs.log.log_handler import LogHandler
-from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient
 
 
 class MDSCatchUp(MDSShared):
@@ -43,7 +46,6 @@ class MDSCatchUp(MDSShared):
     """
     # Extra caching
     _contexts_cache = {}
-    _clients = {}
     _sockets_service_map = {}
 
     _logger = LogHandler.get('lib', 'mds catchup')
@@ -52,6 +54,7 @@ class MDSCatchUp(MDSShared):
     _CATCH_UP_VDISK_KEY = '{0}_{{0}}'.format(_CATCH_UP_NAME_SPACE)  # Second format should be the vdisk guid
 
     def __init__(self, vdisk_guid):
+        # type: (str) -> None
         """
         Initializes a new MDSCatchUp
         :param vdisk_guid: Guid of the vDisk to catch up for
@@ -62,6 +65,7 @@ class MDSCatchUp(MDSShared):
         self.tlog_threshold = Configuration.get('ovs/volumedriver/mds|tlogs_behind', default=100)
         self.volumedriver_service_name = 'ovs-volumedriver_{0}'.format(self.vdisk.vpool.name)
         self.mds_client_timeout = Configuration.get('ovs/vpools/{0}/mds_config|mds_client_connection_timeout'.format(self.vdisk.vpool_guid), default=120)
+        self.clients = self.build_clients()
         self.mds_clients = {}
         self.dry_run = True
 
@@ -70,8 +74,12 @@ class MDSCatchUp(MDSShared):
         self._log = 'MDS catchup for vDisk {0} (volume id: {1})'.format(self.vdisk.guid, self.vdisk.volume_id)
 
         self.contexts = self.get_contexts()
+        self.worker_contexts = self.get_worker_contexts()
+        self.worker_context = self.worker_contexts[System.get_my_storagerouter()]
+        self._relevant_contexts = self._get_all_relevant_contexts()
 
     def get_context(self, service):
+        # type: (Service) -> Dict[str, str]
         """
         Return the context to handle in
         """
@@ -80,8 +88,11 @@ class MDSCatchUp(MDSShared):
         return self.contexts[service]
 
     def get_contexts(self):
+        # type: () -> Dict[Service, Dict[str, str]]
         """
         Return all possible contexts that can be handled in
+        :return: Information about the associated volumedrivers
+        :rtype: dict
         """
         contexts = {}
         if self.vdisk.vpool not in self._contexts_cache:
@@ -89,19 +100,18 @@ class MDSCatchUp(MDSShared):
         for service in self.map_mds_services_by_socket_for_vdisk(self.vdisk).itervalues():
             if service.storagerouter not in self._contexts_cache[self.vdisk.vpool]:
                 try:
-                    if service.storagerouter not in self._clients:
+                    if service.storagerouter not in self.clients:
                         client = self.build_ssh_client(service.storagerouter)
                         if client is None:
                             continue
-                        self._clients[service.storagerouter] = client
-                    client = self._clients[service.storagerouter]
+                        self.clients[service.storagerouter] = client
+                    client = self.clients[service.storagerouter]
                     volumedriver_pid = self._service_manager.get_service_pid(name=self.volumedriver_service_name, client=client)
                     if volumedriver_pid == 0:
                         self._logger.warning(self._format_message('Volumedriver {0} is down on StorageRouter {1}. Won\'t be able to catchup service {2}'
                                              .format(self.volumedriver_service_name, service.storagerouter.ip, service.name)))
                         continue
-                    volumedriver_start = self._service_manager.get_service_start_time(
-                        name=self.volumedriver_service_name, client=client)
+                    volumedriver_start = self._service_manager.get_service_start_time(name=self.volumedriver_service_name, client=client)
                     context = {'volumedriver_pid': volumedriver_pid, 'volumedriver_start': volumedriver_start}
                     self._contexts_cache[self.vdisk.vpool][service.storagerouter] = context
                 except:
@@ -110,12 +120,60 @@ class MDSCatchUp(MDSShared):
             contexts[service] = self._contexts_cache[self.vdisk.vpool][service.storagerouter]
         return contexts
 
+    def build_clients(self):
+        # type: () -> Dict[StorageRouter, SSHClient]
+        """
+        Builds SSHClients towards all StorageRouters
+        :return: SSHClient mapped by storagerouter
+        :rtype: dict((storagerouter, sshclient))
+        """
+        clients = {}
+        for storagerouter in StorageRouterList.get_storagerouters():
+            client = self.build_ssh_client(storagerouter)
+            if client is not None:
+                clients[storagerouter] = client
+        return clients
+
+    def get_worker_contexts(self):
+        # type: () -> dict
+        """
+        Retrieves information about the all workers (where it is executed and under what PID)
+        This information is later used to check which data can be discarded (because of interrupted workers)
+        :return: Information about the current workers
+        :rtype: dict
+        """
+        workers_context = {}
+        for storagerouter, client in self.clients.iteritems():
+            worker_pid = 0
+            worker_start = None
+            try:
+                # Retrieve the current start time of the process (used to create a unique key)
+                # Output of the command:
+                #                  STARTED   PID
+                # Mon Jan 22 11:49:04 2018 22287
+                worker_pid = self._service_manager.get_service_pid(name='ovs-workers', client=client)
+                if worker_pid == 0:
+                    self._logger.warning('The workers are down on StorageRouter {0}'.format(storagerouter.guid))
+                else:
+                    worker_start = self._service_manager.get_service_start_time(name='ovs-workers', client=client)
+            except Exception:
+                self._logger.exception(self._format_message('Unable to retrieve information about the worker'))
+            workers_context[storagerouter] = {'storagerouter_guid': storagerouter.guid,
+                                              'worker_pid': worker_pid,
+                                              'worker_start': worker_start}
+        if System.get_my_storagerouter() not in workers_context:
+            raise ValueError(self._format_message('The context about the workers on this machine should be known'))
+        return workers_context
+
     def build_ssh_client(self, storagerouter, max_retries=5):
+        # type: (StorageRouter, int) -> SSHClient
         """
         Build an sshclient with retries for a certain endpoint
         :param storagerouter: Point to connect too
+        :type storagerouter: StorageRouter
         :param max_retries: Maximum amount of time to retry
-        :return:
+        :return: The built sshclient
+        :rtype: SSHClient
         """
         client = None
         tries = 0
@@ -134,6 +192,14 @@ class MDSCatchUp(MDSShared):
 
     def _catch_up(self, mds_client, service):
         # type: (MDSClient, Service) -> None
+        """
+        Perform a catchup for the service
+        :param mds_client: MDSClient
+        :type mds_client: volumedriver.storagerouter.storagerouterclient.MDSClient
+        :param service: Associated service
+        :type service: Service
+        :return:
+        """
         registered_catchup = self.register_catch_up(service)
         try:
             log_identifier = 'MDS Service {0} at {1}:{2}'.format(service.name, service.storagerouter.ip, service.ports[0])
@@ -146,11 +212,15 @@ class MDSCatchUp(MDSShared):
             self.unregister_catch_up(service)
 
     def catch_up(self):
-        # type: () -> None
+        # type: () -> List[Tuple[Service, int, bool]]
         """
         Catch up all MDS services
+        :return: List with information which mdses were behind and how much
+        :rtype: list
         """
+        behind = []
         for service in self.contexts.iterkeys():
+            caught_up = False
             service_identifier = '{0} ({1}:{2})'.format(service.name, service.storagerouter.ip, service.ports[0])
             client = MetadataServerClient.load(service=service, timeout=self.mds_client_timeout)
             if client is None:
@@ -167,9 +237,61 @@ class MDSCatchUp(MDSShared):
                                      .format(service_identifier, tlogs_behind_master, self.tlog_threshold)))
                 # @todo offload to a thread
                 self._catch_up(client, service)
+                caught_up = True
             else:
                 self._logger.info(self._format_message('Service {0} does not need catching up ({1}/{2})'
                                                        .format(service_identifier, tlogs_behind_master, self.tlog_threshold)))
+            behind.append((Service, tlogs_behind_master, caught_up))
+        return behind
+
+    def _get_mds_catch_ups(self, context):
+        # type: (Dict[str, str]) -> List[Dict[str, str]]
+        """
+        Returns all relevant mds catch ups happening
+        - When the volumedriver is no longer the same as for when it got registered:
+        the entry will be cleared and catch up can happen again
+        - When the workers died: the catchup might still have complete on the volumedriver level but the entry was not cleared:
+        this entry will be cleared and the lock release
+        :param context: Context object
+        :type context: dict
+        :return: List of relevant work items
+        :rtype: list
+        """
+        return self._get_relevant_items(self.mds_key,
+                                        relevant_values=self._relevant_contexts,
+                                        relevant_keys=context.keys())
+
+    def _get_all_relevant_contexts(self):
+        # type: () -> List[Dict[str, str]]
+        """
+        Retrieve all possible contexts
+        Combines worker information together with volumedriver information
+        If the worker information would get out of date -> catch up should happen again with a refreshed lock but the
+        mds client will wait for the already pending catch up to wait
+        if the volumedriver would get out of date -> that worker is no longer relevant (should have received an exception)
+        :return: All relevant contexts
+        :rtype: list[dict]
+        """
+        relevant_contexts = []
+        for worker_context in self.worker_contexts.itervalues():
+            for context in self.contexts.itervalues():
+                worker_context_copy = worker_context.copy()
+                worker_context_copy.update(context)
+                relevant_contexts.append(worker_context_copy)
+        return relevant_contexts
+
+    def _get_relevant_context(self, service):
+        # type: (Service) -> Dict[str, str]
+        """
+        Get a fully relevant context for a MDS service
+        :param service: Service object
+        :type service: Service
+        :return: Relevant context item
+        :rtype: dict
+        """
+        worker_context_copy = self.worker_context.copy()
+        worker_context_copy.update(self.contexts[service])
+        return worker_context_copy
 
     def register_catch_up(self, service):
         # type: (Service) -> List[Dict[str, str]]
@@ -181,12 +303,10 @@ class MDSCatchUp(MDSShared):
         :rtype: list
         """
         special = {'relevant_work_items': None}
-        registering_data = self.contexts[service]
+        registering_data = self._get_relevant_context(service)
 
         def _get_value_and_expected_value():
-            relevant_work_items, fetched_work_items = self._get_relevant_items(self.mds_key,
-                                                                               relevant_values=self.contexts.values(),
-                                                                               relevant_keys=registering_data.keys())
+            relevant_work_items, fetched_work_items = self._get_mds_catch_ups(registering_data)
             relevant_work_items.append(registering_data)
             special['relevant_work_items'] = relevant_work_items
             return relevant_work_items, fetched_work_items
@@ -227,12 +347,10 @@ class MDSCatchUp(MDSShared):
 
     def unregister_catch_up(self, service):
         special = {'relevant_work_items': None}
-        registering_data = self.contexts[service]
+        registering_data = self._get_relevant_context(service)
 
         def _get_value_and_expected_value():
-            relevant_work_items, fetched_work_items = self._get_relevant_items(self.mds_key,
-                                                                               relevant_values=self.contexts.values(),
-                                                                               relevant_keys=registering_data.keys())
+            relevant_work_items, fetched_work_items = self._get_mds_catch_ups(registering_data)
             relevant_work_items.remove(registering_data)
             special['relevant_work_items'] = relevant_work_items
             return relevant_work_items, fetched_work_items
@@ -246,6 +364,7 @@ class MDSCatchUp(MDSShared):
 
     @staticmethod
     def map_mds_services_by_socket_for_vdisk(vdisk):
+        # type: (VDisk) -> Dict[str, Service]
         """
         Maps the mds services related to the vpool by their socket
         :param vdisk: VDisk object to
@@ -261,6 +380,7 @@ class MDSCatchUp(MDSShared):
         return service_per_key
 
     def _safely_store(self, key, get_value_and_expected_value, logging_start, max_retries=20):
+        # type: (str, callable, str, int) -> any
         """
         Safely store a key/value pair within the persistent storage
         :param key: Key to store
@@ -303,6 +423,7 @@ class MDSCatchUp(MDSShared):
         return return_value
 
     def _get_relevant_items(self, key, relevant_values, relevant_keys):
+        # type: (str, List[Dict], List[any]) -> Tuple[List, List]
         """
         Retrieves all scrub work currently being done based on relevant values and the relevant format
         - Filters out own data
@@ -343,6 +464,7 @@ class MDSCatchUp(MDSShared):
         return relevant_work_items, fetched_items
 
     def _fetch_registered_items(self, key):
+        # type: (str) -> any
         """
         Fetches all items currently registered on the key
         Saves them under _fetched_work_items for caching purposes. When None is returned, an empty list is set
@@ -359,6 +481,7 @@ class MDSCatchUp(MDSShared):
         return items
 
     def _format_message(self, message):
+        # type: (str) -> str
         if self._log is None:
             raise ValueError('_log property has no value. Nothing to format with')
         return '{0} - {1}'.format(self._log, message)
