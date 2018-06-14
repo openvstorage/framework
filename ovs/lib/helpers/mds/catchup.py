@@ -19,9 +19,9 @@ MDS Catchup module
 """
 
 import time
-import uuid
 import collections
 from random import randint
+from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs_extensions.storage.exceptions import AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -30,7 +30,7 @@ from ovs.lib.helpers.mds.shared import MDSShared
 from ovs.log.log_handler import LogHandler
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient, SRCObjectNotFoundException
+from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient
 
 
 class MDSCatchUp(MDSShared):
@@ -41,6 +41,11 @@ class MDSCatchUp(MDSShared):
       the catchup would still happen by the MDSClient so a re-locking will be happening and it will wait for the original
       catchup to finish
     """
+    # Extra caching
+    _contexts_cache = {}
+    _clients = {}
+    _sockets_service_map = {}
+
     _logger = LogHandler.get('lib', 'mds catchup')
 
     _CATCH_UP_NAME_SPACE = 'ovs_jobs_catchup'
@@ -52,16 +57,17 @@ class MDSCatchUp(MDSShared):
         :param vdisk_guid: Guid of the vDisk to catch up for
         :type vdisk_guid: str
         """
-        self.id = uuid.uuid4()
         self.vdisk = VDisk(vdisk_guid)
         self.mds_key = self._CATCH_UP_VDISK_KEY.format(self.vdisk.guid)
         self.tlog_threshold = Configuration.get('ovs/volumedriver/mds|tlogs_behind', default=100)
         self.volumedriver_service_name = 'ovs-volumedriver_{0}'.format(self.vdisk.vpool.name)
         self.mds_client_timeout = Configuration.get('ovs/vpools/{0}/mds_config|mds_client_connection_timeout'.format(self.vdisk.vpool_guid), default=120)
+        self.mds_clients = {}
+        self.dry_run = True
 
         self._service_manager = ServiceFactory.get_manager()
         self._persistent = PersistentFactory.get_client()
-        self._log = 'MDS catchup {0}'.format(self.id)
+        self._log = 'MDS catchup for vDisk {0} (volume id: {1})'.format(self.vdisk.guid, self.vdisk.volume_id)
 
         self.contexts = self.get_contexts()
 
@@ -77,25 +83,31 @@ class MDSCatchUp(MDSShared):
         """
         Return all possible contexts that can be handled in
         """
-        clients = {}
         contexts = {}
+        if self.vdisk.vpool not in self._contexts_cache:
+            self._contexts_cache[self.vdisk.vpool] = {}
         for service in self.map_mds_services_by_socket_for_vdisk(self.vdisk).itervalues():
-            try:
-                if service.storagerouter not in clients:
-                    client = self.build_ssh_client(service.storagerouter)
-                    if client is None:
+            if service.storagerouter not in self._contexts_cache[self.vdisk.vpool]:
+                try:
+                    if service.storagerouter not in self._clients:
+                        client = self.build_ssh_client(service.storagerouter)
+                        if client is None:
+                            continue
+                        self._clients[service.storagerouter] = client
+                    client = self._clients[service.storagerouter]
+                    volumedriver_pid = self._service_manager.get_service_pid(name=self.volumedriver_service_name, client=client)
+                    if volumedriver_pid == 0:
+                        self._logger.warning(self._format_message('Volumedriver {0} is down on StorageRouter {1}. Won\'t be able to catchup service {2}'
+                                             .format(self.volumedriver_service_name, service.storagerouter.ip, service.name)))
                         continue
-                    clients[service.storagerouter] = client
-                client = clients[service.storagerouter]
-                volumedriver_pid = self._service_manager.get_service_pid(name=self.volumedriver_service_name, client=client)
-                if volumedriver_pid == 0:
-                    self._logger.warning('Volumedriver {0} is down on StorageRouter {1}. Won\'t be able to catchup service {2}'
-                                         .format(self.volumedriver_service_name, service.storagerouter.ip, service.name))
+                    volumedriver_start = self._service_manager.get_service_start_time(
+                        name=self.volumedriver_service_name, client=client)
+                    context = {'volumedriver_pid': volumedriver_pid, 'volumedriver_start': volumedriver_start}
+                    self._contexts_cache[self.vdisk.vpool][service.storagerouter] = context
+                except:
+                    self._logger.exception(self._format_message('Exception while retrieving context for service {0}'.format(service.name)))
                     continue
-                volumedriver_start = self._service_manager.get_service_start_time(name=self.volumedriver_service_name, client=client)
-                contexts[service] = {'volumedriver_pid': volumedriver_pid, 'volumedriver_start': volumedriver_start}
-            except:
-                self._logger.exception('Exception while retrieving context for service {0}'.format(service.name))
+            contexts[service] = self._contexts_cache[self.vdisk.vpool][service.storagerouter]
         return contexts
 
     def build_ssh_client(self, storagerouter, max_retries=5):
@@ -120,7 +132,21 @@ class MDSCatchUp(MDSShared):
         if client is not None:
             return client
 
+    def _catch_up(self, mds_client, service):
+        # type: (MDSClient, Service) -> None
+        registered_catchup = self.register_catch_up(service)
+        try:
+            log_identifier = 'MDS Service {0} at {1}:{2}'.format(service.name, service.storagerouter.ip, service.ports[0])
+            self._logger.info(self._format_message('{0} catch up registrations: {1}'.format(log_identifier, registered_catchup)))
+            if len(registered_catchup) > 1:
+                self._logger.info(self._format_message('{0} is already being caught up'.format(log_identifier)))
+                return
+            mds_client.catch_up(str(self.vdisk.volume_id), dry_run=self.dry_run)
+        finally:
+            self.unregister_catch_up(service)
+
     def catch_up(self):
+        # type: () -> None
         """
         Catch up all MDS services
         """
@@ -137,17 +163,86 @@ class MDSCatchUp(MDSShared):
                 self._logger.exception(self._format_message('Unable to fetch the tlogs behind master for service {0}'.format(service_identifier)))
                 continue
             if tlogs_behind_master >= self.tlog_threshold:
-                self._logger.warning('Service {0} is {1} tlogs behind master. Catching up because threshold was reached ({1}/{2})'
-                                     .format(service_identifier, tlogs_behind_master, self.tlog_threshold))
-                raise NotImplementedError()
+                self._logger.warning(self._format_message('Service {0} is {1} tlogs behind master. Catching up because threshold was reached ({1}/{2})'
+                                     .format(service_identifier, tlogs_behind_master, self.tlog_threshold)))
+                # @todo offload to a thread
+                self._catch_up(client, service)
             else:
-                self._logger.info('Service {0} does not need catching up ({1}/{2})'.format(service_identifier, tlogs_behind_master, self.tlog_threshold))
+                self._logger.info(self._format_message('Service {0} does not need catching up ({1}/{2})'
+                                                       .format(service_identifier, tlogs_behind_master, self.tlog_threshold)))
 
-    def register_catch_up(self):
+    def register_catch_up(self, service):
+        # type: (Service) -> List[Dict[str, str]]
         """
         Register that catch up is happening for this vdisk
+        :param service: Service object of the MDSService
+        :type service: Service
+        :return: List of relevant work items
+        :rtype: list
         """
-        pass
+        special = {'relevant_work_items': None}
+        registering_data = self.contexts[service]
+
+        def _get_value_and_expected_value():
+            relevant_work_items, fetched_work_items = self._get_relevant_items(self.mds_key,
+                                                                               relevant_values=self.contexts.values(),
+                                                                               relevant_keys=registering_data.keys())
+            relevant_work_items.append(registering_data)
+            special['relevant_work_items'] = relevant_work_items
+            return relevant_work_items, fetched_work_items
+
+        log_start = self._format_message('{0} - Registering catch up of {1} ({2}:{3})'.format(self._log, service.name, service.storagerouter.ip, service.ports[0]))
+        self._logger.info(log_start)
+
+        # Attempt to save with all fetched data during work generation, expect the current key to not have changed
+        self._safely_store(self.mds_key, get_value_and_expected_value=_get_value_and_expected_value, logging_start=log_start)
+        return special['relevant_work_items']
+
+    # def register_catch_up_false_data(self, service):
+    #     # type: (Service) -> List[Dict[str, str]]
+    #     """
+    #     Register that catch up is happening for this vdisk
+    #     :param service: Service object of the MDSService
+    #     :type service: Service
+    #     :return: List of relevant work items
+    #     :rtype: list
+    #     """
+    #     special = {'relevant_work_items': None}
+    #     registering_data = {'volumedriver_pid': 100*1000, 'volumedriver_start': 'Not a real time'}
+    #
+    #     def _get_value_and_expected_value():
+    #         relevant_work_items, fetched_work_items = self._get_relevant_items(self.mds_key,
+    #                                                                            relevant_values=self.contexts.values(),
+    #                                                                            relevant_keys=registering_data.keys())
+    #         relevant_work_items.append(registering_data)
+    #         special['relevant_work_items'] = relevant_work_items
+    #         return relevant_work_items, fetched_work_items
+    #
+    #     log_start = '{0} - Registering catch up of {1} ({2}:{3})'.format(self._log, service.name, service.storagerouter.ip, service.ports[0])
+    #     self._logger.info(log_start)
+    #
+    #     # Attempt to save with all fetched data during work generation, expect the current key to not have changed
+    #     self._safely_store(self.mds_key, get_value_and_expected_value=_get_value_and_expected_value, logging_start=log_start)
+    #     return special['relevant_work_items']
+
+    def unregister_catch_up(self, service):
+        special = {'relevant_work_items': None}
+        registering_data = self.contexts[service]
+
+        def _get_value_and_expected_value():
+            relevant_work_items, fetched_work_items = self._get_relevant_items(self.mds_key,
+                                                                               relevant_values=self.contexts.values(),
+                                                                               relevant_keys=registering_data.keys())
+            relevant_work_items.remove(registering_data)
+            special['relevant_work_items'] = relevant_work_items
+            return relevant_work_items, fetched_work_items
+
+        log_start = self._format_message('{0} - Unregistering catch up of {1} ({2}:{3})'.format(self._log, service.name, service.storagerouter.ip, service.ports[0]))
+        self._logger.info(log_start)
+
+        # Attempt to save with all fetched data during work generation, expect the current key to not have changed
+        self._safely_store(self.mds_key, get_value_and_expected_value=_get_value_and_expected_value, logging_start=log_start)
+        return special['relevant_work_items']
 
     @staticmethod
     def map_mds_services_by_socket_for_vdisk(vdisk):
@@ -165,7 +260,7 @@ class MDSCatchUp(MDSShared):
             service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.ports[0])] = service
         return service_per_key
 
-    def _safely_store(self, key, get_value_and_expected_value, logging_start, key_not_exist=False, max_retries=20):
+    def _safely_store(self, key, get_value_and_expected_value, logging_start, max_retries=20):
         """
         Safely store a key/value pair within the persistent storage
         :param key: Key to store
@@ -176,8 +271,6 @@ class MDSCatchUp(MDSShared):
         :type logging_start: str
         :param max_retries: Number of retries to attempt
         :type max_retries: int
-        :param key_not_exist: Only store if the key does not exist
-        :type key_not_exist: bool
         :return: Stored value or the current value if key_not_exists is True and the key is already present
         :rtype: any
         :raises: AssertException:
@@ -190,10 +283,6 @@ class MDSCatchUp(MDSShared):
         # Call the passed function
         value, expected_value = get_value_and_expected_value()
         return_value = value
-        if key_not_exist is True and self._persistent.exists(key) is True:
-            return_value = self._persistent.get(key)
-            success = True
-            self._logger.info('{0} - key {1} is already present and key_not_exist given. Not saving and returning current value'.format(logging_start, key))
         while success is False:
             transaction = self._persistent.begin_transaction()
             return_value = value  # Value might change because of hooking
@@ -248,9 +337,9 @@ class MDSCatchUp(MDSShared):
                     relevant_work_items.append(item)
                 else:
                     # Not a item for the current scrubbing context. Possible remnant of an aborted scrub job so it will be removed when re-saving all total work items
-                    self._logger.info('{0} - Will be removing {1} on the next save as it is no longer relevant'.format(self._log, item))
+                    self._logger.info(self._format_message('Will be removing {0} on the next save as it is no longer relevant'.format(item)))
         except KeyError:
-            raise ValueError('{0} - Someone is registering keys to this namespace'.format(self._log))
+            raise ValueError(self._format_message('Someone is registering keys to this namespace'))
         return relevant_work_items, fetched_items
 
     def _fetch_registered_items(self, key):
