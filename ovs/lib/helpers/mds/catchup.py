@@ -18,6 +18,7 @@
 MDS Catchup module
 """
 
+import sys
 import time
 import uuid
 import collections
@@ -36,6 +37,7 @@ from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig,
 from ovs_extensions.testing.exceptions import WorkerLossException
 from ovs.lib.helpers.mds.shared import MDSShared
 from ovs.log.log_handler import LogHandler
+from threading import Thread
 
 
 class MDSCatchUp(MDSShared):
@@ -70,6 +72,8 @@ class MDSCatchUp(MDSShared):
         self.mds_client_timeout = Configuration.get('ovs/vpools/{0}/mds_config|mds_client_connection_timeout'.format(self.vdisk.vpool_guid), default=120)
         self.mds_clients = {}
         self.dry_run = False
+        self.catch_up_threads = []
+        self.errors = []
 
         self._service_manager = ServiceFactory.get_manager()
         self._persistent = PersistentFactory.get_client()
@@ -186,51 +190,64 @@ class MDSCatchUp(MDSShared):
         if client is not None:
             return client
 
-    def _catch_up(self, mds_client, service):
-        # type: (MDSClient, Service) -> None
+    def _catch_up(self, mds_client, service, threaded):
+        # type: (MDSClient, Service, bool) -> None
         """
         Perform a catchup for the service
         :param mds_client: MDSClient
         :type mds_client: volumedriver.storagerouter.storagerouterclient.MDSClient
         :param service: Associated service
         :type service: Service
+        :param threaded: Working in a threaded context
+        :type threaded: bool
         :return:
         """
-        registered_catchup = self.register_catch_up(service)
-        do_finally = True
-        reset_volumedriver_cache = False
         log_identifier = 'MDS Service {0} at {1}:{2}'.format(service.name, service.storagerouter.ip, service.ports[0])
         try:
-            self._logger.info(self._format_message('{0} catch up registrations: {1}'.format(log_identifier, registered_catchup)))
-            if len(registered_catchup) > 1:
-                self._logger.info(self._format_message('{0} is already being caught up'.format(log_identifier)))
-                return
-            mds_client.catch_up(str(self.vdisk.volume_id), dry_run=self.dry_run)
-        except WorkerLossException:  # Thrown during unittests to simulate a worker getting killed at this stage
-            do_finally = False
-            raise
+            registered_catchup = self.register_catch_up(service)
+            do_finally = True
+            reset_volumedriver_cache = False
+            try:
+                self._logger.info(self._format_message('{0} catch up registrations: {1}'.format(log_identifier, registered_catchup)))
+                if len(registered_catchup) > 1:
+                    self._logger.info(self._format_message('{0} is already being caught up'.format(log_identifier)))
+                    return
+                mds_client.catch_up(str(self.vdisk.volume_id), dry_run=self.dry_run)
+            except WorkerLossException:  # Thrown during unittests to simulate a worker getting killed at this stage
+                do_finally = False
+                raise
+            except Exception:
+                self._logger.exception('Exception occurred while going to/doing catch up')
+                # The volumedriver might have been killed. Invalidate the cache for this instance
+                reset_volumedriver_cache = True
+                raise
+            finally:
+                if do_finally:
+                    try:
+                        self.unregister_catch_up(service)
+                    except Exception:
+                        self._logger.exception(self._format_message('{0} - Failed to unregister catchup'.format(log_identifier)))
+                    finally:
+                        if reset_volumedriver_cache:
+                            self.reset_volumedriver_cache_for_service(service)
         except Exception:
-            self._logger.exception('Exception occurred while going to/doing catch up')
-            # The volumedriver might have been killed. Invalidate the cache for this instance
-            reset_volumedriver_cache = True
-            raise
-        finally:
-            if do_finally:
-                try:
-                    self.unregister_catch_up(service)
-                except Exception:
-                    self._logger(self._format_message('{0} - Failed to unregister catchup'.format(log_identifier)))
-                finally:
-                    if reset_volumedriver_cache:
-                        self.reset_volumedriver_cache_for_service(service)
+            if threaded:
+                self._logger.exception(self._format_message('{0} - Exception occurred while catching up in thread'.format(log_identifier)))
+                self.errors.append(sys.exc_info())
+            else:
+                raise
 
-    def catch_up(self):
-        # type: () -> List[Tuple[Service, int, bool]]
+    def catch_up(self, async=True):
+        # type: (bool) -> List[Tuple[Service, int, bool]]
         """
         Catch up all MDS services
+        :param async: Perform catchups asynchronously (offload to a thread)
+        When set to True (default): results can be waited for using `wait`
         :return: List with information which mdses were behind and how much
         :rtype: list
         """
+        self.errors = []
+        self.catch_up_threads = []
         behind = []
         for service in self._volumedriver_contexts.iterkeys():
             caught_up = False
@@ -249,13 +266,30 @@ class MDSCatchUp(MDSShared):
                 self._logger.warning(self._format_message('Service {0} is {1} tlogs behind master. Catching up because threshold was reached ({1}/{2})'
                                      .format(service_identifier, tlogs_behind_master, self.tlog_threshold)))
                 # @todo offload to a thread
-                self._catch_up(client, service)
+                if async:
+                    thread = Thread(target=self._catch_up, args=(client, service, async,))
+                    thread.start()
+                    self.catch_up_threads.append(thread)
+                else:
+                    self._catch_up(client, service, async)
                 caught_up = True
             else:
                 self._logger.info(self._format_message('Service {0} does not need catching up ({1}/{2})'
                                                        .format(service_identifier, tlogs_behind_master, self.tlog_threshold)))
             behind.append((Service, tlogs_behind_master, caught_up))
         return behind
+
+    def wait(self):
+        """
+        Wait for all async threads to complete
+        """
+        for thread in self.catch_up_threads:  # type: Thread
+            thread.join()
+        message = []
+        for exc_type, exc_obj, exc_trace in self.errors:
+            message.append(str(exc_obj))
+        if len(message) > 0:
+            raise RuntimeError(self._format_message('Exception occurred while catching up: \n - {0}'.format('\n - '.join(message))))
 
     def _get_mds_catch_ups(self, context):
         # type: (Dict[str, str]) -> List[Dict[str, str]]

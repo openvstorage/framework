@@ -107,11 +107,11 @@ class SafetyEnsurer(MDSShared):
         return super(SafetyEnsurer, self).map_mds_services_by_socket(self.vdisk)
 
     def get_primary_and_secondary_storagerouters(self):
-        # type: () -> Tuple[Set[StorageRouter], Set[StorageRouter]]
+        # type: () -> Tuple[List[StorageRouter], List[StorageRouter]]
         """
         Retrieve the primary and secondary storagerouters for MDS deployment
         :return: Both primary and secondary storagerouters
-        :rtype: Tuple[Set[StorageRouter], Set[StorageRouter]]
+        :rtype: Tuple[List[StorageRouter], List[StorageRouter]]
         """
         # Create a pool of StorageRouters being a part of the primary and secondary domains of this StorageRouter
         vdisk = self.vdisk
@@ -231,15 +231,16 @@ class SafetyEnsurer(MDSShared):
             reconfigure_reasons.add('Too much safety - Current: {0} - Expected: {1}'.format(len(current_service_ips), self.safety))
         if len(current_service_ips) < self.safety and len(current_service_ips) < len(nodes):
             reconfigure_reasons.add('Not enough safety - Current: {0} - Expected: {1}'.format(len(current_service_ips), self.safety))
-        if self.master_service is not None and self.services_load[self.master_service] > self.max_load:
-            reconfigure_reasons.add('Master overloaded - Current load: {0}% - Max load: {1}%'.format(self.services_load[self.master_service], self.max_load))
-        if self.master_service is not None and self.master_service.storagerouter_guid != self.vdisk.storagerouter_guid:
-            reconfigure_reasons.add('Master {0}:{1} is not local - Current location: {0} - Expected location: {2}'.format(self.master_service.storagerouter.ip, self.master_service.ports[0], vdisk_storagerouter.ip))
+        if self.master_service is not None:
+            if self.services_load[self.master_service] > self.max_load:
+                reconfigure_reasons.add('Master overloaded - Current load: {0}% - Max load: {1}%'.format(self.services_load[self.master_service], self.max_load))
+            if self.master_service.storagerouter_guid != self.vdisk.storagerouter_guid:
+                reconfigure_reasons.add('Master {0}:{1} is not local - Current location: {0} - Expected location: {2}'.format(self.master_service.storagerouter.ip, self.master_service.ports[0], vdisk_storagerouter.ip))
+            if self.master_service not in self.mds_layout['primary']['used']:
+                reconfigure_reasons.add('Master service {0}:{1} not in primary domain'.format(self.master_service.storagerouter.ip, self.master_service.ports[0]))
         for slave_service in self.slave_services:
             if self.services_load[slave_service] > self.max_load:
                 reconfigure_reasons.add('Slave {0}:{1} overloaded - Current load: {2}% - Max load: {3}%'.format(slave_service.storagerouter.ip, slave_service.ports[0], self.services_load[slave_service], self.max_load))
-        if self.master_service is not None and self.master_service not in self.mds_layout['primary']['used']:
-            reconfigure_reasons.add('Master service {0}:{1} not in primary domain'.format(self.master_service.storagerouter.ip, self.master_service.ports[0]))
 
         # Check reconfigure required based upon domains
         self.recommended_primary = int(math.ceil(self.safety / 2.0)) if len(secondary_storagerouters) > 0 else self.safety
