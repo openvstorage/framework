@@ -592,14 +592,13 @@ class SafetyEnsurer(MDSShared):
         :return: None
         :rtype: NoneType
         """
-        vdisk = self.vdisk
-        self._logger.info('vDisk {0} - Start checkup for vDisk {1}'.format(vdisk.guid, vdisk.name))
+        self._logger.info('vDisk {0} - Start checkup for vDisk {1}'.format(self.vdisk.guid, self.vdisk.name))
         self.validate_vdisk()
 
-        self._logger.debug('vDisk {0} - Safety: {1}, Max load: {2}%, Tlogs: {3}'.format(vdisk.guid, self.safety, self.max_load, self.tlogs))
+        self._logger.debug('vDisk {0} - Safety: {1}, Max load: {2}%, Tlogs: {3}'.format(self.vdisk.guid, self.safety, self.max_load, self.tlogs))
 
-        vdisk.reload_client('storagedriver')
-        vdisk.reload_client('objectregistry')
+        self.vdisk.reload_client('storagedriver')
+        self.vdisk.reload_client('objectregistry')
 
         reconfigure_reasons = self.get_reconfiguration_reasons()
         if not reconfigure_reasons:
@@ -628,11 +627,11 @@ class SafetyEnsurer(MDSShared):
         new_services.extend(new_secondary_services)
 
         service_string = ', '.join(["{{'ip': '{0}', 'port': {1}}}".format(service.storagerouter.ip, service.ports[0]) for service in new_services])
-        self._logger.debug('vDisk {0} - Configuration after SLAVE calculation: [{1}]'.format(vdisk.guid, service_string))
+        self._logger.debug('vDisk {0} - Configuration after SLAVE calculation: [{1}]'.format(self.vdisk.guid, service_string))
         if new_services == [self.master_service] + self.slave_services and len(new_services) == len(self.metadata_backend_config_start):
-            self._logger.info('vDisk {0} - Could not calculate a better MDS layout. Nothing to update'.format(vdisk.guid))
-            self._sync_vdisk_to_reality(vdisk)
+            self._logger.info('vDisk {0} - Could not calculate a better MDS layout. Nothing to update'.format(self.vdisk.guid))
+            self._sync_vdisk_to_reality(self.vdisk)
             return
 
         self.apply_reconfigurations(new_services, previous_master)
-        self._logger.info('vDisk {0}: Completed'.format(vdisk.guid))
+        self._logger.info('vDisk {0}: Completed'.format(self.vdisk.guid))

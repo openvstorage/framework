@@ -509,6 +509,7 @@ class MDSClient(object):
     Mocks the Metadata Server Client
     """
     _catchup = {}
+    _catchup_hook = {}
     _roles = {}
 
     def __init__(self, mds_node_config, timeout_secs=20, key=None):
@@ -538,8 +539,19 @@ class MDSClient(object):
         if nspace not in MDSClient._catchup[self.key]:
             raise RuntimeError('Namespace does not exist')
         if dry_run is False:
+            if self.key in MDSClient._catchup_hook:
+                if nspace in MDSClient._catchup_hook[self.key]:
+                    MDSClient._catchup_hook[self.key][nspace]()
             MDSClient._catchup[self.key][nspace] = 0
         return MDSClient._catchup[self.key][nspace]
+
+    @staticmethod
+    def get_tlogs_behind(key, nspace):
+        if key not in MDSClient._catchup:
+            MDSClient._catchup[key] = {}
+        if nspace not in MDSClient._catchup[key]:
+            raise RuntimeError('Namespace does not exist')
+        return MDSClient._catchup[key][nspace]
 
     def create_namespace(self, nspace):
         """
@@ -612,6 +624,15 @@ class MDSClient(object):
         if key not in MDSClient._catchup:
             MDSClient._catchup[key] = {}
         MDSClient._catchup[key][volume_id] = tlogs
+
+    @staticmethod
+    def set_catchup_hook(key, volume_id, callback):
+        """
+        Set a callback hook for the catchup
+        """
+        if key not in MDSClient._catchup_hook:
+            MDSClient._catchup_hook[key] = {}
+        MDSClient._catchup_hook[key][volume_id] = callback
 
 
 class LockedClient(object):
