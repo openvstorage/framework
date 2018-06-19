@@ -17,6 +17,7 @@
 define(['knockout'], function(ko){
     "use strict";
     var singleton = function() {
+        var pluginData = {};
         return {
             messaging      : undefined,
             tasks          : undefined,
@@ -29,7 +30,7 @@ define(['knockout'], function(ko){
             nodes          : undefined,
             identification : ko.observable(),
             releaseName    : '',
-            pluginData     : ko.observable({}),
+            pluginData     : pluginData,
             user           : {
                 username: ko.observable(),
                 guid    : ko.observable(),

@@ -17,31 +17,34 @@
 define([
     'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
-    'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications'
-], function($, router, system, activator, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
+    'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/notifications', 'ovs/pluginloader',
+    'viewmodels/services/user', 'viewmodels/services/misc'
+], function ($, router, system, activator, bootstrap, i18n,
+             shared, routing, Messaging, generic, Tasks,
+             Authentication, cssLoader, notifications, pluginLoader,
+             userService, miscService) {
     "use strict";
     // Initially load in all routes
     router.map(routing.mainRoutes)
-          .buildNavigationModel()
-          .mapUnknownRoutes('viewmodels/404');
+        .buildNavigationModel()
+        .mapUnknownRoutes('viewmodels/404');
 
-    return function() {
+    return function () {
         var self = this;
 
-        self._translate = function() {
-            return $.Deferred(function(deferred) {
-                i18n.setLng(self.shared.language, function() {
+        self._translate = function () {
+            return $.when().then(function () {
+                i18n.setLng(self.shared.language, function () {
                     $('html').i18n(); // Force retranslation of complete UI
-                    deferred.resolve();
                 });
-            }).promise();
+            })
         };
 
         self.shared = shared;
         self.router = router;
-        self.compositionComplete = function() {
-            return api.get('branding')
-                .then(function(brandings) {
+        self.compositionComplete = function () {
+            return miscService.branding()
+                .then(function (brandings) {
                     var i, brand, css;
                     for (i = 0; i < brandings.length; i += 1) {
                         brand = brandings[i];
@@ -55,48 +58,40 @@ define([
                     }
                 });
         };
-        self.activate = function() {
-            self.shared.messaging      = new Messaging();
+        self.activate = function () {
+            self.shared.messaging = new Messaging();
             self.shared.authentication = new Authentication();
-            self.shared.tasks          = new Tasks();
-            self.shared.routing        = routing;
+            self.shared.tasks = new Tasks();
+            self.shared.routing = routing;
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
-            self.shared.authentication.onLoggedIn.push(function() {
-                return $.Deferred(function(deferred) {
-                    api.get('')
-                        .then(function(metadata) {
-                            return $.Deferred(function(mdDeferred) {
-                                self.shared.authentication.metadata = metadata.authentication_metadata;
-                                self.shared.user.username(undefined);
-                                self.shared.user.guid(undefined);
-                                self.shared.user.roles([]);
+            self.shared.authentication.onLoggedIn.push(function () {
+                return $.when().then(function() {
+                    return miscService.metadata()
+                        .then(function (metadata) {
                                 if (!metadata.authenticated) {
                                     // This shouldn't be the case, but is checked anyway.
                                     self.shared.authentication.logout();
-                                    return mdDeferred.reject();
+                                    throw new Error('User was not logged in. Logging out')
                                 }
+                                self.shared.authentication.metadata = metadata.authentication_metadata;
                                 self.shared.user.username(metadata.username);
                                 self.shared.user.guid(metadata.userguid);
                                 self.shared.user.roles(metadata.roles);
                                 self.shared.releaseName = metadata.release.name;
-                                mdDeferred.resolve();
-                            }).promise();
+                                return self.shared.user.guid()
+                            })
                         })
-                        .then(function() {
-                            return api.get('users/' + self.shared.user.guid());
-                        })
-                        .then(function(data) {
+                        .then(userService.fetchUser)
+                        .then(function (data) {
                             self.shared.language = data.language;
                         })
                         .then(self._translate)
-                        .always(deferred.resolve);
-                }).promise();
             });
-            self.shared.authentication.onLoggedIn.push(function() {
+            self.shared.authentication.onLoggedIn.push(function () {
                 self.shared.messaging.subscribe('EVENT', notifications.handleEvent);
             });
-            self.shared.authentication.onLoggedOut.push(function() {
+            self.shared.authentication.onLoggedOut.push(function () {
                 self.shared.language = self.shared.defaultLanguage;
                 return self._translate();
             });
@@ -118,80 +113,30 @@ define([
             if (token !== null) {
                 self.shared.authentication.accessToken(token);
             }
-            return $.Deferred(function(activateDeferred) {
-                $.Deferred(function(metadataCheckDeferred) {
-                    api.get('')
-                        .done(function(metadata) {
-                            var metadataHandlers = [], backendsActive = false;
-                            $.each(metadata.plugins, function(plugin, types) {
+            return $.when().then(function() {
+                    return miscService.metadata()
+                        // @todo handle failures - do a promise retry and swallow error on x'th retry
+                        .then(function (metadata) {
+                            var metadataPromises = [], backendsActive = false;
+                            // Load plugin views and viewmodels
+                            $.each(metadata.plugins, function (plugin, types) {
                                 if (types.contains('gui')) {
-                                    var moduleHandler = $.Deferred(function(translationDeferred) {
+                                    // i18n works with callbacks. Make it a promise for loading it all in concurrently
+                                    var moduleHandler = $.Deferred(function (translationDeferred) {
                                         i18n.loadNamespace(plugin, function () {
                                             translationDeferred.resolve();
                                         });
                                     }).promise();
-                                    moduleHandler.then(function() {
-                                        // Load in hooks
-                                        return $.Deferred(function(moduleDeferred) {
-                                            require(['ovs/hooks/' + plugin], function(hook) { // webapps/frontend/lib/ovs/hooks
-                                                routing.extraRoutes.push(hook.routes);
-                                                routing.routePatches.push(hook.routePatches);
-                                                $.each(hook.dashboards, function(index, dashboard) {
-                                                    system.acquire('viewmodels/site/' + dashboard)
-                                                        .then(function(module) {
-                                                            var moduleInstance = new module();
-                                                            shared.hooks.dashboards.push({
-                                                                module: moduleInstance,
-                                                                activator: activator.create()
-                                                            });
-                                                        });
-                                                });
-                                                $.each(hook.wizards, function(wizard, moduleName) {
-                                                    if (!shared.hooks.wizards.hasOwnProperty(wizard)) {
-                                                        shared.hooks.wizards[wizard] = [];
-                                                    }
-                                                    system.acquire('viewmodels/wizards/' + wizard + '/' + moduleName)
-                                                        .then(function(module) {
-                                                            var moduleInstance = new module();
-                                                            shared.hooks.wizards[wizard].push({
-                                                                name: moduleName,
-                                                                module: moduleInstance,
-                                                                activator: activator.create()
-                                                            });
-                                                        });
-                                                });
-                                                $.each(hook.pages, function(page, pageInfo) {
-                                                    if (!shared.hooks.pages.hasOwnProperty(page)) {
-                                                        shared.hooks.pages[page] = [];
-                                                    }
-                                                    $.each(pageInfo, function(index, info) {
-                                                        var moduleName;
-                                                        if (typeof info === 'string') {
-                                                            moduleName = info;
-                                                            info = {type: 'generic', module: moduleName};
-                                                        } else {
-                                                            moduleName = info.module;
-                                                        }
-                                                        system.acquire('viewmodels/site/' + moduleName)
-                                                            .then(function(module) {
-                                                                var moduleInstance = new module();
-                                                                shared.hooks.pages[page].push({
-                                                                    info: info,
-                                                                    name: moduleName,
-                                                                    module: moduleInstance,
-                                                                    activator: activator.create()
-                                                                });
-                                                            });
-                                                    });
-
-                                                });
-                                                moduleDeferred.resolve();
-                                            });
-                                        }).promise();
-                                    });
-                                    metadataHandlers.push(moduleHandler);
+                                    metadataPromises.push(pluginLoader.load_hooks(plugin).then(function(){
+                                        // Plugins are loaded here
+                                        $.extend(self.shared.hooks.wizards, pluginLoader.wizards);
+                                        $.extend(self.shared.hooks.dashboards, pluginLoader.dashboards);
+                                        $.extend(self.shared.hooks.pages, pluginLoader.pages);
+                                    }));
+                                    metadataPromises.push(moduleHandler);
                                 }
                                 if (types.contains('backend') && !backendsActive) {
+                                    // Enable backend view
                                     routing.siteRoutes.push({
                                         route: 'backends',
                                         moduleId: 'backend/backends',
@@ -205,15 +150,13 @@ define([
                             });
                             self.shared.authentication.metadata = metadata.authentication_metadata;
                             if (metadata.authenticated) {
-                                metadataHandlers.push(self.shared.authentication.dispatch(true));
+                                metadataPromises.push(self.shared.authentication.dispatch(true));
                             }
-                            $.when.apply($, metadataHandlers).always(metadataCheckDeferred.resolve);
+                            // Wait for all promises to resolve
+                            return $.when.apply($, metadataPromises);
                         })
-                        .fail(metadataCheckDeferred.resolve);
-                }).promise()
-                    .then(router.activate)
-                    .always(activateDeferred.resolve);
-            }).promise();
+                .then(router.activate)
+            });
         };
     };
 });
