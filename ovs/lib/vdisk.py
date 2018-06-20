@@ -857,7 +857,7 @@ class VDiskController(object):
                                                                  metadata_backend_config=backend_config,
                                                                  volume_size="{0}B".format(volume_size),
                                                                  node_id=str(storagedriver.storagedriver_id),
-                                                                 req_timeout_secs=30)
+                                                                 req_timeout_secs=Configuration.get('ovs/volumedriver/timeouts|create_volume', default=30))
         except Exception as ex:
             VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
             raise

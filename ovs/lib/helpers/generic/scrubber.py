@@ -462,7 +462,9 @@ class StackWorker(ScrubShared):
                                                                                       self.stack_number)
 
         # Both the proxy and scrub directory are bound to the scrub location and both will be re-used
-        self.backend_connection_manager_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
+        self.backend_connection_manager_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config|backend_connection_manager'.format(self.vpool.guid, self.vpool.storagedrivers[0].storagedriver_id))
+        # Allow a custom one to be inserted
+        self.backend_connection_manager_config.update(Configuration.get('ovs/vpools/{0}/scrub/tweaks|backend_connection_manager'.format(self.vpool.guid), default={}))
         proxy_amount_key = '/ovs/framework/hosts/{0}/config|scrub_proxy_amount'.format(self.storagerouter.machine_id)
         proxy_amount = Configuration.get(key=proxy_amount_key, default=1)
         if proxy_amount <= 0:
@@ -568,13 +570,18 @@ class StackWorker(ScrubShared):
                             self._logger.warning('{0} - Skipping because vDisk is already being scrubbed'.format(vdisk_log, vdisk.name))
                             continue
 
+                        # Fetch the generic lease
+                        lease_interval = Configuration.get('/ovs/volumedriver/intervals|locked_lease', default=5)
+                        # Lease per vpool
+                        lease_interval = Configuration.get('/ovs/vpools/{0}/scrub/tweaks|locked_lease_interval'.format(self.vpool.guid), default=lease_interval)
+
                         # Register that the disk is being scrubbed
                         registrator = self.stack_work_handler.register_vdisk_for_scrub(vdisk_guid)
                         try:
                             if 'post_vdisk_scrub_registration' in self._test_hooks:
                                 self._test_hooks['post_vdisk_scrub_registration'](self, vdisk_guid)
                             # Do the actual scrubbing
-                            with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
+                            with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id), update_interval_secs=lease_interval) as locked_client:
                                 self._logger.info('{0} - Retrieve and apply scrub work'.format(vdisk_log, vdisk.name))
                                 work_units = locked_client.get_scrubbing_workunits()
                                 for work_unit in work_units:
@@ -584,7 +591,7 @@ class StackWorker(ScrubShared):
                                                               backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                     locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                                 if work_units:
-                                    self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, vdisk.name, len(work_units)))
+                                    self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, len(work_units)))
                                 else:
                                     self._logger.info('{0} - No scrubbing required'.format(vdisk_log, vdisk.name))
                         finally:

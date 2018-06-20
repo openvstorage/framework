@@ -7,7 +7,6 @@ Before=ovs-volumedriver_<VPOOL_NAME>.service
 Type=simple
 User=root
 Group=root
-Environment=ALBA_FAIL_FAST=true
 Environment=LD_LIBRARY_PATH=/usr/lib/alba
 ExecStartPre=/bin/bash -c "if [ ! -d /opt/OpenvStorage/run ]; then mkdir /opt/OpenvStorage/run; chown ovs:ovs /opt/OpenvStorage/run; fi; echo alba=`alba version --terse` > /opt/OpenvStorage/run/<SERVICE_NAME>.version"
 ExecStart=/usr/bin/alba proxy-start --config <CONFIG_PATH> --log-sink <LOG_SINK>
