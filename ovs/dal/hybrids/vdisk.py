@@ -39,6 +39,7 @@ class VDisk(DataObject):
     """
     _logger = LogHandler.get('dal', name='hybrid')
     STATUSES = DataObject.enumerator('Status', ['HALTED', 'NON_RUNNING', 'RUNNING'])
+    SCRUB_JOB_TRACK_COUNT = 3  # Track the last 3 scrub jobs
 
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
@@ -445,4 +446,6 @@ class VDisk(DataObject):
         :rtype: bool
         """
         now = time.time()
-        return self.scrubbing_information is not None and self.scrubbing_information['expires'] < now
+        scrub_info = self.scrubbing_information
+        # Scrubbing information shouldn't be expired
+        return isinstance(scrub_info, dict) and scrub_info['on_going'] and self.scrubbing_information['expires'] >= now

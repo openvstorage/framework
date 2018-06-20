@@ -390,8 +390,10 @@ class StackWorkHandler(ScrubShared):
             data = self._wrap_data(vdisk_guid)
             now = time.time()
             expires = now + 30
-            data.update({'expires': expires, 'time_set': now})
-            vdisk.scrubbing_information = data
+            data.update({'expires': expires, 'time_set': now, 'on_going': True})
+            current_scrub_info = vdisk.scrubbing_information or {}
+            current_scrub_info.update(data)
+            vdisk.scrubbing_information = current_scrub_info
             vdisk.save()
 
         vdisk = VDisk(vdisk_guid)
@@ -399,20 +401,35 @@ class StackWorkHandler(ScrubShared):
         rt.start()
         return rt
 
-    def unregister_vdisk_for_scrub(self, vdisk_guid, registering_thread):
+    @staticmethod
+    def unregister_vdisk_for_scrub(vdisk_guid, registering_thread, possible_exception=None):
         """
         Register that a vDisk is being actively scrubbed
         :param vdisk_guid: Guid of the vDisk to register
         :type vdisk_guid: basestring
         :param registering_thread: The thread registering scrub data onto the vdisk
         :type registering_thread: RepeatingTimer
+        :param possible_exception: Possible exception that occurred while scrubbing
+        :type possible_exception: Excepion
         :return: The loop instance keeping the information up to date
         :rtype: RepeatedTimer
         """
         registering_thread.cancel()
         registering_thread.join()
         vdisk = VDisk(vdisk_guid)
-        vdisk.scrubbing_information = None
+        if not vdisk.scrubbing_information:
+            current_scrub_info = {}
+        else:
+            current_scrub_info = vdisk.scrubbing_information.copy()
+        current_scrub_info['on_going'] = False
+        if possible_exception:
+            previous_runs = current_scrub_info.get('previous_failed_runs', [])
+        else:
+            previous_runs = current_scrub_info.get('previous_successful_runs', [])
+        updated_previous_runs = [dict((k, v) for k, v in current_scrub_info.iteritems() if k != 'previous_runs')] + previous_runs[0:VDisk.SCRUB_JOB_TRACK_COUNT - 1]
+
+        current_scrub_info['previous_successful_runs'] = updated_previous_runs
+        vdisk.scrubbing_information = current_scrub_info
         vdisk.save()
 
 
@@ -577,6 +594,7 @@ class StackWorker(ScrubShared):
 
                         # Register that the disk is being scrubbed
                         registrator = self.stack_work_handler.register_vdisk_for_scrub(vdisk_guid)
+                        scrub_exception = None
                         try:
                             if 'post_vdisk_scrub_registration' in self._test_hooks:
                                 self._test_hooks['post_vdisk_scrub_registration'](self, vdisk_guid)
@@ -594,8 +612,11 @@ class StackWorker(ScrubShared):
                                     self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, len(work_units)))
                                 else:
                                     self._logger.info('{0} - No scrubbing required'.format(vdisk_log, vdisk.name))
+                        except Exception as ex:
+                            scrub_exception = ex
+                            raise
                         finally:
-                            self.stack_work_handler.unregister_vdisk_for_scrub(vdisk_guid, registrator)
+                            self.stack_work_handler.unregister_vdisk_for_scrub(vdisk_guid, registrator, scrub_exception)
                             if 'post_vdisk_scrub_unregistration' in self._test_hooks:
                                 self._test_hooks['post_vdisk_scrub_unregistration'](self, vdisk_guid)
                     except Exception:
