@@ -442,7 +442,7 @@ class StackWorkHandler(ScrubShared):
         else:
             previous_run_key = 'previous_successful_runs'
             previous_runs = scrub_info_copy.get('previous_successful_runs', [])
-        updated_previous_runs = [dict((k, v) for k, v in scrub_info.iteritems() if k != 'previous_runs')] + previous_runs[0:self._SCRUB_JOB_TRACK_COUNT - 1]
+        updated_previous_runs = [dict((k, v) for k, v in scrub_info.iteritems() if k not in ['previous_failed_runs', 'previous_successful_runs'])] + previous_runs[0:self._SCRUB_JOB_TRACK_COUNT - 1]
 
         scrub_info_copy[previous_run_key] = updated_previous_runs
         vdisk.scrubbing_information = scrub_info_copy
@@ -628,6 +628,7 @@ class StackWorker(ScrubShared):
                                     self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, len(work_units)))
                                 else:
                                     self._logger.info('{0} - No scrubbing required'.format(vdisk_log, vdisk.name))
+                                time.sleep(10)
                         except Exception as ex:
                             scrub_exception = ex
                             raise
