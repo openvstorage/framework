@@ -22,6 +22,7 @@ import copy
 import json
 import time
 import uuid
+from datetime import datetime
 from Queue import Empty, Queue
 from random import randint
 from threading import Thread
@@ -63,6 +64,7 @@ class ScrubShared(object):
     _SCRUB_VDISK_KEY = '{0}_{{0}}_vdisks'.format(_SCRUB_NAMESPACE)  # Second format should be the vpool name
     _SCRUB_VDISK_ACTIVE_KEY = '{0}_active_scrub'.format(_SCRUB_VDISK_KEY)  # Second format should be the vpool name
     _SCRUB_PROXY_KEY = '{0}_{{0}}'.format(_SCRUB_NAMESPACE)  # Second format should be the proxy name
+    _SCRUB_JOB_TRACK_COUNT = Configuration.get('{0}/generic|vdisk_scrub_track_count'.format(_SCRUB_KEY), default=5)  # Track the last X scrub jobs on the vdisk object
 
     def __init__(self, job_id):
         self.job_id = job_id
@@ -387,11 +389,15 @@ class StackWorkHandler(ScrubShared):
         :rtype: RepeatingTimer
         """
         def _update_vdisk_scrubbing_info():
-            data = self._wrap_data(vdisk_guid)
             now = time.time()
             expires = now + 30
-            data.update({'expires': expires, 'time_set': now, 'on_going': True})
+            data = {'job_id': self.job_id,
+                    'expires': expires,
+                    'on_going': True}
             current_scrub_info = vdisk.scrubbing_information or {}
+            if not current_scrub_info.get('start_time'):
+                data.update({'start_time': now,
+                             'start_time_readable': datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M:%S.%f%z")})
             current_scrub_info.update(data)
             vdisk.scrubbing_information = current_scrub_info
             vdisk.save()
@@ -401,8 +407,7 @@ class StackWorkHandler(ScrubShared):
         rt.start()
         return rt
 
-    @staticmethod
-    def unregister_vdisk_for_scrub(vdisk_guid, registering_thread, possible_exception=None):
+    def unregister_vdisk_for_scrub(self, vdisk_guid, registering_thread, possible_exception=None):
         """
         Register that a vDisk is being actively scrubbed
         :param vdisk_guid: Guid of the vDisk to register
@@ -418,18 +423,29 @@ class StackWorkHandler(ScrubShared):
         registering_thread.join()
         vdisk = VDisk(vdisk_guid)
         if not vdisk.scrubbing_information:
-            current_scrub_info = {}
+            scrub_info = {}
         else:
-            current_scrub_info = vdisk.scrubbing_information.copy()
-        current_scrub_info['on_going'] = False
+            scrub_info = vdisk.scrubbing_information
+        now = time.time()
+        # Updating for storing it under previous runs
+        scrub_info.update({'end_time': time.time(),
+                           # For Operations. Easier to grep in the logs
+                           'end_time_readable': datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M:%S.%f%z"),
+                           'exception': str(possible_exception),
+                           'on_going': False})
+        scrub_info_copy = scrub_info.copy()
+        # Reset copy
+        scrub_info_copy.update(dict.fromkeys(['job_id', 'expires', 'exception', 'end_time', 'end_time_readable', 'start_time', 'start_time_readable']))
         if possible_exception:
-            previous_runs = current_scrub_info.get('previous_failed_runs', [])
+            previous_run_key = 'previous_failed_runs'
+            previous_runs = scrub_info_copy.get('previous_failed_runs', [])
         else:
-            previous_runs = current_scrub_info.get('previous_successful_runs', [])
-        updated_previous_runs = [dict((k, v) for k, v in current_scrub_info.iteritems() if k != 'previous_runs')] + previous_runs[0:VDisk.SCRUB_JOB_TRACK_COUNT - 1]
+            previous_run_key = 'previous_successful_runs'
+            previous_runs = scrub_info_copy.get('previous_successful_runs', [])
+        updated_previous_runs = [dict((k, v) for k, v in scrub_info.iteritems() if k != 'previous_runs')] + previous_runs[0:self._SCRUB_JOB_TRACK_COUNT - 1]
 
-        current_scrub_info['previous_successful_runs'] = updated_previous_runs
-        vdisk.scrubbing_information = current_scrub_info
+        scrub_info_copy[previous_run_key] = updated_previous_runs
+        vdisk.scrubbing_information = scrub_info_copy
         vdisk.save()
 
 
@@ -487,7 +503,7 @@ class StackWorker(ScrubShared):
         if proxy_amount <= 0:
             raise ValueError('{0} - Incorrect amount of proxies. Expected at least 1, found {1}'.format(self._log, proxy_amount))
         if self.backend_connection_manager_config.get('backend_type') != 'MULTI':
-            self._logger.warning('{0} - {1} amount of proxies were request but the backend_connection_manager config only supports 1 proxy'.format(self._log, proxy_amount))
+            self._logger.warning('{0} - {1} proxies were request but the backend_connection_manager config only supports 1 proxy'.format(self._log, proxy_amount))
             proxy_amount = 1
         self.alba_proxy_services = ['ovs-albaproxy_{0}_{1}_{2}_scrub_{3}'.format(self.vpool.name, self.storagerouter.name, self.partition_guid, i)
                                     for i in xrange(0, proxy_amount)]

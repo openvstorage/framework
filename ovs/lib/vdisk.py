@@ -23,10 +23,8 @@ import json
 import math
 import time
 import uuid
-import gevent
 import pickle
 import random
-from ovs.constants.vdisk import SCRUB_VDISK_LOCK
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
@@ -42,7 +40,6 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import log, ovs_task
@@ -525,25 +522,23 @@ class VDiskController(object):
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.delete_snapshot')
-    def delete_snapshot(vdisk_guid, snapshot_id, wait_for_upload=True):
+    def delete_snapshot(vdisk_guid, snapshot_id):
         """
         Delete a vDisk snapshot
         :param vdisk_guid: Guid of the vDisk
         :type vdisk_guid: str
         :param snapshot_id: ID of the snapshot
         :type snapshot_id: str
-        :param wait_for_upload: Wait until the snapshot.xml was uploaded. Normal deletion returns before uploading it
-        :type wait_for_upload: bool
         :return: None
         """
-        result = VDiskController.delete_snapshots({vdisk_guid: snapshot_id}, wait_for_upload)
+        result = VDiskController.delete_snapshots({vdisk_guid: snapshot_id})
         vdisk_result = result[vdisk_guid]
         if vdisk_result[0] is False:
             raise RuntimeError(vdisk_result[1])
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.delete_snapshots')
-    def delete_snapshots(snapshot_mapping, wait_for_upload=True):
+    def delete_snapshots(snapshot_mapping):
         """
         Delete vDisk snapshots
         :param snapshot_mapping: Mapping of VDisk guid and Snapshot ID(s)
@@ -552,7 +547,6 @@ class VDiskController(object):
         :rtype: dict
         """
         results = {}
-        sync_threads = []
         for vdisk_guid, snapshot_ids in snapshot_mapping.iteritems():
             backwards_compat = False  # Snapshot_mapping and return value of this function used to be different in older versions
             if not isinstance(snapshot_ids, list):
@@ -572,64 +566,38 @@ class VDiskController(object):
                     results[vdisk_guid] = [False, ex.message]
                 continue
             if vdisk.being_scrubbed:
+                msg = 'VDisk is being scrubbed. Unable to remove snapshots at this time'
                 results[vdisk_guid].update({'success': False,
-                                            'error': 'VDisk is being scrubbed. Unable to remove snapshots at this time'})
+                                            'error': msg})
+                if backwards_compat is True:
+                    results[vdisk_guid] = [False, msg]
                 continue
 
-            # @todo place a lock that snapshot deletion is happening - scrubber should wait for this lock to resolve
-            persistent = PersistentFactory.get_client()
-            with persistent.lock(SCRUB_VDISK_LOCK.format(vdisk_guid, wait=1, expires=2 * 60)):
-                errors = []
-                for snapshot_id in snapshot_ids:
-                    try:
-                        vdisk.invalidate_dynamics(['snapshot_ids'])
-                        if snapshot_id not in vdisk.snapshot_ids:
-                            raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
+            for snapshot_id in snapshot_ids:
+                try:
+                    vdisk.invalidate_dynamics(['snapshot_ids'])
+                    if snapshot_id not in vdisk.snapshot_ids:
+                        raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
 
-                        nr_clones = len(VDiskList.get_by_parentsnapshot(snapshot_id))
-                        if nr_clones > 0:
-                            raise RuntimeError('Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(snapshot_id, nr_clones, '' if nr_clones == 1 else 's'))
+                    nr_clones = len(VDiskList.get_by_parentsnapshot(snapshot_id))
+                    if nr_clones > 0:
+                        raise RuntimeError('Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(snapshot_id, nr_clones, '' if nr_clones == 1 else 's'))
 
-                        VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
-                        vdisk.storagedriver_client.delete_snapshot(volume_id=str(vdisk.volume_id),
-                                                                   snapshot_id=str(snapshot_id),
-                                                                   req_timeout_secs=10)
-                        result = [True, snapshot_id]
-                    except Exception as ex:
-                        errors.append(ex)
-                        result = [False, ex.message]
-                    results[vdisk_guid]['results'][snapshot_id] = result
-                    if result[0] is False:
-                        results[vdisk_guid].update({'success': False,
-                                                    'error': 'One or more snapshots could not be removed'})
-                if len(errors) < len(snapshot_ids):
-                    # Some snapshots were deleted
-                    sync_thread = gevent.spawn(VDiskController.wait_for_backend_sync, vdisk)
-                    gevent.sleep(0)  # Kick off the greenlet
-                    sync_threads.append(sync_thread)
+                    VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
+                    vdisk.storagedriver_client.delete_snapshot(volume_id=str(vdisk.volume_id),
+                                                               snapshot_id=str(snapshot_id),
+                                                               req_timeout_secs=10)
+                    result = [True, snapshot_id]
+                except Exception as ex:
+                    result = [False, ex.message]
+                results[vdisk_guid]['results'][snapshot_id] = result
+                if result[0] is False:
+                    results[vdisk_guid].update({'success': False,
+                                                'error': 'One or more snapshots could not be removed'})
             vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
             if backwards_compat is True:
                 results[vdisk_guid] = results[vdisk_guid]['results'][snapshot_ids[0]]
-            if wait_for_upload:
-                ready_threads = gevent.joinall(sync_threads)
         return results
-
-    @staticmethod
-    def wait_for_backend_sync(vdisk, retry_delay=0.05):
-        # type: (VDisk, float, float) -> None
-        """
-        Wait until a volume was completely synced to the backend
-        :param vdisk: VDisk to sync
-        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
-        :param retry_delay: Time to wait before checking again
-        :type retry_delay: float
-        :param timeout: Timeout in seconds
-        :type timeout: float
-        """
-        tlog = vdisk.storagedriver_client.schedule_backend_sync(str(vdisk.volume_id))
-        # When this tlog would be synced to the backend: all the other uploads have been done too
-        while not vdisk.storagedriver_client.is_volume_synced_up_to_tlog(tlog):
-            time.sleep(0.05)
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.set_as_template')

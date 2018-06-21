@@ -36,7 +36,7 @@ from ovs.lib.helpers.generic.scrubber import ScrubShared, StackWorker, Scrubber
 from ovs.log.log_handler import LogHandler
 
 
-class Generic(unittest.TestCase):
+class ScrubTestCase(unittest.TestCase):
     """
     This test class will validate the various scenarios of the Generic logic
     """
@@ -1017,7 +1017,6 @@ class Generic(unittest.TestCase):
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
         hooks = {'post_vdisk_scrub_registration': _check_vdisk_for_scrub_registration,
-                 # This will make the scrubber stacks to wait forever before deploying proxies
                  'post_vdisk_scrub_unregistration': _check_vdisk_for_scrub_unregistration}
         ScrubShared._test_hooks.update(hooks)
         GenericController.execute_scrub()
