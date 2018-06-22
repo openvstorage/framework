@@ -27,6 +27,7 @@ from Queue import Empty, Queue
 from random import randint
 from threading import Thread
 from ovs.dal.dataobject import DataObject
+from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
@@ -636,10 +637,12 @@ class StackWorker(ScrubShared):
                             self.stack_work_handler.unregister_vdisk_for_scrub(vdisk_guid, registrator, scrub_exception)
                             if 'post_vdisk_scrub_unregistration' in self._test_hooks:
                                 self._test_hooks['post_vdisk_scrub_unregistration'](self, vdisk_guid)
-                    except Exception:
+                    except Exception as ex:
                         vdisk = VDisk(vdisk_guid)
                         vdisk_log = '{0} - vDisk {1} with volume id {2}'.format(log, vdisk.name, vdisk.volume_id)
                         message = '{0} - Scrubbing failed'.format(vdisk_log, vdisk.name)
+                        if isinstance(ex, ObjectNotFoundException):
+                            message = '{0} because the vDisk is no longer available'.format(message)
                         self.error_messages.append(message)
                         self._logger.exception(message)
                     finally:
@@ -1160,8 +1163,8 @@ class Scrubber(ScrubShared):
                     'worker_contexts': self._covert_data_objects(self.worker_contexts)}
         Configuration.set(job_key, json.dumps(job_info, indent=4), raw=True)
 
-    @staticmethod
-    def generate_vpool_vdisk_map(vpool_guids=None, vdisk_guids=None, manual=False):
+    @classmethod
+    def generate_vpool_vdisk_map(cls, vpool_guids=None, vdisk_guids=None, manual=False):
         """
         Generates a mapping between the provided vpools and vdisks
         :param vpool_guids: Guids of the vPools
@@ -1183,11 +1186,14 @@ class Scrubber(ScrubShared):
                 vpool = VPool(vpool_guid)
                 vpool_vdisk_map[vpool] = list(vpool.vdisks)
             for vdisk_guid in set(vdisk_guids):
-                vdisk = VDisk(vdisk_guid)
-                if vdisk.vpool not in vpool_vdisk_map:
-                    vpool_vdisk_map[vdisk.vpool] = []
-                if vdisk not in vpool_vdisk_map[vdisk.vpool]:
-                    vpool_vdisk_map[vdisk.vpool].append(vdisk)
+                try:
+                    vdisk = VDisk(vdisk_guid)
+                    if vdisk.vpool not in vpool_vdisk_map:
+                        vpool_vdisk_map[vdisk.vpool] = []
+                    if vdisk not in vpool_vdisk_map[vdisk.vpool]:
+                        vpool_vdisk_map[vdisk.vpool].append(vdisk)
+                except ObjectNotFoundException:
+                    cls._logger.warning('vDisk with guid {0} is no longer available. Skipping'.format(vdisk_guid))
         else:
             vpool_vdisk_map = dict((vpool, list(vpool.vdisks)) for vpool in VPoolList.get_vpools())
         return vpool_vdisk_map
