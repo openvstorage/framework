@@ -128,6 +128,10 @@ class GenericController(object):
         # Place all snapshots in bucket_chains
         bucket_chains = []
         for vdisk in VDiskList.get_vdisks():
+            vdisk.invalidate_dynamics('being_scrubbed')
+            if vdisk.being_scrubbed:
+                continue
+
             if vdisk.info['object_type'] in ['BASE']:
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:

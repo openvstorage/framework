@@ -565,6 +565,13 @@ class VDiskController(object):
                 if backwards_compat is True:
                     results[vdisk_guid] = [False, ex.message]
                 continue
+            if vdisk.being_scrubbed:
+                msg = 'VDisk is being scrubbed. Unable to remove snapshots at this time'
+                results[vdisk_guid].update({'success': False,
+                                            'error': msg})
+                if backwards_compat is True:
+                    results[vdisk_guid] = [False, msg]
+                continue
 
             for snapshot_id in snapshot_ids:
                 try:
