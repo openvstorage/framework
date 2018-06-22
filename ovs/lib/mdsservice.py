@@ -140,7 +140,7 @@ class MDSServiceController(MDSShared):
                         raise
 
     @staticmethod
-    @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'DEFAULT'})
+    @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'CHAINED'})
     def mds_checkup():
         """
         Validates the current MDS setup/configuration and takes actions where required
@@ -451,7 +451,7 @@ class MDSServiceController(MDSShared):
             pass
 
     @staticmethod
-    @ovs_task(name='ovs.mds.mds_catchup', schedule=Schedule(minute='30', hour='*/2'), ensure_single_info={'mode': 'CHAINED'})
+    @ovs_task(name='ovs.mds.mds_catchup', schedule=Schedule(minute='30', hour='*/2'), ensure_single_info={'mode': 'DEFAULT'})
     def mds_catchup():
         """
         Looks to catch up all MDS slaves which are too far behind
