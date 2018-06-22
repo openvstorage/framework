@@ -629,7 +629,6 @@ class StackWorker(ScrubShared):
                                     self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, len(work_units)))
                                 else:
                                     self._logger.info('{0} - No scrubbing required'.format(vdisk_log, vdisk.name))
-                                time.sleep(10)
                         except Exception as ex:
                             scrub_exception = ex
                             raise
