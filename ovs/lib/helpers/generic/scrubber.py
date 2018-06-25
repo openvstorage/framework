@@ -587,7 +587,7 @@ class StackWorker(ScrubShared):
                     try:
                         # Check MDS master is local. Trigger MDS handover if necessary
                         vdisk = rem.VDisk(vdisk_guid)
-                        vdisk_log = '{0} - vDisk {1} with volume id {2}'.format(log, vdisk.name, vdisk.volume_id)
+                        vdisk_log = '{0} - vDisk {1} with guid {2} and volume id {3}'.format(log, vdisk.name, vdisk.guid, vdisk.volume_id)
                         self._logger.info('{0} - Started scrubbing at location {1}'.format(vdisk_log, self.scrub_directory))
                         configs = _verify_mds_config(current_vdisk=vdisk)
                         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
@@ -637,13 +637,15 @@ class StackWorker(ScrubShared):
                             if 'post_vdisk_scrub_unregistration' in self._test_hooks:
                                 self._test_hooks['post_vdisk_scrub_unregistration'](self, vdisk_guid)
                     except Exception as ex:
-                        vdisk = VDisk(vdisk_guid)
-                        vdisk_log = '{0} - vDisk {1} with volume id {2}'.format(log, vdisk.name, vdisk.volume_id)
-                        message = '{0} - Scrubbing failed'.format(vdisk_log, vdisk.name)
                         if isinstance(ex, ObjectNotFoundException):
-                            message = '{0} because the vDisk is no longer available'.format(message)
-                        self.error_messages.append(message)
-                        self._logger.exception(message)
+                            message = '{0} - Scrubbing failed vDisk with guid {1} because the vDisk is no longer available'.format(log, vdisk_guid)
+                            self._logger.warning(message)
+                        else:
+                            vdisk = VDisk(vdisk_guid)
+                            vdisk_log = '{0} - vDisk {1} with volume id {2}'.format(log, vdisk.name, vdisk.volume_id)
+                            message = '{0} - Scrubbing failed'.format(vdisk_log, vdisk.name)
+                            self.error_messages.append(message)
+                            self._logger.exception(message)
                     finally:
                         # Remove vDisk from volatile memory and scrub work
                         self._volatile.delete(volatile_key)

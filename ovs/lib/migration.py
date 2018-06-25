@@ -337,5 +337,20 @@ class MigrationController(object):
         for root_client in changed_clients:
             root_client.run(['systemctl', 'daemon-reload'])
 
+        ###################################################
+        # Disable MDS checkup job by default
+        mds_catch_up_migration_key = '/ovs/framework/migration|mds_catch_up'
+        if Configuration.get(key=mds_catch_up_migration_key, default=False) is False:
+            try:
+                celery_key = '/ovs/framework/scheduling/celery'
+                catch_up_key = 'ovs.mds.mds_catchup'
+                scheduling_config = Configuration.get(key=celery_key, default={})
+                if catch_up_key not in scheduling_config:
+                    scheduling_config[catch_up_key] = None  # Disable
+                    Configuration.set(key=celery_key, value=scheduling_config)
+                Configuration.set(mds_catch_up_migration_key, True)
+            except:
+                MigrationController._logger.exception('Integration of mds_catch_up failed')
+
         MigrationController._logger.info('Finished out of band migrations')
         GenericController.refresh_package_information()

@@ -76,9 +76,7 @@ class DistributedScheduler(Scheduler):
                 name = filename.replace('.py', '')
                 mod = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(mod):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                    if inspect.isclass(member[1]) and member[1].__module__ == name:
                         for submember in inspect.getmembers(member[1]):
                             if hasattr(submember[1], 'schedule') and (isinstance(submember[1].schedule, crontab) or
                                                                       isinstance(submember[1].schedule, timedelta) or

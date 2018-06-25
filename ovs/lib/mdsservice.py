@@ -27,14 +27,16 @@ import collections
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
-from ovs.lib.helpers.mds.shared import MDSShared
+from ovs.lib.helpers.mds.catchup import MDSCatchUp
 from ovs.lib.helpers.mds.safety import SafetyEnsurer
+from ovs.lib.helpers.mds.shared import MDSShared
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
@@ -447,3 +449,24 @@ class MDSServiceController(MDSShared):
                 time.sleep(1)
         except KeyboardInterrupt:
             pass
+
+    @staticmethod
+    @ovs_task(name='ovs.mds.mds_catchup', schedule=Schedule(minute='30', hour='*/2'), ensure_single_info={'mode': 'DEFAULT'})
+    def mds_catchup():
+        """
+        Looks to catch up all MDS slaves which are too far behind
+        """
+        catch_ups = []
+        for vdisk in VDiskList.get_vdisks():
+            catch_up = MDSCatchUp(vdisk.guid)
+            catch_up.catch_up(async=True)
+            catch_ups.append(catch_up)
+        errors = []
+        for catch_up in catch_ups:
+            try:
+                catch_up.wait()
+            except Exception as ex:
+                MDSServiceController._logger.exception('Exceptions while catching for vDisk {0}'.format(catch_up.vdisk.guid))
+                errors.append(str(ex))
+        if len(errors) > 0:
+            raise RuntimeError('Exception occurred while catching up: \n - {0}'.format('\n - '.join(errors)))
