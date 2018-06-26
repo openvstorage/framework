@@ -1285,7 +1285,7 @@
         "update": {
             "component_choose": "Please choose at least 1 component to update",
             "component_framework": "Framework",
-            "component_plugins": "Plugin",
+            "component_plugins": "Manager: ",
             "component_storagedriver": "StorageDriver",
             "downtime": {
                 "api": "API",
