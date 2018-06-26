@@ -25,18 +25,18 @@ from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient, SRCObjectNotFoundException
 from ovs.lib.helpers.mds.shared import MDSShared
-from ovs.log.log_handler import LogHandler
 
 
 class SafetyEnsurer(MDSShared):
     """
     Class responsible to ensure the MDS Safety of a volume
     """
-    _logger = LogHandler.get('lib', name='mds safety ensurer')
+    _logger = Logger('lib')
 
     def __init__(self, vdisk_guid, excluded_storagerouter_guids=None):
         """
@@ -205,7 +205,7 @@ class SafetyEnsurer(MDSShared):
                 importance = 'secondary'
 
             # If MDS already in use, take current load, else take next load
-            loads = self._get_mds_load(mds_service=service.mds_service)
+            loads = self.get_mds_load(mds_service=service.mds_service)
             if service == self.master_service or service in self.slave_services:  # Service is still in use
                 load = loads[0]
                 if importance is not None:
@@ -379,7 +379,9 @@ class SafetyEnsurer(MDSShared):
         :return: New slave services for the primary domain, New slave services for the secondary domain
         :rtype: Tuple[List[Service], List[Service]]
         """
-        def _add_suitable_nodes(local_importance, local_safety, services_to_recycle=list()):
+        def _add_suitable_nodes(local_importance, local_safety, services_to_recycle=None):
+            if services_to_recycle is None:
+                services_to_recycle = []
             if local_importance == 'primary':
                 local_services = new_primary_services
             else:
@@ -507,6 +509,7 @@ class SafetyEnsurer(MDSShared):
             if duration > 5:
                 self._logger.critical('{0} - Updating MDS configuration took {1}s'.format(log_start, duration))
         except RuntimeError:
+            # @TODO: Timeout throws RuntimeError for now. Replace this once https://github.com/openvstorage/volumedriver/issues/349 is fixed
             if time.time() - start >= self.sr_client_timeout:  # Timeout reached, clean up must be done manually once server side finished
                 self._logger.critical('{0} - Updating MDS configuration timed out'.format(log_start))
                 for service in [svc for svc in services_to_check if svc not in new_services]:

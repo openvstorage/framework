@@ -29,19 +29,19 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, SRCObjectNotFoundException, StorageDriverConfiguration
-from ovs.log.log_handler import LogHandler
 
 
 class MDSShared(object):
 
-    _logger = LogHandler.get('lib', name='mds shared')
+    _logger = Logger('lib')
 
     @classmethod
-    def _get_mds_load(cls, mds_service):
+    def get_mds_load(cls, mds_service):
         """
         Gets a 'load' for an MDS service based on its capacity and the amount of assigned vDisks
         :param mds_service: MDS service the get current load for
@@ -56,7 +56,7 @@ class MDSShared(object):
             return float('inf'), float('inf')
         usage = len(mds_service.vdisks_guids)
         return round(usage / service_capacity * 100.0, 5), round((usage + 1) / service_capacity * 100.0, 5)
-    
+
     @classmethod
     def _sync_vdisk_to_reality(cls, vdisk):
         """
@@ -185,7 +185,7 @@ class MDSShared(object):
             mds_port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|mds'.format(System.get_my_machine_id(client)))
             free_ports = System.get_free_ports(selected_range=mds_port_range,
                                                exclude=occupied_ports,
-                                               nr=1,
+                                               amount=1,
                                                client=client)
             if len(free_ports) != 1:
                 raise RuntimeError('Failed to find an available port on StorageRouter {0} within range {1}'.format(storagerouter.name, mds_port_range))
@@ -244,8 +244,7 @@ class MDSShared(object):
             cls._logger.info('StorageRouter {0} - vPool {1}: Configuring StorageDriver with MDS nodes: {2}'.format(storagerouter.name, vpool.name, mds_nodes))
             # Generate the correct section in the StorageDriver's configuration
             try:
-                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-                storagedriver_config.load()
+                storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
                 storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
                 storagedriver_config.save(client)
             except Exception:

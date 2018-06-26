@@ -33,7 +33,7 @@ from ovs_extensions.services.mockups.systemd import SystemdMock
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
-from ovs.lib.helpers.generic.scrubber import ScrubShared, StackWorker
+from ovs.lib.helpers.generic.scrubber import Scrubber, ScrubShared, StackWorker
 
 
 class ScrubTestCase(unittest.TestCase):

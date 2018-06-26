@@ -28,6 +28,7 @@ from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -36,7 +37,6 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient
 from ovs_extensions.testing.exceptions import WorkerLossException
 from ovs.lib.helpers.mds.shared import MDSShared
-from ovs.log.log_handler import LogHandler
 from threading import Thread
 
 
@@ -52,7 +52,7 @@ class MDSCatchUp(MDSShared):
     _volumedriver_contexts_cache = {}
     _worker_contexts_cache = {}
 
-    _logger = LogHandler.get('lib', 'mds catchup')
+    _logger = Logger('lib')
 
     _CATCH_UP_NAME_SPACE = 'ovs_jobs_catchup'
     _CATCH_UP_VDISK_KEY = '{0}_{{0}}'.format(_CATCH_UP_NAME_SPACE)  # Second format should be the vdisk guid
