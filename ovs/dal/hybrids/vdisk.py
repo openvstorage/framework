@@ -53,7 +53,8 @@ class VDisk(DataObject):
                     Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer'),
                     Property('pagecache_ratio', float, default=1.0, doc='Ratio of the volume\'s metadata pages that needs to be cached'),
                     Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)'),
-                    Property('cache_quota', dict, mandatory=False, doc='Maximum caching space(s) this volume can consume (in Bytes) per cache type. If not None, the caching(s) for this volume has been set manually')]
+                    Property('cache_quota', dict, mandatory=False, doc='Maximum caching space(s) this volume can consume (in Bytes) per cache type. If not None, the caching(s) for this volume has been set manually'),
+                    Property('scrubbing_information', dict, mandatory=False, doc='Scrubbing metadata set by scrubber with an expiration date')]
     __relations = [Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),
@@ -64,7 +65,8 @@ class VDisk(DataObject):
                   Dynamic('storagedriver_id', str, 60),
                   Dynamic('storagerouter_guid', str, 15),
                   Dynamic('is_vtemplate', bool, 60),
-                  Dynamic('edge_clients', list, 30)]
+                  Dynamic('edge_clients', list, 30),
+                  Dynamic('being_scrubbed', bool, 5)]
     _fixed_properties = ['storagedriver_client', 'objectregistry_client', 'fsmetadata_client']
 
     def __init__(self, *args, **kwargs):
@@ -440,3 +442,17 @@ class VDisk(DataObject):
             elif client == 'filesystem_metadata':
                 self._fsmetadata_client = FSMetaDataClient.load(self.vpool)
             self._frozen = True
+
+    def _being_scrubbed(self):
+        """
+        Return True when the vDisk is currently being scrubbed
+        Relies on the scrubbing_information property set by the scrubber. The expiration is checked in case the worker
+        would get killed before clearing the vdisk data.
+        The scrubber updates the entry every 5 seconds with a new expiration time
+        :return: True when the vDisk is currently being scrubbed
+        :rtype: bool
+        """
+        now = time.time()
+        scrub_info = self.scrubbing_information
+        # Scrubbing information shouldn't be expired
+        return isinstance(scrub_info, dict) and scrub_info['on_going'] and self.scrubbing_information['expires'] and self.scrubbing_information['expires'] >= now

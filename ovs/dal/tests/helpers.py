@@ -46,6 +46,7 @@ from ovs.extensions.generic.system import System
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs_extensions.packages.packagefactory import PackageFactory
 from ovs_extensions.services.mockups.systemd import SystemdMock
+from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
