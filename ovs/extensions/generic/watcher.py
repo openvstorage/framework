@@ -31,6 +31,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.storage.persistent.pyrakoonstore import PyrakoonStore
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
 class WatcherTypes(object):
@@ -102,7 +103,6 @@ class Watcher(object):
             else:
                 try:
                     if store_type == 'volatile':
-                        from ovs.extensions.storage.volatilefactory import VolatileFactory
                         VolatileFactory.store = None
                         volatile = VolatileFactory.get_client()
                         volatile.set(key, value)
