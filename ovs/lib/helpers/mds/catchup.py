@@ -243,10 +243,12 @@ class MDSCatchUp(MDSShared):
                         if reset_volumedriver_cache:
                             self.reset_volumedriver_cache_for_service(service)
         except Exception:
+            msg = '{0} - Exception occurred while catching up'.format(log_identifier)
             if threaded:
-                self._logger.exception(self._format_message('{0} - Exception occurred while catching up in thread'.format(log_identifier)))
+                self._logger.exception(self._format_message('{0} in thread'.format(msg)))
                 self.errors.append(sys.exc_info())
             else:
+                self._logger.exception(self._format_message('{0}'.format(msg)))
                 raise
 
     def catch_up(self, async=True):
