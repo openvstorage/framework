@@ -250,7 +250,7 @@ class MDSCatchUp(MDSShared):
                 raise
 
     def catch_up(self, async=True):
-        # type: (bool) -> List[Tuple[VDisk, Tuple[Service, int, bool]]]
+        # type: (bool) -> List[Tuple[Tuple[Service, int, bool]]]
         """
         Catch up all MDS services
         :param async: Perform catchups asynchronously (offload to a thread)
@@ -288,7 +288,7 @@ class MDSCatchUp(MDSShared):
             else:
                 self._logger.info(self._format_message('Service {0} does not need catching up ({1}/{2})'
                                                        .format(service_identifier, tlogs_behind_master, self.tlog_threshold)))
-            behind.append((self.vdisk, service, tlogs_behind_master, caught_up))
+            behind.append((service, tlogs_behind_master, caught_up))
         return behind
 
     def wait(self):
