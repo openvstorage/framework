@@ -22,10 +22,14 @@ Watcher module for framework and volumedriver
 import os
 import sys
 import time
+import pika
 import uuid
-import logging
 import argparse
+from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
+from ovs.extensions.db.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
+from ovs_extensions.storage.persistent.pyrakoonstore import PyrakoonStore
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 
@@ -51,93 +55,91 @@ class Watcher(object):
     """
     Watcher class
     """
-
     LOG_CONTENTS = None
 
-    def __init__(self):
+    def __init__(self, target, mode, level=0):
         # type: () -> None
-        """
-        Dummy init method
-        """
         self._logger = Logger('extensions-generic')
+        self.target = target
+        self.mode = mode
+        self.level = level  # Minimal level to log
 
-    def log_message(self, log_target, entry, level):
-        # type: (str, str, int) -> None
+    def log_message(self, entry, level=None, show_level=0):
+        # type: (str, int, int) -> None
         """
-        Logs an entry
+        Logs an entry if above threshold level
         """
-        if level > 0:  # 0 = debug, 1 = info, 2 = error
-            self._logger.debug('[{0}] {1}'.format(log_target, entry))
+        level = level or self.level  # Picks self.level if not overriden per call
+        if level >= show_level:  # 0 = debug, 1 = info, 2 = error
+            self._logger.debug('[{0}] {1}'.format(self.target, entry))
 
-    def _test_store(self, store_type, target, key=None, value=None):
+    def _test_store(self, store_type, key=None, value=None):
+        # type: (str, str, str) -> bool
+        """
+        Test specified store type
+        :param store_type: name of the store type
+        :type: str
+        :param key: key content to test
+        :type key: str
+        :param value: value to put
+        :type value: str
+        :return: boolean
+        """
         # Volatile
-        self.log_message(target, 'Testing {0} store...'.format(store_type), 0)
+        self.log_message('Testing {0} store...'.format(store_type))
         max_tries = 5
         tries = 0
         while tries < max_tries:
             if store_type == 'arakoon_voldrv':
                 try:
-                    from ovs.extensions.generic.configuration import Configuration
-                    from ovs_extensions.storage.persistent.pyrakoonstore import PyrakoonStore
                     cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
                     configuration = Configuration.get('/ovs/arakoon/{0}/config'.format(cluster_name), raw=True)
                     client = PyrakoonStore(cluster=cluster_name, configuration=configuration)
                     client.nop()
                     break
                 except Exception as message:
-                    self.log_message(target, '  Error during arakoon (voldrv) test: {0}'.format(message), 2)
+                    self.log_message('  Error during arakoon (voldrv) test: {0}'.format(message), 2)
             else:
                 try:
-                    try:
-                        logging.disable(logging.WARNING)
-                        if store_type == 'volatile':
-                            from ovs.extensions.storage.volatilefactory import VolatileFactory
-                            VolatileFactory.store = None
-                            volatile = VolatileFactory.get_client()
-                            volatile.set(key, value)
-                            if volatile.get(key) == value:
-                                volatile.delete(key)
-                                break
+                    if store_type == 'volatile':
+                        from ovs.extensions.storage.volatilefactory import VolatileFactory
+                        VolatileFactory.store = None
+                        volatile = VolatileFactory.get_client()
+                        volatile.set(key, value)
+                        if volatile.get(key) == value:
                             volatile.delete(key)
-                        elif store_type == 'persistent':
-                            persistent = PersistentFactory.get_client()
-                            persistent.nop()
                             break
-                    finally:
-                        logging.disable(logging.NOTSET)
+                        volatile.delete(key)
+                    elif store_type == 'persistent':
+                        persistent = PersistentFactory.get_client()
+                        persistent.nop()
+                        break
                 except Exception as message:
-                    self.log_message(target, '  Error during {0} store test: {1}'.format(store_type, message), 2)
+                    self.log_message('  Error during {0} store test: {1}'.format(store_type, message), 3)
             key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
             time.sleep(1)
             tries += 1
         if tries == max_tries:
-            self.log_message(target, '  {0} store not working correctly'.format(store_type), 2)
+            self.log_message('  {0} store not working correctly'.format(store_type), 2)
             return False
-        self.log_message(target, '  {0} store OK after {1} tries'.format(store_type, tries), 0)
+        self.log_message('  {0} store OK after {1} tries'.format(store_type, tries))
 
-    def services_running(self, target):
+    def services_running(self):
+        # type: () -> bool
         """
-        Check all services are running
-        :param target: Target to check
+        Check if all services are running
         :return: Boolean
         """
         try:
             key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))
             value = str(time.time())
-            if target not in WatcherTypes.list():
-                self.log_message(target, 'Target not found in allowed ', 2)
-
-            if target in [WatcherTypes.CONFIG, WatcherTypes.FWK]:
-                self.log_message(target, 'Testing configuration store...', 0)
-                from ovs.extensions.generic.configuration import Configuration
+            if self.target in [WatcherTypes.CONFIG, WatcherTypes.FWK]:
+                self.log_message('Testing configuration store...')
                 try:
                     Configuration.list('/')
                 except Exception as ex:
-                    self.log_message(target, '  Error during configuration store test: {0}'.format(ex), 2)
+                    self.log_message('  Error during configuration store test: {0}'.format(ex), 2)
                     return False
-
-                from ovs.extensions.db.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
-                from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
 
                 with open(Configuration.CACC_LOCATION) as config_file:
                     contents = config_file.read()
@@ -149,7 +151,7 @@ class Watcher(object):
                     try:
                         config.read_config(contents=contents)  # Validate whether the contents are not corrupt
                     except Exception as ex:
-                        self.log_message(target, '  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
+                        self.log_message('  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
                         return False
                     temp_filename = '{0}~'.format(Configuration.CACC_LOCATION)
                     with open(temp_filename, 'w') as config_file:
@@ -158,21 +160,19 @@ class Watcher(object):
                         os.fsync(config_file)
                     os.rename(temp_filename, Configuration.CACC_LOCATION)
                     Watcher.LOG_CONTENTS = contents
-                self.log_message(target, '  Configuration store OK', 0)
+                self.log_message('  Configuration store OK', 0)
 
-            if target == WatcherTypes.FWK:
-                self._test_store('volatile', target, key, value)
-                self._test_store('persistent', target)
+            if self.target == WatcherTypes.FWK:
+                self._test_store('volatile', key, value)
+                self._test_store('persistent')
 
-            if target == WatcherTypes.VOLDRV:
+            if self.target == WatcherTypes.VOLDRV:
                 # Arakoon, voldrv cluster
-                self._test_store('arakoon_voldrv', target)
+                self._test_store('arakoon_voldrv')
 
-            if target in [WatcherTypes.FWK, WatcherTypes.VOLDRV]:
+            if self.target in [WatcherTypes.FWK, WatcherTypes.VOLDRV]:
                 # RabbitMQ
-                self.log_message(target, 'Test rabbitMQ...', 0)
-                import pika
-                from ovs.extensions.generic.configuration import Configuration
+                self.log_message('Test rabbitMQ...', 0)
                 messagequeue = Configuration.get('/ovs/framework/messagequeue')
                 rmq_servers = messagequeue['endpoints']
                 good_node = False
@@ -189,46 +189,52 @@ class Watcher(object):
                         connection.close()
                         good_node = True
                     except Exception as message:
-                        self.log_message(target, '  Error during rabbitMQ test on node {0}: {1}'.format(server, message), 2)
+                        self.log_message('  Error during rabbitMQ test on node {0}: {1}'.format(server, message), 2)
                 if good_node is False:
-                    self.log_message(target, '  No working rabbitMQ node could be found', 2)
+                    self.log_message('  No working rabbitMQ node could be found', 2)
                     return False
-                self.log_message(target, '  RabbitMQ test OK', 0)
-                self.log_message(target, 'All tests OK', 0)
+                self.log_message('  RabbitMQ test OK')
+                self.log_message('All tests OK')
 
             return True
         except Exception as ex:
-            self.log_message(target, 'Unexpected exception: {0}'.format(ex), 2)
+            self.log_message('Unexpected exception: {0}'.format(ex), 2)
             return False
+
+    def start(self):
+        # type: () -> None
+        """
+        Start the ovs framework watcher
+        """
+        if self.mode == 'wait':
+            watcher.log_message('Waiting for master services', 1)
+            while True:
+                if watcher.services_running():
+                    watcher.log_message('Master services available', 1)
+                    sys.exit(0)
+                time.sleep(5)
+
+        if self.mode == 'check':
+            watcher.log_message('Checking master services', 1)
+            while True:
+                if not watcher.services_running():
+                    watcher.log_message('One of the master services is unavailable', 1)
+                    sys.exit(1)
+                time.sleep(5)
+
+        watcher.log_message('Invalid parameter', 1)
+        time.sleep(60)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
-    watcher = Watcher()
-
     parser = argparse.ArgumentParser(prog='framework-watcher', description='Framework watcher service')
     subparsers = parser.add_subparsers(dest='given_target', help='Possible options for the framework watcher manager service')
 
     parser_setup = subparsers.add_parser(name='framework', help='Run framework related watcher service')
-    parser_setup.add_argument('mode', help="", choices=['wait', 'check', 'stop_pre', 'start_post'], type=str)
+    parser_setup.add_argument('mode', help="", choices=['wait', 'check'])
 
     arguments = parser.parse_args()
 
-    given_target = arguments.given_target
-    mode = arguments.mode
-    if mode == 'wait':
-        watcher.log_message(given_target, 'Waiting for master services', 1)
-        while True:
-            if watcher.services_running(given_target):
-                watcher.log_message(given_target, 'Master services available', 1)
-                sys.exit(0)
-            time.sleep(5)
-    if mode == 'check':
-        watcher.log_message(given_target, 'Checking master services', 1)
-        while True:
-            if not watcher.services_running(given_target):
-                watcher.log_message(given_target, 'One of the master services is unavailable', 1)
-                sys.exit(1)
-            time.sleep(5)
-    watcher.log_message(given_target, 'Invalid parameter', 1)
-    time.sleep(60)
-    sys.exit(1)
+    watcher = Watcher(target=arguments.given_target, mode=arguments.mode)
+    watcher.start()
