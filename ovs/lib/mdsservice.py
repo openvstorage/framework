@@ -463,9 +463,8 @@ class MDSServiceController(MDSShared):
         def storagedriver_worker(queue, error_list):
             # type: (Queue.Queue, List[str]) -> None
             while not queue.empty():
-                mds_catch_up = queue.get()
+                mds_catch_up = queue.get()  # type: MDSCatchUp
                 try:
-                    mds_catch_up.dry_run = False
                     mds_catch_up.catch_up(async=False)
                 except Exception as ex:
                     MDSServiceController._logger.exception('Exceptions while catching for vDisk {0}'.format(mds_catch_up.vdisk.guid))
