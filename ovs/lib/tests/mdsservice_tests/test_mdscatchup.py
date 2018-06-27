@@ -24,6 +24,7 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
+from ovs_extensions.log.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -31,7 +32,6 @@ from ovs.extensions.storageserver.tests.mockups import MDSClient
 from ovs_extensions.testing.exceptions import WorkerLossException
 from ovs.lib.helpers.mds.catchup import MDSCatchUp
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.log_handler import LogHandler
 
 
 class MDSCatchupTest(unittest.TestCase):
@@ -145,7 +145,7 @@ class MDSCatchupTest(unittest.TestCase):
         catch_up_thread = gevent.spawn(self.catch_up_worker, catch_up_1)
         gevent.sleep(0)  # Start the gevent scheduling
         catch_up_thread.join()  # Wait for the worker lost to raise
-        logs = LogHandler._logs['lib_mds catchup']
+        logs = Logger._logs['lib']
         MDSCatchUp.reset_cache()
         # No catchup should have happened
         for mds_key, volume_id, tlogs_start in catch_up_list:
@@ -286,7 +286,7 @@ class MDSCatchupTest(unittest.TestCase):
         registration_data = catch_up._relevant_contexts[0]
         self.persistent.set(catch_up.mds_key, [registration_data])
         catch_up.catch_up(async=False)
-        logs = LogHandler._logs['lib_mds catchup']
+        logs = Logger._logs['lib']
         catch_up_logs = [catch_up._format_message(log) for log in already_registered_logs]
         for log in catch_up_logs:
             self.assertIn(log, logs)
@@ -330,7 +330,7 @@ class MDSCatchupTest(unittest.TestCase):
         self.persistent.set(catch_up.mds_key, [registration_data])
         catch_up.catch_up()
         catch_up.wait()
-        logs = LogHandler._logs['lib_mds catchup']
+        logs = Logger._logs['lib']
         catch_up_logs = [catch_up._format_message(log) for log in already_registered_logs]
         for log in catch_up_logs:
             self.assertIn(log, logs)
@@ -440,7 +440,7 @@ class MDSCatchupTest(unittest.TestCase):
         catch_up_thread = gevent.spawn(self.catch_up_worker, catch_up_1)
         gevent.sleep(0)  # Start the gevent scheduling
         catch_up_thread.join()  # Wait for the worker lost to raise
-        logs = LogHandler._logs['lib_mds catchup']
+        logs = Logger._logs['lib']
         MDSCatchUp.reset_cache()
         # No catchup should have happened
         for mds_key, volume_id, tlogs_start in catch_up_list:
