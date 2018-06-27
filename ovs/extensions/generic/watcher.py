@@ -46,6 +46,7 @@ class WatcherTypes(object):
         """
         return [WatcherTypes.FWK, WatcherTypes.CONFIG, WatcherTypes.VOLDRV]
 
+
 class Watcher(object):
     """
     Watcher class
@@ -212,20 +213,22 @@ if __name__ == '__main__':
 
     arguments = parser.parse_args()
 
-    if arguments.mode == 'wait':
-        watcher.log_message(arguments.given_target, 'Waiting for master services', 1)
+    given_target = arguments.given_target
+    mode = arguments.mode
+    if mode == 'wait':
+        watcher.log_message(given_target, 'Waiting for master services', 1)
         while True:
-            if watcher.services_running(arguments.given_target):
-                watcher.log_message(arguments.given_target, 'Master services available', 1)
+            if watcher.services_running(given_target):
+                watcher.log_message(given_target, 'Master services available', 1)
                 sys.exit(0)
             time.sleep(5)
-    elif arguments.mode == 'check':
-        watcher.log_message(arguments.given_target, 'Checking master services', 1)
+    if mode == 'check':
+        watcher.log_message(given_target, 'Checking master services', 1)
         while True:
-            if not watcher.services_running(arguments.given_target):
-                watcher.log_message(arguments.given_target, 'One of the master services is unavailable', 1)
+            if not watcher.services_running(given_target):
+                watcher.log_message(given_target, 'One of the master services is unavailable', 1)
                 sys.exit(1)
             time.sleep(5)
-    watcher.log_message(arguments.given_target, 'Invalid parameter', 1)
+    watcher.log_message(given_target, 'Invalid parameter', 1)
     time.sleep(60)
     sys.exit(1)
