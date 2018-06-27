@@ -295,7 +295,7 @@ class MDSServiceController(MDSShared):
     # noinspection PyUnresolvedReferences
     @staticmethod
     @ovs_task(name='ovs.mds.ensure_safety', ensure_single_info={'mode': 'CHAINED'})
-    def ensure_safety(vdisk_guid, excluded_storagerouter_guids=list()):
+    def ensure_safety(vdisk_guid, excluded_storagerouter_guids=None):
         """
         Ensures (or tries to ensure) the safety of a given vDisk.
         Assumptions:
@@ -325,6 +325,9 @@ class MDSServiceController(MDSShared):
         :return: None
         :rtype: NoneType
         """
+        if excluded_storagerouter_guids is None:
+            excluded_storagerouter_guids = []
+
         safety_ensurer = SafetyEnsurer(vdisk_guid, excluded_storagerouter_guids)
         safety_ensurer.ensure_safety()
 
@@ -348,7 +351,7 @@ class MDSServiceController(MDSShared):
         return mds_info
 
     @staticmethod
-    def get_mds_storagedriver_config_set(vpool, offline_nodes=list()):
+    def get_mds_storagedriver_config_set(vpool, offline_nodes=None):
         """
         Builds a configuration for all StorageRouters from a given vPool with following goals:
             * Primary MDS is the local one
@@ -367,6 +370,9 @@ class MDSServiceController(MDSShared):
         :return: MDS configuration for a vPool
         :rtype: dict[list]
         """
+        if offline_nodes is None:
+            offline_nodes = []
+
         mds_per_storagerouter = {}
         mds_per_load = {}
         for storagedriver in vpool.storagedrivers:
