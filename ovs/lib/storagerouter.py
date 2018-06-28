@@ -1012,7 +1012,7 @@ class StorageRouterController(object):
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.remove_storagedriver')
-    def remove_storagedriver(storagedriver_guid, offline_storage_router_guids=list()):
+    def remove_storagedriver(storagedriver_guid, offline_storage_router_guids=None):
         """
         Removes a StorageDriver (if its the last StorageDriver for a vPool, the vPool is removed as well)
         :param storagedriver_guid: Guid of the StorageDriver to remove
@@ -1022,6 +1022,9 @@ class StorageRouterController(object):
         :type offline_storage_router_guids: list
         :return: None
         """
+        if offline_storage_router_guids is None:
+            offline_storage_router_guids = []
+
         storage_driver = StorageDriver(storagedriver_guid)
         StorageRouterController._logger.info('Remove StorageDriver - Guid {0} - Deleting StorageDriver {1}'.format(storage_driver.guid, storage_driver.name))
 

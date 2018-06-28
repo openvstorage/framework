@@ -793,7 +793,6 @@ class ScrubTestCase(unittest.TestCase):
         Validate race condition handling
         - Validate that already queued items won't be scrubbed again
         """
-        print SystemdMock.services
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
              # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
@@ -828,7 +827,6 @@ class ScrubTestCase(unittest.TestCase):
         pid = None
         start_time = None
         other_sr = None
-        print SystemdMock.services
         for ip, service_info in SystemdMock.services.iteritems():
             if ip == local_sr.ip:
                 continue

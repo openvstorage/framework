@@ -51,6 +51,7 @@ class MDSCatchUp(MDSShared):
     # Extra caching
     _volumedriver_contexts_cache = {}
     _worker_contexts_cache = {}
+    _clients_cache = {}
 
     _logger = LogHandler.get('lib', 'mds catchup')
 
@@ -61,6 +62,8 @@ class MDSCatchUp(MDSShared):
         # type: (str) -> None
         """
         Initializes a new MDSCatchUp
+        An instance populates some caches. These cached are cleared once the instance is garbage collected.
+        When running MDSCatchup in bulk: add them to a list to speed up the process
         :param vdisk_guid: Guid of the vDisk to catch up for
         :type vdisk_guid: str
         """
@@ -84,6 +87,13 @@ class MDSCatchUp(MDSShared):
         self._worker_contexts = self.get_worker_contexts()
         self._worker_context = self._worker_contexts[System.get_my_storagerouter()]
         self._relevant_contexts = self._get_all_relevant_contexts()  # All possible contexts (by mixing volumedriver ones with workers)
+
+    def __del__(self):
+        """
+        Destructor
+        """
+        # All caching should be removed
+        self.reset_cache()
 
     def get_volumedriver_contexts(self):
         # type: () -> Dict[Service, Dict[str, str]]
@@ -175,7 +185,7 @@ class MDSCatchUp(MDSShared):
         :return: The built sshclient
         :rtype: SSHClient
         """
-        client = None
+        client = self._clients_cache.get(storagerouter)
         tries = 0
         while client is None:
             tries += 1
@@ -183,8 +193,10 @@ class MDSCatchUp(MDSShared):
                 self._logger.error(self._format_message('Assuming StorageRouter {0} is dead. Unable to checkup there'.format(storagerouter.ip)))
                 break
             try:
-                # Requesting new client to avoid races (if the same worker would build the clients again)
-                client = SSHClient(storagerouter, username='root', timeout=30, cached=False)
+                client = SSHClient(storagerouter, username='root', timeout=30)
+                # Avoids re-connecting for every client
+                # Cache needs to be cleared once this object is no longer so all clients can close their connection
+                self._clients_cache[storagerouter] = client
             except Exception:
                 self._logger.exception(self._format_message('Unable to connect to StorageRouter {0} - Retrying {1} more times before assuming it is down'.format(storagerouter.ip, max_retries - tries)))
         if client is not None:
@@ -231,14 +243,16 @@ class MDSCatchUp(MDSShared):
                         if reset_volumedriver_cache:
                             self.reset_volumedriver_cache_for_service(service)
         except Exception:
+            msg = '{0} - Exception occurred while catching up'.format(log_identifier)
             if threaded:
-                self._logger.exception(self._format_message('{0} - Exception occurred while catching up in thread'.format(log_identifier)))
+                self._logger.exception(self._format_message('{0} in thread'.format(msg)))
                 self.errors.append(sys.exc_info())
             else:
+                self._logger.exception(self._format_message('{0}'.format(msg)))
                 raise
 
     def catch_up(self, async=True):
-        # type: (bool) -> List[Tuple[Service, int, bool]]
+        # type: (bool) -> List[Tuple[Tuple[Service, int, bool]]]
         """
         Catch up all MDS services
         :param async: Perform catchups asynchronously (offload to a thread)
@@ -276,7 +290,7 @@ class MDSCatchUp(MDSShared):
             else:
                 self._logger.info(self._format_message('Service {0} does not need catching up ({1}/{2})'
                                                        .format(service_identifier, tlogs_behind_master, self.tlog_threshold)))
-            behind.append((Service, tlogs_behind_master, caught_up))
+            behind.append((service, tlogs_behind_master, caught_up))
         return behind
 
     def wait(self):
@@ -514,6 +528,7 @@ class MDSCatchUp(MDSShared):
         """
         cls._volumedriver_contexts_cache = {}
         cls._worker_contexts_cache = {}
+        cls._clients_cache = {}
 
     def reset_volumedriver_cache_for_service(self, service):
         # type: (Service) -> None

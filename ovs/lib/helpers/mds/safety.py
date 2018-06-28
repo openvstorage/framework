@@ -379,7 +379,10 @@ class SafetyEnsurer(MDSShared):
         :return: New slave services for the primary domain, New slave services for the secondary domain
         :rtype: Tuple[List[Service], List[Service]]
         """
-        def _add_suitable_nodes(local_importance, local_safety, services_to_recycle=list()):
+        def _add_suitable_nodes(local_importance, local_safety, services_to_recycle=None):
+            if services_to_recycle is None:
+                services_to_recycle = []
+
             if local_importance == 'primary':
                 local_services = new_primary_services
             else:
