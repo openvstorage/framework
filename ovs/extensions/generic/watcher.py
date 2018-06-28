@@ -229,12 +229,11 @@ class Watcher(object):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='framework-watcher', description='Framework watcher service')
-    subparsers = parser.add_subparsers(dest='given_target', help='Possible options for the framework watcher manager service')
 
-    parser_setup = subparsers.add_parser(name='framework', help='Run framework related watcher service')
-    parser_setup.add_argument('mode', help="", choices=['wait', 'check'])
+    parser.add_argument('target', help='The target (sub)component to handle', choices=['volumedriver', 'config', 'framework'])
+    parser.add_argument('mode', help='Mode to start the watcher with', choices=['wait', 'check'])
 
     arguments = parser.parse_args()
 
-    watcher = Watcher(target=arguments.given_target, mode=arguments.mode)
+    watcher = Watcher(target=arguments.target, mode=arguments.mode)
     watcher.start()
