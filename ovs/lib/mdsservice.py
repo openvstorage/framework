@@ -22,8 +22,10 @@ import sys
 import math
 import time
 import random
+import Queue
 import datetime
 import collections
+from threading import Thread
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -324,6 +326,9 @@ class MDSServiceController(MDSShared):
         :return: None
         :rtype: NoneType
         """
+        if excluded_storagerouter_guids is None:
+            excluded_storagerouter_guids = []
+
         safety_ensurer = SafetyEnsurer(vdisk_guid, excluded_storagerouter_guids)
         safety_ensurer.ensure_safety()
 
@@ -457,18 +462,37 @@ class MDSServiceController(MDSShared):
     def mds_catchup():
         """
         Looks to catch up all MDS slaves which are too far behind
+        Only one catch for every storagedriver is invoked
         """
-        catch_ups = []
+        # Only for caching purposes
+        def storagedriver_worker(queue, error_list):
+            # type: (Queue.Queue, List[str]) -> None
+            while not queue.empty():
+                mds_catch_up = queue.get()  # type: MDSCatchUp
+                try:
+                    mds_catch_up.catch_up(async=False)
+                except Exception as ex:
+                    MDSServiceController._logger.exception('Exceptions while catching for vDisk {0}'.format(mds_catch_up.vdisk.guid))
+                    error_list.append(str(ex))
+                finally:
+                    queue.task_done()
+
+        storagedriver_queues = {}
         for vdisk in VDiskList.get_vdisks():
+            if vdisk.storagedriver_id not in storagedriver_queues:
+                storagedriver_queues[vdisk.storagedriver_id] = Queue.Queue()
+            # Putting it in the Queue ensures that the reference is still there so the caching is used optimally
             catch_up = MDSCatchUp(vdisk.guid)
-            catch_up.catch_up(async=True)
-            catch_ups.append(catch_up)
+            storagedriver_queues[vdisk.storagedriver_id].put(catch_up)
+
         errors = []
-        for catch_up in catch_ups:
-            try:
-                catch_up.wait()
-            except Exception as ex:
-                MDSServiceController._logger.exception('Exceptions while catching for vDisk {0}'.format(catch_up.vdisk.guid))
-                errors.append(str(ex))
+        threads = []
+        for storadriver_id, storagedriver_queue in storagedriver_queues.iteritems():
+            thread = Thread(target=storagedriver_worker, args=(storagedriver_queue, errors,))
+            thread.start()
+            threads.append(thread)
+        for thread in threads:
+            thread.join()
+
         if len(errors) > 0:
             raise RuntimeError('Exception occurred while catching up: \n - {0}'.format('\n - '.join(errors)))
