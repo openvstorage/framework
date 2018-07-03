@@ -16,9 +16,13 @@
 /*global define */
 define([
     'knockout', 'jquery', 'plugins/dialog',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../../containers/support/statsmonkey', '../../containers/storagerouter/storagerouter', '../../wizards/statsmonkeyconfigure/index'
-], function(ko, $, dialog, shared, generic, Refresher, api, StatsMonkeyConfigVM, StorageRouter, StatsMonkeyConfigureWizard) {
+    'ovs/shared', 'ovs/generic', 'ovs/refresher',
+    '../../containers/support/statsmonkey', '../../containers/storagerouter/storagerouter', '../../wizards/statsmonkeyconfigure/index',
+    'viewmodels/services/storagerouter'
+], function(ko, $, dialog,
+            shared, generic, Refresher,
+            StatsMonkeyConfigVM, StorageRouter, StatsMonkeyConfigureWizard,
+            storagerouterService) {
     "use strict";
     return function() {
         var self = this;
@@ -116,6 +120,7 @@ define([
                         stats_monkey: self.selectedSupportSettings().contains('stats_monkey'),
                         support_agent: self.selectedSupportSettings().contains('support_agent'),
                         remote_access: self.selectedSupportSettings().contains('remote_access'),
+                        scrub_statistics: self.selectedSupportSettings().contains('scrub_statistics'),
                         stats_monkey_config: self.newStatsMonkeyConfig.toJS()
                     }
                 };
@@ -124,8 +129,7 @@ define([
                     $.t('ovs:support.settings.saving_msg')
                 );
                 self.saving(true);
-                api.post('storagerouters/' + self.storageRouters()[0].guid() + '/configure_support', { data: data })
-                    .then(self.shared.tasks.wait)
+                storagerouterService.postSupportData(self.storageRouters()[0].guid(), data)
                     .done(function() {
                         generic.alertSuccess(
                             $.t('ovs:support.settings.saved'),
@@ -153,17 +157,17 @@ define([
             }
         };
         self.loadStorageRouters = function() {
-            return $.Deferred(function(deferred) {
-                api.get('storagerouters', {queryparams: {sort: 'name', contents: ''}})
-                    .done(function(data) {
+            return $.when().then(function () {
+                storagerouterService.loadStorageRouters({sort: 'name', contents: ''})
+                    .done(function (data) {
                         var guids = [], srData = {};
-                        $.each(data.data, function(index, item) {
+                        $.each(data.data, function (index, item) {
                             guids.push(item.guid);
                             srData[item.guid] = item;
                         });
                         generic.crossFiller(
                             guids, self.storageRouters,
-                            function(guid) {
+                            function (guid) {
                                 var sr = new StorageRouter(guid);
                                 sr.metadata = ko.observable('');
                                 sr.versions = ko.observable({});
@@ -171,7 +175,7 @@ define([
                                 return sr;
                             }, 'guid'
                         );
-                        $.each(self.storageRouters(), function(index, storageRouter) {
+                        $.each(self.storageRouters(), function (index, storageRouter) {
                             if (guids.contains(storageRouter.guid())) {
                                 storageRouter.fillData(srData[storageRouter.guid()]);
                             }
@@ -179,9 +183,9 @@ define([
                             var calls = [];
                             if (index === 0) {  // Support information are cluster-wide settings, so only retrieving for 1st StorageRouter
                                 if (generic.xhrCompleted(self.supportSettingsHandle)) {
-                                    self.supportSettingsHandle = api.get('storagerouters/' + storageRouter.guid() + '/get_support_info')
-                                        .then(self.shared.tasks.wait)
-                                        .then(function(data) {
+                                    self.supportSettingsHandle = storagerouterService.getSupportSettingsHandle(storageRouter.guid())
+                                        .then(function (data) {
+                                            console.log(data)
                                             self.clusterID(data.cluster_id);
                                             self.origStatsMonkeyConfig.update(data.stats_monkey_config);
 
@@ -211,27 +215,25 @@ define([
                                 }
                             }
                             if (generic.xhrCompleted(self.supportMetadataHandle[storageRouter.guid()])) {
-                                self.supportMetadataHandle[storageRouter.guid()] = api.get('storagerouters/' + storageRouter.guid() + '/get_support_metadata')
-                                    .then(self.shared.tasks.wait)
-                                    .then(function(data) {
+                                self.supportMetadataHandle[storageRouter.guid()] = storagerouterService.getSupportMetadataHandle(storageRouter.guid())
+                                    .then(function (data) {
                                         storageRouter.metadata(data);
                                         storageRouter.versions(data.metadata.versions);
                                         storageRouter.packageNames(generic.keys(data.metadata.versions));
-                                        storageRouter.packageNames.sort(function(name1, name2) {
+                                        storageRouter.packageNames.sort(function (name1, name2) {
                                             return name1 < name2 ? -1 : 1;
                                         });
                                     });
                                 calls.push(self.supportMetadataHandle[storageRouter.guid()]);
                             }
                             $.when.apply($, calls)
-                                .always(function() {
+                                .always(function () {
                                     storageRouter.loading(false);
                                 })
                         });
-                        deferred.resolve();
                     })
-                    .fail(deferred.reject);
-            }).promise();
+
+            })
         };
 
         // Subscriptions
