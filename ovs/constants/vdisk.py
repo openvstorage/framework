@@ -13,3 +13,13 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
+
+"""
+VDisk Constants module. Contains constants related to vdisks
+"""
+
+# General
+LOCK_NAMESPACE = 'ovs_locks'
+
+# Scrub related
+SCRUB_VDISK_LOCK = '{0}_{{0}}'.format(LOCK_NAMESPACE)  # Second format is the vdisk guid
