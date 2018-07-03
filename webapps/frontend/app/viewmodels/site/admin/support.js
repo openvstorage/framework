@@ -184,21 +184,29 @@ define([
                                         .then(function(data) {
                                             self.clusterID(data.cluster_id);
                                             self.origStatsMonkeyConfig.update(data.stats_monkey_config);
+
                                             if (self.newStatsMonkeyConfig.isInitialized() === false) {
                                                 self.newStatsMonkeyConfig.update(data.stats_monkey_config);
                                             }
                                             delete data.cluster_id;
                                             delete data.stats_monkey_config;
 
-                                            if (self.oldSupportSettings().length === 0) {
+                                            if (self.allSupportSettings().length === 0) {
                                                 $.each(data, function(key, boolValue) {
                                                     self.allSupportSettings.push({name: key, func: self.getFunction(key), enable: self.disableSupportSetting(key)});
-                                                    if (boolValue === true) {
-                                                        self.selectedSupportSettings.push(key);
+                                                });
+
+                                            }
+                                            $.each(data, function(key, boolValue) {
+                                                if (boolValue === true) {
+                                                    if (self.oldSupportSettings.indexOf(key) === -1){
                                                         self.oldSupportSettings.push(key);
                                                     }
-                                                });
-                                            }
+                                                    if (self.selectedSupportSettings.indexOf(key) === -1){
+                                                        self.selectedSupportSettings.push(key);
+                                                    }
+                                                }
+                                            });
                                         });
                                 }
                             }
@@ -240,8 +248,10 @@ define([
         self.activate = function() {
             $.each(shared.hooks.pages, function(pageType, pages) {
                 if (pageType === 'support') {
-                    $.each(pages, function(index, page) {
-                        page.activator.activateItem(page.module);
+                    $.each(pages, function (index, page) {
+                        if (page.hasOwnProperty('activator')) {
+                            page.activator.activateItem(page.module);
+                        }
                     })
                 }
             });
