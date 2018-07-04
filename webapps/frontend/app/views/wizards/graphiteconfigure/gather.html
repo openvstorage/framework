@@ -1,0 +1,42 @@
+<!--
+Copyright (C) 2018 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <!-- ko with: data.origConfig -->
+
+        <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('host') }">
+            <label class="col-lg-3 control-label" for="host" data-i18n="ovs:wizards.graphite.host"></label>
+            <div class="col-lg-4">
+                <input type="text" id="host" class="form-control" data-bind="value: $data.host, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" for="port" data-i18n="ovs:wizards.graphite.port"></label>
+            <div class="col-lg-4">
+                <input type="text" id="port" class="form-control" data-bind="value: $data.port, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+
+    <!-- /ko -->
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

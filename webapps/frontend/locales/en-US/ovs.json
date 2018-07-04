@@ -1133,6 +1133,13 @@
                 "title": "Extend vPool __name__"
             }
         },
+        "graphite":{
+            "title": "Configure the Graphite host settings",
+            "host": "Host IP",
+            "port": "Host port",
+            "host_required": "A host IP is required to configure Graphite statistics",
+            "port_required": "No host port is given. Default port 2003 will be used."
+        },
         "reconfigure_vpool": {
             "gather_block_cache": {
                 "alba_backend": "Backend:",

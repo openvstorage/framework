@@ -26,7 +26,8 @@ class GraphiteController():
 
     def __init__(self):
         self._send_statistics = Configuration.get('/ovs/framework/support|fwk_statistics', default=False)
-        self._client = GraphiteClient()
+        if self._send_statistics:
+            self._client = GraphiteClient()
 
     def fire_duration(self, start):
         # type: (float) -> None
