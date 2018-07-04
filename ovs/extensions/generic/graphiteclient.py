@@ -46,7 +46,7 @@ class GraphiteClient(object):
                 raise RuntimeError('No graphite data found in config path `{0}`'.format(config_path))
 
         ip = ip or graphite_data['ip']
-        port = port or graphite_data.get('port', default=2003)
+        port = port or graphite_data.get('port', 2003)
 
         ExtensionsToolbox.verify_required_params(verify_keys=True,
                                                  actual_params={'ip': ip,
