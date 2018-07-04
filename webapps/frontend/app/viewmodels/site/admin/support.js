@@ -185,7 +185,6 @@ define([
                                 if (generic.xhrCompleted(self.supportSettingsHandle)) {
                                     self.supportSettingsHandle = storagerouterService.getSupportSettingsHandle(storageRouter.guid())
                                         .then(function (data) {
-                                            console.log(data)
                                             self.clusterID(data.cluster_id);
                                             self.origStatsMonkeyConfig.update(data.stats_monkey_config);
 
