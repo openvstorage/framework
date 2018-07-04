@@ -38,15 +38,15 @@ class GraphiteClient(object):
         config_path = 'ovs/framework/graphite'
         self.precursor = 'openvstorage.fwk.{0} {1} {2}'
 
-        try:
-            graphite_data = Configuration.get(config_path)
-        except NotFoundException:
-            raise RuntimeError('No graphite data found in config path `{0}`'.format(config_path))
+        if all(p is None for p in [ip, port]):
+            # Nothing specified
+            try:
+                graphite_data = Configuration.get(config_path)
+            except NotFoundException:
+                raise RuntimeError('No graphite data found in config path `{0}`'.format(config_path))
 
-        if ip is None:
-            ip = graphite_data['ip']
-        if port is None:
-            port = int(graphite_data.get('port', 2003))
+        ip = ip or graphite_data['ip']
+        port = port or graphite_data.get('port', default=2003)
 
         ExtensionsToolbox.verify_required_params(verify_keys=True,
                                                  actual_params={'ip': ip,

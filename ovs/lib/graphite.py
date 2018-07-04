@@ -19,15 +19,16 @@ from ovs.extensions.generic.graphiteclient import GraphiteClient
 from ovs.extensions.generic.configuration import Configuration
 
 
-class GraphiteController(GraphiteClient):
+class GraphiteController():
     """
     Graphite Controller that sends or does not send, depending on the saved config setting
     """
 
-    _send_statistics = Configuration.get('/ovs/framework/support|fwk_statistics', default=False)
+    def __init__(self):
+        self._send_statistics = Configuration.get('/ovs/framework/support|fwk_statistics', default=False)
+        self._client = GraphiteClient()
 
-    @staticmethod
-    def fire_duration(start):
+    def fire_duration(self, start):
         # type: (float) -> None
         """
         Fire the duration of the scrubjob to Graphite
@@ -35,12 +36,11 @@ class GraphiteController(GraphiteClient):
         :type start: float
         :return:
         """
-        if GraphiteController._send_statistics:
+        if self._send_statistics:
             delta = time.time() - start
-            GraphiteClient().send(path='scrubber.duration_jobs', data=delta)
+            self._client.send(path='scrubber.duration_jobs', data=delta)
 
-    @staticmethod
-    def fire_number(nr_of_jobs):
+    def fire_number(self, nr_of_jobs):
         # type: (int) -> None
         """
         Fire the number of jobs the scrubjob is divided in to Graphite
@@ -48,11 +48,10 @@ class GraphiteController(GraphiteClient):
         :type nr_of_jobs: int
         :return: None
         """
-        if GraphiteController._send_statistics:
-            GraphiteClient().send(path='scrubber.nr_of_jobs', data=nr_of_jobs)
+        if self._send_statistics:
+            self._client.send(path='scrubber.nr_of_jobs', data=nr_of_jobs)
 
-    @staticmethod
-    def fire_nsm_capacity(capacity):
+    def fire_nsm_capacity(self, capacity):
         # type: (int) -> None
         """
         Fire the current NSM capacity to Graphite
@@ -60,5 +59,5 @@ class GraphiteController(GraphiteClient):
         :type capacity: int
         :return:
         """
-        if GraphiteController._send_statistics:
-            GraphiteClient().send(path='nsm.capacity', data=capacity)
+        if self._send_statistics:
+            self._client.send(path='nsm.capacity', data=capacity)

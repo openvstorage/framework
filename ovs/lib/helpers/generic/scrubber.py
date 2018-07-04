@@ -621,6 +621,7 @@ class StackWorker(ScrubShared):
                             with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id), update_interval_secs=lease_interval) as locked_client:
                                 self._logger.info('{0} - Retrieve and apply scrub work'.format(vdisk_log, vdisk.name))
                                 starttime = time.time()
+                                graphite_controller = GraphiteController()
                                 work_units = locked_client.get_scrubbing_workunits()
                                 for work_unit in work_units:
                                     res = locked_client.scrub(work_unit=work_unit,
@@ -628,8 +629,8 @@ class StackWorker(ScrubShared):
                                                               log_sinks=[Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)],
                                                               backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                     locked_client.apply_scrubbing_result(scrubbing_work_result=res)
-                                GraphiteController.fire_duration(start=starttime)
-                                GraphiteController.fire_number(len(work_units))
+                                graphite_controller.fire_duration(start=starttime)
+                                graphite_controller.fire_number(len(work_units))
                                 if work_units:
                                     self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, len(work_units)))
                                 else:

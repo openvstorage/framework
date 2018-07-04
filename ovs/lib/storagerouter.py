@@ -376,7 +376,6 @@ class StorageRouterController(object):
         if fwk_statistics_change is True:
             Configuration.set(key=fwk_statistics_key, value=fwk_statistics_new)
             StorageRouterController._logger.info('Configuring scrubbing statistics')
-            # todo implement service
 
         # Configure stats monkey
         if stats_monkey_change is True:
