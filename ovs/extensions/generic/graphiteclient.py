@@ -18,6 +18,7 @@ import time
 import socket
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.configuration.exceptions import ConfigurationNotFoundException as NotFoundException
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
 
 class GraphiteClient(object):
@@ -26,34 +27,50 @@ class GraphiteClient(object):
     """
 
     def __init__(self, ip=None, port=None):
+        # type: (str, int) -> None
+        """
+        Create client instance for graphite and validate parameters
+        :param ip: IP address of the client to send graphite data towards
+        :type ip: str
+        :param port: port of the UDP listening socket
+        :type port: int
+        """
         config_path = 'ovs/framework/graphite'
-        self.precursor = 'openvstorage.fwk:{0}'
+        self.precursor = 'openvstorage.fwk.{0} {1} {2}'
 
-        if ip is not None:
-            self.ip = ip
-        if port is not None:
-            self.port = port
+        try:
+            graphite_data = Configuration.get(config_path)
+        except NotFoundException:
+            raise RuntimeError('No graphite data found in config path `{0}`'.format(config_path))
 
-        else:
-            try:
-                graphite_data = Configuration.get(config_path)
-                if 'ip' not in graphite_data:
-                    raise RuntimeError('IP needs to be specified in config path `{0}`'.format(config_path))
-            except NotFoundException:
-                raise RuntimeError('No graphite data found in config path `{0}`'.format(config_path))
+        if ip is None:
+            ip = graphite_data['ip']
+        if port is None:
+            port = int(graphite_data.get('port', 2003))
 
-            self.port = graphite_data.get('port', 2003)
-            self.ip = graphite_data['ip']
+        ExtensionsToolbox.verify_required_params(verify_keys=True,
+                                                 actual_params={'ip': ip,
+                                                                'port': port},
+                                                 required_params={'ip': (str, ExtensionsToolbox.regex_ip, True),
+                                                                  'port': (int, {'min': 1025, 'max': 65535}, True)})
+        self.ip = ip
+        self.port = port
 
     def __str__(self):
         return 'Graphite client: ({0}:{1})'.format(self.ip, self.port)
 
-    def send(self, data):
+    def __repr__(self):
+        return str(self)
+
+    def send(self, path, data):
+        # type: (str, float) -> None
         """
-        Send the statistics object to
+        Send the statistics with client
+        :param path: path in graphite to send the data to
         :param data: data to send
-        :return:
+        :return: None
         """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(self.precursor.format(bytes(data)), (self.ip, self.port))
+        datastring = self.precursor.format(path, int(data), int(time.time()))  # Carbon timestamp in integers
+        sock.sendto(datastring, (self.ip, self.port))
         sock.close()

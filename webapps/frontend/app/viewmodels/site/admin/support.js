@@ -120,7 +120,7 @@ define([
                         stats_monkey: self.selectedSupportSettings().contains('stats_monkey'),
                         support_agent: self.selectedSupportSettings().contains('support_agent'),
                         remote_access: self.selectedSupportSettings().contains('remote_access'),
-                        scrub_statistics: self.selectedSupportSettings().contains('scrub_statistics'),
+                        fwk_statistics: self.selectedSupportSettings().contains('fwk_statistics'),
                         stats_monkey_config: self.newStatsMonkeyConfig.toJS()
                     }
                 };
@@ -265,7 +265,9 @@ define([
             $.each(shared.hooks.pages, function(pageType, pages) {
                 if (pageType === 'support') {
                     $.each(pages, function(index, page) {
-                        page.activator.deactivateItem(page.module);
+                        if (page.hasOwnProperty('activator')) {
+                            page.activator.deactivateItem(page.module);
+                        }
                     });
                 }
             });

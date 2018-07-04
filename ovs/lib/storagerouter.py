@@ -211,7 +211,7 @@ class StorageRouterController(object):
                 'support_agent': Configuration.get(key='/ovs/framework/support|support_agent'),
                 'remote_access': Configuration.get(key='ovs/framework/support|remote_access'),
                 'stats_monkey_config': Configuration.get(key='ovs/framework/monitoring/stats_monkey', default={}),
-                'scrub_statistics': Configuration.get(key='ovs/framework/support|scrub_statistics', default=False)}
+                'fwk_statistics': Configuration.get(key='ovs/framework/support|fwk_statistics', default=False)}
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_support_metadata')
@@ -286,7 +286,7 @@ class StorageRouterController(object):
                                                                   'remote_access': (bool, None, False),
                                                                   'support_agent': (bool, None, False),
                                                                   'stats_monkey_config': (dict, None, False),
-                                                                  'scrub_statistics': (bool, None, False)})
+                                                                  'fwk_statistics': (bool, None, False)})
         # All settings are optional, so if nothing is specified, no need to change anything
         if len(support_info) == 0:
             StorageRouterController._logger.warning('Configure support called without any specific settings. Doing nothing')
@@ -303,10 +303,10 @@ class StorageRouterController(object):
         remote_access_old = Configuration.get(key=remote_access_key)
         remote_access_change = remote_access_new is not None and remote_access_old != remote_access_new
 
-        scrub_statistics_key = '/ovs/framework/support|scrub_statistics'
-        scrub_statistics_new = support_info.get('scrub_statistics')
-        scrub_statistics_old = Configuration.get(key=scrub_statistics_key, default=False)
-        scrub_statistics_change = scrub_statistics_new is not None and scrub_statistics_old != scrub_statistics_new
+        fwk_statistics_key = '/ovs/framework/support|fwk_statistics'
+        fwk_statistics_new = support_info.get('fwk_statistics')
+        fwk_statistics_old = Configuration.get(key=fwk_statistics_key, default=False)
+        fwk_statistics_change = fwk_statistics_new is not None and fwk_statistics_old != fwk_statistics_new
 
         stats_monkey_celery_key = '/ovs/framework/scheduling/celery'
         stats_monkey_config_key = '/ovs/framework/monitoring/stats_monkey'
@@ -372,9 +372,9 @@ class StorageRouterController(object):
                         StorageRouterController._service_manager.remove_service(name=service_name, client=root_client)
 
         # Configure scrubbing statistics
-        StorageRouterController._logger.info('statistics:{0}, {1}'.format(scrub_statistics_old, scrub_statistics_new))
-        if scrub_statistics_change is True:
-            Configuration.set(key=scrub_statistics_key, value=scrub_statistics_new)
+        StorageRouterController._logger.info('statistics:{0}, {1}'.format(fwk_statistics_old, fwk_statistics_new))
+        if fwk_statistics_change is True:
+            Configuration.set(key=fwk_statistics_key, value=fwk_statistics_new)
             StorageRouterController._logger.info('Configuring scrubbing statistics')
             # todo implement service
 

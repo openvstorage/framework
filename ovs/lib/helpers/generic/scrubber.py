@@ -47,6 +47,7 @@ from ovs_extensions.storage.exceptions import AssertException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.graphite import GraphiteController
 
 
 class ScrubShared(object):
@@ -521,6 +522,7 @@ class StackWorker(ScrubShared):
                         lease_interval = Configuration.get('/ovs/vpools/{0}/scrub/tweaks|locked_lease_interval'.format(self.vpool.guid), default=lease_interval)
                         # Do the actual scrubbing
                         with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id), update_interval_secs=lease_interval) as locked_client:
+                            starttime = time.time()
                             self._logger.info('{0} - vDisk {1} - Retrieve and apply scrub work'.format(log, vdisk.name))
                             work_units = locked_client.get_scrubbing_workunits()
                             for work_unit in work_units:
@@ -529,6 +531,9 @@ class StackWorker(ScrubShared):
                                                           log_sinks=[Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)],
                                                           backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                 locked_client.apply_scrubbing_result(scrubbing_work_result=res)
+                            GraphiteController.fire_duration(start=starttime)
+                            GraphiteController.fire_number(len(work_units))
+
                             if work_units:
                                 self._logger.info('{0} - vDisk {1} - {2} work units successfully applied'.format(log, vdisk.name, len(work_units)))
                             else:
