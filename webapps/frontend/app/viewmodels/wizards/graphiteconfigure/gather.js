@@ -15,14 +15,13 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', './data'
-], function($, ko, data) {
+    'jquery', 'knockout'
+], function($, ko) {
     "use strict";
-    return function() {
+    return function(stepOptions) {
         var self = this;
 
-        // Variables
-        self.data = data;
+        self.data = stepOptions.data;
 
         // Computed
         self.canContinue = ko.computed(function() {

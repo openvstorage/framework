@@ -376,7 +376,7 @@ class StorageRouterController(object):
                         StorageRouterController._service_manager.stop_service(name=service_name, client=root_client)
                         StorageRouterController._service_manager.remove_service(name=service_name, client=root_client)
 
-        # Configure scrubbing statistics
+        # Configure fwk statistics endpoint
         StorageRouterController._logger.info('statistics:{0}, {1}'.format(fwk_statistics_old, fwk_statistics_new))
         if fwk_statistics_change is True:
             if fwk_statistics_new is True:

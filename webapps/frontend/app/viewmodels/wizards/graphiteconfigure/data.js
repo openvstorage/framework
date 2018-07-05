@@ -17,8 +17,9 @@
 define([
 ], function(){
     "use strict";
-    var singleton = function() {
-        return {};
+        return function(newConfig, origConfig){
+            var self = this;
+            self.newConfig = newConfig;
+            self.origConfig = origConfig;
     };
-    return singleton();
 });

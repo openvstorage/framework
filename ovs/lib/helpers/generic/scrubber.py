@@ -458,7 +458,7 @@ class StackWorker(ScrubShared):
     This class represents a worker of the scrubbing stack
     """
 
-    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number):
+    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number, graphite_controller):
         """
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
         :type queue: Queue
@@ -522,6 +522,8 @@ class StackWorker(ScrubShared):
         # Always at least 1 proxy service. Using that name to register items under
         self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_services[0])
         self._state_key = '{0}_state'.format(self._key)  # Key with the combined state for all proxies
+
+        self.graphite_controller = graphite_controller
 
     def deploy_stack_and_scrub(self):
         """
@@ -621,7 +623,6 @@ class StackWorker(ScrubShared):
                             with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id), update_interval_secs=lease_interval) as locked_client:
                                 self._logger.info('{0} - Retrieve and apply scrub work'.format(vdisk_log, vdisk.name))
                                 starttime = time.time()
-                                graphite_controller = GraphiteController()
                                 work_units = locked_client.get_scrubbing_workunits()
                                 for work_unit in work_units:
                                     res = locked_client.scrub(work_unit=work_unit,
@@ -629,8 +630,8 @@ class StackWorker(ScrubShared):
                                                               log_sinks=[Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)],
                                                               backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                     locked_client.apply_scrubbing_result(scrubbing_work_result=res)
-                                graphite_controller.fire_duration(start=starttime)
-                                graphite_controller.fire_number(len(work_units))
+                                self.graphite_controller.fire_duration(start=starttime)
+                                self.graphite_controller.fire_number(len(work_units))
                                 if work_units:
                                     self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, len(work_units)))
                                 else:
@@ -935,6 +936,7 @@ class Scrubber(ScrubShared):
 
     _KEY_LIFETIME = 7 * 24 * 60 * 60  # All job keys are kept for 7 days and after that the next scrubbing job will remove the outdated ones
 
+
     def __init__(self, vpool_guids=None, vdisk_guids=None, storagerouter_guid=None, manual=False, task_id=None):
         """
         :param vpool_guids: Guids of the vPools that need to be scrubbed completely
@@ -987,6 +989,8 @@ class Scrubber(ScrubShared):
         self.max_stacks_per_vpool = None
         self.stack_workers = []  # Unit tests can hook into this variable to do some fiddling
         self.stack_threads = []
+
+        self.graphite_controller = GraphiteController()
 
     @staticmethod
     def setup_for_unittests():
@@ -1085,6 +1089,8 @@ class Scrubber(ScrubShared):
         self.set_main_job_info()
         counter = 0
         vp_work_map = {}
+        graphite_controller = GraphiteController()
+
         for vp, vdisks in self.vpool_vdisk_map.iteritems():
             logging_start = self._format_message('vPool {0}'.format(vp.name))
             # Verify amount of vDisks on vPool
@@ -1107,7 +1113,8 @@ class Scrubber(ScrubShared):
                                            stack_work_handler=stack_work_handler,
                                            job_id=self.job_id,
                                            stacks_to_spawn=stacks_to_spawn,
-                                           stack_number=stack_number)
+                                           stack_number=stack_number,
+                                           graphite_controller=graphite_controller)
                 self.stack_workers.append(stack_worker)
                 stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                args=())

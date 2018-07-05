@@ -35,7 +35,7 @@ class GraphiteClient(object):
         :param port: port of the UDP listening socket
         :type port: int
         """
-        config_path = 'ovs/framework/graphite'
+        config_path = 'ovs/statistics/graphite'
         self.precursor = 'openvstorage.fwk.{0} {1} {2}'
 
         if all(p is None for p in [ip, port]):
@@ -71,6 +71,8 @@ class GraphiteClient(object):
         :return: None
         """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        datastring = self.precursor.format(path, int(data), int(time.time()))  # Carbon timestamp in integers
-        sock.sendto(datastring, (self.ip, self.port))
-        sock.close()
+        try:
+            datastring = self.precursor.format(path, int(data), int(time.time()))  # Carbon timestamp in integers
+            sock.sendto(datastring, (self.ip, self.port))
+        finally:
+            sock.close()

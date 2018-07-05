@@ -17,23 +17,25 @@
 define([
     'jquery', 'ovs/generic',
     '../build', './gather', './data'
-], function($, generic, Build, Gather, data) {
+], function($, generic, Build, Gather, Data) {
     "use strict";
     return function(options) {
         var self = this;
+        // Inherit
         Build.call(self);
-
-        // Variables
-        self.data = data;
-
-        // Cleaning data
-        self.data.newConfig = options.newConfig;
-        self.data.origConfig = options.origConfig;
 
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.graphite.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new Gather()]);
+
+        // Variables
+        var data = new Data(options.newConfig, options.origConfig);
+
+        var stepOptions = {
+            data: data
+        };
+
+        self.steps([new Gather(stepOptions)]);
         self.activateStep();
     };
 });

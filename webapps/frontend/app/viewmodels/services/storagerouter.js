@@ -47,11 +47,11 @@ define([
                 .then(shared.tasks.wait)
         };
         /**
-         * Fetches support info of a StorageRouter
+         * Fetches support settings of a StorageRouter
          * @param storageRouterGuid: Guid of the StorageRouter
          * @return {Promise<T>}
          */
-        self.getSupportSettingsHandle = function(storageRouterGuid) {
+        self.getSupportSettings = function(storageRouterGuid) {
             return api.get('storagerouters/' + storageRouterGuid + '/get_support_info')
                 .then(shared.tasks.wait)
         };
@@ -60,18 +60,18 @@ define([
          * @param storageRouterGuid: Guid of the StorageRouter
          * @return {Promise<T>}
          */
-        self.getSupportMetadataHandle = function(storageRouterGuid) {
+        self.getSupportMetadata = function(storageRouterGuid) {
             return api.get('storagerouters/' + storageRouterGuid + '/get_support_metadata')
                 .then(shared.tasks.wait)
         };
         /**
-         * Fetches support info of a StorageRouter
+         * Sets support info of a StorageRouter
          * @param storageRouterGuid: Guid of the StorageRouter
          * @param metaData: data to post
          * @return {Promise<T>}
          */
-        self.postSupportData = function(storageRouterGuid, metaData) {
-            return api.post('storagerouters/' + storageRouterGuid + '/configure_support', { data: metaData })
+        self.saveSupportData = function(storageRouterGuid, Data) {
+            return api.post('storagerouters/' + storageRouterGuid + '/configure_support', { data: Data })
                 .then(shared.tasks.wait)
         };
     }

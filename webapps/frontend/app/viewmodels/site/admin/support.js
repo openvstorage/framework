@@ -52,7 +52,7 @@ define([
 
         // Handles
         self.supportMetadataHandle = {};
-        self.supportSettings = undefined;
+        self.supportSettingsHandle = undefined;
 
         // Computed
         self.supportSettingsChanged = ko.pureComputed(function() {
@@ -173,7 +173,7 @@ define([
                     $.t('ovs:support.settings.saving_msg')
                 );
                 self.saving(true);
-                storagerouterService.postSupportData(self.storageRouters()[0].guid(), data)
+                storagerouterService.saveSupportData(self.storageRouters()[0].guid(), data)
                     .done(function() {
                         generic.alertSuccess(
                             $.t('ovs:support.settings.saved'),
@@ -226,8 +226,8 @@ define([
                             storageRouter.loading(true);
                             var calls = [];
                             if (index === 0) {  // Support information are cluster-wide settings, so only retrieving for 1st StorageRouter
-                                if (generic.xhrCompleted(self.supportSettings)) {
-                                    self.supportSettings = storagerouterService.getSupportSettingsHandle(storageRouter.guid())
+                                if (generic.xhrCompleted(self.supportSettingsHandle)) {
+                                    self.supportSettingsHandle = storagerouterService.getSupportSettings(storageRouter.guid())
                                         .then(function (data) {
                                             self.clusterID(data.cluster_id);
                                             self.origStatsMonkeyConfig.update(data.stats_monkey_config);
@@ -258,7 +258,7 @@ define([
                                 }
                             }
                             if (generic.xhrCompleted(self.supportMetadataHandle[storageRouter.guid()])) {
-                                self.supportMetadataHandle[storageRouter.guid()] = storagerouterService.getSupportMetadataHandle(storageRouter.guid())
+                                self.supportMetadataHandle[storageRouter.guid()] = storagerouterService.getSupportMetadata(storageRouter.guid())
                                     .then(function (data) {
                                         storageRouter.metadata(data);
                                         storageRouter.versions(data.metadata.versions);
