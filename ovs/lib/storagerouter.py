@@ -286,7 +286,9 @@ class StorageRouterController(object):
                                                                   'remote_access': (bool, None, False),
                                                                   'support_agent': (bool, None, False),
                                                                   'stats_monkey_config': (dict, None, False),
-                                                                  'fwk_statistics': (bool, None, False)})
+                                                                  'fwk_statistics': (bool, None, False),
+                                                                  'fwk_statistics_config': (dict, None, False)
+                                                                  })
         # All settings are optional, so if nothing is specified, no need to change anything
         if len(support_info) == 0:
             StorageRouterController._logger.warning('Configure support called without any specific settings. Doing nothing')
@@ -307,6 +309,9 @@ class StorageRouterController(object):
         fwk_statistics_new = support_info.get('fwk_statistics')
         fwk_statistics_old = Configuration.get(key=fwk_statistics_key, default=False)
         fwk_statistics_change = fwk_statistics_new is not None and fwk_statistics_old != fwk_statistics_new
+        fwk_statistics_config_key = '/ovs/statistics/graphite'
+        fwk_statistics_new_config = support_info.get('fwk_statistics_config')
+        fwk_statistics_old_config = Configuration.get(key=fwk_statistics_config_key, default={})
 
         stats_monkey_celery_key = '/ovs/framework/scheduling/celery'
         stats_monkey_config_key = '/ovs/framework/monitoring/stats_monkey'
@@ -374,8 +379,13 @@ class StorageRouterController(object):
         # Configure scrubbing statistics
         StorageRouterController._logger.info('statistics:{0}, {1}'.format(fwk_statistics_old, fwk_statistics_new))
         if fwk_statistics_change is True:
+            if fwk_statistics_new is True:
+                ExtensionsToolbox.verify_required_params(actual_params=fwk_statistics_new_config,
+                                                         required_params={'host': (str, ExtensionsToolbox.regex_ip),
+                                                                          'port': (int, {'min': 1035, 'max': 65535})})
+                Configuration.set(key=fwk_statistics_config_key, value=fwk_statistics_new_config)
+                StorageRouterController._logger.info('Configured scrubbing statistics')
             Configuration.set(key=fwk_statistics_key, value=fwk_statistics_new)
-            StorageRouterController._logger.info('Configuring scrubbing statistics')
 
         # Configure stats monkey
         if stats_monkey_change is True:

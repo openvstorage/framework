@@ -164,7 +164,8 @@ define([
                         support_agent: self.selectedSupportSettings().contains('support_agent'),
                         remote_access: self.selectedSupportSettings().contains('remote_access'),
                         fwk_statistics: self.selectedSupportSettings().contains('fwk_statistics'),
-                        stats_monkey_config: self.newStatsMonkeyConfig.toJS()
+                        stats_monkey_config: self.newStatsMonkeyConfig.toJS(),
+                        fwk_statistics_config: self.newGraphiteSettings.toJS()
                     }
                 };
                 generic.alertInfo(

@@ -25,7 +25,7 @@ class GraphiteController():
     """
 
     def __init__(self):
-        self._send_statistics = Configuration.get('/ovs/framework/support|fwk_statistics', default=False)
+        self._send_statistics = Configuration.get('/ovs/framework/support', default=False)
         if self._send_statistics:
             self._client = GraphiteClient()
 
