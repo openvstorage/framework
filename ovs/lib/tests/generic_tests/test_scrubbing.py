@@ -34,6 +34,7 @@ from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.generic.scrubber import Scrubber, ScrubShared, StackWorker
+from ovs.lib.graphite import GraphiteController
 
 
 class ScrubTestCase(unittest.TestCase):
@@ -45,6 +46,7 @@ class ScrubTestCase(unittest.TestCase):
         (Re)Sets the stores on every test
         """
         self.volatile, self.persistent = DalHelper.setup()
+        self.graphite_controller = GraphiteController()
 
     def tearDown(self):
         """
@@ -890,7 +892,8 @@ class ScrubTestCase(unittest.TestCase):
                                            stack_work_handler=model_stack_worker.stack_work_handler,
                                            job_id='Another job',
                                            stacks_to_spawn=100,
-                                           stack_number=100)
+                                           stack_number=100,
+                                           graphite_controller=self.graphite_controller)
                 stack_workers.append(stack_worker)
                 stack_worker._test_hooks = {}  # Clear hooks
                 stack_worker._deploy_proxies()
