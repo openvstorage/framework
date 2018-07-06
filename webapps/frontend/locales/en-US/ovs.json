@@ -553,7 +553,7 @@
             "failed_msg": "Failed to apply the settings: __error__",
             "heart_beat": "Heart Beat",
             "remote_access": "Remote Access",
-            "fwk_statistics": "Collect and send scrub result to Grafana",
+            "fwk_statistics": "Collect and send framework statistics to Grafana",
             "save": "Save Settings",
             "saved": "Applied",
             "saved_msg": "The settings have been successfully applied",

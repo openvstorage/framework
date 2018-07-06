@@ -132,7 +132,7 @@ define([
             }
 
             if (showWizard === false) {
-                return true;  // Critical to return True, because returning true makes sure that the default 'click' handler gets triggered too (required for the 'checked' handler
+                return true;
             }
             var wizard = new GraphiteConfigureWizard({
                 modal: true,
@@ -238,22 +238,15 @@ define([
                                             delete data.cluster_id;
                                             delete data.stats_monkey_config;
 
-                                            if (self.allSupportSettings().length === 0) {
+                                            if (self.oldSupportSettings().length === 0) { // Only fetch and apply selected items upon loading of the page
                                                 $.each(data, function(key, boolValue) {
                                                     self.allSupportSettings.push({name: key, func: self.getFunction(key), enable: self.disableSupportSetting(key)});
-                                                });
-
-                                            }
-                                            $.each(data, function(key, boolValue) {
-                                                if (boolValue === true) {
-                                                    if (self.oldSupportSettings.indexOf(key) === -1){
+                                                    if (boolValue === true) {
+                                                        self.selectedSupportSettings.push(key);
                                                         self.oldSupportSettings.push(key);
                                                     }
-                                                    if (self.selectedSupportSettings.indexOf(key) === -1){
-                                                        self.selectedSupportSettings.push(key);
-                                                    }
-                                                }
-                                            });
+                                                });
+                                            }
                                         });
                                 }
                             }

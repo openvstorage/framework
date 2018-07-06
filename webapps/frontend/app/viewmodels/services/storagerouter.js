@@ -67,7 +67,7 @@ define([
         /**
          * Sets support info of a StorageRouter
          * @param storageRouterGuid: Guid of the StorageRouter
-         * @param metaData: data to post
+         * @param Data: data to post
          * @return {Promise<T>}
          */
         self.saveSupportData = function(storageRouterGuid, Data) {
