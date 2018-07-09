@@ -51,7 +51,6 @@ class StatsMonkeyController(StatsMonkey):
         raise RuntimeError('StatsMonkeyController is a static class')
 
     @staticmethod
-    @ovs_task(name='ovs.stats_monkey.run_all', schedule=Schedule(minute='*', hour='*'), ensure_single_info={"mode": "DEFAULT"})
     def run_all():
         """
         Run all the get stats methods from StatsMonkeyController
@@ -149,3 +148,7 @@ class StatsMonkeyController(StatsMonkey):
                 errors = True
                 cls._logger.exception('Retrieving statistics for vPool {0} failed'.format(vpool.name))
         return errors, stats
+
+
+if __name__ == '__main__':
+    StatsMonkeyController.run_all()

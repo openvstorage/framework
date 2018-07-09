@@ -24,10 +24,10 @@ class GraphiteController():
     Graphite Controller that sends or does not send, depending on the saved config setting
     """
 
-    def __init__(self):
-        self._send_statistics = Configuration.get('/ovs/framework/support|fwk_statistics', default=False)
+    def __init__(self, database=None):
+        self._send_statistics = Configuration.get('/ovs/framework/support|stats_monkey', default=False)
         if self._send_statistics:
-            self._client = GraphiteClient()
+            self._client = GraphiteClient(database)
 
     def fire_duration(self, start):
         # type: (float) -> None
@@ -39,7 +39,7 @@ class GraphiteController():
         """
         if self._send_statistics:
             delta = time.time() - start
-            self._client.send(path='scrubber.duration_jobs', data=delta)
+            self._client.send(path='duration_jobs', data=delta)
 
     def fire_number(self, nr_of_jobs):
         # type: (int) -> None
@@ -50,7 +50,20 @@ class GraphiteController():
         :return: None
         """
         if self._send_statistics:
-            self._client.send(path='scrubber.nr_of_jobs', data=nr_of_jobs)
+            self._client.send(path='nr_of_jobs', data=nr_of_jobs)
+
+    def fire_success(self, vdisk_guid, success):
+        # type: (str, bool) -> None
+        """
+        Fire the number of jobs the scrubjob is divided in to Graphite
+        :param vdisk_guid: guid of the scrubbed vdisk
+        :type vdisk_guid: str
+        :param success: whether or not the scrubjob succeeded
+        :type success: bool
+        :return: None
+        """
+        if self._send_statistics:
+            self._client.send(path='succeeded', data=(vdisk_guid, success))
 
     def fire_nsm_capacity(self, capacity):
         # type: (int) -> None

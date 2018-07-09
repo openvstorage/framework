@@ -27,13 +27,13 @@ define([
         var self = this;
 
         self.host        = ko.observable().extend({regex: generic.ipRegex});
-        self.port        = ko.observable(1).extend({numeric: {min: 1, max: 65535}});
-        self.database    = ko.observable().extend({removeWhiteSpaces: null});
+        self.port        = ko.observable(2003).extend({numeric: {min: 1035, max: 65535}});
+        self.database    = ko.observable('openvstorage.fwk').extend({removeWhiteSpaces: null});
         self.username    = ko.observable().extend({removeWhiteSpaces: null});
         self.password    = ko.observable().extend({removeWhiteSpaces: null});
         self.interval    = ko.observable(1).extend({numeric: {min: 1, max: 86400}});
         self.transport   = ko.observable();
-        self.transports  = ko.observableArray(['influxdb', 'redis']);
+        self.transports  = ko.observableArray(['influxdb', 'redis','graphite']);
         self.environment = ko.observable().extend({removeWhiteSpaces: null});
 
         BaseContainer.call(this);
@@ -82,7 +82,7 @@ define([
                 fields.push('username');
                 reasons.push($.t('ovs:wizards.stats_monkey_configure.username_required'));
             }
-            if (self.password() === undefined || self.password() === '') {
+            if ((self.password() === undefined || self.password() === '') && (self.transport() === 'influxdb' ||  self.transport() === 'redis')) {
                 fields.push('password');
                 reasons.push($.t('ovs:wizards.stats_monkey_configure.password_required'));
             }

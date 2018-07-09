@@ -26,7 +26,7 @@ class GraphiteClient(object):
     Make a statistics object, which allows it to be sent to Graphite
     """
 
-    def __init__(self, ip=None, port=None):
+    def __init__(self, ip=None, port=None, database=None):
         # type: (str, int) -> None
         """
         Create client instance for graphite and validate parameters
@@ -35,8 +35,14 @@ class GraphiteClient(object):
         :param port: port of the UDP listening socket
         :type port: int
         """
-        config_path = 'ovs/statistics/graphite'
-        self.precursor = 'openvstorage.fwk.{0} {1} {2}'
+        config_path = '/ovs/framework/monitoring/stats_monkey'
+
+        #todo create logger
+        precursor = 'openvstorage.fwk.'
+        if database is not None:
+            precursor= precursor + database + '.'
+            #todo test format of databasestring voor GUI
+        self.precursor = precursor + '{0} {1} {2}'
 
         if all(p is None for p in [ip, port]):
             # Nothing specified
@@ -45,13 +51,13 @@ class GraphiteClient(object):
             except NotFoundException:
                 raise RuntimeError('No graphite data found in config path `{0}`'.format(config_path))
 
-        ip = ip or graphite_data['ip']
+        ip = ip or graphite_data['host']
         port = port or graphite_data.get('port', 2003)
 
         ExtensionsToolbox.verify_required_params(verify_keys=True,
-                                                 actual_params={'ip': ip,
+                                                 actual_params={'host': ip,
                                                                 'port': port},
-                                                 required_params={'ip': (str, ExtensionsToolbox.regex_ip, True),
+                                                 required_params={'host': (str, ExtensionsToolbox.regex_ip, True),
                                                                   'port': (int, {'min': 1025, 'max': 65535}, True)})
         self.ip = ip
         self.port = port
@@ -63,7 +69,7 @@ class GraphiteClient(object):
         return str(self)
 
     def send(self, path, data):
-        # type: (str, float) -> None
+        # type: (str, Any) -> None
         """
         Send the statistics with client
         :param path: path in graphite to send the data to
@@ -72,7 +78,38 @@ class GraphiteClient(object):
         """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            datastring = self.precursor.format(path, int(data), int(time.time()))  # Carbon timestamp in integers
+            datastring = self.precursor.format(path, data, int(time.time()))  # Carbon timestamp in integers
             sock.sendto(datastring, (self.ip, self.port))
         finally:
             sock.close()
+
+    def send_statsmonkey_data(self, sm_data, function_name):
+        # type: (List, str) -> None
+        """
+        Sends statsmonkey formatted data to graphite
+        :param sm_data: list
+        Example format:
+             [{'fields': {'capacity': 100,
+                          'load': 1.0,
+                          'masters': 1,
+                          'slaves': 0},
+               'measurement': 'mds',
+               'tags': {'environment': u'simon_stats_test',
+                        'mds_number': 0,
+                        'storagerouter_name': u'svdb_01',
+                        'vpool_name': u'vp1'}}]
+        :param function_name: Name of the statsmonkey being executed
+        :type function_name: str
+        :return None
+        """
+        # todo test incoming data
+        for datapointset in sm_data:
+            path = '.'.join([function_name,
+                             datapointset['tags'].get('environment'),
+                             datapointset['tags'].get('vpool_name') or '__',  # If the key is not present, place a __ to make later removal possible
+                             datapointset['tags'].get('storagerouter_name') or '__',
+                             str(datapointset['tags'].get('mds_number') or '__')])
+            path = path.replace('.__', '', 4) #todo replace or not
+            for fieldkey, fieldvalue in datapointset['fields'].items():
+                tmp_path = '{0}.{1}'.format(path, fieldkey)
+                self.send(tmp_path, fieldvalue)

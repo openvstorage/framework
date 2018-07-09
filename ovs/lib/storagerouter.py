@@ -210,8 +210,7 @@ class StorageRouterController(object):
                 'stats_monkey': not stats_monkey_disabled,
                 'support_agent': Configuration.get(key='/ovs/framework/support|support_agent'),
                 'remote_access': Configuration.get(key='ovs/framework/support|remote_access'),
-                'stats_monkey_config': Configuration.get(key='ovs/framework/monitoring/stats_monkey', default={}),
-                'fwk_statistics': Configuration.get(key='ovs/framework/support|fwk_statistics', default=False)}
+                'stats_monkey_config': Configuration.get(key='ovs/framework/monitoring/stats_monkey', default={})}
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.get_support_metadata')
@@ -285,9 +284,9 @@ class StorageRouterController(object):
                                                  required_params={'stats_monkey': (bool, None, False),
                                                                   'remote_access': (bool, None, False),
                                                                   'support_agent': (bool, None, False),
-                                                                  'stats_monkey_config': (dict, None, False),
-                                                                  'fwk_statistics': (bool, None, False),
-                                                                  'fwk_statistics_config': (dict, None, False)
+                                                                  # 'fwk_statistics': (bool, None, False),
+                                                                  # 'fwk_statistics_config': (dict, None, False)
+                                                                  'stats_monkey_config': (dict, None, False)
                                                                   })
         # All settings are optional, so if nothing is specified, no need to change anything
         if len(support_info) == 0:
@@ -305,16 +304,17 @@ class StorageRouterController(object):
         remote_access_old = Configuration.get(key=remote_access_key)
         remote_access_change = remote_access_new is not None and remote_access_old != remote_access_new
 
-        fwk_statistics_key = '/ovs/framework/support|fwk_statistics'
-        fwk_statistics_new = support_info.get('fwk_statistics')
-        fwk_statistics_old = Configuration.get(key=fwk_statistics_key, default=False)
-        fwk_statistics_change = fwk_statistics_new is not None and fwk_statistics_old != fwk_statistics_new
-        fwk_statistics_config_key = '/ovs/statistics/graphite'
-        fwk_statistics_new_config = support_info.get('fwk_statistics_config')
-        fwk_statistics_old_config = Configuration.get(key=fwk_statistics_config_key, default={})
+        # fwk_statistics_key = '/ovs/framework/support|fwk_statistics'
+        # fwk_statistics_new = support_info.get('fwk_statistics')
+        # fwk_statistics_old = Configuration.get(key=fwk_statistics_key, default=False)
+        # fwk_statistics_change = fwk_statistics_new is not None and fwk_statistics_old != fwk_statistics_new
+        # fwk_statistics_config_key = '/ovs/statistics/graphite'
+        # fwk_statistics_new_config = support_info.get('fwk_statistics_config')
+        # fwk_statistics_old_config = Configuration.get(key=fwk_statistics_config_key, default={})
 
         stats_monkey_celery_key = '/ovs/framework/scheduling/celery'
         stats_monkey_config_key = '/ovs/framework/monitoring/stats_monkey'
+        stats_monkey_support_key = '/ovs/framework/support|statsmonkey'
         stats_monkey_new_config = support_info.get('stats_monkey_config')
         stats_monkey_old_config = Configuration.get(key=stats_monkey_config_key, default={})
         stats_monkey_celery_config = Configuration.get(key=stats_monkey_celery_key, default={})
@@ -341,9 +341,11 @@ class StorageRouterController(object):
                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                       'database': (str, None),
                                                                       'interval': (int, {'min': 1, 'max': 86400}),
-                                                                      'password': (str, None),
-                                                                      'transport': (str, ['influxdb', 'redis']),
+                                                                      'transport': (str, ['influxdb', 'redis', 'graphite']),
                                                                       'environment': (str, None)})
+            if stats_monkey_new_config['transport'] in ['influxdb', 'reddis']:
+                ExtensionsToolbox.verify_required_params(actual_params=stats_monkey_new_config, required_params={'password': (str, None)})
+
             if stats_monkey_new_config['transport'] == 'influxdb':
                 ExtensionsToolbox.verify_required_params(actual_params=stats_monkey_new_config, required_params={'username': (str, None)})
 
@@ -375,17 +377,6 @@ class StorageRouterController(object):
                     if StorageRouterController._service_manager.has_service(name=service_name, client=root_client):
                         StorageRouterController._service_manager.stop_service(name=service_name, client=root_client)
                         StorageRouterController._service_manager.remove_service(name=service_name, client=root_client)
-
-        # Configure fwk statistics endpoint
-        StorageRouterController._logger.info('statistics:{0}, {1}'.format(fwk_statistics_old, fwk_statistics_new))
-        if fwk_statistics_change is True:
-            if fwk_statistics_new is True:
-                ExtensionsToolbox.verify_required_params(actual_params=fwk_statistics_new_config,
-                                                         required_params={'host': (str, ExtensionsToolbox.regex_ip),
-                                                                          'port': (int, {'min': 1035, 'max': 65535})})
-                Configuration.set(key=fwk_statistics_config_key, value=fwk_statistics_new_config)
-                StorageRouterController._logger.info('Configured scrubbing statistics')
-            Configuration.set(key=fwk_statistics_key, value=fwk_statistics_new)
 
         # Configure stats monkey
         if stats_monkey_change is True:

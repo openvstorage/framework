@@ -38,8 +38,6 @@ define([
         // View Models
         self.newStatsMonkeyConfig  = new StatsMonkeyConfigVM();  // New configured settings for the stats monkey
         self.origStatsMonkeyConfig = new StatsMonkeyConfigVM();  // Currently configured settings for the stats monkey
-        self.newGraphiteSettings   = new GraphiteSettingsVM();
-        self.origGraphiteSettings   = new GraphiteSettingsVM();
 
         // Observables
         self.allSupportSettings      = ko.observableArray([]);  // All possible configurable settings regarding support agent, stats monkey and remote access for the entire cluster
@@ -58,8 +56,7 @@ define([
         self.supportSettingsChanged = ko.pureComputed(function() {
             // Computed used for enabling/disabling the 'Save Settings' button
             return !self.selectedSupportSettings().sort().equals(self.oldSupportSettings().sort()) ||
-                   (self.newStatsMonkeyConfig.isInitialized() && self.newStatsMonkeyConfig.toJSON() !== self.origStatsMonkeyConfig.toJSON()) ||
-                   (self.newGraphiteSettings.isInitialized() && self.newGraphiteSettings.toJSON() !== self.origGraphiteSettings.toJSON());
+                   (self.newStatsMonkeyConfig.isInitialized() && self.newStatsMonkeyConfig.toJSON() !== self.origStatsMonkeyConfig.toJSON())
         });
         self.lastHeartbeat = ko.computed(function() {
             var timestamp = undefined, currentTimestamp;
@@ -121,40 +118,6 @@ define([
             dialog.show(wizard);
             return true;  // Critical to return True, otherwise knockout can't handle a click + checked event
         };
-        self.configureGraphite = function(edit) {
-            var showWizard = false;
-            if (edit === true) {
-                showWizard = true;
-            } else {
-                if (!self.selectedSupportSettings().contains('fwk_statistics') && self.origGraphiteSettings.isInitialized() === false) {
-                    showWizard = true;
-                }
-            }
-
-            if (showWizard === false) {
-                return true;
-            }
-            var wizard = new GraphiteConfigureWizard({
-                modal: true,
-                newConfig: self.newGraphiteSettings,
-                origConfig: new GraphiteSettingsVM(self.origGraphiteSettings.toJS())
-            });
-            wizard.closing.always(function() {
-                if (self.origGraphiteSettings.isInitialized() === false) {
-                    var index = self.selectedSupportSettings.indexOf('fwk_statistics');
-                    if (index > -1) {
-                        self.selectedSupportSettings.splice(index, 1);
-                    }
-                }
-            });
-            wizard.finishing.always(function() {
-                if (self.supportSettingsChanged() === true) {
-                    self.save();
-                }
-            });
-            dialog.show(wizard);
-            return true;  // Critical to return True, otherwise knockout can't handle a click + checked event
-        };
 
         self.save = function() {
             if (self.storageRouters().length > 0) {
@@ -163,9 +126,7 @@ define([
                         stats_monkey: self.selectedSupportSettings().contains('stats_monkey'),
                         support_agent: self.selectedSupportSettings().contains('support_agent'),
                         remote_access: self.selectedSupportSettings().contains('remote_access'),
-                        fwk_statistics: self.selectedSupportSettings().contains('fwk_statistics'),
-                        stats_monkey_config: self.newStatsMonkeyConfig.toJS(),
-                        fwk_statistics_config: self.newGraphiteSettings.toJS()
+                        stats_monkey_config: self.newStatsMonkeyConfig.toJS()
                     }
                 };
                 generic.alertInfo(
@@ -211,7 +172,7 @@ define([
                         });
                         generic.crossFiller(
                             guids, self.storageRouters,
-                            function (guid) {
+                            function(guid) {
                                 var sr = new StorageRouter(guid);
                                 sr.metadata = ko.observable('');
                                 sr.versions = ko.observable({});
@@ -228,7 +189,7 @@ define([
                             if (index === 0) {  // Support information are cluster-wide settings, so only retrieving for 1st StorageRouter
                                 if (generic.xhrCompleted(self.supportSettingsHandle)) {
                                     self.supportSettingsHandle = storagerouterService.getSupportSettings(storageRouter.guid())
-                                        .then(function (data) {
+                                        .then(function(data) {
                                             self.clusterID(data.cluster_id);
                                             self.origStatsMonkeyConfig.update(data.stats_monkey_config);
 

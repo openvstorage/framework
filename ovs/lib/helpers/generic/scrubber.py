@@ -592,6 +592,7 @@ class StackWorker(ScrubShared):
                     try:
                         # Check MDS master is local. Trigger MDS handover if necessary
                         vdisk = rem.VDisk(vdisk_guid)
+                        scrubbing_succeeded = False
                         vdisk_log = '{0} - vDisk {1} with guid {2} and volume id {3}'.format(log, vdisk.name, vdisk.guid, vdisk.volume_id)
                         self._logger.info('{0} - Started scrubbing at location {1}'.format(vdisk_log, self.scrub_directory))
                         configs = _verify_mds_config(current_vdisk=vdisk)
@@ -630,6 +631,7 @@ class StackWorker(ScrubShared):
                                                               log_sinks=[Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)],
                                                               backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                     locked_client.apply_scrubbing_result(scrubbing_work_result=res)
+                                scrubbing_succeeded = True
                                 self.graphite_controller.fire_duration(start=starttime)
                                 self.graphite_controller.fire_number(len(work_units))
                                 if work_units:
@@ -641,6 +643,7 @@ class StackWorker(ScrubShared):
                             raise
                         finally:
                             self.stack_work_handler.unregister_vdisk_for_scrub(vdisk_guid, registrator, scrub_exception)
+                            self.graphite_controller.fire_success(vdisk_guid, scrubbing_succeeded)
                             if 'post_vdisk_scrub_unregistration' in self._test_hooks:
                                 self._test_hooks['post_vdisk_scrub_unregistration'](self, vdisk_guid)
                     except Exception as ex:
@@ -990,7 +993,7 @@ class Scrubber(ScrubShared):
         self.stack_workers = []  # Unit tests can hook into this variable to do some fiddling
         self.stack_threads = []
 
-        self.graphite_controller = GraphiteController()
+        self.graphite_controller = GraphiteController(database='scrubber')
 
     @staticmethod
     def setup_for_unittests():

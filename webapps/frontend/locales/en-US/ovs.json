@@ -1284,7 +1284,8 @@
             "title": "Collect Statistics",
             "transport_types": {
                 "influxdb": "InfluxDB",
-                "redis": "Redis"
+                "redis": "Redis",
+                "graphite": "Graphite"
             },
             "type": "Type:",
             "username": "Username:",
