@@ -61,6 +61,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <b data-i18n="ovs:support.settings.title"></b>
                 </div>
                 <div class="panel-body">
+                    <span data-bind="text: $data.selectedSupportSettings()"></span>
                     <!-- ko foreach: allSupportSettings -->
                         <input type="checkbox" title="" data-bind="click: $data.func, value: $data.name, enable: $data.enable, checked: $parent.selectedSupportSettings, attr: {id: $data.name}"/>
                         <label data-bind="attr: {for: $data.name}, translate: 'ovs:support.settings.' + $data.name"></label>

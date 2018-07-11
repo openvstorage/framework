@@ -17,7 +17,7 @@
 define([
     'jquery', 'ovs/generic',
     '../build', './gather', './data'
-], function($, generic, Build, Gather, data) {
+], function($, generic, Build, Gather, Data) {
     "use strict";
     return function(options) {
         var self = this;
@@ -27,13 +27,17 @@ define([
         self.data = data;
 
         // Cleaning data
-        self.data.newConfig = options.newConfig;
-        self.data.origConfig = options.origConfig;
+        // Variables
+        var data = new Data(options.newConfig, options.origConfig);
+
+        var stepOptions = {
+            data: data
+        };
 
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.stats_monkey_configure.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new Gather()]);
+        self.steps([new Gather(stepOptions)]);
         self.activateStep();
     };
 });

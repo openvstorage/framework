@@ -553,6 +553,7 @@
             "failed_msg": "Failed to apply the settings: __error__",
             "heart_beat": "Heart Beat",
             "remote_access": "Remote Access",
+            "fwk_statistics": "Collect and send framework statistics to Grafana",
             "save": "Save Settings",
             "saved": "Applied",
             "saved_msg": "The settings have been successfully applied",
@@ -1132,6 +1133,13 @@
                 "title": "Extend vPool __name__"
             }
         },
+        "graphite":{
+            "title": "Configure the Graphite host settings",
+            "host": "Host IP",
+            "port": "Host port",
+            "host_required": "A host IP is required to configure Graphite statistics",
+            "port_required": "No host port is given. Default port 2003 will be used."
+        },
         "reconfigure_vpool": {
             "gather_block_cache": {
                 "alba_backend": "Backend:",
@@ -1276,7 +1284,8 @@
             "title": "Collect Statistics",
             "transport_types": {
                 "influxdb": "InfluxDB",
-                "redis": "Redis"
+                "redis": "Redis",
+                "graphite": "Graphite"
             },
             "type": "Type:",
             "username": "Username:",

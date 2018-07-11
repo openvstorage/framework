@@ -18,11 +18,11 @@ define([
     'jquery', 'knockout', './data'
 ], function($, ko, data) {
     "use strict";
-    return function() {
+    return function(stepOptions) {
         var self = this;
 
         // Variables
-        self.data = data;
+        self.data = stepOptions.data;
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -32,14 +32,13 @@ define([
 
         // Functions
         self.finish = function() {
-            return $.Deferred(function(deferred) {
+            return $.when().then(function () {
                 var origConfig = self.data.origConfig.toJS();
                 if (self.data.origConfig.transport() === 'influxdb') {
                     origConfig.username = self.data.origConfig.username()
                 }
                 self.data.newConfig.update(origConfig);  // Passed by reference from main support page
-                deferred.resolve(true);
-            }).promise();
+            })
         };
     };
 });
