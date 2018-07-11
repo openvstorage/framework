@@ -525,6 +525,9 @@ class StackWorker(ScrubShared):
         threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
         self.amount_threads = Configuration.get(key=threads_key, default=2)
 
+        if not isinstance(self.amount_threads, int):
+            raise RuntimeError('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
+
     def deploy_stack_and_scrub(self):
         """
         Executes scrub work for a given vDisk queue and vPool, based on scrub_info
@@ -543,9 +546,6 @@ class StackWorker(ScrubShared):
 
         # Execute the actual scrubbing
         threads = []
-        if not isinstance(self.amount_threads, int):
-            self.error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
-            return
 
         amount_threads = max(self.amount_threads, 1)  # Make sure amount_threads is at least 1
         amount_threads = min(min(self.queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
@@ -1106,15 +1106,15 @@ class Scrubber(ScrubShared):
                                                job_id=self.job_id,
                                                stacks_to_spawn=stacks_to_spawn,
                                                stack_number=stack_number)
-                    self.stack_workers.append(stack_worker)
-                    stack = Thread(target=stack_worker.deploy_stack_and_scrub,
-                               args=())
-                    stack.start()
-                    self.stack_threads.append(stack)
                 except Exception as ex:
                     self._logger.exception(ex)
-                finally:
-                    counter += 1
+                    continue
+                self.stack_workers.append(stack_worker)
+                stack = Thread(target=stack_worker.deploy_stack_and_scrub,
+                           args=())
+                stack.start()
+                self.stack_threads.append(stack)
+                counter += 1
 
         if 'post_stack_worker_deployment' in self._test_hooks:
             self._test_hooks['post_stack_worker_deployment'](self)
