@@ -19,7 +19,7 @@ from ovs.extensions.generic.graphiteclient import GraphiteClient
 from ovs.extensions.generic.configuration import Configuration
 
 
-class GraphiteController():
+class GraphiteController(object):
     """
     Graphite Controller that sends or does not send, depending on the saved config setting
     """
@@ -27,6 +27,7 @@ class GraphiteController():
     def __init__(self, database=None):
         celery_scheduling = Configuration.get(key='/ovs/framework/scheduling/celery', default={})
         self._send_statistics = any(celery_scheduling.get(key) is not None for key in ['ovs.stats_monkey.run_all', 'alba.stats_monkey.run_all'])
+        self._client = None
         if self._send_statistics:
             self._client = GraphiteClient(database=database)
 

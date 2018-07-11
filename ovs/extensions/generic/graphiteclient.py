@@ -18,17 +18,18 @@ import time
 import socket
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.configuration.exceptions import ConfigurationNotFoundException as NotFoundException
+from ovs_extensions.generic.graphiteclient import GraphiteClient as _graphite_client
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
-from ovs.extensions.generic.logger import Logger
 
 
-class GraphiteClient(object):
+class GraphiteClient(_graphite_client):
     """
-    Make a statistics object, which allows it to be sent to Graphite
+    Make a Graphite client, which allows data to be sent to Graphite
     """
+    CONFIG_PATH = '/ovs/framework/monitoring/stats_monkey'
 
     def __init__(self, ip=None, port=None, database=None):
-        # type: (str, int) -> None
+        # type: (str, int, str) -> None
         """
         Create client instance for graphite and validate parameters
         :param ip: IP address of the client to send graphite data towards
@@ -37,22 +38,13 @@ class GraphiteClient(object):
         :type port: int
         :param database: name of the database
         :type database: str
-        ":param env:
         """
-        config_path = '/ovs/framework/monitoring/stats_monkey'
-        self.logger = Logger(name='lib')
-
-        precursor = 'openvstorage.fwk'
-        if database is not None and not database.startswith(precursor):
-            precursor = '.'.join([precursor, database])
-        self.precursor = precursor + '.{0} {1} {2}'   # format: precusor.env.x.y.z value timestamp
-
         if all(p is None for p in [ip, port]):
             # Nothing specified
             try:
-                graphite_data = Configuration.get(config_path)
+                graphite_data = Configuration.get(self.CONFIG_PATH)
             except NotFoundException:
-                raise RuntimeError('No graphite data found in config path `{0}`'.format(config_path))
+                raise RuntimeError('No graphite data found in config path `{0}`'.format(self.CONFIG_PATH))
 
         ip = ip or graphite_data['host']
         port = port or graphite_data.get('port', 2003)
@@ -62,29 +54,8 @@ class GraphiteClient(object):
                                                                 'port': port},
                                                  required_params={'host': (str, ExtensionsToolbox.regex_ip, True),
                                                                   'port': (int, {'min': 1025, 'max': 65535}, True)})
-        self.ip = ip
-        self.port = port
 
-    def __str__(self):
-        return 'Graphite client: ({0}:{1})'.format(self.ip, self.port)
-
-    def __repr__(self):
-        return str(self)
-
-    def send(self, path, data):
-        # type: (str, Any) -> None
-        """
-        Send the statistics with client
-        :param path: path in graphite to send the data to
-        :param data: data to send
-        :return: None
-        """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            datastring = self.precursor.format(path, data, int(time.time()))  # Carbon timestamp in integers
-            sock.sendto(datastring, (self.ip, self.port))
-        finally:
-            sock.close()
+        super(GraphiteClient, self).__init__(ip=ip, port=port, database=database)
 
     def send_statsmonkey_data(self, sm_data, function_name):
         # type: (List, str) -> None
