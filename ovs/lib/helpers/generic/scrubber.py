@@ -522,6 +522,9 @@ class StackWorker(ScrubShared):
         self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_services[0])
         self._state_key = '{0}_state'.format(self._key)  # Key with the combined state for all proxies
 
+        threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
+        self.amount_threads = Configuration.get(key=threads_key, default=2)
+
     def deploy_stack_and_scrub(self):
         """
         Executes scrub work for a given vDisk queue and vPool, based on scrub_info
@@ -540,13 +543,11 @@ class StackWorker(ScrubShared):
 
         # Execute the actual scrubbing
         threads = []
-        threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
-        amount_threads = Configuration.get(key=threads_key, default=2)
-        if not isinstance(amount_threads, int):
+        if not isinstance(self.amount_threads, int):
             self.error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
             return
 
-        amount_threads = max(amount_threads, 1)  # Make sure amount_threads is at least 1
+        amount_threads = max(self.amount_threads, 1)  # Make sure amount_threads is at least 1
         amount_threads = min(min(self.queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
         self._logger.info('{0} - Spawning {1} threads for proxy services {2}'.format(self._log, amount_threads, ', '.join(self.alba_proxy_services)))
         for index in range(amount_threads):
@@ -1095,21 +1096,25 @@ class Scrubber(ScrubShared):
             self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
             for stack_number in xrange(stacks_to_spawn):
                 scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
-                stack_worker = StackWorker(queue=vpool_queue,
-                                           vpool=vp,
-                                           scrub_info=scrub_target,
-                                           error_messages=self.error_messages,
-                                           worker_contexts=self.worker_contexts,
-                                           stack_work_handler=stack_work_handler,
-                                           job_id=self.job_id,
-                                           stacks_to_spawn=stacks_to_spawn,
-                                           stack_number=stack_number)
-                self.stack_workers.append(stack_worker)
-                stack = Thread(target=stack_worker.deploy_stack_and_scrub,
+                try:
+                    stack_worker = StackWorker(queue=vpool_queue,
+                                               vpool=vp,
+                                               scrub_info=scrub_target,
+                                               error_messages=self.error_messages,
+                                               worker_contexts=self.worker_contexts,
+                                               stack_work_handler=stack_work_handler,
+                                               job_id=self.job_id,
+                                               stacks_to_spawn=stacks_to_spawn,
+                                               stack_number=stack_number)
+                    self.stack_workers.append(stack_worker)
+                    stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                args=())
-                stack.start()
-                self.stack_threads.append(stack)
-                counter += 1
+                    stack.start()
+                    self.stack_threads.append(stack)
+                except Exception as ex:
+                    self._logger.exception(ex)
+                finally:
+                    counter += 1
 
         if 'post_stack_worker_deployment' in self._test_hooks:
             self._test_hooks['post_stack_worker_deployment'](self)
