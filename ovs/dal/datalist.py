@@ -330,6 +330,7 @@ class DataList(object):
                    complex queries are possible
         """
         from ovs.dal.dataobject import DataObject
+
         hybrid_structure = HybridRunner.get_hybrids()
         query_object_id = Descriptor(self._object_type).descriptor['identifier']
         if query_object_id in hybrid_structure and query_object_id != hybrid_structure[query_object_id]['identifier']:
