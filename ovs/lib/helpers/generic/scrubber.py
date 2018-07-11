@@ -1116,14 +1116,16 @@ class Scrubber(ScrubShared):
                                                stack_work_handler=stack_work_handler,
                                                job_id=self.job_id,
                                                stacks_to_spawn=stacks_to_spawn,
-                                               stack_number=stack_number)
+                                               stack_number=stack_number,
+                                               graphite_controller=self.graphite_controller)
                 except Exception as ex:
-                    self._logger.exception(ex)
+                    self.error_messages.append(str(ex))
+                    self._logger.exception(str(ex))
                     continue
 
                 self.stack_workers.append(stack_worker)
                 stack = Thread(target=stack_worker.deploy_stack_and_scrub,
-                           args=())
+                               args=())
                 stack.start()
                 self.stack_threads.append(stack)
                 counter += 1
