@@ -25,53 +25,59 @@ class GraphiteController():
     """
 
     def __init__(self, database=None):
-        self._send_statistics = Configuration.get('/ovs/framework/support|stats_monkey', default=False)
+        celery_scheduling = Configuration.get(key='/ovs/framework/scheduling/celery', default={})
+        self._send_statistics = any(celery_scheduling.get(key) is not None for key in ['ovs.stats_monkey.run_all', 'alba.stats_monkey.run_all'])
         if self._send_statistics:
-            self._client = GraphiteClient(database)
+            self._client = GraphiteClient(database=database)
 
-    def fire_duration(self, start):
-        # type: (float) -> None
+    def send_scrubjob_duration(self, vdisk_guid, start):
+        # type: (str, float) -> None
         """
         Fire the duration of the scrubjob to Graphite
-        :param start: starttime in seconds
-        :type start: float
+        :param vdisk_guid: guid of the scrubbed vdisk
+        :type vdisk_guid: str
+        :param start: number of jobs
+        :type start: int
+        :return: None
         :return:
         """
         if self._send_statistics:
             delta = time.time() - start
-            self._client.send(path='duration_jobs', data=delta)
+            self._client.send(path='duration_of_jobs.{0}'.format(vdisk_guid), data=delta)
 
-    def fire_number(self, nr_of_jobs):
-        # type: (int) -> None
-        """
-        Fire the number of jobs the scrubjob is divided in to Graphite
-        :param nr_of_jobs: number of jobs
-        :type nr_of_jobs: int
-        :return: None
-        """
-        if self._send_statistics:
-            self._client.send(path='nr_of_jobs', data=nr_of_jobs)
-
-    def fire_success(self, vdisk_guid, success):
-        # type: (str, bool) -> None
+    def send_scrubjob_worker_units(self, vdisk_guid, nr_of_workers):
+        # type: (str, int) -> None
         """
         Fire the number of jobs the scrubjob is divided in to Graphite
         :param vdisk_guid: guid of the scrubbed vdisk
         :type vdisk_guid: str
-        :param success: whether or not the scrubjob succeeded
-        :type success: bool
+        :param nr_of_workers: number of jobs
+        :type nr_of_workers: int
         :return: None
         """
         if self._send_statistics:
-            self._client.send(path='succeeded', data=(vdisk_guid, success))
+            self._client.send(path='nr_of_worker_units.{0}'.format(vdisk_guid), data=nr_of_workers)
 
-    def fire_nsm_capacity(self, capacity):
-        # type: (int) -> None
+    def send_scrubjob_success(self, vdisk_guid, success):
+        # type: (str, int) -> None
         """
-        Fire the current NSM capacity to Graphite
-        :param capacity: current capacity
-        :type capacity: int
-        :return:
+        Fire whether the scrubjob succeeded or not
+        :param vdisk_guid: guid of the scrubbed vdisk
+        :type vdisk_guid: str
+        :param success: whether or not the scrubjob succeeded
+        :type success: int
+        :return: None
         """
         if self._send_statistics:
-            self._client.send(path='nsm.capacity', data=capacity)
+            self._client.send(path='succeeded.{0}'.format(vdisk_guid), data=1 if success else 0)
+
+    def send_scrubjob_batch_size(self, batch):
+        # type: (int) -> None
+        """
+        Send the scrubjob batch to Graphite
+        :param batch: list of VDisks in the scrubjob
+        :type batch: list
+        :return: None
+        """
+        if self._send_statistics:
+            self._client.send(path='batch_size', data=batch)

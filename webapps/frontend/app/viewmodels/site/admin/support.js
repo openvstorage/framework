@@ -17,13 +17,13 @@
 define([
     'knockout', 'jquery', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher',
-    '../../containers/support/statsmonkey', '../../containers/storagerouter/storagerouter', '../../containers/support/graphitesettings',
-    '../../wizards/statsmonkeyconfigure/index', '../../wizards/graphiteconfigure/index',
+    '../../containers/support/statsmonkey', '../../containers/storagerouter/storagerouter',
+    '../../wizards/statsmonkeyconfigure/index',
     'viewmodels/services/storagerouter'
 ], function(ko, $, dialog,
             shared, generic, Refresher,
-            StatsMonkeyConfigVM, StorageRouter, GraphiteSettingsVM,
-            StatsMonkeyConfigureWizard, GraphiteConfigureWizard,
+            StatsMonkeyConfigVM, StorageRouter,
+            StatsMonkeyConfigureWizard,
             storagerouterService) {
     "use strict";
     return function() {

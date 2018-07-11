@@ -24,12 +24,12 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.monitoring.statsmonkey import StatsMonkey
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
-
 
 class StatsMonkeyController(StatsMonkey):
     """
@@ -50,7 +50,12 @@ class StatsMonkeyController(StatsMonkey):
         """
         raise RuntimeError('StatsMonkeyController is a static class')
 
+    @classmethod
+    def _get_configuration(cls):
+        return Configuration
+
     @staticmethod
+    @ovs_task(name='ovs.stats_monkey.run_all', schedule=Schedule(minute='*', hour='*'), ensure_single_info={"mode": "DEFAULT"})
     def run_all():
         """
         Run all the get stats methods from StatsMonkeyController
@@ -148,7 +153,3 @@ class StatsMonkeyController(StatsMonkey):
                 errors = True
                 cls._logger.exception('Retrieving statistics for vPool {0} failed'.format(vpool.name))
         return errors, stats
-
-
-if __name__ == '__main__':
-    StatsMonkeyController.run_all()

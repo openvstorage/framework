@@ -84,6 +84,8 @@ class ScrubShared(object):
         # Used to lock SSHClient usage. SSHClient should be locked as Paramiko will fork the SSHProcess causing some issues in multithreading context
         self._client_lock = file_mutex('{0}_client_lock'.format(self._SCRUB_NAMESPACE))
         self._client_cluster_lock = volatile_mutex('{0}_client_cluster_lock'.format(self._SCRUB_NAMESPACE), wait=5 * 60)
+        self.graphite_controller = GraphiteController(database='scrubber')
+
 
     @property
     def worker_context(self):
@@ -632,8 +634,8 @@ class StackWorker(ScrubShared):
                                                               backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                     locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                                 scrubbing_succeeded = True
-                                self.graphite_controller.fire_duration(start=starttime)
-                                self.graphite_controller.fire_number(len(work_units))
+                                self.graphite_controller.send_scrubjob_duration(vdisk.guid, start=starttime)
+                                self.graphite_controller.send_scrubjob_worker_units(vdisk.guid, len(work_units))
                                 if work_units:
                                     self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, len(work_units)))
                                 else:
@@ -643,7 +645,7 @@ class StackWorker(ScrubShared):
                             raise
                         finally:
                             self.stack_work_handler.unregister_vdisk_for_scrub(vdisk_guid, registrator, scrub_exception)
-                            self.graphite_controller.fire_success(vdisk_guid, scrubbing_succeeded)
+                            self.graphite_controller.send_scrubjob_success(vdisk_guid, scrubbing_succeeded)
                             if 'post_vdisk_scrub_unregistration' in self._test_hooks:
                                 self._test_hooks['post_vdisk_scrub_unregistration'](self, vdisk_guid)
                     except Exception as ex:
@@ -939,7 +941,6 @@ class Scrubber(ScrubShared):
 
     _KEY_LIFETIME = 7 * 24 * 60 * 60  # All job keys are kept for 7 days and after that the next scrubbing job will remove the outdated ones
 
-
     def __init__(self, vpool_guids=None, vdisk_guids=None, storagerouter_guid=None, manual=False, task_id=None):
         """
         :param vpool_guids: Guids of the vPools that need to be scrubbed completely
@@ -992,8 +993,6 @@ class Scrubber(ScrubShared):
         self.max_stacks_per_vpool = None
         self.stack_workers = []  # Unit tests can hook into this variable to do some fiddling
         self.stack_threads = []
-
-        self.graphite_controller = GraphiteController(database='scrubber')
 
     @staticmethod
     def setup_for_unittests():
@@ -1092,8 +1091,8 @@ class Scrubber(ScrubShared):
         self.set_main_job_info()
         counter = 0
         vp_work_map = {}
-        graphite_controller = GraphiteController()
 
+        self.graphite_controller.send_scrubjob_batch_size(batch=len([vdisk.guid for vp, vdisks in self.vpool_vdisk_map.iteritems() for vdisk in vdisks]))
         for vp, vdisks in self.vpool_vdisk_map.iteritems():
             logging_start = self._format_message('vPool {0}'.format(vp.name))
             # Verify amount of vDisks on vPool
@@ -1117,7 +1116,7 @@ class Scrubber(ScrubShared):
                                            job_id=self.job_id,
                                            stacks_to_spawn=stacks_to_spawn,
                                            stack_number=stack_number,
-                                           graphite_controller=graphite_controller)
+                                           graphite_controller=self.graphite_controller)
                 self.stack_workers.append(stack_worker)
                 stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                args=())

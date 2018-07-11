@@ -19,6 +19,7 @@ import socket
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.configuration.exceptions import ConfigurationNotFoundException as NotFoundException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
+from ovs.extensions.generic.logger import Logger
 
 
 class GraphiteClient(object):
@@ -34,15 +35,17 @@ class GraphiteClient(object):
         :type ip: str
         :param port: port of the UDP listening socket
         :type port: int
+        :param database: name of the database
+        :type database: str
+        ":param env:
         """
         config_path = '/ovs/framework/monitoring/stats_monkey'
+        self.logger = Logger(name='lib')
 
-        #todo create logger
-        precursor = 'openvstorage.fwk.'
-        if database is not None:
-            precursor= precursor + database + '.'
-            #todo test format of databasestring voor GUI
-        self.precursor = precursor + '{0} {1} {2}'
+        precursor = 'openvstorage.fwk'
+        if database is not None and not database.startswith(precursor):
+            precursor = '.'.join([precursor, database])
+        self.precursor = precursor + '.{0} {1} {2}'   # format: precusor.env.x.y.z value timestamp
 
         if all(p is None for p in [ip, port]):
             # Nothing specified
@@ -102,14 +105,13 @@ class GraphiteClient(object):
         :type function_name: str
         :return None
         """
-        # todo test incoming data
         for datapointset in sm_data:
-            path = '.'.join([function_name,
-                             datapointset['tags'].get('environment'),
+            path = '.'.join([datapointset['tags'].get('environment'),
+                             function_name,
                              datapointset['tags'].get('vpool_name') or '__',  # If the key is not present, place a __ to make later removal possible
                              datapointset['tags'].get('storagerouter_name') or '__',
                              str(datapointset['tags'].get('mds_number') or '__')])
-            path = path.replace('.__', '', 4) #todo replace or not
+            path = path.replace('.__', '', 4)
             for fieldkey, fieldvalue in datapointset['fields'].items():
                 tmp_path = '{0}.{1}'.format(path, fieldkey)
                 self.send(tmp_path, fieldvalue)

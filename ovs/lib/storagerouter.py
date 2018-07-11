@@ -204,10 +204,9 @@ class StorageRouterController(object):
         :rtype: dict
         """
         celery_scheduling = Configuration.get(key='/ovs/framework/scheduling/celery', default={})
-        stats_monkey_disabled = 'ovs.stats_monkey.run_all' in celery_scheduling and celery_scheduling['ovs.stats_monkey.run_all'] is None
-        stats_monkey_disabled &= 'alba.stats_monkey.run_all' in celery_scheduling and celery_scheduling['alba.stats_monkey.run_all'] is None
+        stats_monkey_enabled = any(celery_scheduling.get(key) is not None for key in ['ovs.stats_monkey.run_all', 'alba.stats_monkey.run_all'])
         return {'cluster_id': Configuration.get(key='/ovs/framework/cluster_id'),
-                'stats_monkey': not stats_monkey_disabled,
+                'stats_monkey': stats_monkey_enabled,
                 'support_agent': Configuration.get(key='/ovs/framework/support|support_agent'),
                 'remote_access': Configuration.get(key='ovs/framework/support|remote_access'),
                 'stats_monkey_config': Configuration.get(key='ovs/framework/monitoring/stats_monkey', default={})}
@@ -284,10 +283,7 @@ class StorageRouterController(object):
                                                  required_params={'stats_monkey': (bool, None, False),
                                                                   'remote_access': (bool, None, False),
                                                                   'support_agent': (bool, None, False),
-                                                                  # 'fwk_statistics': (bool, None, False),
-                                                                  # 'fwk_statistics_config': (dict, None, False)
-                                                                  'stats_monkey_config': (dict, None, False)
-                                                                  })
+                                                                  'stats_monkey_config': (dict, None, False)})
         # All settings are optional, so if nothing is specified, no need to change anything
         if len(support_info) == 0:
             StorageRouterController._logger.warning('Configure support called without any specific settings. Doing nothing')
@@ -304,17 +300,8 @@ class StorageRouterController(object):
         remote_access_old = Configuration.get(key=remote_access_key)
         remote_access_change = remote_access_new is not None and remote_access_old != remote_access_new
 
-        # fwk_statistics_key = '/ovs/framework/support|fwk_statistics'
-        # fwk_statistics_new = support_info.get('fwk_statistics')
-        # fwk_statistics_old = Configuration.get(key=fwk_statistics_key, default=False)
-        # fwk_statistics_change = fwk_statistics_new is not None and fwk_statistics_old != fwk_statistics_new
-        # fwk_statistics_config_key = '/ovs/statistics/graphite'
-        # fwk_statistics_new_config = support_info.get('fwk_statistics_config')
-        # fwk_statistics_old_config = Configuration.get(key=fwk_statistics_config_key, default={})
-
         stats_monkey_celery_key = '/ovs/framework/scheduling/celery'
         stats_monkey_config_key = '/ovs/framework/monitoring/stats_monkey'
-        stats_monkey_support_key = '/ovs/framework/support|statsmonkey'
         stats_monkey_new_config = support_info.get('stats_monkey_config')
         stats_monkey_old_config = Configuration.get(key=stats_monkey_config_key, default={})
         stats_monkey_celery_config = Configuration.get(key=stats_monkey_celery_key, default={})
@@ -390,7 +377,7 @@ class StorageRouterController(object):
                 # The scheduled task cannot be configured to run more than once a minute, so for intervals < 60, the stats monkey task handles this itself
                 StorageRouterController._logger.debug('Requested interval to run at: {0}'.format(interval))
                 Configuration.set(key=stats_monkey_config_key, value=stats_monkey_new_config)
-                if interval > 60:
+                if interval > 0:
                     days, hours, minutes, _ = ExtensionsToolbox.convert_to_days_hours_minutes_seconds(seconds=interval)
                     if days == 1:  # Max interval is 24 * 60 * 60, so once every day at 3 AM
                         schedule = {'hour': '3'}
