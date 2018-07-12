@@ -167,7 +167,8 @@ class DalHelper(object):
                 vpool = VPool()
                 vpool.name = str(vpool_id)
                 vpool.status = 'RUNNING'
-                vpool.metadata = {'backend': {'caching_info': {}}}
+                vpool.metadata = {'backend': {},
+                                  'caching_info': {}}
                 vpool.metadata_store_bits = 5
                 vpool.save()
                 vpools[vpool_id] = vpool
