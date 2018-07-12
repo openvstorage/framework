@@ -2,12 +2,12 @@
 Description=ALBA proxy
 After=local-fs.target network-online.target
 Before=ovs-volumedriver_<VPOOL_NAME>.service
-SyslogIdentifier=%N
 
 [Service]
 Type=simple
 User=root
 Group=root
+SyslogIdentifier=%N
 Environment=LD_LIBRARY_PATH=/usr/lib/alba
 # Garbage collection for ALBA
 Environment=OCAMLRUNPARAM='b,a=1,s=4096k,O=50'

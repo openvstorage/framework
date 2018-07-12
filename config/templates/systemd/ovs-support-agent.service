@@ -1,10 +1,10 @@
 [Unit]
 Description=Open vStorage support agent
 After=local-fs.target network-online.target
-SyslogIdentifier=%N
 
 [Service]
 Type=simple
+SyslogIdentifier=%N
 Environment=PYTHONPATH=/opt/OpenvStorage
 ExecStart=/usr/bin/python2 /opt/OpenvStorage/ovs/extensions/support/agent.py
 Restart=on-failure

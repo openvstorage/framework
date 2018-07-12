@@ -2,12 +2,12 @@
 Description=Open vStorage scheduled tasks
 After=ovs-watcher-framework.service
 BindsTo=ovs-watcher-framework.service
-SyslogIdentifier=%N
 
 [Service]
 Type=simple
 User=ovs
 Group=ovs
+SyslogIdentifier=%N
 WorkingDirectory=/opt/OpenvStorage
 ExecStart=/usr/bin/celery beat -A ovs.celery_run -l debug -S ovs.celery_beat.DistributedScheduler
 Restart=on-failure

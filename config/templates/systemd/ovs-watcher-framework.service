@@ -1,10 +1,10 @@
 [Unit]
 Description=Watcher for Open vStorage master services
 After=local-fs.target network-online.target
-SyslogIdentifier=%N
 
 [Service]
 Type=simple
+SyslogIdentifier=%N
 Environment=PYTHONPATH=/opt/OpenvStorage
 # The watcher will block until all services are running
 ExecStartPre=/usr/bin/python /opt/OpenvStorage/ovs/extensions/generic/watcher.py framework wait
