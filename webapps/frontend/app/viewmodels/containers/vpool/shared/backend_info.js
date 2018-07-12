@@ -85,7 +85,7 @@ define([
         self.client_id      = ko.observable().extend({removeWhiteSpaces: null});
         self.client_secret  = ko.observable().extend({removeWhiteSpaces: null});
         self.host           = ko.observable().extend({regex: generic.hostRegex});
-        self.port           = ko.observable().extend({ numeric: {min: 1, max: 65535}});
+        self.port           = ko.observable().extend({ numeric: {min: 1, max: 65535}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
         self.local          = ko.observable();
 
         // Default data

@@ -78,7 +78,7 @@ define(['jquery', 'knockout'], function($, ko){
 
     singleton = function() {
         var wizardData = {
-            hprmPort:                ko.observable().extend({ numeric: {min: 1, max: 65535}}),
+            hprmPort:                ko.observable().extend({ numeric: {min: 1, max: 65535}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
             identifier:              ko.observable('').extend({regex: nameRegex}),
             storageRouter:           ko.observable(),
             vPool:                   ko.observable(),

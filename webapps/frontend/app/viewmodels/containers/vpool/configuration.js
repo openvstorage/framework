@@ -135,7 +135,7 @@ define([
         // Observables (This will ensure that these observables are present even if the data is missing them)
         self.mds_maxload        = ko.observable();
         self.mds_tlogs          = ko.observable();
-        self.mds_safety         = ko.observable().extend({ numeric: {min: 1, max: 5}});
+        self.mds_safety         = ko.observable().extend({ numeric: {min: 1, max: 5}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
 
         BaseContainer.call(self);
 
