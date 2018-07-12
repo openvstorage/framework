@@ -1,6 +1,7 @@
 [Unit]
 Description=Watcher for Open vStorage master services
 After=local-fs.target network-online.target
+SyslogIdentifier=%N
 
 [Service]
 Type=simple

@@ -1,6 +1,7 @@
 [Unit]
 Description=Watcher for the configuration cluster
 After=local-fs.target network-online.target
+SyslogIdentifier=%N
 
 [Service]
 Type=simple

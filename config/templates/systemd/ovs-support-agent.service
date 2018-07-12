@@ -1,6 +1,7 @@
 [Unit]
 Description=Open vStorage support agent
 After=local-fs.target network-online.target
+SyslogIdentifier=%N
 
 [Service]
 Type=simple

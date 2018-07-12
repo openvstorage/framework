@@ -1,6 +1,7 @@
 [Unit]
 Description=Open vStorage distributed transaction log
 After=local-fs.target network-online.target ovs-watcher-volumedriver.service
+SyslogIdentifier=%N
 
 [Service]
 Type=simple

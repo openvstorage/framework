@@ -2,6 +2,7 @@
 Description=Open vStorage volumerouter consumer
 After=ovs-watcher-framework.service
 BindsTo=ovs-watcher-framework.service
+SyslogIdentifier=%N
 
 [Service]
 Type=simple

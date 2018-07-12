@@ -2,6 +2,7 @@
 Description=ALBA proxy
 After=local-fs.target network-online.target
 Before=ovs-volumedriver_<VPOOL_NAME>.service
+SyslogIdentifier=%N
 
 [Service]
 Type=simple

@@ -2,6 +2,7 @@
 Description=Open vStorage StorageDriver
 After=ovs-watcher-volumedriver.service
 Wants=ovs-watcher-volumedriver.service
+SyslogIdentifier=%N
 
 [Service]
 Type=simple
