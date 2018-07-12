@@ -159,10 +159,10 @@ define([
         // Observables
         self.number_of_scos_in_tlog = ko.observable()
             .extend({numeric: {min: 4, max: 20, allowUndefined: false, validate: true},
-                     rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
+                     rateLimit: { method: "notifyWhenChangesStop", timeout: 800}});
         self.non_disposable_scos_factor = ko.observable()
             .extend({numeric: {min: 1.5, max: 20, allowUndefined: false, validate: true},
-                     rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
+                     rateLimit: { method: "notifyWhenChangesStop", timeout: 800}});
         // Event subscriptions
         self.eventSubscriptions = ko.observableArray();
 

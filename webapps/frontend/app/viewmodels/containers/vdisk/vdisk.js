@@ -79,7 +79,7 @@ define([
         self.volumeId          = ko.observable();
         self.vpoolGuid         = ko.observable();
         self.writeSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeBuffer       = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
+        self.writeBuffer       = ko.observable(128).extend({numeric: {min: 128, max: 10240}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
 
         // Computed
         self.dtlModes = ko.computed(function() {

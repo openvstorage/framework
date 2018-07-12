@@ -27,11 +27,11 @@ define([
         var self = this;
 
         self.host        = ko.observable().extend({regex: generic.ipRegex});
-        self.port        = ko.observable(2003).extend({numeric: {min: 1035, max: 65535}});
+        self.port        = ko.observable(2003).extend({numeric: {min: 1035, max: 65535}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
         self.database    = ko.observable('openvstorage.fwk').extend({removeWhiteSpaces: null});
         self.username    = ko.observable().extend({removeWhiteSpaces: null});
         self.password    = ko.observable().extend({removeWhiteSpaces: null});
-        self.interval    = ko.observable(1).extend({numeric: {min: 1, max: 86400}});
+        self.interval    = ko.observable(1).extend({numeric: {min: 1, max: 86400}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
         self.transport   = ko.observable();
         self.transports  = ko.observableArray(['influxdb', 'redis','graphite']);
         self.environment = ko.observable().extend({removeWhiteSpaces: null});

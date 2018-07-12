@@ -19,7 +19,7 @@ define(['jquery', 'knockout', 'ovs/generic'], function($, ko, generic){
     var singleton = function() {
         var wizardData = {
             name:                  ko.observable('').extend({ regex: generic.vdiskNameRegex }),
-            sizeEntry:             ko.observable(0).extend({ numeric: { min: 1, max: 65535 }, throttle: 500}),
+            sizeEntry:             ko.observable(0).extend({ numeric: { min: 1, max: 65535 }, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
             storageRouter:         ko.observable(),
             storageRouters:        ko.observableArray([]),
             vPool:                 ko.observable(),
