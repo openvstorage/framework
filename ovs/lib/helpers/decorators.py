@@ -25,6 +25,7 @@ import random
 import string
 import inspect
 import threading
+from functools import wraps
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
@@ -57,13 +58,12 @@ def log(event_type):
     :param event_type: Event type
     :return: Pointer to function
     """
-
     def wrap(f):
         """
         Wrapper function
         :param f: Function to log something about
         """
-
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
@@ -154,6 +154,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
         Wrapper function
         :param f: Function to check
         """
+        @wraps(f)
         def new_function(self, *args, **kwargs):
             """
             Wrapped function
