@@ -135,7 +135,7 @@ define([
         // Observables (This will ensure that these observables are present even if the data is missing them)
         self.mds_maxload        = ko.observable();
         self.mds_tlogs          = ko.observable();
-        self.mds_safety         = ko.observable().extend({ numeric: {min: 1, max: 5}});
+        self.mds_safety         = ko.observable().extend({ numeric: {min: 1, max: 5}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
 
         BaseContainer.call(self);
 
@@ -159,10 +159,10 @@ define([
         // Observables
         self.number_of_scos_in_tlog = ko.observable()
             .extend({numeric: {min: 4, max: 20, allowUndefined: false, validate: true},
-                     rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
+                     rateLimit: { method: "notifyWhenChangesStop", timeout: 800}});
         self.non_disposable_scos_factor = ko.observable()
             .extend({numeric: {min: 1.5, max: 20, allowUndefined: false, validate: true},
-                     rateLimit: { method: "notifyWhenChangesStop", timeout: 400}});
+                     rateLimit: { method: "notifyWhenChangesStop", timeout: 800}});
         // Event subscriptions
         self.eventSubscriptions = ko.observableArray();
 
