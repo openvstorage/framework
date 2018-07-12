@@ -5,6 +5,7 @@ BindsTo=ovs-watcher-framework.service
 
 [Service]
 Type=simple
+SyslogIdentifier=%N
 Environment=PYTHONPATH=:/opt/OpenvStorage:/opt/OpenvStorage/webapps
 WorkingDirectory=/opt/OpenvStorage/webapps
 ExecStart=/usr/bin/gunicorn -c /opt/OpenvStorage/config/django_gunicorn_ovs.cfg.py api.wsgi

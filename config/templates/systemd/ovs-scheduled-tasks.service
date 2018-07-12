@@ -7,6 +7,7 @@ BindsTo=ovs-watcher-framework.service
 Type=simple
 User=ovs
 Group=ovs
+SyslogIdentifier=%N
 WorkingDirectory=/opt/OpenvStorage
 ExecStart=/usr/bin/celery beat -A ovs.celery_run -l debug -S ovs.celery_beat.DistributedScheduler
 Restart=on-failure

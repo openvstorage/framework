@@ -7,6 +7,7 @@ BindsTo=ovs-watcher-framework.service
 Type=simple
 Group=ovs
 User=ovs
+SyslogIdentifier=%N
 WorkingDirectory=/opt/OpenvStorage
 ExecStartPre=/usr/bin/python /opt/OpenvStorage/ovs/celery_run.py clear_cache
 ExecStart=/usr/bin/celery worker -A ovs.celery_run -l debug -Q ovs_generic,ovs_<WORKER_QUEUE> --autoscale=8,2 -Ofair
