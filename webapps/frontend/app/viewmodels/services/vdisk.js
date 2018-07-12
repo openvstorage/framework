@@ -40,11 +40,11 @@ define([
          * @param guid: Additional query params.
          * @returns {Deferred}
          */
-        self.loadConfigHandle = function (guid) {
+        self.loadConfig = function (guid) {
             return api.get('vdisks/' + guid + '/get_config_params')
                 .then(self.shared.tasks.wait)
         };
-        self.setConfigHandle = function (guid, new_config_params) {
+        self.setConfig = function (guid, new_config_params) {
                 return api.post('vdisks/' + guid + '/set_config_params', {
                     data: { new_config_params: new_config_params}
                 })
