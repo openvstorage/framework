@@ -283,7 +283,7 @@ define([
                     var quota = vd.vpool().metadata().caching_info[self.vDisk.storageRouterGuid()].quota;
                     vd.configuration().cache_quota = quota / Math.pow(1024.0, 3);
                 }
-                vDiskService.setConfigHandle(vd.guid(), new_config)
+                vDiskService.setConfig(vd.guid(), new_config)
                     .done(function () {
                         generic.alertSuccess(
                             $.t('ovs:vdisks.save_config.success'),

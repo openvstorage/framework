@@ -959,9 +959,11 @@ class VDiskController(object):
         cache_quota = vdisk.cache_quota
         if cache_quota is None:
             vdisk.invalidate_dynamics('storagerouter_guid')
-            metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
-            cache_quota = {VPool.CACHES.FRAGMENT: metadata.get('quota_fc'),
-                           VPool.CACHES.BLOCK: metadata.get('quota_bc')}
+            cache_info = vpool.metadata['caching_info'].get(vdisk.storagerouter_guid, {})  # type: dict
+            cache_info_fragment = cache_info.get(StorageDriverConfiguration.CACHE_FRAGMENT, {})  # type: dict
+            cache_info_block = cache_info.get(StorageDriverConfiguration.CACHE_BLOCK, {})  # type: dict
+            cache_quota = {VPool.CACHES.FRAGMENT: cache_info_fragment.get('quota'),
+                           VPool.CACHES.BLOCK: cache_info_block.get('quota')}
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,

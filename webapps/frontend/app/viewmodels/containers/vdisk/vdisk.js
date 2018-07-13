@@ -358,7 +358,7 @@ define([
             }
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadConfigHandle)) {
-                    self.loadConfigHandle = vdiskService.loadConfigHandle(self.guid())
+                    self.loadConfigHandle = vdiskService.loadConfig(self.guid())
                         .done(function (data) {
                             if (data.hasOwnProperty('pagecache_ratio')) {
                                 delete data['pagecache_ratio'];
