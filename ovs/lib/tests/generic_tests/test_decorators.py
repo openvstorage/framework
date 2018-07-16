@@ -30,10 +30,17 @@ class TestDecorator(unittest.TestCase):
         value_wrapper = 'value_wrapper'
 
         @wrap(key_wrapper)
-        def test_wrapper_decorator():
+        def test_wrapper_decorator_param():
             return value_wrapper
 
-        wrapped_dict = test_wrapper_decorator()
-        self.assertDictEqual(d1=wrapped_dict, d2= {key_wrapper: value_wrapper})
+        wrapped_dict = test_wrapper_decorator_param()
+        self.assertDictEqual(d1=wrapped_dict, d2={key_wrapper: value_wrapper,
+                                                  'data': value_wrapper})
+        @wrap()
+        def test_wrapper_decorator_no_param():
+            return value_wrapper
+
+        wrapped_dict = test_wrapper_decorator_no_param()
+        self.assertDictEqual(d1=wrapped_dict, d2={'data': value_wrapper})
 
 
