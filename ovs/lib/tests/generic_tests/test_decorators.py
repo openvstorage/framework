@@ -18,9 +18,10 @@ Test decorators
 """
 
 import unittest
-from ovs_extensions.api.decorators import HTTPRequestDecorators
+from ovs_extensions.api.decorators.generic import HTTPRequestGenericDecorators
 
-wrap = HTTPRequestDecorators.proper_wrap
+wrap = HTTPRequestGenericDecorators.wrap_data
+
 
 class TestDecorator(unittest.TestCase):
 
@@ -35,10 +36,4 @@ class TestDecorator(unittest.TestCase):
         wrapped_dict = test_wrapper_decorator()
         self.assertDictEqual(d1=wrapped_dict, d2= {key_wrapper: value_wrapper})
 
-        @wrap(key_wrapper)
-        def test_wrapper_decorator(a='a'):
-            return value_wrapper + a
-
-        wrapped_dict = test_wrapper_decorator()
-        self.assertDictEqual(d1=wrapped_dict, d2= {key_wrapper: value_wrapper + 'a'})
 
