@@ -131,9 +131,9 @@ class APIClient(object):
         :rtype: dict
         """
         data_copy = data.copy()  # Shallow copy is good enough since keys are discarded
-        for _key in data_copy.keys():
+        for _key in data.keys():
             if _key.startswith('_'):
                 del data_copy[_key]
             elif isinstance(data_copy[_key], dict):
-                cls._clean(data_copy[_key])
+                data_copy[_key] = cls._clean(data_copy[_key])
         return data_copy
