@@ -18,7 +18,7 @@ Test decorators
 """
 
 import unittest
-from ovs_extensions.api.decorators.generic import HTTPRequestGenericDecorators
+from ovs_extensions.api.decorators.generic_requests import HTTPRequestGenericDecorators
 
 wrap = HTTPRequestGenericDecorators.wrap_data
 
