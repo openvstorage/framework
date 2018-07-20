@@ -396,7 +396,7 @@ class StackWorkHandler(ScrubShared):
             expires = now + 30
             data = {'job_id': self.job_id,
                     'expires': expires,
-                    'on_going': True,
+                    'ongoing': True,
                     'location': location_data}
             current_scrub_info = vdisk.scrubbing_information or {}
             if not current_scrub_info.get('start_time'):
@@ -436,7 +436,7 @@ class StackWorkHandler(ScrubShared):
                            # For Operations. Easier to grep in the logs
                            'end_time_readable': datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M:%S.%f%z"),
                            'exception': str(possible_exception) if possible_exception else possible_exception,
-                           'on_going': False})
+                           'ongoing': False})
         scrub_info_copy = scrub_info.copy()
         # Reset copy
         scrub_info_copy.update(dict.fromkeys(['job_id', 'expires', 'exception', 'end_time', 'end_time_readable', 'start_time', 'start_time_readable', 'location']))
