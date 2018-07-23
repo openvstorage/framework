@@ -448,5 +448,4 @@ class VDisk(DataObject):
         now = time.time()
         scrub_info = self.scrubbing_information
         # Scrubbing information shouldn't be expired
-        is_ongoing = any(scrub_info.get(key) for key in ['on_going', 'ongoing'])
-        return isinstance(scrub_info, dict) and is_ongoing and self.scrubbing_information['expires'] and self.scrubbing_information['expires'] >= now
+        return isinstance(scrub_info, dict) and any(scrub_info.get(key) for key in ['on_going', 'ongoing']) and self.scrubbing_information['expires'] and self.scrubbing_information['expires'] >= now
