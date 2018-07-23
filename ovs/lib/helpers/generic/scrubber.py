@@ -113,34 +113,23 @@ class ScrubShared(object):
         :raises: AssertException:
         - When the save could not happen
         """
-        tries = 0
-        success = False
-        last_exception = None
-        # Call the passed function
-        value, expected_value = get_value_and_expected_value()
-        return_value = value
-        if key_not_exist is True and self._persistent.exists(key) is True:
-            return_value = self._persistent.get(key)
-            success = True
-            self._logger.info('{0} - key {1} is already present and key_not_exist given. Not saving and returning current value'.format(logging_start, key))
-        while success is False:
+        reference = {}
+
+        def build_transaction():
+            self._logger.info('{0} - Executing the passed function'.format(logging_start))
+            value, expected_value = get_value_and_expected_value()
             transaction = self._persistent.begin_transaction()
-            return_value = value  # Value might change because of hooking
-            tries += 1
-            if tries > max_retries:
-                raise last_exception
             self._persistent.assert_value(key, expected_value, transaction=transaction)
             self._persistent.set(key, value, transaction=transaction)
-            try:
-                self._persistent.apply_transaction(transaction)
-                success = True
-            except AssertException as ex:
-                self._logger.warning('{0} - Asserting failed for key {1}. Retrying {2} more times'.format(logging_start, key, max_retries - tries))
-                last_exception = ex
-                time.sleep(randint(0, 25) / 100.0)
-                self._logger.info('{0} - Executing the passed function again'.format(logging_start))
-                value, expected_value = get_value_and_expected_value()
-        return return_value
+            reference['value'] = value
+            return transaction
+
+        def retry_callback(tries):
+            self._logger.warning('{0} - Asserting failed for key {1}. Retrying {2} more times'.format(logging_start, key, max_retries - tries))
+            time.sleep(randint(0, 25) / 100.0)
+
+        self._persistent.apply_callback_transaction(build_transaction, max_retries=max_retries, retry_wait_function=retry_callback)
+        return reference.get('value')
 
     def _get_relevant_items(self, relevant_values, relevant_keys, key=None):
         """
@@ -383,11 +372,13 @@ class StackWorkHandler(ScrubShared):
         self._logger.info(self._format_message('Successfully unregistered vDisk {0}'.format(vdisk_guid)))
         return special['relevant_work_items']
 
-    def register_vdisk_for_scrub(self, vdisk_guid):
+    def register_vdisk_for_scrub(self, vdisk_guid, location_data):
         """
         Register that a vDisk is being actively scrubbed
         :param vdisk_guid: Guid of the vDisk to register
         :type vdisk_guid: basestring
+        :param location_data: Data about the scrub location
+        :type location_data: dict
         :return: The loop instance keeping the information up to date
         :rtype: RepeatingTimer
         """
@@ -396,7 +387,8 @@ class StackWorkHandler(ScrubShared):
             expires = now + 30
             data = {'job_id': self.job_id,
                     'expires': expires,
-                    'on_going': True}
+                    'ongoing': True,
+                    'location': location_data}
             current_scrub_info = vdisk.scrubbing_information or {}
             if not current_scrub_info.get('start_time'):
                 data.update({'start_time': now,
@@ -434,11 +426,11 @@ class StackWorkHandler(ScrubShared):
         scrub_info.update({'end_time': time.time(),
                            # For Operations. Easier to grep in the logs
                            'end_time_readable': datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M:%S.%f%z"),
-                           'exception': str(possible_exception),
-                           'on_going': False})
+                           'exception': str(possible_exception) if possible_exception else possible_exception,
+                           'ongoing': False})
         scrub_info_copy = scrub_info.copy()
         # Reset copy
-        scrub_info_copy.update(dict.fromkeys(['job_id', 'expires', 'exception', 'end_time', 'end_time_readable', 'start_time', 'start_time_readable']))
+        scrub_info_copy.update(dict.fromkeys(['job_id', 'expires', 'exception', 'end_time', 'end_time_readable', 'start_time', 'start_time_readable', 'location']))
         if possible_exception:
             previous_run_key = 'previous_failed_runs'
             previous_runs = scrub_info_copy.get('previous_failed_runs', [])
@@ -612,7 +604,11 @@ class StackWorker(ScrubShared):
                         lease_interval = Configuration.get('/ovs/vpools/{0}/scrub/tweaks|locked_lease_interval'.format(self.vpool.guid), default=lease_interval)
 
                         # Register that the disk is being scrubbed
-                        registrator = self.stack_work_handler.register_vdisk_for_scrub(vdisk_guid)
+                        log_path = Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)
+                        location_data = {'scrub_directory': self.scrub_directory,
+                                         'storagerouter_guid': self.storagerouter.guid,
+                                         'log_path': log_path}
+                        registrator = self.stack_work_handler.register_vdisk_for_scrub(vdisk_guid, location_data)
                         scrub_exception = None
                         try:
                             if 'post_vdisk_scrub_registration' in self._test_hooks:
@@ -624,7 +620,7 @@ class StackWorker(ScrubShared):
                                 for work_unit in work_units:
                                     res = locked_client.scrub(work_unit=work_unit,
                                                               scratch_dir=self.scrub_directory,
-                                                              log_sinks=[Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)],
+                                                              log_sinks=[log_path],
                                                               backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                     locked_client.apply_scrubbing_result(scrubbing_work_result=res)
                                 if work_units:
