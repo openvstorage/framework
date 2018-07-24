@@ -452,7 +452,8 @@ class VDisk(DataObject):
         :return: True when the vDisk is currently being scrubbed
         :rtype: bool
         """
+        # The format was changed. 'on_going' was renamed to 'ongoing'. Account for both
         now = time.time()
         scrub_info = self.scrubbing_information
         # Scrubbing information shouldn't be expired
-        return isinstance(scrub_info, dict) and scrub_info['on_going'] and self.scrubbing_information['expires'] and self.scrubbing_information['expires'] >= now
+        return isinstance(scrub_info, dict) and any(scrub_info.get(key) for key in ['on_going', 'ongoing']) and self.scrubbing_information['expires'] and self.scrubbing_information['expires'] >= now

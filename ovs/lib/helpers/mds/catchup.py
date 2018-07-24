@@ -430,31 +430,23 @@ class MDSCatchUp(MDSShared):
         :raises: AssertException:
         - When the save could not happen
         """
-        # @todo move this to the persistent client instead
-        tries = 0
-        success = False
-        last_exception = None
-        # Call the passed function
-        value, expected_value = get_value_and_expected_value()
-        return_value = value
-        while success is False:
+        reference = {}
+
+        def build_transaction():
+            self._logger.info('{0} - Executing the passed function'.format(logging_start))
+            value, expected_value = get_value_and_expected_value()
             transaction = self._persistent.begin_transaction()
-            return_value = value  # Value might change because of hooking
-            tries += 1
-            if tries > max_retries:
-                raise last_exception
             self._persistent.assert_value(key, expected_value, transaction=transaction)
             self._persistent.set(key, value, transaction=transaction)
-            try:
-                self._persistent.apply_transaction(transaction)
-                success = True
-            except AssertException as ex:
-                self._logger.warning('{0} - Asserting failed for key {1}. Retrying {2} more times'.format(logging_start, key, max_retries - tries))
-                last_exception = ex
-                time.sleep(randint(0, 25) / 100.0)
-                self._logger.info('{0} - Executing the passed function again'.format(logging_start))
-                value, expected_value = get_value_and_expected_value()
-        return return_value
+            reference['value'] = value
+            return transaction
+
+        def retry_callback(tries):
+            self._logger.warning('{0} - Asserting failed for key {1}. Retrying {2} more times'.format(logging_start, key, max_retries - tries))
+            time.sleep(randint(0, 25) / 100.0)
+
+        self._persistent.apply_callback_transaction(build_transaction, max_retries=max_retries, retry_wait_function=retry_callback)
+        return reference.get('value')
 
     def _get_relevant_items(self, key, relevant_values, relevant_keys):
         # type: (str, List[Dict], List[any]) -> Tuple[List, List]
