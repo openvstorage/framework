@@ -360,13 +360,14 @@ class DataList(object):
             query_type = self._query['type']
             query_items = self._query['items']
 
-            invalidations = {object_type_name: ['__all']}
-            DataList._build_invalidations(invalidations, self._object_type, query_items)
+            start_references = {object_type_name: ['__all']}
+            # Providing the arguments for thread safety. State could change if query would be set in a different thread
+            class_references = self._get_referenced_fields(start_references, self._object_type, query_items)
             transaction = self._persistent.begin_transaction()
-            for class_name, fields in invalidations.iteritems():
-                key = '{0}_{1}|{{0}}|{{1}}'.format(DataList.CACHELINK, class_name)
+            for class_name, fields in class_references.iteritems():
                 for field in fields:
-                    self._persistent.set(key.format(self._key, field), 0, transaction=transaction)
+                    key = self.generate_persistent_cache_key(class_name, self._key, field)
+                    self._persistent.set(key, 0, transaction=transaction)
             self._persistent.apply_transaction(transaction)
 
             self._guids = []
@@ -392,12 +393,9 @@ class DataList(object):
             if self._key is not None and elements > 0 and self._can_cache:
                 self._volatile.set(self._key, self._guids, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
                 # Check whether the cache was invalidated and should be removed again
-                for class_name in invalidations:
-                    key = '{0}_{1}|{{0}}|'.format(DataList.CACHELINK, class_name)
-                    if len(list(self._persistent.prefix(key.format(self._key)))) == 0:
-                        self._volatile.delete(self._key)
-                        break
-            self._executed = True
+                if self.cache_invalidated(class_references):
+                    # Pointers were removed. Remove the cached data
+                    self.remove_cached_data()
         else:
             self.from_cache = True
             self._guids = cached_data
@@ -414,66 +412,121 @@ class DataList(object):
                 else:
                     self._data[guid] = {'data': entries[index],
                                         'guid': guid}
-            self._executed = True
+        self._executed = True
 
-    @staticmethod
-    def _build_invalidations(invalidations, object_type, items):
+    def remove_cached_data(self):
+        # type: () -> None
         """
-        Builds an invalidation set out of a given object type and query items. It will use type information
-        to build the invalidations, and not the actual data.
-        :param invalidations: A by-ref dict containing all invalidations for this list
-        :param object_type: The object type for this invalidations run
-        :param items: The query items that need to be used for building invalidations
+        Removes all cached data
+        :return: None
+        :rtype: NoneType
         """
-        def _add(cname, field):
-            if cname not in invalidations:
-                invalidations[cname] = []
-            if field not in invalidations[cname]:
-                invalidations[cname].append(field)
+        self._volatile.delete(self._key)
 
-        for item in items:
-            if isinstance(item, dict):
-                # Recursive
-                DataList._build_invalidations(invalidations, object_type, item['items'])
+    def cache_invalidated(self, references=None):
+        """
+        Check if the cache was already invalidated
+        When a DataObject saves/deleted, all list-caches persistent keys are removed within that code part.
+        This can race with this list caching the results of a query. This should be checked after saving the list to remove the data.
+        :param references: Class and field references taken from the query. Regenerated if not given
+        :type references: dict
+        :return: True if invalidated else False
+        :rtype: bool
+        """
+        references = references or self._get_referenced_fields()
+        # own key first
+        # Check if any pointers were removed
+        class_pointer_lengths = []
+        for class_name in references.iterkeys():
+            key = self.generate_persistent_cache_key(class_name, self._key)
+            class_pointer_lengths.append(len(list(self._persistent.prefix(key))))
+        return any(pointer == 0 for pointer in class_pointer_lengths)
+        # # Fields first
+        # persistent_keys = []
+        # # List all possible keys that the list can cache under
+        # for class_name, fields in references.iteritems():
+        #     for field in fields:
+        #         persistent_keys.append(self.generate_persistent_cache_key(class_name, self._key, field))
+        # data = list(self._persistent.get_multi(persistent_keys, must_exist=False))  # type: list
+        # return any(item is None for item in data)
+
+    def _get_referenced_fields(self, references=None, object_type=None, query_items=None):
+        # type: (Optional[dict], Optional[type], Optional[list]) -> dict
+        """
+        Retrieve an overview of all fields included in the query
+        The fields are mapped by the class name. This mapping is used for nested properties
+        :param references: A by-ref dict containing all references for this list (Providing None will generate a new dict)
+        :param object_type: The object type for this references run (Providing None will use the current object type)
+        :param query_items: The query items that need to be used for building references (Providing None will use the current query)
+        :return: A dict containing all classes referenced within the itens together with the fields of those classes
+        Example: {disk: ['__all', 'model'], 'storagerouter': ['name']}
+        where disk with model X was requested on storagerouter with name Y
+        :rtype: dict
+        """
+        def add_reference(c_name, f_name):
+            """
+            :param c_name of the class to add
+            :param f_name: Name of the field to add
+            Add a reference to the dict
+            """
+            if c_name not in references:
+                references[c_name] = []
+            if f_name not in references[c_name]:
+                references[c_name].append(f_name)
+
+        # All fields are referenced by default.
+        references = references or {self._object_type.__name__.lower(): ['__all']}
+        object_type = object_type or self._object_type
+        query_items = query_items or self._query['items']
+
+        for query_item in query_items:
+            if isinstance(query_item, dict):
+                # Recursive, items are added by reference
+                self._get_referenced_fields(references, object_type, query_item['items'])
             else:
-                path = item[0].split('.')
-                value = object_type
-                itemcounter = 0
-                for pitem in path:
-                    itemcounter += 1
-                    class_name = value.__name__.lower()
-                    if pitem == 'guid':
+                field = query_item[0]
+                field_paths = field.split('.')
+                current_object_type = object_type
+                item_counter = 0
+                # Handle nesting of properties
+                for property_item in field_paths:
+                    item_counter += 1
+                    class_name = current_object_type.__name__.lower()
+                    # Determine which property type it is:
+                    # Options are: relation (both direction), dynamic, simple
+                    if property_item == 'guid':
                         # The guid is a final value which can't be changed so it shouldn't be taken into account
                         break
-                    elif pitem in (prop.name for prop in value._properties):
-                        # The pitem is in the properties, so it's a simple property (e.g. vmachine.name)
-                        _add(class_name, pitem)
+                    elif property_item in (prop.name for prop in current_object_type._properties):
+                        # The property_item is in the properties, so it's a simple property (e.g. vmachine.name)
+                        add_reference(class_name, property_item)
                         break
-                    elif pitem in (relation.name for relation in value._relations):
-                        # The pitem is in the relations, so it's a relation property (e.g. vdisk.vmachine)
-                        _add(class_name, pitem)
-                        relation = [relation for relation in value._relations if relation.name == pitem][0]
+                    elif property_item in (relation.name for relation in current_object_type._relations):
+                        # The property_item is in the relations, so it's a relation property (e.g. vdisk.vmachine)
+                        add_reference(class_name, property_item)
+                        relation = [relation for relation in current_object_type._relations if relation.name == property_item][0]
                         if relation.foreign_type is not None:
-                            value = relation.foreign_type
+                            current_object_type = relation.foreign_type
                         continue
-                    elif pitem.endswith('_guid') and pitem.replace('_guid', '') in (relation.name for relation in value._relations):
-                        # The pitem is the guid pointing to a relation, so it can be handled like a simple property (e.g. vdisk.vmachine_guid)
-                        _add(class_name, pitem.replace('_guid', ''))
+                    elif property_item.endswith('_guid') and property_item.replace('_guid', '') in (relation.name for relation in current_object_type._relations):
+                        # The property_item is the guid pointing to a relation, so it can be handled like a simple property (e.g. vdisk.vmachine_guid)
+                        add_reference(class_name, property_item.replace('_guid', ''))
                         break
-                    elif pitem in (dynamic.name for dynamic in value._dynamics):
-                        # The pitem is a dynamic property, which will be ignored anyway
+                    elif property_item in (dynamic.name for dynamic in current_object_type._dynamics):
+                        # The property_item is a dynamic property, which will be ignored anyway
                         break
                     else:
                         # No property and no relation, it might be a foreign relation (e.g. vmachine.vdisks)
-                        # this means the pitem most likely contains an index
-                        cleaned_pitem = pitem.split('[')[0]
-                        relations = RelationMapper.load_foreign_relations(value)
+                        # this means the property_item most likely contains an index
+                        cleaned_property_item = property_item.split('[')[0]
+                        relations = RelationMapper.load_foreign_relations(current_object_type)
                         if relations is not None:
-                            if cleaned_pitem in relations:
-                                value = Descriptor().load(relations[cleaned_pitem]['class']).get_object()
-                                _add(value.__name__.lower(), relations[cleaned_pitem]['key'])
+                            if cleaned_property_item in relations:
+                                current_object_type = Descriptor().load(relations[cleaned_property_item]['class']).get_object()
+                                add_reference(current_object_type.__name__.lower(), relations[cleaned_property_item]['key'])
                                 continue
-                    raise RuntimeError('Invalid path given: {0}, currently pointing to {1}'.format(path, pitem))
+                    raise RuntimeError('Invalid path given: {0}, currently pointing to {1}'.format(field_paths, property_item))
+        return references
 
     @staticmethod
     def get_relation_set(remote_class, remote_key, own_class, own_key, own_guid):
@@ -798,3 +851,62 @@ class DataList(object):
         A short self-representation
         """
         return '<DataList (type: {0}, executed: {1}, at: {2})>'.format(self._object_type.__name__, self._executed, hex(id(self)))
+
+    @classmethod
+    def generate_persistent_cache_key(cls, class_name=None, identifier=None, property_name=None):
+        # type: (str, str, str) -> str
+        """
+        Generate the pointer to the cache key
+        Providing None will skip that part
+        The persistent DB is used for prefixing support. These DB keys point towards the key in the volatile store.
+        :param class_name: Name of the the class
+        :type class_name: str
+        :param identifier: ID of the list. Also serves as the key where the data will be cached
+        :type identifier: str
+        :param property_name: Name of the property
+        :type property_name: str
+        :return: The generated key
+        :rtype: str
+        """
+        parts = '{0}_{{0}}|{{0}}|{{0}}'.format(cls.CACHELINK).split('|')
+        arg_parts = [class_name, identifier, property_name]
+        key = ''
+        for index, arg_part in enumerate(arg_parts):
+            if arg_part is None:
+                if index == 0:
+                    # Special case. Return CACHELINK_
+                    return parts[index].format('')
+                return key
+            part_to_add = '|{1}'.format(key, parts[index].format(arg_part))
+            if key == '':
+                part_to_add = part_to_add.split('|')[-1]
+            key = '{0}{1}'.format(key, part_to_add)
+        return key
+
+    @classmethod
+    def get_key_parts(cls, list_key):
+        # type: (str) -> Tuple[str, str, str]
+        """
+        Returns all parts of the key
+        :param list_key: Key of the list
+        :type list_key: str
+        :return: The parts of the key
+        :rtype: Tuple[str, str, str]
+        """
+        namespace_class, cache_key, field = list_key.split('|')
+        class_name = namespace_class.replace('{0}_'.format(cls.CACHELINK), '')
+        return class_name, cache_key, field
+
+    @classmethod
+    def extract_cache_key(cls, list_key):
+        # type: (str) -> str
+        """
+        Extract the cache key from a complete list key
+        :param list_key: Key of the list
+        :type list_key: str
+        :return: The extracted key
+        :rtype: str
+        """
+        # Format class|key|prop
+        class_name, cache_key, field = cls.get_key_parts(list_key)
+        return cache_key
