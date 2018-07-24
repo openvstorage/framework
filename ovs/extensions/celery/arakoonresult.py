@@ -154,28 +154,30 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         would not be able to retrieve the information of the task if it would be removed
         The clean up task is scheduled by the celery beat. The default expires is 1 day (can be overruled in the settings)
         """
-        transaction = self._client.begin_transaction()  # Faster to batch them all at once than it is to wait for results after every delete
-        for key, value in self._client.prefix_entries(self._NAMESPACE_PREFIX):
-            if isinstance(value, dict):  # PyrakoonStore wraps it up in a dict and json dumps/loads it
-                if all(k in value for k in ['time_set', 'data']):  # Dealing with a wrapped instance
-                    # Will be either JSON or YAML format. JSON will be decoded as dict, YAML as string which needs conversion
-                    data = value.get('data')
-                    loaded_data = None
-                    if isinstance(data, basestring):
-                        try:
-                            loaded_data = yaml.load(data)
-                        except Exception:
-                            self._logger.exception('Invalid entry within the ResultBackend')
-                    elif isinstance(data, dict):
-                        loaded_data = data
-                    if isinstance(loaded_data, dict) and 'status' in loaded_data:  # Check for state
-                        status = loaded_data['status']
-                        # All possible states: PENDING, STARTED, RETRY, FAILURE, SUCCESS
-                        if status in ['STARTED', 'RETRY', 'PENDING']:
-                            self._logger.debug('Not removing {0} as it has not yet finished'.format(key))
-                            continue
-                    if time.time() - value['time_set'] > self.expires:
-                        self._logger.debug('Removing {0} as it has expired'.format(key))
-                        self._client.delete(key, must_exist=False, transaction=transaction)
-        self._logger.debug('Applying removal transactions')
-        self._client.apply_transaction(transaction)
+        def build_cleanup():
+            transaction = self._client.begin_transaction()  # Faster to batch them all at once than it is to wait for results after every delete
+            for key, value in self._client.prefix_entries(self._NAMESPACE_PREFIX):
+                if isinstance(value, dict):  # PyrakoonStore wraps it up in a dict and json dumps/loads it
+                    if all(k in value for k in ['time_set', 'data']):  # Dealing with a wrapped instance
+                        # Will be either JSON or YAML format. JSON will be decoded as dict, YAML as string which needs conversion
+                        data = value.get('data')
+                        loaded_data = None
+                        if isinstance(data, basestring):
+                            try:
+                                loaded_data = yaml.load(data)
+                            except Exception:
+                                self._logger.exception('Invalid entry within the ResultBackend')
+                        elif isinstance(data, dict):
+                            loaded_data = data
+                        if isinstance(loaded_data, dict) and 'status' in loaded_data:  # Check for state
+                            status = loaded_data['status']
+                            # All possible states: PENDING, STARTED, RETRY, FAILURE, SUCCESS
+                            if status in ['STARTED', 'RETRY', 'PENDING']:
+                                self._logger.debug('Not removing {0} as it has not yet finished'.format(key))
+                                continue
+                        if time.time() - value['time_set'] > self.expires:
+                            self._logger.debug('Removing {0} as it has expired'.format(key))
+                            self._client.delete(key, must_exist=False, transaction=transaction)
+
+            self._logger.debug('Applying removal transactions')
+        self._client.apply_callback_transaction(build_cleanup, max_retries=20)
