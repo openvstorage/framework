@@ -229,4 +229,6 @@ class OVSMigrator(object):
                                 junction_partition.partition.roles.append(DiskPartition.ROLES.DTL)
                                 junction_partition.partition.save()
 
+            # @todo remove all list keys here once the update lands
+
         return OVSMigrator.THIS_VERSION

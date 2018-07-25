@@ -366,7 +366,7 @@ class DataList(object):
             transaction = self._persistent.begin_transaction()
             for class_name, fields in class_references.iteritems():
                 for field in fields:
-                    key = self.generate_persistent_cache_key(class_name, self._key, field)
+                    key = self.generate_persistent_cache_key(class_name, field, self._key)
                     self._persistent.set(key, 0, transaction=transaction)
             self._persistent.apply_transaction(transaction)
 
@@ -436,19 +436,19 @@ class DataList(object):
         references = references or self._get_referenced_fields()
         # own key first
         # Check if any pointers were removed
-        class_pointer_lengths = []
-        for class_name in references.iterkeys():
-            key = self.generate_persistent_cache_key(class_name, self._key)
-            class_pointer_lengths.append(len(list(self._persistent.prefix(key))))
-        return any(pointer == 0 for pointer in class_pointer_lengths)
+        # class_pointer_lengths = []
+        # for class_name in references.iterkeys():
+        #     key = self.generate_persistent_cache_key(class_name, self._key)
+        #     class_pointer_lengths.append(len(list(self._persistent.prefix(key))))
+        # return any(pointer == 0 for pointer in class_pointer_lengths)
         # # Fields first
-        # persistent_keys = []
-        # # List all possible keys that the list can cache under
-        # for class_name, fields in references.iteritems():
-        #     for field in fields:
-        #         persistent_keys.append(self.generate_persistent_cache_key(class_name, self._key, field))
-        # data = list(self._persistent.get_multi(persistent_keys, must_exist=False))  # type: list
-        # return any(item is None for item in data)
+        persistent_keys = []
+        # List all possible keys that the list can cache under
+        for class_name, fields in references.iteritems():
+            for field in fields:
+                persistent_keys.append(self.generate_persistent_cache_key(class_name, field, self._key))
+        data = list(self._persistent.get_multi(persistent_keys, must_exist=False))  # type: list
+        return any(item is None for item in data)
 
     def _get_referenced_fields(self, references=None, object_type=None, query_items=None):
         # type: (Optional[dict], Optional[type], Optional[list]) -> dict
@@ -853,7 +853,7 @@ class DataList(object):
         return '<DataList (type: {0}, executed: {1}, at: {2})>'.format(self._object_type.__name__, self._executed, hex(id(self)))
 
     @classmethod
-    def generate_persistent_cache_key(cls, class_name=None, identifier=None, property_name=None):
+    def generate_persistent_cache_key(cls, class_name=None, property_name=None, identifier=None):
         # type: (str, str, str) -> str
         """
         Generate the pointer to the cache key
@@ -869,7 +869,7 @@ class DataList(object):
         :rtype: str
         """
         parts = '{0}_{{0}}|{{0}}|{{0}}'.format(cls.CACHELINK).split('|')
-        arg_parts = [class_name, identifier, property_name]
+        arg_parts = [class_name, property_name, identifier]
         key = ''
         for index, arg_part in enumerate(arg_parts):
             if arg_part is None:
@@ -893,9 +893,9 @@ class DataList(object):
         :return: The parts of the key
         :rtype: Tuple[str, str, str]
         """
-        namespace_class, cache_key, field = list_key.split('|')
+        namespace_class, field, cache_key = list_key.split('|')
         class_name = namespace_class.replace('{0}_'.format(cls.CACHELINK), '')
-        return class_name, cache_key, field
+        return class_name, field, cache_key
 
     @classmethod
     def extract_cache_key(cls, list_key):
@@ -908,5 +908,5 @@ class DataList(object):
         :rtype: str
         """
         # Format class|key|prop
-        class_name, cache_key, field = cls.get_key_parts(list_key)
+        class_name, field, cache_key = cls.get_key_parts(list_key)
         return cache_key

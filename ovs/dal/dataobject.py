@@ -653,32 +653,39 @@ class DataObject(object):
 
             # Invalidate property lists
             # class|key|field
+            # persistent_cache_key = DataList.generate_persistent_cache_key(self._classname)
+            # cache_keys = set()
+            # cache_key_mapping = {}
+            # # class|key|field
+            # for key in list(self._persistent.prefix(persistent_cache_key)):
+            #     _, cache_key, field = DataList.get_key_parts(key)
+            #     if cache_key not in cache_key_mapping:
+            #         cache_key_mapping[cache_key] = [False, []]
+            #     # @Todo work with delete prefix based on field instead of listing all keys
+            #     cache_key_mapping[cache_key][1].append(key)
+            #     if field in changed_fields or self._new is True:
+            #         cache_keys.add(cache_key)
+            #         cache_key_mapping[cache_key][0] = True
+            # for cache_key in cache_keys:
+            #     self._volatile.delete(cache_key)
+            #     if cache_key_mapping[cache_key][0] is True:
+            #         for key in cache_key_mapping[cache_key][1]:
+            #             self._persistent.delete(key, must_exist=False, transaction=transaction)
+            # # class|field|key
             persistent_cache_key = DataList.generate_persistent_cache_key(self._classname)
             cache_keys = set()
-            cache_key_mapping = {}
-            # class|key|field
             for key in list(self._persistent.prefix(persistent_cache_key)):
-                _, cache_key, field = DataList.get_key_parts(key)
-                if cache_key not in cache_key_mapping:
-                    cache_key_mapping[cache_key] = [False, []]
-                # @Todo work with delete prefix based on field instead of listing all keys
-                cache_key_mapping[cache_key][1].append(key)
+                _, field, cache_key = DataList.get_key_parts(key)
                 if field in changed_fields or self._new is True:
                     cache_keys.add(cache_key)
-                    cache_key_mapping[cache_key][0] = True
             for cache_key in cache_keys:
                 self._volatile.delete(cache_key)
-                if cache_key_mapping[cache_key][0] is True:
-                    for key in cache_key_mapping[cache_key][1]:
-                        self._persistent.delete(key, must_exist=False, transaction=transaction)
-            # # class|field|key
-            # persistent_cache_key = DataList.generate_persistent_cache_key(self._classname)
-            # if self._new:
-            #     # New item. All lists need to be removed
-            #     self._persistent.delete_prefix(persistent_cache_key, transaction=transaction)
-            # else:
-            #     for field in changed_fields:
-            #         self._persistent.delete_prefix(DataList.generate_persistent_cache_key(self._classname, field))
+            if self._new:
+                # New item. All lists need to be removed
+                self._persistent.delete_prefix(persistent_cache_key, transaction=transaction)
+            else:
+                for field in changed_fields:
+                    self._persistent.delete_prefix(DataList.generate_persistent_cache_key(self._classname, field), transaction=transaction)
 
             # Validate unique constraints
             unique_key = 'ovs_unique_{0}_{{0}}_{{1}}'.format(self._classname)
