@@ -122,9 +122,9 @@ class OVSMigrator(object):
                     rolegroup.save()
                 for user in setting[0].users:
                     for role in setting[1]:
-                        for client in user.clients:
+                        for persistent_client in user.clients:
                             roleclient = RoleClient()
-                            roleclient.client = client
+                            roleclient.client = persistent_client
                             roleclient.role = role
                             roleclient.save()
 
@@ -160,8 +160,12 @@ class OVSMigrator(object):
             from ovs.extensions.generic.configuration import Configuration
             from ovs.extensions.storage.persistentfactory import PersistentFactory
 
+            persistent_client = PersistentFactory.get_client()
+            if working_version <= 16:
+                # The list caching keys were changed to class|field|list_id instead of class|list_id|field
+                persistent_client.delete_prefix(DataList.generate_persistent_cache_key())
+
             # Migrate unique constraints & indexes
-            client = PersistentFactory.get_client()
             hybrid_structure = HybridRunner.get_hybrids()
             for class_descriptor in hybrid_structure.values():
                 cls = Descriptor().load(class_descriptor).get_object()
@@ -173,29 +177,29 @@ class OVSMigrator(object):
                 indexes = []
                 # noinspection PyProtectedMember
                 for prop in cls._properties:
-                    if prop.unique is True and len([k for k in client.prefix(unique_key.format(prop.name))]) == 0:
+                    if prop.unique is True and len([k for k in persistent_client.prefix(unique_key.format(prop.name))]) == 0:
                         uniques.append(prop.name)
-                    if prop.indexed is True and len([k for k in client.prefix(index_prefix.format(prop.name))]) == 0:
+                    if prop.indexed is True and len([k for k in persistent_client.prefix(index_prefix.format(prop.name))]) == 0:
                         indexes.append(prop.name)
                 if len(uniques) > 0 or len(indexes) > 0:
                     prefix = 'ovs_data_{0}_'.format(classname)
-                    for key, data in client.prefix_entries(prefix):
+                    for key, data in persistent_client.prefix_entries(prefix):
                         for property_name in uniques:
                             ukey = '{0}{1}'.format(unique_key.format(property_name), hashlib.sha1(str(data[property_name])).hexdigest())
-                            client.set(ukey, key)
+                            persistent_client.set(ukey, key)
                         for property_name in indexes:
                             if property_name not in data:
                                 continue  # This is the case when there's a new indexed property added.
                             ikey = index_key.format(property_name, hashlib.sha1(str(data[property_name])).hexdigest())
-                            index = list(client.get_multi([ikey], must_exist=False))[0]
-                            transaction = client.begin_transaction()
+                            index = list(persistent_client.get_multi([ikey], must_exist=False))[0]
+                            transaction = persistent_client.begin_transaction()
                             if index is None:
-                                client.assert_value(ikey, None, transaction=transaction)
-                                client.set(ikey, [key], transaction=transaction)
+                                persistent_client.assert_value(ikey, None, transaction=transaction)
+                                persistent_client.set(ikey, [key], transaction=transaction)
                             elif key not in index:
-                                client.assert_value(ikey, index[:], transaction=transaction)
-                                client.set(ikey, index + [key], transaction=transaction)
-                            client.apply_transaction(transaction)
+                                persistent_client.assert_value(ikey, index[:], transaction=transaction)
+                                persistent_client.set(ikey, index + [key], transaction=transaction)
+                            persistent_client.apply_transaction(transaction)
 
             # Clean up - removal of obsolete 'cfgdir'
             paths = Configuration.get(key='/ovs/framework/paths')
@@ -205,7 +209,6 @@ class OVSMigrator(object):
 
             # Rewrite indices 'alba_proxy' --> 'alba_proxies'
             changes = False
-            persistent_client = PersistentFactory.get_client()
             transaction = persistent_client.begin_transaction()
             for old_key in persistent_client.prefix('ovs_reverseindex_storagedriver'):
                 if '|alba_proxy|' in old_key:
@@ -229,6 +232,4 @@ class OVSMigrator(object):
                                 junction_partition.partition.roles.append(DiskPartition.ROLES.DTL)
                                 junction_partition.partition.save()
 
-            # The list caching keys were changed to class|field|list_id instead of class|list_id|field
-            persistent_client.delete_prefix(DataList.generate_persistent_cache_key())
         return OVSMigrator.THIS_VERSION

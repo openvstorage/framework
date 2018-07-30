@@ -899,6 +899,5 @@ class DataList(object):
         :return: The extracted key
         :rtype: str
         """
-        # Format class|key|prop
         class_name, field, cache_key = cls.get_key_parts(list_key)
         return cache_key
