@@ -28,7 +28,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'
-    THIS_VERSION = 15
+    THIS_VERSION = 16
 
     def __init__(self):
         """ Init method """
@@ -49,7 +49,6 @@ class OVSMigrator(object):
         if working_version == 0:
             # Initial version:
             # * Set the version to THIS RELEASE version
-
             from ovs.dal.hybrids.user import User
             from ovs.dal.hybrids.group import Group
             from ovs.dal.hybrids.role import Role
@@ -153,6 +152,7 @@ class OVSMigrator(object):
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         elif working_version < OVSMigrator.THIS_VERSION:
+            from ovs.dal.datalist import DataList
             from ovs.dal.helpers import HybridRunner, Descriptor
             from ovs.dal.hybrids.diskpartition import DiskPartition
             from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -229,6 +229,6 @@ class OVSMigrator(object):
                                 junction_partition.partition.roles.append(DiskPartition.ROLES.DTL)
                                 junction_partition.partition.save()
 
-            # @todo remove all list keys here once the update lands
-
+            # The list caching keys were changed to class|field|list_id instead of class|list_id|field
+            persistent_client.delete_prefix(DataList.generate_persistent_cache_key())
         return OVSMigrator.THIS_VERSION
