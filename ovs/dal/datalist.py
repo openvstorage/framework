@@ -424,9 +424,10 @@ class DataList(object):
         self._volatile.delete(self._key)
 
     def cache_invalidated(self, references=None):
+        # type: (Optional[Dict[str, List[str]]]) -> bool
         """
         Check if the cache was already invalidated
-        When a DataObject saves/deleted, all list-caches persistent keys are removed within that code part.
+        When a DataObject saves/deletes, all list-caches persistent keys are removed within that code part.
         This can race with this list caching the results of a query. This should be checked after saving the list to remove the data.
         :param references: Class and field references taken from the query. Regenerated if not given
         :type references: dict
