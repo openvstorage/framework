@@ -122,9 +122,9 @@ class OVSMigrator(object):
                     rolegroup.save()
                 for user in setting[0].users:
                     for role in setting[1]:
-                        for persistent_client in user.clients:
+                        for client in user.clients:
                             roleclient = RoleClient()
-                            roleclient.client = persistent_client
+                            roleclient.client = client
                             roleclient.role = role
                             roleclient.save()
 
