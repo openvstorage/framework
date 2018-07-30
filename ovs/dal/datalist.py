@@ -434,14 +434,6 @@ class DataList(object):
         :rtype: bool
         """
         references = references or self._get_referenced_fields()
-        # own key first
-        # Check if any pointers were removed
-        # class_pointer_lengths = []
-        # for class_name in references.iterkeys():
-        #     key = self.generate_persistent_cache_key(class_name, self._key)
-        #     class_pointer_lengths.append(len(list(self._persistent.prefix(key))))
-        # return any(pointer == 0 for pointer in class_pointer_lengths)
-        # # Fields first
         persistent_keys = []
         # List all possible keys that the list can cache under
         for class_name, fields in references.iteritems():
