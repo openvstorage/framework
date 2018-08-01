@@ -24,6 +24,37 @@ define([
 
     function BackendService() {
         var self = this;
+        // Properties
+        self.nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;
+
+        // Functions
+        /**
+         * Adds a new backend
+         * @param data: Data about the data to add
+         */
+        self.addBackend = function(data) {
+            return api.post('backends', {data: data})
+        };
+
+        /**
+         * Load all possible backend types
+         * @param queryParams: Additional query params. Defaults to no params
+         * @param relayParams: Relay to use (Optional, defaults to no relay)
+         * @returns {Deferred}
+         */
+        self.loadBackendTypes = function(queryParams, relayParams){
+            return api.get('backendtypes', { queryparams: queryParams, relayParams: relayParams })
+        };
+
+        /**
+         * Load all backends
+         * @param queryParams: Additional query params. Defaults to no params
+         * @param relayParams: Relay to use (Optional, defaults to no relay)
+         * @returns {Deferred}
+         */
+        self.loadBackends = function(queryParams, relayParams){
+            return api.get('backends', { queryparams: queryParams, relayParams: relayParams })
+        };
         /**
          * Compute a preset to look like presetName: (1,1,1,1),(2,1,2,1)
          * @param presetName: Name of the preset

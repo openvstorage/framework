@@ -28,7 +28,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="col-lg-7">
             <span id="backendtype"
                   data-bind="dropdown: {
-                      items: data.backendTypes, target: data.backendType,
+                      items: data.backendTypes, target: data.selectedBackendType,
                       text: function(item) {
                           return $.t('ovs:generic.backendtypes.' + item.code());
                       }

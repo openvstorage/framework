@@ -104,7 +104,7 @@ class APIClient(object):
                 raise InvalidCredentialsError(error_message)
             raise RuntimeError(error_message)
         if clean is True:
-            data = self._clean(data)
+            data = self.clean(data)
         duration = time.time() - start
         if duration > self._log_min_duration:
             self._logger.info('Request "{0}" took {1:.2f} seconds (internal duration {2:.2f} seconds)'.format(inspect.stack()[1][3], duration, internal_duration))
@@ -120,20 +120,41 @@ class APIClient(object):
         """
         return self._base_url, self._base_headers
 
+    def extract_data(self, response_data, old_key=None):
+        # type: (dict) -> any
+        """
+        Extract the data from the API
+        For backwards compatibility purposes (older asd-managers might not wrap their data)
+        :param response_data: Data of the response
+        :type response_data: dict
+        :param old_key: Old key (if any) to extract
+        :type old_key: str
+        :return: The data
+        :rtype: any
+        """
+        if 'data' in response_data:
+            return response_data['data']
+        if old_key:
+            if old_key not in response_data:
+                raise KeyError('{0} not present in the response data. Format might have changed'.format(old_key))
+            return response_data[old_key]
+        # Revert back to cleaning the response
+        return self.clean(response_data)
+
     @classmethod
-    def _clean(cls, data):
+    def clean(cls, data):
         # type: (dict) -> dict
         """
-        Cleans a response
-        :param data: Response data
+        Clean data of metadata keys
+        :param data: Dict with data
         :type data: dict
-        :return: The cleaned data
+        :return: Cleaned data
         :rtype: dict
         """
-        data_copy = data.copy()  # Shallow copy is good enough since keys are discarded
-        for _key in data.keys():
-            if _key.startswith('_'):
-                del data_copy[_key]
-            elif isinstance(data_copy[_key], dict):
-                data_copy[_key] = cls._clean(data_copy[_key])
+        data_copy = data.copy()
+        for key in data.iterkeys():
+            if key.startswith('_'):
+                del data_copy[key]
+            elif isinstance(data_copy[key], dict):
+                data_copy[key] = cls.clean(data_copy[key])
         return data_copy

@@ -29,6 +29,23 @@ define(['jquery', 'knockout',
         self.dashboards = [];
     }
 
+    /**
+     * Load a new module instance
+     */
+    function load_new_instances(views, instanceID, viewType) {
+        return views.reduce(function(acc, cur) {
+            if (cur.type !== viewType) {
+                return acc // Continue
+            }
+            var module_constructor = cur['module_constructor'];
+            var module_instance = new module_constructor();
+            var new_page = $.extend({}, cur, {'module': module_instance, 'activator': activator.create()});
+            viewcache.put(new_page['plugin'], new_page, instanceID);
+            acc.push(new_page);
+            return acc;
+        }, []);
+    }
+
     var functions = {
         load_hooks: function (plugin) {
             var self = this;
@@ -50,11 +67,12 @@ define(['jquery', 'knockout',
                                         type: 'dashboard'
                                     };
                                     self.dashboards.push(view);
+                                    viewcache.put(plugin, view)
                                 }));
                         });
                         $.each(hook.wizards, function (wizard, moduleName) {
-                            if (!shared.hooks.wizards.hasOwnProperty(wizard)) {
-                                shared.hooks.wizards[wizard] = [];
+                            if (!self.wizards.hasOwnProperty(wizard)) {
+                                self.wizards[wizard] = [];
                             }
                             systemLoaders.push(system.acquire('viewmodels/wizards/' + wizard + '/' + moduleName)
                                 .then(function (module) {
@@ -66,7 +84,8 @@ define(['jquery', 'knockout',
                                         activator: activator.create(),
                                         type: 'wizard'
                                     };
-                                    shared.hooks.wizards[wizard].push(view);
+                                    self.wizards[wizard].push(view);
+                                    viewcache.put(plugin, view)
                                 }));
                         });
                         $.each(hook.pages, function (page, pageInfo) {
@@ -110,26 +129,36 @@ define(['jquery', 'knockout',
                 return self;
             })
         },
-        get_plugin_pages: function (page, identifier) {
-            var self = this;
-            var out = [];
-            var cachedPages = viewcache.get_by_page(page, identifier);
+        /**
+         * Retrieve all plugin pages
+         * Creates new instances when the requested instance does not exist
+         * @param pageID: Identifier of the page (eg 'vdisk')
+         * @param instanceID: Identifier of the page instance (eg 'A_VDISK_GUID')
+         * @return {Array}
+         */
+        get_plugin_pages: function (pageID, instanceID) {
+            var cachedPages = viewcache.get_by_page(pageID, instanceID);
             if (cachedPages.length > 0){
                 return cachedPages
             }
             // Need new module instances
-            var standardPages = viewcache.get_by_page(page); // Loaded on boot time
-            return standardPages.reduce(function(acc, cur) {
-                if (cur.type !== 'page') {
-                    return acc // Continue
-                }
-                var module_constructor = cur['module_constructor'];
-                var module_instance = new module_constructor();
-                var new_page = $.extend({}, cur, {'module': module_instance, 'activator': activator.create()});
-                viewcache.put(new_page['plugin'], new_page, identifier);
-                acc.push(new_page);
-                return acc;
-            }, []);
+            var standardPages = viewcache.get_by_page(pageID); // Loaded on boot time
+            return load_new_instances(standardPages, instanceID, 'page')
+        },
+        /**
+         * Retrieve all plugin wizards
+         * Creates new instances when the requested instance does not exist
+         * @param instanceID: Identifier of the wizard instance (eg: 'AN_ALBA_BACKEND_GUID')
+         * @return {Array}
+         */
+        get_plugin_wizards: function(instanceID) {
+            var cachedPages = viewcache.get_wizards(instanceID);
+            if (cachedPages.length > 0){
+                return cachedPages
+            }
+            // Need new module instances
+            var standardPages = viewcache.get_wizards(); // Loaded on boot time
+            return load_new_instances(standardPages, instanceID, 'wizard')
         },
         activate_page: function (page) {
             page.activator.activateItem(page.module).fail(function (error) {
