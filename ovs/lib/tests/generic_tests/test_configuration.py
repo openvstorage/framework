@@ -30,8 +30,8 @@ class ConfigurationTest(unittest.TestCase):
     def test_rename_happy(self):
         rename_key_old = 'test_file'
         rename_key_new = 'test_file_changed'
-        set_data = [(basestring, rename_key_old, rename_key_old, False), (basestring, 'test_folder/{0}'.format(rename_key_old), 'test_folder/test_file', False)]
-        get_data = [(basestring, rename_key_new, rename_key_old, False), (basestring, 'test_folder/{0}'.format(rename_key_new), 'test_folder/test_file', False)]
+        set_data = [(basestring, rename_key_old, rename_key_old, False)]
+        get_data = [(basestring, rename_key_new, rename_key_old, False)]
         self._compare(rename_key_old, rename_key_new, set_data, get_data)
         with self.assertRaises(ConfigurationNotFoundException):
             Configuration.get('test_folder/test_file_changed')  # This key should not be made
@@ -39,16 +39,26 @@ class ConfigurationTest(unittest.TestCase):
             Configuration.get(rename_key_old)   # This key cannot exist anymore
 
     def test_rename_unhappy(self):
-        rename_key_old = 'test_file'
-        rename_key_new = 'test_file_changed'
-        set_data = [(basestring, '{0}_'.format(rename_key_old), rename_key_old, False), (basestring, 'test_folder/test'.format(rename_key_old), rename_key_old, False)]
-        get_data = [(basestring, rename_key_new, rename_key_old, False), (basestring, 'test_folder/test_file', rename_key_old, False)]
+        rename_key_old = 'test_folder'
+        rename_key_new = 'test_folder_changed'
+        set_data = [(basestring, '{0}_'.format(rename_key_old), rename_key_old, False), (basestring, '{0}_/test_file'.format(rename_key_old), rename_key_old, False)]
+        get_data = [(basestring, rename_key_new, rename_key_old, False), (basestring, rename_key_new, rename_key_old, False)]
         self._compare(rename_key_old, rename_key_new, set_data, get_data)
 
         c = Configuration.get_client()
         entries = c.prefix_entries(rename_key_old)
-        self.assertTrue(Configuration.get('test_file_') == rename_key_old)  # Old key still in place
+        print entries
+        self.assertTrue(Configuration.get('{0}_'.format(rename_key_old)) == rename_key_old)  # Old key still in place
+        self.assertTrue(Configuration.get('{0}_/test_file'.format(rename_key_new)) == rename_key_old)  # This one should be renamed
         self.assertFalse(any(['/../' in i[0] for i in entries]), 'Error during joining of prefixes')  # Check if joining error happened in some key
+
+
+    def test_jeff(self):
+        Configuration.set('djef/test', 'test_content')
+        Configuration.set('djef_test1', 'test_content')
+        Configuration.rename('djef', 'djef2')
+        c = Configuration.get_client()
+        self.assertListEqual(c.prefix_entries('djef'), [('djef_test1', '"test"'), ('djef2/test', '"test"')])
 
     def _compare(self, rename_key_old, rename_key_new, a, b):
             for set_data, get_data in zip(a, b):
