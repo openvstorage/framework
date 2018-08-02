@@ -47,9 +47,8 @@ class ConfigurationTest(unittest.TestCase):
 
         c = Configuration.get_client()
         entries = c.prefix_entries(rename_key_old)
-        print entries
-        self.assertTrue(Configuration.get('{0}_'.format(rename_key_old)) == rename_key_old)  # Old key still in place
-        self.assertTrue(Configuration.get('{0}_/test_file'.format(rename_key_new)) == rename_key_old)  # This one should be renamed
+        self.assertTrue(Configuration.get('{0}_'.format(rename_key_old)) == rename_key_old)  # None of these keys should be renamed
+        self.assertTrue(Configuration.get('{0}_/test_file'.format(rename_key_old)) == rename_key_old)
         self.assertFalse(any(['/../' in i[0] for i in entries]), 'Error during joining of prefixes')  # Check if joining error happened in some key
 
 
@@ -58,7 +57,8 @@ class ConfigurationTest(unittest.TestCase):
         Configuration.set('djef_test1', 'test_content')
         Configuration.rename('djef', 'djef2')
         c = Configuration.get_client()
-        self.assertListEqual(c.prefix_entries('djef'), [('djef_test1', '"test"'), ('djef2/test', '"test"')])
+        self.assertListEqual(c.prefix_entries('djef'), [('djef_test1', '"test_content"'), ('djef2/test', '"test_content"')])
+
 
     def _compare(self, rename_key_old, rename_key_new, a, b):
             for set_data, get_data in zip(a, b):
