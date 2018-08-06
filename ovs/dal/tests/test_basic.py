@@ -1651,18 +1651,30 @@ class Basic(unittest.TestCase):
         """
         Validates whether a delete will retry on an assert error
         """
+        prop_types = [str, int, float, long]
+
         def _change_list():
-            if Basic._executed is False:
-                PersistentFactory.store.set('ovs_listcache_testdisk', {})
-                Basic._executed = True
+            # Trigger an AssertException on ovs_unique constraint
+            unique_key = 'ovs_unique_{0}_{{0}}_{{1}}'.format(disk._classname)
+            store_data = disk._persistent.get(disk._key)
+            for prop in disk._properties:
+                if prop.unique is True:
+                    if prop.property_type not in prop_types:
+                        raise RuntimeError('A unique constraint can only be set on field of type {0}'.format(', '.join(t.__name__ for t in prop_types)))
+                    key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
+                    value_of_key = '{0}_mutated'.format(disk._key) if not Basic._executed else disk._key
+                    disk._persistent.set(key, value_of_key)
+            Basic._executed = True
+            Basic._loop += 1
 
         _ = self
-        PersistentFactory.store.set('ovs_listcache_testdisk', {'foo': 'bar'})
         Basic._executed = False
+        Basic._loop = 0
         disk = TestDisk()
         disk.name = 'disk'
         disk.save()
         disk.delete(_hook=_change_list)
+        self.assertEquals(Basic._loop, 2, 'Retry should have happened')
 
     def test_object_comparison_on_different_level(self):
         """
