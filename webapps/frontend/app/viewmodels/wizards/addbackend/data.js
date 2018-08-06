@@ -14,17 +14,62 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['knockout'], function(ko){
+define([
+    'jquery', 'knockout',
+    'viewmodels/containers/shared/base_container', 'viewmodels/containers/backend/backendtype', 'viewmodels/containers/backend/backend',
+    'viewmodels/services/backend'
+], function($, ko,
+            BaseContainer, BackendType, Backend,
+            backendService){
     "use strict";
-    var nameRegex, singleton;
-    nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;
-    singleton = function() {
-        return {
-            backends:     ko.observableArray([]),
-            backendType:  ko.observable(),
-            backendTypes: ko.observableArray([]),
-            name:         ko.observable().extend({ regex: nameRegex })
-        };
+    var viewModelMapping  = {
+        backendTypes: {
+            key: function (data) {
+                return ko.utils.unwrapObservable(data.guid)
+            },
+            create: function (options) {
+                var guid = options.data.guid;
+                var backendType = new BackendType(guid);
+                backendType.fillData((ko.utils.unwrapObservable(options.data)));
+                backendType.loaded(true);
+                return backendType;
+            },
+            update: function (options){
+                options.target.fillData(options.data);
+                return options.target
+            }
+        },
+        backends: {
+            key: function (data) {
+                return ko.utils.unwrapObservable(data.guid)
+            },
+            create: function (options) {
+                var guid = options.data.guid;
+                var backend = new Backend(guid);
+                backend.fillData((ko.utils.unwrapObservable(options.data)));
+                backend.loaded(true);
+                return backend;
+            },
+            update: function (options){
+                options.target.fillData(options.data);
+                return options.target
+            }
+        }
     };
-    return singleton();
+    function AddBackendData(data) {
+        var self = this;
+        BaseContainer.call(self);  // Inheritance
+
+        self.name = ko.observable().extend({ regex: backendService.nameRegex });
+        self.selectedBackendType = ko.observable();
+
+        var vmData = $.extend({
+            backends: [],
+            backendTypes: [],
+            name: undefined
+        }, data || {});
+        ko.mapping.fromJS(vmData, viewModelMapping, self);
+    }
+    AddBackendData.prototype = $.extend({}, BaseContainer.prototype);
+    return AddBackendData
 });

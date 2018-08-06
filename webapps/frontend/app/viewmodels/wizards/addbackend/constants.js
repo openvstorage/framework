@@ -15,22 +15,9 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'ovs/generic',
-    '../build', './gather', './data'
-], function($, generic, Build, Gather, Data) {
+], function(){
     "use strict";
-    return function(options) {
-        var self = this;
-        // Inherit
-        Build.call(self);
-
-        // Variables
-        var data = new Data();
-        var stepOptions = {data: data};
-        // Setup
-        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_backend.title')));
-        self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new Gather(stepOptions)]);
-        self.activateStep();
-    };
+    return {
+        wizard_identifier: 'addbackend'
+    }
 });

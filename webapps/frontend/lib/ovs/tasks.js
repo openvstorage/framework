@@ -37,19 +37,15 @@ define([
             return self.hooks[taskID].promise();
         };
         self.load = function(taskID) {
-            return $.Deferred(function(deferred) {
-                api.get('tasks/' + taskID)
-                    .done(function(data) {
-                        if (data.successful === true) {
-                            deferred.resolve(data.result);
+            return api.get('tasks/' + taskID)
+                .then(
+                    function(data) {
+                        if (data.successful) {
+                            return data.result;
                         } else {
-                            deferred.reject(data.result);
+                            throw new Error(data.result)
                         }
                     })
-                    .fail(function(error) {
-                        deferred.reject(error);
-                    });
-            }).promise();
         };
         self.validateTasks = function() {
             $.each(self.hooks, function(taskID, deferred) {
