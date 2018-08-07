@@ -30,8 +30,7 @@ from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient, \
-    SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
-from volumedriver.storagerouter.storagerouterclient import ClusterNotReachableException
+    SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException, ClusterNotReachableException
 
 
 class VDisk(DataObject):

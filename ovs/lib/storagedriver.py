@@ -34,7 +34,7 @@ from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, ClusterNotReachableException, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
@@ -133,15 +133,16 @@ class StorageDriverController(object):
                                     lsrc = rem.LocalStorageRouterClient(path)
                                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
                                     available_storagedrivers.append(sd)
-                                except Exception as ex:
-                                    if 'ClusterNotReachableException' in str(ex):
+
+                                except (ClusterNotReachableException, RuntimeError) as exception:
+                                    if isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
                                         StorageDriverController._logger.warning('StorageDriver {0} on StorageRouter {1} not available.'.format(
                                             sd.guid, storagerouter.name
                                         ))
-                                    else:
-                                        StorageDriverController._logger.exception('Got exception when validating StorageDriver {0} on StorageRouter {1}.'.format(
-                                            sd.guid, storagerouter.name
-                                        ))
+                                except Exception:
+                                    StorageDriverController._logger.exception('Got exception when validating StorageDriver {0} on StorageRouter {1}.'.format(
+                                        sd.guid, storagerouter.name
+                                    ))
 
                     StorageDriverController._logger.info('Updating cluster node configs for VPool {0}'.format(vpool.guid))
                     vpool.clusterregistry_client.set_node_configs(node_configs)
