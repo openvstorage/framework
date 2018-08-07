@@ -371,9 +371,9 @@ class StorageDriverConfiguration(object):
                 with remote(client.ip, [LocalStorageRouterClient]) as rem:
                     changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
             reloaded = True
-        except (ClusterNotReachableException, RuntimeError) as exception:
-            if isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
-                pass  # Other erros will be raised
+        except Exception as exception:
+            if not is_clusterNotReachableException(exception):
+                raise
 
         # No changes
         if len(changes) == 0:
@@ -433,3 +433,9 @@ class StorageDriverConfiguration(object):
         """
         if section in self.configuration:
             del self.configuration[section]
+
+def is_clusterNotReachableException(exception):
+    if isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
+        return True
+    else:
+        return False

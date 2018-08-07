@@ -37,7 +37,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient, StorageDriverConfiguration, ClusterNotReachableException
+from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient, StorageDriverConfiguration, is_clusterNotReachableException
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.vpool.shared import VPoolShared
@@ -278,9 +278,10 @@ class VPoolController(object):
                         lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
                         cls._logger.info('StorageDriver {0} - Responsive StorageDriver {1} on node with IP {2}'.format(storagedriver.guid, sd.name, sd.storagerouter.ip))
                         reachable_storagedrivers.append(sd)
-                    except (ClusterNotReachableException, RuntimeError) as exception:
-                        if isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
-                            pass
+                    except Exception as exception:
+                        if not is_clusterNotReachableException(exception):
+                            raise
+
         if len(reachable_storagedrivers) == 0:
             raise RuntimeError('Could not find any responsive node in the cluster')
 
