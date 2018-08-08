@@ -30,7 +30,7 @@ from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient, \
-    SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException, is_clusterNotReachableException
+    SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException, is_connection_failure
 
 
 class VDisk(DataObject):
@@ -238,7 +238,7 @@ class VDisk(DataObject):
                 vdisk_state = VDisk.STATUSES.NON_RUNNING
             # @todo replace RuntimeError with NodeNotReachableException
             except Exception as exception:
-                if is_clusterNotReachableException(exception):
+                if is_connection_failure(exception):
                     self._logger.debug('VDisk {0} status has been set to UNKNOWN'.format(self.name))
                     vdisk_state = VDisk.STATUSES.UNKNOWN
                 else:

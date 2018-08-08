@@ -37,7 +37,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient, StorageDriverConfiguration, is_clusterNotReachableException
+from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient, StorageDriverConfiguration, is_connection_failure
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.vpool.shared import VPoolShared
@@ -279,7 +279,7 @@ class VPoolController(object):
                         cls._logger.info('StorageDriver {0} - Responsive StorageDriver {1} on node with IP {2}'.format(storagedriver.guid, sd.name, sd.storagerouter.ip))
                         reachable_storagedrivers.append(sd)
                     except Exception as exception:
-                        if not is_clusterNotReachableException(exception):
+                        if not is_connection_failure(exception):
                             raise
 
         if len(reachable_storagedrivers) == 0:
