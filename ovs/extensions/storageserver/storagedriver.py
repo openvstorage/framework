@@ -441,5 +441,4 @@ def is_connection_failure(exception):
     :type exception: Exception
     :return: bool
     """
-    return isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
-
+    return isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception))
