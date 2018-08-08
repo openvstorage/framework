@@ -43,7 +43,7 @@ from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, \
+from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, is_connection_failure, LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, \
                                                        MDSNodeConfig, StorageDriverClient, StorageDriverConfiguration, VolumeRestartInProgressException
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
@@ -896,7 +896,10 @@ class VDiskController(object):
                                                                  node_id=str(storagedriver.storagedriver_id),
                                                                  req_timeout_secs=Configuration.get('ovs/volumedriver/timeouts|create_volume', default=30))
         except Exception as ex:
-            VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
+            if is_connection_failure(ex):
+                VDiskController._logger.error('Unable to connect to volumedriver {0}, creation failed with: {1}'.format(volume_name, str(ex)))
+            else:
+                VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
             raise
 
         with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):

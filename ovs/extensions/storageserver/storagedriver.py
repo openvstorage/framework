@@ -31,7 +31,7 @@ from volumedriver.storagerouter import storagerouterclient
 # noinspection PyUnresolvedReferences
 
 from volumedriver.storagerouter.storagerouterclient import \
-    ClusterContact, ClusterNodeConfig, \
+    ClusterContact, ClusterNodeConfig, ClusterNotReachableException, \
     DTLConfig, DTLConfigMode, DTLMode, Logger, \
     MaxRedirectsExceededException, MDSMetaDataBackendConfig,  MDSNodeConfig, \
     ObjectNotFoundException as SRCObjectNotFoundException, \
@@ -371,8 +371,8 @@ class StorageDriverConfiguration(object):
                 with remote(client.ip, [LocalStorageRouterClient]) as rem:
                     changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
             reloaded = True
-        except Exception as ex:
-            if 'ClusterNotReachableException' not in str(ex):
+        except Exception as exception:
+            if not is_connection_failure(exception):
                 raise
 
         # No changes
@@ -433,3 +433,12 @@ class StorageDriverConfiguration(object):
         """
         if section in self.configuration:
             del self.configuration[section]
+
+def is_connection_failure(exception):
+    """
+    Returns True if the provided exception is a ClusterNotReachableException, False if not the case
+    :param exception: The raised exception to check for type
+    :type exception: Exception
+    :return: bool
+    """
+    return isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception))

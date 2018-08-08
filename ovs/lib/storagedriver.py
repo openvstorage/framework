@@ -34,7 +34,7 @@ from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, is_connection_failure, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
@@ -133,8 +133,9 @@ class StorageDriverController(object):
                                     lsrc = rem.LocalStorageRouterClient(path)
                                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
                                     available_storagedrivers.append(sd)
-                                except Exception as ex:
-                                    if 'ClusterNotReachableException' in str(ex):
+
+                                except Exception as exception:
+                                    if is_connection_failure(exception):
                                         StorageDriverController._logger.warning('StorageDriver {0} on StorageRouter {1} not available.'.format(
                                             sd.guid, storagerouter.name
                                         ))
