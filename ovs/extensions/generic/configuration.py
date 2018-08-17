@@ -121,6 +121,15 @@ class Configuration(_Configuration):
             cls.set('/ovs/framework/{0}'.format(key), value, raw=False)
 
     @classmethod
+    def read_store_info(cls):
+        # type: () -> str
+        """
+        Reads the configured store method. This can currently only be 'arakoon'
+        :return: The configured store
+        :rtype: str
+        """
+
+    @classmethod
     def get_store_info(cls):
         """
         Retrieve the configuration store method. This can currently only be 'arakoon'

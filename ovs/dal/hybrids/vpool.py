@@ -22,7 +22,9 @@ import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
-from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration,\
+    LocalStorageRouterClient
+from ovs.log.log_handler import LogHandler
 
 
 class VPool(DataObject):
@@ -30,6 +32,8 @@ class VPool(DataObject):
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
     deploy vDisks. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
     """
+    _logger = LogHandler.get('dal', name='hybrid')
+
     STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
     CACHES = DataObject.enumerator('Cache', {'BLOCK': 'block',
                                              'FRAGMENT': 'fragment'})
@@ -47,7 +51,8 @@ class VPool(DataObject):
     __dynamics = [Dynamic('configuration', dict, 3600),
                   Dynamic('statistics', dict, 4),
                   Dynamic('identifier', str, 120),
-                  Dynamic('extensible', tuple, 60)]
+                  Dynamic('extensible', tuple, 60),
+                  Dynamic('volume_potentials', dict, 60)]
     _fixed_properties = ['storagedriver_client', 'objectregistry_client', 'clusterregistry_client']
 
     def __init__(self, *args, **kwargs):
@@ -189,3 +194,23 @@ class VPool(DataObject):
         if self.metadata_store_bits is None:
             reasons.append('voldrv_missing_info')
         return len(reasons) == 0, reasons
+
+    def _volume_potentials(self):
+        # type: () -> Dict[str, int]
+        """
+        Get an overview of all volume potentials for every Storagedriver in this vpool
+        A possible -1 can be returned for the volume potential which indicates that the potential could not be retrieved
+        :return: The overview with the volume potential
+        :rtype: dict
+        """
+        volume_potentials = {}
+        for storagedriver in self.storagedrivers:
+            volume_potential = -1
+            try:
+                std_config = StorageDriverConfiguration('storagedriver',    storagedriver.vpool_guid, storagedriver.storagedriver_id)
+                client = LocalStorageRouterClient(std_config.remote_path)
+                volume_potential = client.volume_potential(str(storagedriver.storagedriver_id))
+            except Exception:
+                self._logger.exception('Unable to retrieve configuration for storagedriver {0}'.format(storagedriver.storagedriver_id))
+            volume_potentials[storagedriver.storagerouter.guid] = volume_potential
+        return volume_potentials
