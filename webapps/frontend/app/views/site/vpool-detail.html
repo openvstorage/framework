@@ -236,15 +236,16 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <table class="table table-noborder table-hover table-condensed">
                                     <thead>
                                         <tr>
-                                            <th style="width: 120px;" data-i18n="ovs:generic.storagerouter"></th>
-                                            <th style="width: 75px;" data-i18n="ovs:vpools.proxies_amount"></th>
-                                            <th style="width: 120px;">
+                                            <th style="width: 15%;" data-i18n="ovs:generic.storagerouter"></th>
+                                            <th style="width: 10%;" data-i18n="ovs:vpools.proxies_amount"></th>
+                                            <th style="width: 15%;">
                                                 <abbr data-i18n="ovs:vpools.global_write_buffer_short"
                                                       data-bind="attr: { title: $.t('ovs:vpools.global_write_buffer') }"></abbr>
                                             </th>
                                             <th data-i18n="ovs:vpools.fragment_caching"></th>
                                             <th data-i18n="ovs:vpools.block_caching"></th>
-                                            <th style="width: 95px;" data-i18n="ovs:generic.actions"></th>
+                                            <th style="width: 15%" data-i18n="ovs:vpools.volume_potential"></th>
+                                            <th style="width: 10%;" data-i18n="ovs:generic.actions"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -255,6 +256,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                         <span data-bind="text: name" class="hand"></span></a>
                                                 </td>
                                                 <!-- ko if: $root.srSDMap()[guid()] === undefined -->
+                                                    <td data-i18n="ovs:generic.null"></td>
                                                     <td data-i18n="ovs:generic.null"></td>
                                                     <td data-i18n="ovs:generic.null"></td>
                                                     <td data-i18n="ovs:generic.null"></td>
@@ -326,6 +328,9 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                 <br /><span data-i18n="ovs:generic.cache_quota"></span>: <span data-bind="text: $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().cache_quota_bc)"></span>
                                                             <!-- /ko -->
                                                         <!-- /ko -->
+                                                    </td>
+                                                    <td>
+                                                        <span data-bind="text: $root.vPool().volumePotentials()[guid()]"></span>
                                                     </td>
                                                     <td style="height:37px;">
                                                         <button type="button"

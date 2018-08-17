@@ -65,6 +65,7 @@ define([
         self.totalCacheHits       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.vDisks               = ko.observableArray([]);
         self.writeSpeed           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.volumePotentials     = ko.observable({});
 
         // Computed
         self.bandwidth = ko.computed(function() {
@@ -84,7 +85,7 @@ define([
             generic.trySet(self.backendConnection, data, 'connection');
             generic.trySet(self.backendLogin, data, 'login');
             generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
-
+            generic.trySet(self.volumePotentials, data, 'volume_potentials');
             if (data.hasOwnProperty('configuration')) {
                 self.configuration(data.configuration);
             }

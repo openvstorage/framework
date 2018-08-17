@@ -46,7 +46,7 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         self.url = url
         self.options = dict(self.app.conf.CELERY_CACHE_BACKEND_OPTIONS, **options)
 
-        self.backend = url or backend or self.app.conf.CELERY_CACHE_BACKEND  # Will be 'arakoon'
+        self.backend = url or backend or self.app.conf.CELERY_RESULT_BACKEND  # Will be 'arakoon'
         self.expires = self.prepare_expires(expires, type=int)
         self._encode_prefixes()  # rencode the keyprefixes
 
