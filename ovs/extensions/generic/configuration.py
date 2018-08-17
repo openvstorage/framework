@@ -23,6 +23,7 @@ import json
 import random
 import string
 # noinspection PyUnresolvedReferences
+from ovs_extensions.caching.decorators import cache_file
 from ovs_extensions.generic.configuration import NotFoundException, ConnectionException, Configuration as _Configuration
 
 
@@ -121,6 +122,7 @@ class Configuration(_Configuration):
             cls.set('/ovs/framework/{0}'.format(key), value, raw=False)
 
     @classmethod
+    @cache_file(BOOTSTRAP_CONFIG_LOCATION)
     def read_store_info(cls):
         # type: () -> str
         """

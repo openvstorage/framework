@@ -85,7 +85,7 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 )
 
-SECRET_KEY = check_output('cat /etc/openvstorage_id', shell=True)
+SECRET_KEY = check_output('cat {0}'.format(System.OVS_ID_FILE), shell=True)
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
