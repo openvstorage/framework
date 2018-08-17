@@ -128,6 +128,9 @@ class Configuration(_Configuration):
         :return: The configured store
         :rtype: str
         """
+        with open(cls.BOOTSTRAP_CONFIG_LOCATION) as config_file:
+            contents = json.load(config_file)
+            return contents['configuration_store']
 
     @classmethod
     def get_store_info(cls):
@@ -138,6 +141,5 @@ class Configuration(_Configuration):
         """
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
             return 'unittest', None
-        with open(cls.BOOTSTRAP_CONFIG_LOCATION) as config_file:
-            contents = json.load(config_file)
-            return contents['configuration_store'], {'cacc_location': cls.CACC_LOCATION}
+        store = cls.read_store_info()
+        return store, {'cacc_location': cls.CACC_LOCATION}
