@@ -177,6 +177,6 @@ class ArakoonResultBackend(KeyValueStoreBackend):
                         if time.time() - value['time_set'] > self.expires:
                             self._logger.debug('Removing {0} as it has expired'.format(key))
                             self._client.delete(key, must_exist=False, transaction=transaction)
-
             self._logger.debug('Applying removal transactions')
+            return transaction
         self._client.apply_callback_transaction(build_cleanup, max_retries=20)
