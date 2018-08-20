@@ -1502,8 +1502,6 @@ class VDiskController(object):
         """
         from ovs.extensions.storageserver.storagedriver import FeatureNotAvailableException
 
-        stored_parents = {}
-
         if vpool_guid is None:
             vpools = VPoolList.get_vpools()
         else:

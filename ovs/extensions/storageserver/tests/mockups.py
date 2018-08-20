@@ -89,6 +89,7 @@ class StorageRouterClient(object):
     vrouter_id = {}
     object_type = {}
     failover_mode = {}
+    parenthood = {}
     mds_recording = []
     node_config_recordings = []
     synced = True
@@ -140,7 +141,12 @@ class StorageRouterClient(object):
         if parent_volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
             raise RuntimeError('Could not find volume {0}'.format(parent_volume_id))
         volume_size = StorageRouterClient.volumes[self.vpool_guid][parent_volume_id]['volume_size']
-        return self.create_volume(target_path, metadata_backend_config, volume_size, node_id)
+        child_volume_id = self.create_volume(target_path, metadata_backend_config, volume_size, node_id)
+        if parent_volume_id not in self.parenthood:
+            self.parenthood[parent_volume_id] = []
+        current_children = self.parenthood[parent_volume_id]  # type: list
+        current_children.append(child_volume_id)
+        return child_volume_id
 
     def create_clone_from_template(self, target_path, metadata_backend_config, parent_volume_id, node_id, req_timeout_secs=None):
         """
@@ -275,7 +281,7 @@ class StorageRouterClient(object):
         Info volume mockup
         """
         _ = req_timeout_secs
-        volume_size = StorageRouterClient.volumes[self.vpool_guid].get(volume_id, {}).get('volume_size', 0)
+        volume_size = self.convert_volume_size(StorageRouterClient.volumes[self.vpool_guid].get(volume_id, {}).get('volume_size', 0))
         return type('Info', (), {'halted': property(lambda s: False),
                                  'lba_size': property(lambda s: 512),
                                  'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id)),
@@ -284,6 +290,13 @@ class StorageRouterClient(object):
                                  'failover_mode': property(lambda s: StorageRouterClient.failover_mode[self.vpool_guid].get(volume_id, 'OK_STANDALONE')),
                                  'cluster_multiplier': property(lambda s: 8),
                                  'metadata_backend_config': property(lambda s: StorageRouterClient._metadata_backend_config[self.vpool_guid].get(volume_id))})()
+
+    @staticmethod
+    def convert_volume_size(volume_size):
+        if isinstance(volume_size, str):
+            # size passed by create_volume == str(int) + 'B'
+            return int(volume_size.rsplit('B')[0])
+        return volume_size
 
     def is_volume_synced_up_to_snapshot(self, volume_id, snapshot_id, req_timeout_secs=None):
         """
@@ -462,11 +475,7 @@ class ObjectRegistryClient(object):
         """
         registrations = []
         for volume_id in StorageRouterClient.volumes[self.vpool_guid].iterkeys():
-            registrations.append(ObjectRegistration(
-                StorageRouterClient.vrouter_id[self.vpool_guid][volume_id],
-                volume_id,
-                StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')
-            ))
+            registrations.append(self.find(volume_id))
         return registrations
 
     def find(self, volume_id):
@@ -478,10 +487,21 @@ class ObjectRegistryClient(object):
             return ObjectRegistration(
                 StorageRouterClient.vrouter_id[self.vpool_guid][volume_id],
                 volume_id,
-                StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')
+                StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE'),
+                parent_id=self._find_parent(volume_id)
             )
         return None
 
+    @staticmethod
+    def _find_parent(volume_id):
+        """
+        Looks for the parent of the volume
+        :return: The ID of the parent (if any)
+        """
+        # Does not handle multiple parents?
+        for parent_volume_id, child_volume_ids in StorageRouterClient.parenthood.iteritems():
+            if volume_id in child_volume_ids:
+                return parent_volume_id
 
 class FileSystemMetaDataClient(object):
     """
@@ -735,10 +755,11 @@ class ObjectRegistration(object):
     """
     Mocked ObjectRegistration
     """
-    def __init__(self, node_id, object_id, object_type):
+    def __init__(self, node_id, object_id, object_type, parent_id=None):
         self._node_id = node_id
         self._object_id = object_id
         self._object_type = object_type
+        self._parent = parent_id
 
     def node_id(self):
         """
@@ -757,6 +778,11 @@ class ObjectRegistration(object):
         Object Type
         """
         return self._object_type
+    def parent(self):
+        """
+        Object Parent
+        """
+        return self._parent
 
 
 class ArakoonNodeConfig(object):
