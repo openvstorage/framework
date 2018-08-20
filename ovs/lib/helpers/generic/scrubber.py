@@ -78,9 +78,6 @@ class ScrubShared(object):
 
         self._key = None
         self._log = None  # To be overruled
-        # Used to lock SSHClient usage. SSHClient should be locked as Paramiko will fork the SSHProcess causing some issues in multithreading context
-        self._client_lock = file_mutex('{0}_client_lock'.format(self._SCRUB_NAMESPACE))
-        self._client_cluster_lock = volatile_mutex('{0}_client_cluster_lock'.format(self._SCRUB_NAMESPACE), wait=5 * 60)
 
     @property
     def worker_context(self):
@@ -511,6 +508,7 @@ class StackWorker(ScrubShared):
         # Always at least 1 proxy service. Using that name to register items under
         self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_services[0])
         self._state_key = '{0}_state'.format(self._key)  # Key with the combined state for all proxies
+        self._client_cluster_lock = volatile_mutex('{0}_client_cluster_lock'.format(self._SCRUB_NAMESPACE), wait=5 * 60)
 
     def deploy_stack_and_scrub(self):
         """
@@ -1002,7 +1000,8 @@ class Scrubber(ScrubShared):
         :rtype: dict((storagerouter, sshclient))
         """
         clients = {}
-        with self._client_lock:
+        # Used to lock SSHClient usage. SSHClient should be locked as Paramiko will fork the SSHProcess causing some issues in multithreading context
+        with file_mutex('{0}_client_lock'.format(self._SCRUB_NAMESPACE)):
             for storagerouter in StorageRouterList.get_storagerouters():
                 client = None
                 tries = 0
