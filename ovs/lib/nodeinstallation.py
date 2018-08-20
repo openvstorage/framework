@@ -162,7 +162,7 @@ class NodeInstallationController(object):
             if setup_completed is False:
                 Toolbox.log(logger=NodeInstallationController._logger, messages='Collecting cluster information', title=True)
 
-                if root_client.file_exists('/etc/openvstorage_id') is False:
+                if root_client.file_exists(System.OVS_ID_FILE) is False:
                     raise RuntimeError("The 'openvstorage' package is not installed on this node")
 
                 node_name, fqdn_name = root_client.get_hostname()
