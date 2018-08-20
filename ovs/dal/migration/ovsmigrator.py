@@ -161,7 +161,7 @@ class OVSMigrator(object):
             from ovs.extensions.storage.persistentfactory import PersistentFactory
 
             persistent_client = PersistentFactory.get_client()
-            if working_version <= 16:
+            if working_version < 16:
                 # The list caching keys were changed to class|field|list_id instead of class|list_id|field
                 persistent_client.delete_prefix(DataList.generate_persistent_cache_key())
 
