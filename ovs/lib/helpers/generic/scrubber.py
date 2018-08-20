@@ -1075,31 +1075,40 @@ class Scrubber(ScrubShared):
             logging_start = self._format_message('vPool {0}'.format(vp.name))
             # Verify amount of vDisks on vPool
             self._logger.info('{0} - Checking scrub work'.format(logging_start))
-            stack_work_handler = StackWorkHandler(vpool=vp, vdisks=vdisks, worker_contexts=self.worker_contexts, job_id=self.job_id)
-            vpool_queue = stack_work_handler.generate_save_scrub_work()
-            vp_work_map[vp] = (vpool_queue, stack_work_handler)
-            if vpool_queue.qsize() == 0:
-                self._logger.info('{0} - No scrub work'.format(logging_start))
-                continue
-            stacks_to_spawn = min(self.max_stacks_per_vpool, len(self.scrub_locations))
-            self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
-            for stack_number in xrange(stacks_to_spawn):
-                scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
-                stack_worker = StackWorker(queue=vpool_queue,
-                                           vpool=vp,
-                                           scrub_info=scrub_target,
-                                           error_messages=self.error_messages,
-                                           worker_contexts=self.worker_contexts,
-                                           stack_work_handler=stack_work_handler,
-                                           job_id=self.job_id,
-                                           stacks_to_spawn=stacks_to_spawn,
-                                           stack_number=stack_number)
-                self.stack_workers.append(stack_worker)
-                stack = Thread(target=stack_worker.deploy_stack_and_scrub,
-                               args=())
-                stack.start()
-                self.stack_threads.append(stack)
-                counter += 1
+            try:
+                stack_work_handler = StackWorkHandler(vpool=vp, vdisks=vdisks, worker_contexts=self.worker_contexts, job_id=self.job_id)
+                vpool_queue = stack_work_handler.generate_save_scrub_work()
+                vp_work_map[vp] = (vpool_queue, stack_work_handler)
+                if vpool_queue.qsize() == 0:
+                    self._logger.info('{0} - No scrub work'.format(logging_start))
+                    continue
+                stacks_to_spawn = min(self.max_stacks_per_vpool, len(self.scrub_locations))
+                self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
+                for stack_number in xrange(stacks_to_spawn):
+                    scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
+                    stack_worker = StackWorker(queue=vpool_queue,
+                                               vpool=vp,
+                                               scrub_info=scrub_target,
+                                               error_messages=self.error_messages,
+                                               worker_contexts=self.worker_contexts,
+                                               stack_work_handler=stack_work_handler,
+                                               job_id=self.job_id,
+                                               stacks_to_spawn=stacks_to_spawn,
+                                               stack_number=stack_number)
+                    self.stack_workers.append(stack_worker)
+                    stack = Thread(target=stack_worker.deploy_stack_and_scrub,
+                                   args=())
+                    stack.start()
+                    self.stack_threads.append(stack)
+                    counter += 1
+            except Exception:
+                # Capture all possible exceptions of this stage to ensure that the scrubber will continue with
+                # other vpools
+                # The volumedriver could be out of touch while generating work
+                # IOError can come from the lack of file descriptors
+                msg = '{0} - Exception while spawning a StackWorkHandler for VPool {1}'.format(logging_start, vp.name)
+                self.error_messages.append(msg)
+                self._logger.exception(msg)
 
         if 'post_stack_worker_deployment' in self._test_hooks:
             self._test_hooks['post_stack_worker_deployment'](self)
