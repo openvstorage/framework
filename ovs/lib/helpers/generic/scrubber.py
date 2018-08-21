@@ -81,11 +81,8 @@ class ScrubShared(object):
 
         self._key = None
         self._log = None  # To be overruled
-        # Used to lock SSHClient usage. SSHClient should be locked as Paramiko will fork the SSHProcess causing some issues in multithreading context
-        self._client_lock = file_mutex('{0}_client_lock'.format(self._SCRUB_NAMESPACE))
-        self._client_cluster_lock = volatile_mutex('{0}_client_cluster_lock'.format(self._SCRUB_NAMESPACE), wait=5 * 60)
-        self.graphite_controller = GraphiteController(database='scrubber')
 
+        self.graphite_controller = GraphiteController(database='scrubber')
 
     @property
     def worker_context(self):
@@ -516,6 +513,7 @@ class StackWorker(ScrubShared):
         # Always at least 1 proxy service. Using that name to register items under
         self._key = self._SCRUB_PROXY_KEY.format(self.alba_proxy_services[0])
         self._state_key = '{0}_state'.format(self._key)  # Key with the combined state for all proxies
+        self._client_cluster_lock = volatile_mutex('{0}_client_cluster_lock'.format(self._SCRUB_NAMESPACE), wait=5 * 60)
 
         threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
         self.amount_threads = Configuration.get(key=threads_key, default=2)
@@ -1017,7 +1015,8 @@ class Scrubber(ScrubShared):
         :rtype: dict((storagerouter, sshclient))
         """
         clients = {}
-        with self._client_lock:
+        # Used to lock SSHClient usage. SSHClient should be locked as Paramiko will fork the SSHProcess causing some issues in multithreading context
+        with file_mutex('{0}_client_lock'.format(self._SCRUB_NAMESPACE)):
             for storagerouter in StorageRouterList.get_storagerouters():
                 client = None
                 tries = 0
@@ -1093,38 +1092,48 @@ class Scrubber(ScrubShared):
             logging_start = self._format_message('vPool {0}'.format(vp.name))
             # Verify amount of vDisks on vPool
             self._logger.info('{0} - Checking scrub work'.format(logging_start))
-            stack_work_handler = StackWorkHandler(vpool=vp, vdisks=vdisks, worker_contexts=self.worker_contexts, job_id=self.job_id)
-            vpool_queue = stack_work_handler.generate_save_scrub_work()
-            vp_work_map[vp] = (vpool_queue, stack_work_handler)
-            if vpool_queue.qsize() == 0:
-                self._logger.info('{0} - No scrub work'.format(logging_start))
-                continue
-            stacks_to_spawn = min(self.max_stacks_per_vpool, len(self.scrub_locations))
-            self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
-            for stack_number in xrange(stacks_to_spawn):
-                scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
-                try:
-                    stack_worker = StackWorker(queue=vpool_queue,
-                                               vpool=vp,
-                                               scrub_info=scrub_target,
-                                               error_messages=self.error_messages,
-                                               worker_contexts=self.worker_contexts,
-                                               stack_work_handler=stack_work_handler,
-                                               job_id=self.job_id,
-                                               stacks_to_spawn=stacks_to_spawn,
-                                               stack_number=stack_number,
-                                               graphite_controller=self.graphite_controller)
-                except Exception as ex:
-                    self.error_messages.append(str(ex))
-                    self._logger.exception(str(ex))
+            try:
+                stack_work_handler = StackWorkHandler(vpool=vp, vdisks=vdisks, worker_contexts=self.worker_contexts, job_id=self.job_id)
+                vpool_queue = stack_work_handler.generate_save_scrub_work()
+                vp_work_map[vp] = (vpool_queue, stack_work_handler)
+                if vpool_queue.qsize() == 0:
+                    self._logger.info('{0} - No scrub work'.format(logging_start))
                     continue
+                stacks_to_spawn = min(self.max_stacks_per_vpool, len(self.scrub_locations))
+                self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
+                for stack_number in xrange(stacks_to_spawn):
+                    scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
+                    try:
+                        stack_worker = StackWorker(queue=vpool_queue,
+                                                   vpool=vp,
+                                                   scrub_info=scrub_target,
+                                                   error_messages=self.error_messages,
+                                                   worker_contexts=self.worker_contexts,
+                                                   stack_work_handler=stack_work_handler,
+                                                   job_id=self.job_id,
+                                                   stacks_to_spawn=stacks_to_spawn,
+                                                   stack_number=stack_number,
+                                                   graphite_controller=self.graphite_controller)
+                    except Exception as ex:
+                        self.error_messages.append(str(ex))
+                        self._logger.exception(str(ex))
+                        continue
 
-                self.stack_workers.append(stack_worker)
-                stack = Thread(target=stack_worker.deploy_stack_and_scrub,
-                               args=())
-                stack.start()
-                self.stack_threads.append(stack)
-                counter += 1
+                    self.stack_workers.append(stack_worker)
+                    stack = Thread(target=stack_worker.deploy_stack_and_scrub,
+                                   args=())
+                    stack.start()
+                    self.stack_threads.append(stack)
+                    counter += 1
+
+            except Exception:
+                # Capture all possible exceptions of this stage to ensure that the scrubber will continue with
+                # other vpools
+                # The volumedriver could be out of touch while generating work
+                # IOError can come from the lack of file descriptors
+                msg = '{0} - Exception while spawning a StackWorkHandler for VPool {1}'.format(logging_start, vp.name)
+                self.error_messages.append(msg)
+                self._logger.exception(msg)
 
         if 'post_stack_worker_deployment' in self._test_hooks:
             self._test_hooks['post_stack_worker_deployment'](self)
