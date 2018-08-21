@@ -23,6 +23,7 @@ import json
 import random
 import string
 # noinspection PyUnresolvedReferences
+from ovs_extensions.caching.decorators import cache_file
 from ovs_extensions.generic.configuration import Configuration as _Configuration, ConnectionException, NotFoundException
 
 
@@ -126,12 +127,24 @@ class Configuration(_Configuration):
             cls.set('/ovs/framework/{0}'.format(key), value, raw=False)
 
     @classmethod
-    def get_store_info(cls):
+    @cache_file(CONFIG_STORE_LOCATION)
+    def read_store_info(cls):
+        # type: () -> str
         """
-        Retrieve the configuration store method. Currently this can only be 'arakoon'
-        :return: The store method
+        Reads the configured store method. This can currently only be 'arakoon'
+        :return: The configured store
         :rtype: str
         """
         with open(cls.CONFIG_STORE_LOCATION) as config_file:
             contents = json.load(config_file)
             return contents['configuration_store']
+
+    @classmethod
+    def get_store_info(cls):
+        # type: () -> str
+        """
+        Retrieve the configuration store method. Currently this can only be 'arakoon'
+        :return: The store method
+        :rtype: str
+        """
+        return cls.read_store_info()

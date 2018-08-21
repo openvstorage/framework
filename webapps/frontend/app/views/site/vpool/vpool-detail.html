@@ -266,10 +266,11 @@ but WITHOUT ANY WARRANTY of any kind.
                                                 <span class="hand fa" data-i18n="[html]alba:icons.expand"
                                                       data-bind="visible: !$root.expanded(), click: function() { $root.expanded(!$root.expanded()); }"></span>
                                             </th>
-                                            <th style="width: 20%;" data-i18n="ovs:generic.storagerouter"></th>
-                                            <th style="width: 25%;" data-i18n="ovs:vpools.proxies"></th>
+                                            <th style="width: 15%;" data-i18n="ovs:generic.storagerouter"></th>
+                                            <th style="width: 20%;" data-i18n="ovs:vpools.proxies"></th>
                                             <th style="width: 20%;" data-i18n="ovs:generic.storageip"></th>
-                                            <th style="width: 20%;" data-i18n="ovs:generic.edge_port"></th>
+                                            <th style="width: 15%;" data-i18n="ovs:generic.edge_port"></th>
+                                            <th style="width: 15%" data-i18n="ovs:vpools.volume_potential"></th>
                                             <th style="width: 10%;" data-i18n="ovs:generic.actions"></th>
                                         </tr>
                                     </thead>
@@ -287,6 +288,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                                         <span data-bind="text: name" class="hand"></span></a>
                                                 </td>
                                                 <!-- ko if: $root.srSDMap()[guid()] === undefined -->
+                                                    <td data-i18n="ovs:generic.null"></td>
+                                                    <td data-i18n="ovs:generic.null"></td>
                                                     <td data-i18n="ovs:generic.null"></td>
                                                     <td data-i18n="ovs:generic.null"></td>
                                                     <td data-i18n="ovs:generic.null"></td>
@@ -322,7 +325,9 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <td>
                                                         <span data-bind="text: ports().edge"></span>
                                                     </td>
-
+                                                    <td>
+                                                        <span data-bind="text: $root.vPool().volumePotentials()[$parent.guid()]"></span>
+                                                    </td>
                                                     <td style="height:37px;">
                                                         <button type="button"
                                                                 class="btn btn-mini btn-default hand"
