@@ -1508,6 +1508,7 @@ class VDiskController(object):
             vpools = [VPool(vpool_guid)]
         for vpool in vpools:
             vdisks = dict((str(vdisk.volume_id), vdisk) for vdisk in vpool.vdisks)
+            parent_children_map = {}
             for entry in vpool.objectregistry_client.get_all_registrations():
                 volume_id = entry.object_id()
                 if volume_id not in vdisks:
@@ -1533,10 +1534,27 @@ class VDiskController(object):
                             new_vdisk.pagecache_ratio = 1.0
                             new_vdisk.metadata = {'lba_size': new_vdisk.info['lba_size'],
                                                   'cluster_multiplier': new_vdisk.info['cluster_multiplier']}
+                            VDiskController._logger.info('vDisk {0} - has parent func {1}'.format(new_vdisk.name, hasattr(entry, 'parent')))
+                            if hasattr(entry, 'parent'):   # Older releases do not have this option
+                                # Parent is a volume ID
+                                parent_id = entry.parent()  # type: str
+                                VDiskController._logger.info('vDisk {0} - has parent with vol id {1}'.format(new_vdisk.name, parent_id))
+                                if parent_id:
+                                    VDiskController._logger.info('vDisk {0} - has parent with vol id {1}'.format(new_vdisk.name, parent_id))
+                                    if parent_id not in parent_children_map:
+                                        parent_children_map[parent_id] = []
+                                    parent_children_map[parent_id].append(new_vdisk)
                             new_vdisk.save()
                             VDiskController.vdisk_checkup(new_vdisk)
+
                 else:
                     del vdisks[volume_id]
+            # All child vdisks should be saved at this point
+            for parent_id, child_vdisks in parent_children_map.iteritems():
+                for child_vdisk in child_vdisks:
+                    if not child_vdisk.parent_vdisk:
+                        child_vdisk.parent_vdisk = VDiskList.get_vdisk_by_volume_id(parent_id)
+                        child_vdisk.save()
             for volume_id, vdisk in vdisks.iteritems():
                 with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
                     if vpool.objectregistry_client.find(str(volume_id)) is None:
