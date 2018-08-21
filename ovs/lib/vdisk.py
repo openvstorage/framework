@@ -1540,7 +1540,6 @@ class VDiskController(object):
                                 parent_id = entry.parent()  # type: str
                                 VDiskController._logger.info('vDisk {0} - has parent with vol id {1}'.format(new_vdisk.name, parent_id))
                                 if parent_id:
-                                    # @todo figure out why this is empty for clone of clone
                                     VDiskController._logger.info('vDisk {0} - has parent with vol id {1}'.format(new_vdisk.name, parent_id))
                                     if parent_id not in parent_children_map:
                                         parent_children_map[parent_id] = []
