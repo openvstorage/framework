@@ -775,6 +775,7 @@
         "sco_size": "SCO Size",
         "statistics": "Statistics",
         "title": "vPools",
+        "volume_potential": "Volume potential",
         "volume_write_buffer": "Volume Write Buffer"
     },
     "vtemplates": {

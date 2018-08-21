@@ -46,7 +46,7 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         self.url = url
         self.options = dict(self.app.conf.CELERY_CACHE_BACKEND_OPTIONS, **options)
 
-        self.backend = url or backend or self.app.conf.CELERY_CACHE_BACKEND  # Will be 'arakoon'
+        self.backend = url or backend or self.app.conf.CELERY_RESULT_BACKEND  # Will be 'arakoon'
         self.expires = self.prepare_expires(expires, type=int)
         self._encode_prefixes()  # rencode the keyprefixes
 
@@ -177,6 +177,6 @@ class ArakoonResultBackend(KeyValueStoreBackend):
                         if time.time() - value['time_set'] > self.expires:
                             self._logger.debug('Removing {0} as it has expired'.format(key))
                             self._client.delete(key, must_exist=False, transaction=transaction)
-
             self._logger.debug('Applying removal transactions')
+            return transaction
         self._client.apply_callback_transaction(build_cleanup, max_retries=20)
