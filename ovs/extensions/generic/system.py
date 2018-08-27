@@ -52,8 +52,7 @@ class System(_System):
             return cls._machine_id.get('none' if client is None else client.ip)
         if client is not None:
             return client.run(['cat', cls.OVS_ID_FILE]).strip()
-        with open(cls.OVS_ID_FILE, 'r') as the_file:
-            return the_file.read().strip()
+        return cls.read_my_machine_id()
 
     @classmethod
     @cache_file(OVS_ID_FILE)
