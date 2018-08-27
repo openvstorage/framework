@@ -100,8 +100,10 @@ class DiskController(object):
         else:
             for partition in modeled_disk.partitions:
                 partition.state = 'MISSING'
+                partition.save()
                 cls._logger.warning('Disk {0} - Partition with offset {1} - Updated status to MISSING'.format(modeled_disk.name, partition.offset))
             modeled_disk.state = 'MISSING'
+            modeled_disk.save()
             DiskController._logger.warning('Disk {0} - Updated status to MISSING'.format(modeled_disk.name))
 
     @classmethod
@@ -125,6 +127,7 @@ class DiskController(object):
                 if len(partition.roles) > 0:
                     cls._logger.warning('Disk {0} - Partition with offset {1} - Update status to MISSING'.format(modeled_disk.name,partition.offset))
                     partition.state = 'MISSING'
+                    partition.save()
                 else:
                     cls._logger.info('Disk {0} - Partition with offset {1} - Deleting'.format(modeled_disk.name, partition.offset))
                     partition.delete()
