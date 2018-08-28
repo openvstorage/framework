@@ -14,4 +14,4 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-S3_BASE = '/opt/ovs/s3'
+S3_BASE = '/ovs/framework/hosts/{0}/s3'
