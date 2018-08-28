@@ -100,7 +100,7 @@ define([
                     if (error !== undefined && error.status === 404) {
                         router.navigateBack();
                     }
-                    throw new Error(error)
+                    throw error
                 })
         };
         self.loadDomains = function() {

@@ -43,7 +43,7 @@ define([
                         if (data.successful) {
                             return data.result;
                         } else {
-                            throw new Error(data.result)
+                            throw data.result
                         }
                     })
         };
