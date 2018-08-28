@@ -51,8 +51,7 @@ class DiskController(object):
             DiskController._logger.exception('Could not connect to StorageRouter {0}'.format(storagerouter.ip))
             raise
 
-        node_id = System.get_my_machine_id()
-        s3 = Configuration.get(S3_BASE.format(node_id), default=False)
+        s3 = Configuration.get(S3_BASE.format(storagerouter.machine_id), default=False)
         disks, name_alias_mapping = DiskTools.model_devices(client, s3=s3)
         disks_by_name = dict((disk.name, disk) for disk in disks)
         alias_name_mapping = name_alias_mapping.reverse_mapping()
