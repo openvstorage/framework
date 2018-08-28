@@ -204,10 +204,9 @@ class StorageRouterController(object):
         :rtype: dict
         """
         celery_scheduling = Configuration.get(key='/ovs/framework/scheduling/celery', default={})
-        stats_monkey_disabled = 'ovs.stats_monkey.run_all' in celery_scheduling and celery_scheduling['ovs.stats_monkey.run_all'] is None
-        stats_monkey_disabled &= 'alba.stats_monkey.run_all' in celery_scheduling and celery_scheduling['alba.stats_monkey.run_all'] is None
+        stats_monkey_enabled = any(celery_scheduling.get(key) is not None for key in ['ovs.stats_monkey.run_all', 'alba.stats_monkey.run_all'])
         return {'cluster_id': Configuration.get(key='/ovs/framework/cluster_id'),
-                'stats_monkey': not stats_monkey_disabled,
+                'stats_monkey': stats_monkey_enabled,
                 'support_agent': Configuration.get(key='/ovs/framework/support|support_agent'),
                 'remote_access': Configuration.get(key='ovs/framework/support|remote_access'),
                 'stats_monkey_config': Configuration.get(key='ovs/framework/monitoring/stats_monkey', default={})}
@@ -329,9 +328,11 @@ class StorageRouterController(object):
                                                                       'port': (int, {'min': 1, 'max': 65535}),
                                                                       'database': (str, None),
                                                                       'interval': (int, {'min': 1, 'max': 86400}),
-                                                                      'password': (str, None),
-                                                                      'transport': (str, ['influxdb', 'redis']),
+                                                                      'transport': (str, ['influxdb', 'redis', 'graphite']),
                                                                       'environment': (str, None)})
+            if stats_monkey_new_config['transport'] in ['influxdb', 'reddis']:
+                ExtensionsToolbox.verify_required_params(actual_params=stats_monkey_new_config, required_params={'password': (str, None)})
+
             if stats_monkey_new_config['transport'] == 'influxdb':
                 ExtensionsToolbox.verify_required_params(actual_params=stats_monkey_new_config, required_params={'username': (str, None)})
 
@@ -376,7 +377,7 @@ class StorageRouterController(object):
                 # The scheduled task cannot be configured to run more than once a minute, so for intervals < 60, the stats monkey task handles this itself
                 StorageRouterController._logger.debug('Requested interval to run at: {0}'.format(interval))
                 Configuration.set(key=stats_monkey_config_key, value=stats_monkey_new_config)
-                if interval > 60:
+                if interval > 0:
                     days, hours, minutes, _ = ExtensionsToolbox.convert_to_days_hours_minutes_seconds(seconds=interval)
                     if days == 1:  # Max interval is 24 * 60 * 60, so once every day at 3 AM
                         schedule = {'hour': '3'}

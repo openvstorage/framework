@@ -5,6 +5,7 @@ BindsTo=ovs-watcher-framework.service
 
 [Service]
 Type=simple
+SyslogIdentifier=%N
 Environment=PYTHONPATH=/opt/OpenvStorage
 WorkingDirectory=/opt/OpenvStorage
 ExecStart=/usr/bin/python2 /opt/OpenvStorage/ovs/extensions/rabbitmq/consumer.py volumerouter --durable

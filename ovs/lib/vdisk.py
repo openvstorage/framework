@@ -43,7 +43,7 @@ from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, \
+from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, is_connection_failure, LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, \
                                                        MDSNodeConfig, StorageDriverClient, StorageDriverConfiguration, VolumeRestartInProgressException
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
@@ -896,7 +896,10 @@ class VDiskController(object):
                                                                  node_id=str(storagedriver.storagedriver_id),
                                                                  req_timeout_secs=Configuration.get('ovs/volumedriver/timeouts|create_volume', default=30))
         except Exception as ex:
-            VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
+            if is_connection_failure(ex):
+                VDiskController._logger.error('Unable to connect to volumedriver {0}, creation failed with: {1}'.format(volume_name, str(ex)))
+            else:
+                VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
             raise
 
         with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
@@ -959,9 +962,11 @@ class VDiskController(object):
         cache_quota = vdisk.cache_quota
         if cache_quota is None:
             vdisk.invalidate_dynamics('storagerouter_guid')
-            metadata = vpool.metadata['backend']['caching_info'].get(vdisk.storagerouter_guid, {})
-            cache_quota = {VPool.CACHES.FRAGMENT: metadata.get('quota_fc'),
-                           VPool.CACHES.BLOCK: metadata.get('quota_bc')}
+            cache_info = vpool.metadata['caching_info'].get(vdisk.storagerouter_guid, {})  # type: dict
+            cache_info_fragment = cache_info.get(StorageDriverConfiguration.CACHE_FRAGMENT, {})  # type: dict
+            cache_info_block = cache_info.get(StorageDriverConfiguration.CACHE_BLOCK, {})  # type: dict
+            cache_quota = {VPool.CACHES.FRAGMENT: cache_info_fragment.get('quota'),
+                           VPool.CACHES.BLOCK: cache_info_block.get('quota')}
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
@@ -1503,6 +1508,7 @@ class VDiskController(object):
             vpools = [VPool(vpool_guid)]
         for vpool in vpools:
             vdisks = dict((str(vdisk.volume_id), vdisk) for vdisk in vpool.vdisks)
+            parent_children_map = {}
             for entry in vpool.objectregistry_client.get_all_registrations():
                 volume_id = entry.object_id()
                 if volume_id not in vdisks:
@@ -1528,10 +1534,27 @@ class VDiskController(object):
                             new_vdisk.pagecache_ratio = 1.0
                             new_vdisk.metadata = {'lba_size': new_vdisk.info['lba_size'],
                                                   'cluster_multiplier': new_vdisk.info['cluster_multiplier']}
+                            VDiskController._logger.info('vDisk {0} - has parent func {1}'.format(new_vdisk.name, hasattr(entry, 'parent')))
+                            if hasattr(entry, 'parent'):   # Older releases do not have this option
+                                # Parent is a volume ID
+                                parent_id = entry.parent()  # type: str
+                                VDiskController._logger.info('vDisk {0} - has parent with vol id {1}'.format(new_vdisk.name, parent_id))
+                                if parent_id:
+                                    VDiskController._logger.info('vDisk {0} - has parent with vol id {1}'.format(new_vdisk.name, parent_id))
+                                    if parent_id not in parent_children_map:
+                                        parent_children_map[parent_id] = []
+                                    parent_children_map[parent_id].append(new_vdisk)
                             new_vdisk.save()
                             VDiskController.vdisk_checkup(new_vdisk)
+
                 else:
                     del vdisks[volume_id]
+            # All child vdisks should be saved at this point
+            for parent_id, child_vdisks in parent_children_map.iteritems():
+                for child_vdisk in child_vdisks:
+                    if not child_vdisk.parent_vdisk:
+                        child_vdisk.parent_vdisk = VDiskList.get_vdisk_by_volume_id(parent_id)
+                        child_vdisk.save()
             for volume_id, vdisk in vdisks.iteritems():
                 with volatile_mutex(VDiskController._VOLDRV_EVENT_KEY.format(volume_id), wait=30):
                     if vpool.objectregistry_client.find(str(volume_id)) is None:

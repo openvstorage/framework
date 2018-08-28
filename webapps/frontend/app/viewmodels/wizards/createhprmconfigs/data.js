@@ -78,7 +78,7 @@ define(['jquery', 'knockout'], function($, ko){
 
     singleton = function() {
         var wizardData = {
-            hprmPort:                ko.observable().extend({ numeric: {min: 1, max: 65535}}),
+            hprmPort:                ko.observable().extend({ numeric: {min: 1, max: 65535}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
             identifier:              ko.observable('').extend({regex: nameRegex}),
             storageRouter:           ko.observable(),
             vPool:                   ko.observable(),
@@ -99,8 +99,8 @@ define(['jquery', 'knockout'], function($, ko){
             hostFC:                  ko.observable('').extend({regex: hostRegex}),
             localHostFC:             ko.observable(true),
             localPathFC:             ko.observable(''),
-            localSizeFC:             ko.observable().extend({ numeric: {min: 1, max: 10 * 1024}}),
-            portFC:                  ko.observable(80).extend({numeric: {min: 1, max: 65535}}),
+            localSizeFC:             ko.observable().extend({ numeric: {min: 1, max: 10 * 1024}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
+            portFC:                  ko.observable(80).extend({numeric: {min: 1, max: 65535}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
             presetFC:                ko.observable(),
             useFC:                   ko.observable(false),
             // Block cache
@@ -114,8 +114,8 @@ define(['jquery', 'knockout'], function($, ko){
             hostBC:                  ko.observable('').extend({regex: hostRegex}),
             localHostBC:             ko.observable(true),
             localPathBC:             ko.observable(''),
-            localSizeBC:             ko.observable().extend({ numeric: {min: 1, max: 10 * 1024}}),
-            portBC:                  ko.observable(80).extend({numeric: {min: 1, max: 65535}}),
+            localSizeBC:             ko.observable().extend({ numeric: {min: 1, max: 10 * 1024}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
+            portBC:                  ko.observable(80).extend({numeric: {min: 1, max: 65535}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
             presetBC:                ko.observable(),
             supportsBC:              ko.observable(true),
             useBC:                   ko.observable(false)

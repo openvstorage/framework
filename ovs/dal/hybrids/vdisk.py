@@ -30,8 +30,7 @@ from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient, \
-    SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException
-from volumedriver.storagerouter.storagerouterclient import ClusterNotReachableException
+    SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException, is_connection_failure
 
 
 class VDisk(DataObject):
@@ -238,12 +237,12 @@ class VDisk(DataObject):
             except MaxRedirectsExceededException:
                 vdisk_state = VDisk.STATUSES.NON_RUNNING
             # @todo replace RuntimeError with NodeNotReachableException
-            except (ClusterNotReachableException, RuntimeError) as exception:
-                if isinstance(exception, ClusterNotReachableException) or (isinstance(exception, RuntimeError) and 'failed to send XMLRPC request' in str(exception)):
+            except Exception as exception:
+                if is_connection_failure(exception):
                     self._logger.debug('VDisk {0} status has been set to UNKNOWN'.format(self.name))
                     vdisk_state = VDisk.STATUSES.UNKNOWN
-            except Exception as ex:
-                self._logger.debug('Uncaught exception occurred when requesting the volume info for vDisk {0}: {1}'.format(self.name, ex))
+                else:
+                    self._logger.debug('Uncaught exception occurred when requesting the volume info for vDisk {0}: {1}'.format(self.name, ex))
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():

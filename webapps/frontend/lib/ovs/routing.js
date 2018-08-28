@@ -14,7 +14,7 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['jquery'], function($) {
+define(['jquery', 'knockout'], function($, ko) {
     "use strict";
     var mainRoutes, siteRoutes, buildSiteRoutes, loadHash, extraRoutes, routePatches;
 
@@ -70,7 +70,7 @@ define(['jquery'], function($) {
                 hash = siteRoutes[i].hash;
                 for (item in params) {
                     if (params.hasOwnProperty(item)) {
-                        hash = hash.replace(':' + item, params[item].call ? params[item]() : params[item]);
+                        hash = hash.replace(':' + item, ko.utils.unwrapObservable(params[item]));
                     }
                 }
                 if (hash.indexOf(':') === -1) {

@@ -4,6 +4,7 @@ After=local-fs.target network-online.target ovs-watcher-volumedriver.service
 
 [Service]
 Type=simple
+SyslogIdentifier=%N
 ExecStartPre=/bin/bash -c "if [ ! -d <RUN_FILE_DIR> ]; then mkdir <RUN_FILE_DIR>; chown ovs:ovs <RUN_FILE_DIR>; fi; echo <VOLDRV_PKG_NAME>=`<VOLDRV_VERSION_CMD>` > <RUN_FILE_DIR>/<SERVICE_NAME>.version"
 ExecStart=/usr/bin/failovercache --path <DTL_PATH> --address <DTL_ADDRESS> --port <DTL_PORT> --transport <DTL_TRANSPORT> --logrotation --logsink <LOG_SINK>
 Restart=on-failure

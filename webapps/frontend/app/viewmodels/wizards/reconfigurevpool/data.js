@@ -29,8 +29,8 @@ define(['jquery', 'knockout',
             configParams:                       undefined,  // Changes related to general configs (sco size, dtl ...)
             // Storage driver changes
             cachingData:                        undefined,  // Changes related to fragment cache and block cache
-            globalWriteBuffer:                  ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}}),
-            proxyAmount:                        ko.observable().extend({numeric: {min: 1, max: 16}}),
+            globalWriteBuffer:                  ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
+            proxyAmount:                        ko.observable().extend({numeric: {min: 1, max: 16}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
             // Shared across the pages
             // Handles
             loadBackendsHandle:                  undefined,

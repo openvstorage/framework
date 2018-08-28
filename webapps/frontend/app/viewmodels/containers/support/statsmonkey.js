@@ -15,22 +15,28 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic'
-], function($, ko, generic) {
+    'jquery', 'knockout',
+    'ovs/generic',
+    'viewmodels/containers/shared/base_container'
+], function($, ko,
+            generic,
+            BaseContainer) {
     "use strict";
 
-    return function(data) {
+     function StatsMonkey(data) {
         var self = this;
 
         self.host        = ko.observable().extend({regex: generic.ipRegex});
-        self.port        = ko.observable(1).extend({numeric: {min: 1, max: 65535}});
-        self.database    = ko.observable().extend({removeWhiteSpaces: null});
+        self.port        = ko.observable(2003).extend({numeric: {min: 1035, max: 65535}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
+        self.database    = ko.observable('openvstorage.fwk').extend({removeWhiteSpaces: null});
         self.username    = ko.observable().extend({removeWhiteSpaces: null});
         self.password    = ko.observable().extend({removeWhiteSpaces: null});
-        self.interval    = ko.observable(1).extend({numeric: {min: 1, max: 86400}});
+        self.interval    = ko.observable(1).extend({numeric: {min: 1, max: 86400}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
         self.transport   = ko.observable();
-        self.transports  = ko.observableArray(['influxdb', 'redis']);
+        self.transports  = ko.observableArray(['influxdb', 'redis','graphite']);
         self.environment = ko.observable().extend({removeWhiteSpaces: null});
+
+        BaseContainer.call(this);
 
         // Default data: required to set the mappedProperties for ko.mapping
         var vmData = $.extend({
@@ -53,25 +59,6 @@ define([
         });
 
         // Functions
-        /**
-         * Return a JSON representation of this object
-         * Will respect the mapping applied to the viewModel
-         * @return {string|*}
-         */
-        self.toJSON = function(){
-            return ko.toJSON(self.toJS())
-        };
-        /**
-         * return a javascript Object from this object
-         * Will respect the mapping applied to the viewModel
-         * @return {object}
-         */
-        self.toJS = function() {
-            return ko.mapping.toJS(self)
-        };
-        self.update = function(data) {
-            ko.mapping.fromJS(data, self)
-        };
         self.validate = function() {
             var fields = [];
             var reasons = [];
@@ -95,11 +82,13 @@ define([
                 fields.push('username');
                 reasons.push($.t('ovs:wizards.stats_monkey_configure.username_required'));
             }
-            if (self.password() === undefined || self.password() === '') {
+            if ((self.password() === undefined || self.password() === '') && (self.transport() === 'influxdb' ||  self.transport() === 'redis')) {
                 fields.push('password');
                 reasons.push($.t('ovs:wizards.stats_monkey_configure.password_required'));
             }
             return { value: reasons.length === 0, reasons: reasons, fields: fields };
         }
     }
+    StatsMonkey.prototype = $.extend({}, BaseContainer.prototype);
+    return StatsMonkey
 });

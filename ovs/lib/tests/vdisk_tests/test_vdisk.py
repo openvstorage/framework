@@ -19,6 +19,7 @@ Test module for vDisk functionality
 """
 import time
 import unittest
+from collections import OrderedDict
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
@@ -653,3 +654,47 @@ class VDiskTest(unittest.TestCase):
         for devicename, expected in test.iteritems():
             result = VDiskController.extract_volumename(devicename)
             self.assertEqual(result, expected)
+
+    def test_sync_vdisk_with_voldrv(self):
+        clone_depth = 3
+
+        def _make_clones(vdisks_map, depth=clone_depth):
+            for level in range(depth):
+                previous_vd = list(vdisks_map.itervalues())[-1]
+                new_name = previous_vd.name + '_clone'
+                new_guid = VDiskController.clone(previous_vd.guid, new_name).get('vdisk_guid')
+                vdisks_map[new_name] = VDisk(new_guid)
+
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
+        )
+        vdisk_name = 'vdisk_1'
+        storagedriver = structure['storagedrivers'][1]
+        vdisk_1 = VDisk(VDiskController.create_new(volume_name=vdisk_name, volume_size=1024 ** 4, storagedriver_guid=storagedriver.guid))
+        vdisks = OrderedDict()
+        vdisks[vdisk_name] = vdisk_1
+
+        _make_clones(vdisks)
+        self.assertEquals(clone_depth + 1, len(list(VDiskList.get_vdisks())))
+        delete_list = list(vdisks.itervalues())[::-1][:-1]  # These vDisks are clones and ought to be deleted
+        for vdisk in delete_list:
+            for mds_service in vdisk.mds_services:
+                mds_service.delete()
+            vdisk.delete()
+        self.assertEquals(1, len(list(VDiskList.get_vdisks())))  # Make sure vDisk clones are properly removed
+        self.assertEquals(VDiskList.get_vdisks()[0].name,vdisk_name)  # Make sure only item left is original vDisk
+
+        VDiskController.sync_with_reality()
+        self.assertEquals(clone_depth + 1, len(list(VDiskList.get_vdisks())))  # The clones should be in place now
+
+        parents = 0
+        for vdisk in VDiskList.get_vdisks():
+            try:
+                if vdisk.parent_vdisk.name:
+                    parents += 1
+            except AttributeError:
+                pass
+        self.assertEquals(clone_depth, parents)  # As much parents should be detected as the depth of the clones

@@ -50,6 +50,7 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.generic.repeatingtimer import RepeatingTimer
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.graphite import GraphiteController
 
 
 class ScrubShared(object):
@@ -80,6 +81,8 @@ class ScrubShared(object):
 
         self._key = None
         self._log = None  # To be overruled
+
+        self.graphite_controller = GraphiteController(database='scrubber')
 
     @property
     def worker_context(self):
@@ -446,7 +449,7 @@ class StackWorker(ScrubShared):
     This class represents a worker of the scrubbing stack
     """
 
-    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number):
+    def __init__(self, job_id, queue, vpool, scrub_info, error_messages, stack_work_handler, worker_contexts, stacks_to_spawn, stack_number, graphite_controller):
         """
         :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
         :type queue: Queue
@@ -512,6 +515,13 @@ class StackWorker(ScrubShared):
         self._state_key = '{0}_state'.format(self._key)  # Key with the combined state for all proxies
         self._client_cluster_lock = volatile_mutex('{0}_client_cluster_lock'.format(self._SCRUB_NAMESPACE), wait=5 * 60)
 
+        threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
+        self.amount_threads = Configuration.get(key=threads_key, default=2)
+
+        if not isinstance(self.amount_threads, int):
+            raise RuntimeError('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
+        self.graphite_controller = graphite_controller
+
     def deploy_stack_and_scrub(self):
         """
         Executes scrub work for a given vDisk queue and vPool, based on scrub_info
@@ -530,13 +540,8 @@ class StackWorker(ScrubShared):
 
         # Execute the actual scrubbing
         threads = []
-        threads_key = '/ovs/framework/hosts/{0}/config|scrub_stack_threads'.format(self.storagerouter.machine_id)
-        amount_threads = Configuration.get(key=threads_key, default=2)
-        if not isinstance(amount_threads, int):
-            self.error_messages.append('Amount of threads to spawn must be an integer for StorageRouter with ID {0}'.format(self.storagerouter.machine_id))
-            return
 
-        amount_threads = max(amount_threads, 1)  # Make sure amount_threads is at least 1
+        amount_threads = max(self.amount_threads, 1)  # Make sure amount_threads is at least 1
         amount_threads = min(min(self.queue.qsize(), amount_threads), 20)  # Make sure amount threads is max 20
         self._logger.info('{0} - Spawning {1} threads for proxy services {2}'.format(self._log, amount_threads, ', '.join(self.alba_proxy_services)))
         for index in range(amount_threads):
@@ -579,6 +584,7 @@ class StackWorker(ScrubShared):
                     try:
                         # Check MDS master is local. Trigger MDS handover if necessary
                         vdisk = rem.VDisk(vdisk_guid)
+                        scrubbing_succeeded = False
                         vdisk_log = '{0} - vDisk {1} with guid {2} and volume id {3}'.format(log, vdisk.name, vdisk.guid, vdisk.volume_id)
                         self._logger.info('{0} - Started scrubbing at location {1}'.format(vdisk_log, self.scrub_directory))
                         configs = _verify_mds_config(current_vdisk=vdisk)
@@ -600,7 +606,6 @@ class StackWorker(ScrubShared):
                         lease_interval = Configuration.get('/ovs/volumedriver/intervals|locked_lease', default=5)
                         # Lease per vpool
                         lease_interval = Configuration.get('/ovs/vpools/{0}/scrub/tweaks|locked_lease_interval'.format(self.vpool.guid), default=lease_interval)
-
                         # Register that the disk is being scrubbed
                         log_path = Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)
                         location_data = {'scrub_directory': self.scrub_directory,
@@ -614,6 +619,7 @@ class StackWorker(ScrubShared):
                             # Do the actual scrubbing
                             with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id), update_interval_secs=lease_interval) as locked_client:
                                 self._logger.info('{0} - Retrieve and apply scrub work'.format(vdisk_log, vdisk.name))
+                                starttime = time.time()
                                 work_units = locked_client.get_scrubbing_workunits()
                                 for work_unit in work_units:
                                     res = locked_client.scrub(work_unit=work_unit,
@@ -621,6 +627,9 @@ class StackWorker(ScrubShared):
                                                               log_sinks=[log_path],
                                                               backend_config=Configuration.get_configuration_path(self.backend_config_key))
                                     locked_client.apply_scrubbing_result(scrubbing_work_result=res)
+                                scrubbing_succeeded = True
+                                self.graphite_controller.send_scrubjob_duration(vdisk.guid, start=starttime)
+                                self.graphite_controller.send_scrubjob_worker_units(vdisk.guid, len(work_units))
                                 if work_units:
                                     self._logger.info('{0} - {1} work units successfully applied'.format(vdisk_log, len(work_units)))
                                 else:
@@ -630,6 +639,7 @@ class StackWorker(ScrubShared):
                             raise
                         finally:
                             self.stack_work_handler.unregister_vdisk_for_scrub(vdisk_guid, registrator, scrub_exception)
+                            self.graphite_controller.send_scrubjob_success(vdisk_guid, scrubbing_succeeded)
                             if 'post_vdisk_scrub_unregistration' in self._test_hooks:
                                 self._test_hooks['post_vdisk_scrub_unregistration'](self, vdisk_guid)
                     except Exception as ex:
@@ -1076,6 +1086,8 @@ class Scrubber(ScrubShared):
         self.set_main_job_info()
         counter = 0
         vp_work_map = {}
+
+        self.graphite_controller.send_scrubjob_batch_size(batch=len([vdisk.guid for vp, vdisks in self.vpool_vdisk_map.iteritems() for vdisk in vdisks]))
         for vp, vdisks in self.vpool_vdisk_map.iteritems():
             logging_start = self._format_message('vPool {0}'.format(vp.name))
             # Verify amount of vDisks on vPool
@@ -1091,21 +1103,29 @@ class Scrubber(ScrubShared):
                 self._logger.info('{0} - Spawning {1} stack{2}'.format(logging_start, stacks_to_spawn, '' if stacks_to_spawn == 1 else 's'))
                 for stack_number in xrange(stacks_to_spawn):
                     scrub_target = self.scrub_locations[counter % len(self.scrub_locations)]
-                    stack_worker = StackWorker(queue=vpool_queue,
-                                               vpool=vp,
-                                               scrub_info=scrub_target,
-                                               error_messages=self.error_messages,
-                                               worker_contexts=self.worker_contexts,
-                                               stack_work_handler=stack_work_handler,
-                                               job_id=self.job_id,
-                                               stacks_to_spawn=stacks_to_spawn,
-                                               stack_number=stack_number)
+                    try:
+                        stack_worker = StackWorker(queue=vpool_queue,
+                                                   vpool=vp,
+                                                   scrub_info=scrub_target,
+                                                   error_messages=self.error_messages,
+                                                   worker_contexts=self.worker_contexts,
+                                                   stack_work_handler=stack_work_handler,
+                                                   job_id=self.job_id,
+                                                   stacks_to_spawn=stacks_to_spawn,
+                                                   stack_number=stack_number,
+                                                   graphite_controller=self.graphite_controller)
+                    except Exception as ex:
+                        self.error_messages.append(str(ex))
+                        self._logger.exception(str(ex))
+                        continue
+
                     self.stack_workers.append(stack_worker)
                     stack = Thread(target=stack_worker.deploy_stack_and_scrub,
                                    args=())
                     stack.start()
                     self.stack_threads.append(stack)
                     counter += 1
+
             except Exception:
                 # Capture all possible exceptions of this stage to ensure that the scrubber will continue with
                 # other vpools

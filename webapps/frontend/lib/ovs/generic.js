@@ -17,6 +17,7 @@
 define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
     "use strict";
 
+    // Constants
     var ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
     var hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
     var nameRegex = /^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$/;
@@ -323,10 +324,6 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
                 }
             }
         });
-    }
-    function getColor(index) {
-        var colors = ['#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'];
-        return colors[index % colors.length];
     }
     function arrayEquals(array1, array2) {
         var i;
@@ -761,6 +758,25 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
 		};
     String.prototype.format.regex = new RegExp("{-?[0-9]+}", "g");
 
+    JSON.stringifyOnce = function (obj, replacer, space) {
+        // Function to remove all circular references (could prove useful while debugging).
+        // Usage: JSON.stringifyOnce(ko.toJS(item));
+        var cache = [];
+        var json = JSON.stringify(obj, function(key, value) {
+            if (typeof value === 'object' && value !== null) {
+                if (cache.indexOf(value) !== -1) {
+                    // Circular reference found, discard key
+                    return;
+                }
+                // Store value in our collection
+                cache.push(value);
+            }
+            return replacer ? replacer(key, value) : value;
+        }, space);
+        cache = null;
+        return json;
+    };
+
     return {
         // Vars
         ipRegex: ipRegex,
@@ -786,7 +802,6 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         formatNumber: formatNumber,
         formatPercentage: formatPercentage,
         formatSpeed: formatSpeed,
-        getColor: getColor,
         getCookie: getCookie,
         getHash: getHash,
         getTimestamp: getTimestamp,

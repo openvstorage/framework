@@ -339,10 +339,7 @@ define([
          */
         questions = (typeof questions !== 'undefined') ? questions : formQuestions;
         fieldMapping = (typeof fieldMapping !== 'undefined') ? fieldMapping : formFieldMapping;
-        if (ko.isObservable(index)) {
-            index = index()
-        }
-        var formItem =questions.splice(index, 1)[0];
+        var formItem =questions.splice(ko.utils.unwrapObservable(index), 1)[0];
         // Remove left over data entries
         fieldMapping()[formItem().field()].observable.remove(formItem().data);
         var ids = fieldMapping()[formItem().field()].ids;
@@ -357,10 +354,7 @@ define([
          */
         questions = (typeof questions !== 'undefined') ? questions : formQuestions;
         var reasons = [], fields = [];
-        if (ko.isObservable(questions) && questions.isObservableArray) {
-            questions = questions()
-        }
-        $.each(questions, function(index, formItem){
+        $.each(ko.utils.unwrapObservable(questions), function(index, formItem){
             var observable = formItem().data;
             if (observable() === undefined || (typeof observable.valid === 'function' && !observable.valid())){
                 fields.push(formItem().id());

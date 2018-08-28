@@ -127,6 +127,7 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         :param value: Value to store
         :return: True if successful, false if not
         """
+        # @Todo allow DataObjects to be stored and retrieved
         return self._client.set(key, {'data': value, 'time_set': time.time()})
 
     def get_key_for_task(self, *args, **kwargs):

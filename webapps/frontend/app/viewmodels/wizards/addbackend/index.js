@@ -17,7 +17,7 @@
 define([
     'jquery', 'ovs/generic',
     '../build', './gather', './data'
-], function($, generic, Build, Gather, data) {
+], function($, generic, Build, Gather, Data) {
     "use strict";
     return function(options) {
         var self = this;
@@ -25,17 +25,12 @@ define([
         Build.call(self);
 
         // Variables
-        self.data = data;
-
+        var data = new Data();
+        var stepOptions = {data: data};
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_backend.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new Gather()]);
+        self.steps([new Gather(stepOptions)]);
         self.activateStep();
-
-        // Cleaning data
-        data.backends([]);
-        data.backendTypes([]);
-        data.name('');
     };
 });

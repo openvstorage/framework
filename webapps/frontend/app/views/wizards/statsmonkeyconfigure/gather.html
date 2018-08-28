@@ -41,7 +41,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('database') }">
             <label class="col-lg-3 control-label" for="database" data-i18n="ovs:wizards.stats_monkey_configure.database"></label>
             <div class="col-lg-4">
-                <input type="text" id="database" class="autofocus form-control" data-bind="value: $data.database, valueUpdate: 'afterkeydown'">
+                <input type="text" id="database" class="autofocus form-control" data-bind="value: $data.database, valueUpdate: 'afterkeydown', disable: $data.transport() === 'graphite'">
             </div>
         </div>
         <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('environment') }">
@@ -69,7 +69,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <input type="text" id="username" class="form-control" data-bind="value: $data.username, valueUpdate: 'afterkeydown'">
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('password') }">
+        <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('password')}, visible: $data.transport() === 'influxdb' || $data.transport() === 'redis'">
             <label class="col-lg-3 control-label" for="password" data-i18n="ovs:wizards.stats_monkey_configure.password"></label>
             <div class="col-lg-4">
                 <input type="password" id="password" class="form-control" data-bind="value: $data.password, valueUpdate: 'afterkeydown'">

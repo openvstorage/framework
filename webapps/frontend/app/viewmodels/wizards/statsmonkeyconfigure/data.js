@@ -15,10 +15,21 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-], function(){
+    'knockout'
+], function(ko){
     "use strict";
-    var singleton = function() {
-        return {};
+        return function(newConfig, origConfig){
+            var self = this;
+
+            self.newConfig = newConfig;
+            self.origConfig = origConfig;
+
+            self.resetTransport = ko.computed(function() {
+                var transport = self.origConfig.transport();
+                if (transport === 'graphite') {
+                    // Reset the Database name
+                    self.origConfig.database('openvstorage.fwk')
+                }
+            })
     };
-    return singleton();
 });

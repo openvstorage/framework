@@ -24,12 +24,12 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.monitoring.statsmonkey import StatsMonkey
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
-
 
 class StatsMonkeyController(StatsMonkey):
     """
@@ -49,6 +49,10 @@ class StatsMonkeyController(StatsMonkey):
         Init method. This class is a completely static class, so cannot be instantiated
         """
         raise RuntimeError('StatsMonkeyController is a static class')
+
+    @classmethod
+    def _get_configuration(cls):
+        return Configuration
 
     @staticmethod
     @ovs_task(name='ovs.stats_monkey.run_all', schedule=Schedule(minute='*', hour='*'), ensure_single_info={"mode": "DEFAULT"})

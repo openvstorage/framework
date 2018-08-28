@@ -21,7 +21,6 @@ define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/shared'
 ], function ($, ko, api, shared) {
-
     function StorageRouterService() {
         var self = this;
         /**
@@ -37,7 +36,7 @@ define([
         /**
          * Fetches metadata of a StorageRouter
          * @param storageRouterGuid: Guid of the StorageRouter
-         * @return {Deferred}
+         * @return {Promise<T>}
          */
         self.getMetadata = function(storageRouterGuid) {
             if (storageRouterGuid === undefined) {
@@ -47,7 +46,34 @@ define([
             return api.post('storagerouters/' + storageRouterGuid + '/get_metadata')
                 .then(shared.tasks.wait)
         };
-
+        /**
+         * Fetches support settings of a StorageRouter
+         * @param storageRouterGuid: Guid of the StorageRouter
+         * @return {Promise<T>}
+         */
+        self.getSupportSettings = function(storageRouterGuid) {
+            return api.get('storagerouters/' + storageRouterGuid + '/get_support_info')
+                .then(shared.tasks.wait)
+        };
+        /**
+         * Fetches support metadata of a StorageRouter
+         * @param storageRouterGuid: Guid of the StorageRouter
+         * @return {Promise<T>}
+         */
+        self.getSupportMetadata = function(storageRouterGuid) {
+            return api.get('storagerouters/' + storageRouterGuid + '/get_support_metadata')
+                .then(shared.tasks.wait)
+        };
+        /**
+         * Sets support info of a StorageRouter
+         * @param storageRouterGuid: Guid of the StorageRouter
+         * @param Data: data to post
+         * @return {Promise<T>}
+         */
+        self.saveSupportData = function(storageRouterGuid, Data) {
+            return api.post('storagerouters/' + storageRouterGuid + '/configure_support', { data: Data })
+                .then(shared.tasks.wait)
+        };
     }
     return new StorageRouterService();
 });

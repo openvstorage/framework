@@ -17,16 +17,22 @@
 define([
     'jquery', 'knockout',
     'plugins/router',
-    'ovs/api', 'ovs/shared', 'ovs/generic',
-    './data',
-    'viewmodels/containers/backend/backend', 'viewmodels/containers/backend/backendtype'
-], function($, ko, router, api, shared, generic, data, Backend, BackendType) {
+    'ovs/api', 'ovs/shared', 'ovs/generic', 'ovs/pluginloader',
+    './data', './constants',
+    'viewmodels/containers/backend/backend', 'viewmodels/containers/backend/backendtype',
+    'viewmodels/services/backend'
+], function($, ko, router,
+            api, shared, generic, pluginLoader,
+            data, Constants,
+            Backend, BackendType,
+            backendService) {
     "use strict";
-    return function() {
+    return function(stepOptions) {
         var self = this;
 
         // Variables
-        self.data   = data;
+        self.pluginViews = [];
+        self.data   = stepOptions.data;
         self.shared = shared;
 
         // Handles
@@ -34,23 +40,13 @@ define([
         self.loadBackendTypesHandle = undefined;
 
         // Computed
-        self.modules = ko.computed(function() {
-            var modules = [];
-            if (self.data.backendType() === undefined) {
-                return modules;
+        self.modules = ko.pureComputed(function() {
+            if (self.data.selectedBackendType() === undefined) {
+                return [];
             }
-            $.each(shared.hooks.wizards, function (wizard, wModules) {
-                if (wizard === 'addbackend') {
-                    $.each(wModules, function (index, module) {
-                        if (module.name.toLowerCase() == self.data.backendType().name().toLowerCase()) {
-                            modules.push(module);
-                        }
-                    });
-                }
-            });
-            return modules;
+            return self.pluginViews;
         });
-        self.canContinue = ko.computed(function() {
+        self.canContinue = ko.pureComputed(function() {
             var valid = true, reasons = [], fields = [];
             if (!self.data.name.valid()) {
                 valid = false;
@@ -77,106 +73,67 @@ define([
 
         // Functions
         self.finish = function() {
-            return $.Deferred(function(deferred) {
-                var postData = {
-                    data: {
-                        name: self.data.name(),
-                        backend_type_guid: self.data.backendType().guid()
-                    }
-                };
-                var chain = api.post('backends', postData);
-                $.each(self.modules(), function(index, module) {
-                    chain.then(module.module.finish);
-                });
-                chain.done(function() {
-                        generic.alertInfo(
-                            $.t('ovs:wizards.add_backend.gather.creating'),
-                            $.t('ovs:wizards.add_backend.gather.started')
-                        );
-                    })
-                    .fail(function() {
-                        generic.alertError(
-                            $.t('ovs:generic.error'),
-                            $.t('ovs:wizards.add_backend.gather.failed')
-                        );
-                    })
-                    .always(deferred.resolve);
-            }).promise();
+            var postData = {
+                name: self.data.name(),
+                backend_type_guid: self.data.selectedBackendType().guid()
+            };
+            var chain = backendService.addBackend(postData);
+            $.each(self.modules(), function(index, module) {
+                chain.then(module.module.finish);
+            });
+            chain.then(
+                function() {
+                    generic.alertInfo(
+                        $.t('ovs:wizards.add_backend.gather.creating'),
+                        $.t('ovs:wizards.add_backend.gather.started')
+                    )
+                }, function(error) {
+                    error = generic.extractErrorMessage(error);
+                    generic.alertError(
+                        $.t('ovs:generic.error'),
+                        $.t('ovs:wizards.add_backend.gather.failed', {why: error})
+                    );
+            });
+            return chain
         };
 
         // Durandal
         self.activate = function() {
-            $.each(shared.hooks.wizards, function (wizard, modules) {
-                $.each(modules, function (index, module) {
-                    module.activator.activateItem(module.module);
-                });
+            self.pluginViews = pluginLoader.get_plugin_wizards(Constants.wizard_identifier);
+            $.each(self.pluginViews, function(index, view){
+                pluginLoader.activate_page(view)
             });
             if (generic.xhrCompleted(self.loadBackendsHandle)) {
                 var options = {
                     sort: 'name',
                     contents: ''
                 };
-                self.loadBackendsHandle = api.get('backends', { queryparams: options })
-                    .done(function (data) {
-                        var guids = [], bdata = {};
-                        $.each(data.data, function (index, item) {
-                            guids.push(item.guid);
-                            bdata[item.guid] = item;
-                        });
-                        generic.crossFiller(
-                            guids, self.data.backends,
-                            function (guid) {
-                                return new Backend(guid);
-                            }, 'guid'
-                        );
-                        $.each(self.data.backends(), function (index, backend) {
-                            if (guids.contains(backend.guid())) {
-                                backend.fillData(bdata[backend.guid()]);
-                            }
-                        });
+                self.loadBackendsHandle = backendService.loadBackends(options)
+                    .then(function (data) {
+                        self.data.update({backends: data.data});
                     });
             }
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadBackendTypesHandle)) {
-                    var options = {
-                        sort: 'name',
-                        contents: '',
-                        query: JSON.stringify({
-                            type: 'AND',
-                            items: [['has_plugin', 'EQUALS', true]]
-                        })
-                    };
-                    self.loadBackendTypesHandle = api.get('backendtypes', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], btdata = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                btdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.data.backendTypes,
-                                function(guid) {
-                                    return new BackendType(guid);
-                                }, 'guid'
-                            );
-                            $.each(self.data.backendTypes(), function(index, backendType) {
-                                if ($.inArray(backendType.guid(), guids) !== -1) {
-                                    backendType.fillData(btdata[backendType.guid()]);
-                                }
-                            });
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
+            return $.when()
+                .then(function() {
+                    if (generic.xhrCompleted(self.loadBackendTypesHandle)) {
+                        var options = {
+                            sort: 'name',
+                            contents: '',
+                            query: JSON.stringify({
+                                type: 'AND',
+                                items: [['has_plugin', 'EQUALS', true]]
+                            })
+                        };
+                        return self.loadBackendTypesHandle = backendService.loadBackendTypes(options)
+                            .then(function(data) {
+                                self.data.update({backendTypes: data.data});
+                            })
+                    }
+                })
         };
         self.deactivate = function() {
-            $.each(shared.hooks.wizards, function (wizard, modules) {
-                $.each(modules, function (index, module) {
-                    module.activator.deactivateItem(module.module);
-                });
+            $.each(self.pluginViews, function(index, view){
+                pluginLoader.deactivate_page(view)
             });
         };
     };

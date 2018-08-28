@@ -17,12 +17,15 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/disk/disk'
-], function($, ko, generic, api, shared, VDisk, Disk) {
+    'viewmodels/containers/shared/base_container', 'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/disk/disk'
+], function($, ko,
+            generic, api, shared,
+            BaseContainer, VDisk, Disk) {
     "use strict";
-    return function(guid) {
+    function StorageRouter(guid) {
         var self = this;
 
+        BaseContainer.call(this);
         // Variables
         self.shared             = shared;
         self.storageDriverGuids = [];
@@ -105,6 +108,10 @@ define([
                 }
             });
             return updatesFound;
+        });
+        self.pageHash = ko.pureComputed(function() {
+            // Returns the hashed URL to this objects own page
+            return shared.routing.loadHash('storagerouter-detail', { guid: self.guid()})
         });
         // Feature Computed
         self.supportsBlockCache = ko.pureComputed(function() {
@@ -195,6 +202,7 @@ define([
             }
         };
         self.fillData = function (data) {
+            data = data || {};
             if (self.edit()) {
                 self.loading(false);
                 return;
@@ -310,5 +318,7 @@ define([
                     });
             }).promise();
         };
-    };
+    }
+    StorageRouter.prototype = $.extend({}, BaseContainer.prototype)
+    return StorageRouter
 });

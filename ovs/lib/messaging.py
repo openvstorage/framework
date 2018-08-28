@@ -17,6 +17,7 @@
 """
 Messaging module
 """
+from functools import wraps
 from ovs_extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
@@ -31,6 +32,7 @@ def synchronized():
         """
         Returns a wrapped function
         """
+        @wraps(f)
         def new_function(*args, **kw):
             """
             Executes the decorated function in a locked context
