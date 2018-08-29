@@ -23,6 +23,7 @@ import sys
 import json
 import time
 import signal
+from ovs_extensions.constants.config import ARAKOON_NAME, CACC_LOCATION, CONFIG_STORE_LOCATION
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
@@ -723,16 +724,16 @@ class NodeInstallationController(object):
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration management')
         if external_config is None and not cluster_name.startswith('preconfig-'):
             if Interactive.ask_yesno(message='Use an external cluster?', default_value=False) is True:
-                file_location = Configuration.CACC_LOCATION
+                file_location = CACC_LOCATION
                 while not target_client.file_exists(file_location):
                     Toolbox.log(logger=NodeInstallationController._logger, messages='Please place a copy of the Arakoon\'s client configuration file at: {0}'.format(file_location))
                     Interactive.ask_continue()
                 external_config = True
 
-        if not target_client.file_exists(Configuration.CONFIG_STORE_LOCATION):
-            target_client.file_create(Configuration.CONFIG_STORE_LOCATION)
+        if not target_client.file_exists(CONFIG_STORE_LOCATION):
+            target_client.file_create(CONFIG_STORE_LOCATION)
         framework_config = {'configuration_store': 'arakoon'}
-        target_client.file_write(Configuration.CONFIG_STORE_LOCATION, json.dumps(framework_config, indent=4))
+        target_client.file_write(CONFIG_STORE_LOCATION, json.dumps(framework_config, indent=4))
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration Arakoon')
 
@@ -745,11 +746,11 @@ class NodeInstallationController(object):
                                              locked=False)
             arakoon_installer.start_cluster()
             contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
-            target_client.file_write(Configuration.CACC_LOCATION, contents)
+            target_client.file_write(CACC_LOCATION, contents)
             service_manager.register_service(node_name=machine_id,
                                              service_metadata=arakoon_installer.service_metadata[cluster_ip])
         else:
-            arakoon_cacc_cluster = Configuration.ARAKOON_NAME
+            arakoon_cacc_cluster = ARAKOON_NAME
             arakoon_installer = ArakoonInstaller(cluster_name=arakoon_cacc_cluster)
             arakoon_installer.load(ip=cluster_ip)
             arakoon_installer.claim_cluster()
@@ -760,7 +761,7 @@ class NodeInstallationController(object):
 
         # Write away cluster id to let the support agent read it when Arakoon is down
         framework_config['cluster_id'] = Configuration.get('/ovs/framework/cluster_id')
-        target_client.file_write(Configuration.CONFIG_STORE_LOCATION, json.dumps(framework_config, indent=4))
+        target_client.file_write(CONFIG_STORE_LOCATION, json.dumps(framework_config, indent=4))
 
         if rdma is None:
             rdma = Interactive.ask_yesno(message='Enable RDMA?', default_value=False)
@@ -880,10 +881,10 @@ class NodeInstallationController(object):
         master_client = ip_client_map[master_ip]
         machine_id = System.get_my_machine_id(target_client)
 
-        target_client.file_write(Configuration.CONFIG_STORE_LOCATION,
-                                 master_client.file_read(Configuration.CONFIG_STORE_LOCATION))
-        target_client.file_write(Configuration.CACC_LOCATION,
-                                 master_client.file_read(Configuration.CACC_LOCATION))
+        target_client.file_write(CONFIG_STORE_LOCATION,
+                                 master_client.file_read(CONFIG_STORE_LOCATION))
+        target_client.file_write(CACC_LOCATION,
+                                 master_client.file_read(CACC_LOCATION))
         Configuration.initialize_host(machine_id)
 
         service = 'watcher-config'

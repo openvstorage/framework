@@ -21,9 +21,9 @@ MigrationController module
 import copy
 import json
 from ovs.extensions.generic.logger import Logger
+from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
-
 
 class MigrationController(object):
     """
@@ -474,11 +474,11 @@ class MigrationController(object):
         # Write away cluster ID to a file for back-up purposes
         try:
             cluster_id = Configuration.get(key='/ovs/framework/cluster_id', default=None)
-            with open(Configuration.CONFIG_STORE_LOCATION, 'r') as config_file:
+            with open(CONFIG_STORE_LOCATION, 'r') as config_file:
                 config = json.load(config_file)
             if cluster_id is not None and config.get('cluster_id', None) is None:
                 config['cluster_id'] = cluster_id
-                with open(Configuration.CONFIG_STORE_LOCATION, 'w') as config_file:
+                with open(CONFIG_STORE_LOCATION, 'w') as config_file:
                     json.dump(config, config_file, indent=4)
         except Exception:
             MigrationController._logger.exception('Writing cluster id to a file failed.')
