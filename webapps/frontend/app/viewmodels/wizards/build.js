@@ -35,7 +35,7 @@ define([
 
         // Deferreds
         self.closing   = $.Deferred();  // Track if the wizard is closing
-        self.finishing = $.Deferred();  // Track if the wizard is finishing
+        self.finishing = $.Deferred();  // Track if the wizard is finishing. Rejects if the finish has errors
         self.completed = $.Deferred();  // Track if the final steps finish has been completed
 
         // Builded variable
@@ -166,13 +166,17 @@ define([
          * Closes the current modal
          * @param success: Indicator to whether or not the wizard closed with success
          * @type success: bool
+         * @param data: Finishing data. If the closing was due to an error: this will be the error
          */
-        self.close = function(success) {
+        self.close = function(success, data) {
             dialog.close(self, {
                 success: success,
-                data: success ? {} : undefined
+                data: data
             });
-            self.closing.resolve(success);
+            if (success){
+                return self.closing.resolve(data);
+            }
+            return self.closing.reject(data);
         };
         /**
          *  Finish and close the wizard
@@ -240,20 +244,13 @@ define([
                 return $.when();
             })
                 // Handle finishing of the chain
-                .done(function(data) {
-                    dialog.close(self, {
-                        success: true,
-                        data: data
-                    });
-                    self.finishing.resolve(true);
-                })
-                .fail(function(data) {
-                    if (data.abort === false) {
-                        dialog.close(self, {
-                            success: false,
-                            data: data.data
-                        });
-                        self.finishing.resolve(false);
+                .then(function(data) {
+                    self.close(true, data);
+                    self.finishing.resolve(data);
+                }, function(error) {
+                    if (error.abort === false) {
+                        self.close(false, error);
+                        self.finishing.reject(error);
                     }
                 })
                 .always(function() {
