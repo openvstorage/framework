@@ -74,7 +74,25 @@ class APIClient(object):
         self.timeout = timeout
         self._log_min_duration = log_min_duration
 
-    def _call(self, method, url, data=None, timeout=None, clean=False):
+    def _call(self, method, url, data=None, json=None, timeout=None, clean=False):
+        # type: (callable, str, dict, dict, int, bool) -> any
+        """
+        Calls the provided function and adds headings
+        :param method: Method to call
+        :type method: callable
+        :param url: Url to call
+        :type url: str
+        :param data: Data to provide. This parameter will not set the JSON header so data may be interpreted differently!
+        :type data: dict
+        :param json: Data to provide as JSON parameters. This parameter will set the JSOn header to data will be interpreted as a JSON string
+        :type json: dict
+        :param timeout: Timeout to wait for a reply of the server
+        :type timeout: int
+        :param clean: Should the data be cleaned (metdata entries stripped from the result)
+        :type clean: bool
+        :return: The response
+        :rtype: any
+        """
         if timeout is None:
             timeout = self.timeout
 
@@ -86,8 +104,9 @@ class APIClient(object):
                   'headers': self._base_headers,
                   'verify': False,
                   'timeout': timeout}
-        if data is not None:
-            kwargs['data'] = data
+        for key, val in [('json', json), ('data', data)]:
+            if val is not None:
+                kwargs[key] = val
         response = method(**kwargs)
         if response.status_code == 404:
             msg = 'URL not found: {0}'.format(kwargs['url'])
@@ -121,7 +140,7 @@ class APIClient(object):
         return self._base_url, self._base_headers
 
     def extract_data(self, response_data, old_key=None):
-        # type: (dict) -> any
+        # type: (dict, str) -> any
         """
         Extract the data from the API
         For backwards compatibility purposes (older asd-managers might not wrap their data)
@@ -158,3 +177,83 @@ class APIClient(object):
             elif isinstance(data_copy[key], dict):
                 data_copy[key] = cls.clean(data_copy[key])
         return data_copy
+
+    def get(self, url, data=None, json=None, timeout=None, clean=False):
+        """
+        Executes a GET call
+        :param url: Url to call
+        :type url: str
+        :param data: Data to provide. This parameter will not set the JSON header so data may be interpreted differently!
+        :type data: dict
+        :param json: Data to provide as JSON parameters. This parameter will set the JSOn header to data will be interpreted as a JSON string
+        :type json: dict
+        :param timeout: Timeout to wait for a reply of the server
+        :type timeout: int
+        :param clean: Should the data be cleaned (metadata entries stripped from the result)
+        :type clean: bool
+        """
+        return self._call(method=requests.get, url=url, data=data, json=json, clean=clean, timeout=timeout)
+
+    def post(self, url, data=None, json=None, timeout=None, clean=False):
+        """
+        Executes a POST call
+        :param url: Url to call
+        :type url: str
+        :param data: Data to provide. This parameter will not set the JSON header so data may be interpreted differently!
+        :type data: dict
+        :param json: Data to provide as JSON parameters. This parameter will set the JSOn header to data will be interpreted as a JSON string
+        :type json: dict
+        :param timeout: Timeout to wait for a reply of the server
+        :type timeout: int
+        :param clean: Should the data be cleaned (metadata entries stripped from the result)
+        :type clean: bool
+        """
+        return self._call(method=requests.post, url=url, data=data, json=json, clean=clean, timeout=timeout)
+
+    def put(self, url, data=None, json=None, timeout=None, clean=False):
+        """
+        Executes a PUT call
+        :param url: Url to call
+        :type url: str
+        :param data: Data to provide. This parameter will not set the JSON header so data may be interpreted differently!
+        :type data: dict
+        :param json: Data to provide as JSON parameters. This parameter will set the JSOn header to data will be interpreted as a JSON string
+        :type json: dict
+        :param timeout: Timeout to wait for a reply of the server
+        :type timeout: int
+        :param clean: Should the data be cleaned (metadata entries stripped from the result)
+        :type clean: bool
+        """
+        return self._call(method=requests.put, url=url, data=data, json=json, clean=clean, timeout=timeout)
+
+    def patch(self, url, data=None, json=None, timeout=None, clean=False):
+        """
+        Executes a PATCH call
+        :param url: Url to call
+        :type url: str
+        :param data: Data to provide. This parameter will not set the JSON header so data may be interpreted differently!
+        :type data: dict
+        :param json: Data to provide as JSON parameters. This parameter will set the JSOn header to data will be interpreted as a JSON string
+        :type json: dict
+        :param timeout: Timeout to wait for a reply of the server
+        :type timeout: int
+        :param clean: Should the data be cleaned (metadata entries stripped from the result)
+        :type clean: bool
+        """
+        return self._call(method=requests.patch, url=url, data=data, json=json, clean=clean, timeout=timeout)
+
+    def delete(self, url, data=None, json=None, timeout=None, clean=False):
+        """
+        Executes a DELETE call
+        :param url: Url to call
+        :type url: str
+        :param data: Data to provide. This parameter will not set the JSON header so data may be interpreted differently!
+        :type data: dict
+        :param json: Data to provide as JSON parameters. This parameter will set the JSOn header to data will be interpreted as a JSON string
+        :type json: dict
+        :param timeout: Timeout to wait for a reply of the server
+        :type timeout: int
+        :param clean: Should the data be cleaned (metadata entries stripped from the result)
+        :type clean: bool
+        """
+        return self._call(method=requests.delete, url=url, data=data, json=json, clean=clean, timeout=timeout)
