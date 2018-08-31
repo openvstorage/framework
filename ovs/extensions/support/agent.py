@@ -34,8 +34,8 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
+from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
 from ovs.lib.helpers.toolbox import Toolbox
-
 
 class ConfigurationNotFoundError(RuntimeError):
     """
@@ -120,7 +120,7 @@ class SupportAgent(object):
             raise NotImplementedError('Only Systemd is supported')
 
         # Potential failing calls
-        self._cluster_id = self.get_config_key(self.LOCATION_CLUSTER_ID, fallback=[Configuration.CONFIG_STORE_LOCATION, 'cluster_id'])
+        self._cluster_id = self.get_config_key(self.LOCATION_CLUSTER_ID, fallback=[CONFIG_STORE_LOCATION, 'cluster_id'])
         self.interval = self.get_config_key(self.LOCATION_INTERVAL, fallback=[self.FALLBACK_CONFIG, self.KEY_INTERVAL], default=self.DEFAULT_INTERVAL)
         self._openvpn_service_name = 'openvpn@ovs_{0}-{1}'.format(self._cluster_id, self._node_id)
 

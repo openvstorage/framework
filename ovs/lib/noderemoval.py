@@ -21,6 +21,7 @@ Module for NodeRemovalController
 import os
 import re
 import sys
+from ovs_extensions.constants.config import CACC_LOCATION, CONFIG_STORE_LOCATION
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.interactive import Interactive
@@ -255,8 +256,8 @@ class NodeRemovalController(object):
 
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
-                client.file_delete(filenames=[Configuration.CACC_LOCATION])
-                client.file_delete(filenames=[Configuration.CONFIG_STORE_LOCATION])
+                client.file_delete(filenames=[CACC_LOCATION])
+                client.file_delete(filenames=[CONFIG_STORE_LOCATION])
             storage_router_to_remove.delete()
             Toolbox.log(logger=NodeRemovalController._logger, messages='Successfully removed node\n')
         except Exception as exception:
