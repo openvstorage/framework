@@ -15,15 +15,15 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic', './data'
-], function ($, ko, generic, data) {
+    'jquery', 'knockout'
+], function ($, ko) {
     "use strict";
-    return function () {
+    return function (stepOptions) {
         var self = this;
 
         // Variables
         self.activated = false;
-        self.data = data;
+        self.data = stepOptions.data;
 
         // Observables
         self.dtlModes = ko.observableArray([]);
@@ -116,7 +116,7 @@ define([
             });
             $.each(configParams.dtlTransportModes, function (index, dtlTransportMode) {
                 // Check if RDMA option should be disabled
-                if (dtlTransportMode === 'rdma' && !self.data.storageRouter().rdmaCapable() === true) {
+                if (dtlTransportMode === 'rdma' && !self.data.storageRouter.rdmaCapable() === true) {
                     return true // Continue
                 }
                 self.dtlTransportModes.push(dtlTransportMode);

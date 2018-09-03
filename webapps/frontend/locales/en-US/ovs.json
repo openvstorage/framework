@@ -774,6 +774,7 @@
         "proxies": "Proxies",
         "proxies_amount": "# Proxies",
         "sco_size": "SCO Size",
+        "scos_per_tlog": "SCOs per TLog",
         "statistics": "Statistics",
         "title": "vPools",
         "volume_potential": "Volume potential",

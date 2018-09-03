@@ -41,7 +41,6 @@ define(['jquery', 'knockout',
         self.loadStorageRoutersHandle           = undefined;
 
         // Observables
-        self.enableAdvancedConfig               = ko.observable(false);      // @todo remove this check and in the gather_config part when advanced config is done
         self._storageRouter                     = ko.observable(storageRouter);
         self.vPool                              = ko.observable(vPool);
         self.isExtend                           = ko.observable(isExtend);

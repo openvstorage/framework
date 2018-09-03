@@ -15,107 +15,100 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define(['jquery', 'knockout',
-    'ovs/generic', 'ovs/api', 'ovs/shared'],
-    function($, ko, generic, api, shared){
-    "use strict";
-    var singleton;
-    singleton = function() {
-        var wizardData = {
-            storageDriver:                      ko.observable(),
-            storageRouter:                      ko.observable(),
-            vPool:                              ko.observable(),
-            // Changes
-            // General vPool changes
-            configParams:                       undefined,  // Changes related to general configs (sco size, dtl ...)
-            // Storage driver changes
-            cachingData:                        undefined,  // Changes related to fragment cache and block cache
-            globalWriteBuffer:                  ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }}),
-            proxyAmount:                        ko.observable().extend({numeric: {min: 1, max: 16}}),
-            // Shared across the pages
-            // Handles
-            loadBackendsHandle:                  undefined,
-            loadAvailableStorageRoutersHandle:   undefined,
-            // Data
-            albaPresetMap:                      ko.observable({}),
-            backends:                           ko.observableArray([]),
-            invalidBackendInfo:                 ko.observable(),
-            loadingBackends:                    ko.observable(),
-            globalWriteBufferMax:               ko.observable(),  // Used to detect over allocation
-            srPartitions:                       ko.observable()
-        };
-        // Computed
-        wizardData.hasCacheQuota = ko.pureComputed(function() {
-            return wizardData.storageRouter() !== undefined &&
-                wizardData.storageRouter().features() !== undefined &&
-                wizardData.storageRouter().features().alba.features.contains('cache-quota');
-        });
-        wizardData.hasEE = ko.pureComputed(function() {
-            return wizardData.storageRouter() !== undefined &&
-                wizardData.storageRouter().features() !== undefined &&
-                wizardData.storageRouter().features().alba.edition === 'enterprise';
-        });
+    'ovs/generic', 'ovs/api', 'ovs/shared',
+    'viewmodels/containers/shared/base_container',
+    'viewmodels/services/storagerouter'],
+    function($, ko, generic, api, shared,
+             BaseContainer,
+             StoragerouterService){
 
-        // Functions
-        wizardData.fillData = function() {
-            var requiredObservables = [wizardData.storageRouter, wizardData.storageDriver, wizardData.vPool];
-            var missingObservables = [];
-            $.each(requiredObservables, function(index, obs) {
-                if (ko.utils.unwrapObservable(obs) === undefined) {
-                    missingObservables.push(obs);
-                }
-            });
-            if (missingObservables.length > 0) {
-                throw new Error('The wizard does not have the necessary data to continue.')
+    function ReconfigureVPoolData(vpool, storagerouter, storagedriver){
+        var self = this;
+        BaseContainer.call(self); // Inheritance
+
+        var requiredObservables = [storagerouter, vpool, storagedriver];
+        var missingObservables = [];
+        $.each(requiredObservables, function(index, obs) {
+            if (ko.utils.unwrapObservable(obs) === undefined) {
+                missingObservables.push(obs);
             }
-            // Fire up some asynchronous calls
-            wizardData.loadBackends();
-            wizardData.loadStorageRouterMetadata(wizardData.storageRouter().guid())
-                .done(function(data) {
-                    wizardData.srPartitions(data.srData.partitions);
-                    var sdGlobalWriteBuffer =  wizardData.storageDriver().vpoolBackendInfo().global_write_buffer;
-                    var totalBuffer = data.writeCacheSize + sdGlobalWriteBuffer;
-                    wizardData.globalWriteBuffer(sdGlobalWriteBuffer / Math.pow(1024, 3));
-                    wizardData.globalWriteBufferMax(totalBuffer / Math.pow(1024, 3));
-                });
-            // Set all configurable data
-            wizardData.cachingData = wizardData.vPool().getCachingData(wizardData.storageRouter().guid(), true);
-            wizardData.configParams = wizardData.vPool().getConfiguration(true);
-            wizardData.proxyAmount(wizardData.storageDriver().albaProxyGuids().length);
+        });
+        if (missingObservables.length > 0) {
+            throw new Error('The wizard does not have the necessary data to continue.')
+        }
 
-        };
-        wizardData.loadStorageRouterMetadata = function(storageRouterGuid) {
+        var loadBackendsHandle;
+        var loadAvailableStorageRoutersHandle;
+
+        self.storageRouter = storagerouter || {};
+        self.vPool = vpool || {};
+        self.storageDriver = storagedriver || {};
+        self.cachingData = vpool.getCachingData(storagerouter.guid(), true);
+        self.configParams = vpool.getConfiguration(true);
+        self.loadingBackends = ko.observable(false);
+        self.globalWriteBufferMax = ko.observable(null);
+        self.srPartitions = ko.observable(null);
+        self.backends = ko.observableArray([]);
+        self.invalidBackendInfo = ko.observable(false);
+        self.globalWriteBuffer = ko.observable(undefined).extend({numeric: {min: 1, max: 10240, allowUndefined: true}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }})
+        self.proxyAmount = ko.observable(storagedriver.albaProxyGuids().length).extend({numeric: {min: 1, max: 16}});
+        self.albaPresetMap = ko.observable({});
+
+        // Fire up some asynchronous calls
+        self.loadBackends();
+        self.loadStorageRouterMetadata(self.storageRouter.guid())
+            .then(function(data) {
+                self.srPartitions(data.srData.partitions);
+                var sdGlobalWriteBuffer =  self.storageDriver.vpoolBackendInfo().global_write_buffer;
+                var totalBuffer = data.writeCacheSize + sdGlobalWriteBuffer;
+                self.globalWriteBuffer(sdGlobalWriteBuffer / Math.pow(1024, 3));
+                self.globalWriteBufferMax(totalBuffer / Math.pow(1024, 3));
+            });
+
+        // Computed
+        self.hasCacheQuota = ko.pureComputed(function() {
+            return self.storageRouter.supportsCacheQuota()
+        });
+        self.hasEE = ko.pureComputed(function() {
+            return self.storageRouter.isEnterpriseEdition()
+        });
+    }
+    var functions = {
+        loadStorageRouterMetadata: function(storageRouterGuid) {
+            var self = this;
             if (ko.utils.unwrapObservable(storageRouterGuid) === undefined) {
                 throw new Error('Cannot load metadata of an undefined storage router guid')
             }
-            return api.post('storagerouters/' + storageRouterGuid + '/get_metadata')
-                .then(shared.tasks.wait)
+            return StoragerouterService.getMetadata(storageRouterGuid)
                 .then(function (srData) {
                     // Fill in the max global write buffer
                     var writeCacheSize = 0;
-                    $.each(srData.partitions.WRITE, function(index, info) {
+                    $.each(srData.partitions.WRITE, function (index, info) {
                         if (info['usable'] === true) {
                             writeCacheSize += info['available'];
                         }
                     });
                     return {srData: srData, writeCacheSize: writeCacheSize}
                 });
-        };
-        wizardData.filterBackendsByLocationKey = function(locationKey) {
+        },
+        filterBackendsByLocationKey: function(locationKey) {
+            var self = this;
             if (locationKey === undefined) {
-                return wizardData.backends();
+                return self.backends();
             }
-            return ko.utils.arrayFilter(wizardData.backends(), function(backend) {
+            return ko.utils.arrayFilter(self.backends(), function(backend) {
                 return backend.locationKey.toLowerCase().startsWith(locationKey);
             });
-        };
-        wizardData.buildLocationKey = function(connectionInfo) {
+        },
+        buildLocationKey: function(connectionInfo) {
             if (connectionInfo === undefined || connectionInfo.isLocalBackend() === true) {
                 return 'local';
             }
             return '{0}:{1}'.format([ko.utils.unwrapObservable(connectionInfo.host), ko.utils.unwrapObservable(connectionInfo.port)])
-        };
-        wizardData.getBackend = function(backendGuid) {
-            var currentList = wizardData.backends();
+        },
+        getBackend: function(backendGuid) {
+            var self = this;
+            var currentList = self.backends();
             var currentFilters = {'backend_guid': backendGuid};
             $.each(currentFilters, function(itemKey, filterValue){
                 currentList = ko.utils.arrayFilter(currentList, function(item) {
@@ -123,18 +116,19 @@ define(['jquery', 'knockout',
                 });
             });
             return currentList.length === 0 ? undefined : currentList[0];
-        };
-        wizardData.getPreset = function(albaBackendGuid, presetName) {
-            if (albaBackendGuid in wizardData.albaPresetMap()) {
-                var backendPreset = wizardData.albaPresetMap()[albaBackendGuid];
+        },
+        getPreset: function(albaBackendGuid, presetName) {
+            var self = this;
+            if (albaBackendGuid in self.albaPresetMap()) {
+                var backendPreset = self.albaPresetMap()[albaBackendGuid];
                 if (presetName in backendPreset) {
                     return backendPreset[presetName];
                 }
                 return undefined;
             }
             return undefined;
-        };
-        wizardData.getDistinctBackends = function(backends) {
+        },
+        getDistinctBackends: function(backends) {
             /**
              * Filter out backend duplicates
              * @param backends: array of backends
@@ -150,23 +144,24 @@ define(['jquery', 'knockout',
                 }
                 return !seen.contains(uniqueKey) && seen.push(uniqueKey);
             });
-        };
-        wizardData.loadBackends = function(connectionInfo) {
+        },
+        loadBackends: function(connectionInfo) {
+            var self = this;
             /**
              * Loads in all backends for the current supplied data
              * All data is loaded in the backends variable. The key for remote connection is composed of ip:port
              * @param connectionInfo: Object with connection information (optional)
              * @returns {Promise}
             */
-            return $.Deferred(function(albaDeferred) {
-                generic.xhrAbort(wizardData.loadBackendsHandle);
+            return $.when().then(function() {
+                generic.xhrAbort(self.loadBackendsHandle);
                 var relay = '';
                 var getData = {
                     contents: 'available'
                 };
                 var remoteInfo = {};
 
-                if (connectionInfo !== undefined && connectionInfo.isLocalBackend() === false) {
+                if (connectionInfo && connectionInfo.isLocalBackend() === false) {
                     relay = 'relay/';
                     remoteInfo.ip = connectionInfo.host();
                     remoteInfo.port = connectionInfo.port();
@@ -174,12 +169,12 @@ define(['jquery', 'knockout',
                     remoteInfo.client_secret = connectionInfo.client_secret().replace(/\s+/, "");
                 }
                 $.extend(getData, remoteInfo);
-                wizardData.loadingBackends(true);
-                wizardData.invalidBackendInfo(false);
-                wizardData.loadBackendsHandle = api.get(relay + 'alba/backends', { queryparams: getData })
-                    .done(function(data) {
+                self.loadingBackends(true);
+                self.invalidBackendInfo(false);
+                return self.loadBackendsHandle = api.get(relay + 'alba/backends', { queryparams: getData })
+                    .then(function(data) {
                         var calls = [];
-                        var availableBackends = wizardData.backends();
+                        var availableBackends = self.backends();
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
                                 getData.contents = 'name,ns_statistics,presets,usages,backend';
@@ -189,46 +184,49 @@ define(['jquery', 'knockout',
                                             var backendSize = data.usages.size;
                                             if ((backendSize !== undefined && backendSize > 0)) {
                                                 // Add some metadata about the location
-                                                data.locationKey = wizardData.buildLocationKey(connectionInfo);
+                                                data.locationKey = self.buildLocationKey(connectionInfo);
                                                 availableBackends.push(data);
-                                                wizardData.albaPresetMap()[data.guid] = {};
+                                                self.albaPresetMap()[data.guid] = {};
                                                 $.each(data.presets, function (_, preset) {
-                                                    wizardData.albaPresetMap()[data.guid][preset.name] = preset;
+                                                    self.albaPresetMap()[data.guid][preset.name] = preset;
                                                 });
                                             }
                                         })
                                 );
                             }
                         });
-                        $.when.apply($, calls)
+                        return $.when.apply($, calls)
                             .then(function() {
-                                availableBackends = wizardData.getDistinctBackends(availableBackends);
+                                availableBackends = self.getDistinctBackends(availableBackends);
                                 if (availableBackends.length > 0) {
                                     var sortFunction = function(backend1, backend2) {
                                         return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
                                     };
                                     availableBackends = availableBackends.sort(sortFunction);
-                                    wizardData.backends(availableBackends);
+                                    return availableBackends
                                 }
-                                wizardData.loadingBackends(false);
+                            }, function(error) {
+                                availableBackends = self.getDistinctBackends(availableBackends);
+                                self.invalidBackendInfo(true);
+                                throw error
                             })
-                            .done(albaDeferred.resolve)
-                            .fail(function() {
-                                availableBackends = wizardData.getDistinctBackends(availableBackends);
-                                wizardData.backends(availableBackends);
-                                wizardData.loadingBackends(false);
-                                wizardData.invalidBackendInfo(true);
-                                albaDeferred.reject();
+                            .always(function(){
+                                self.backends(availableBackends);
                             });
                     })
-                    .fail(function() {
-                        wizardData.loadingBackends(false);
-                        wizardData.invalidBackendInfo(true);
-                        albaDeferred.reject();
-                    });
-            }).promise();
-        };
-        wizardData.parsePreset = function(preset){
+            }).then(function(result) {
+                // Return the result of the complete chain. The exception should be captured
+                return result
+            }, function(error) {
+                // Something went wrong during the chain. Assume it was invalid backend info
+                self.invalidBackendInfo(true);
+                throw error
+            }).always(function() {
+                // No longer loading at this point
+                self.loadingBackends(false);
+            })
+        },
+        parsePreset: function(preset){
             var worstPolicy = 0;
             var policies = [];
             var replication = undefined;
@@ -277,23 +275,25 @@ define(['jquery', 'knockout',
                 isDefault: preset.is_default,
                 replication: replication
             }
-        };
+        },
 
-        wizardData.parsePresets = function(backend) {
+        parsePresets: function(backend) {
+            var self = this;
             var presets = [];
             if (ko.utils.unwrapObservable(backend) === undefined) {
                 return presets
             }
             $.each(backend.presets, function (index, preset) {
-                presets.push(wizardData.parsePreset(preset));
+                presets.push(self.parsePreset(preset));
             });
             var sortFunction = function (preset1, preset2) {
                 return preset1.name.toLowerCase() < preset2.name.toLowerCase() ? -1 : 1;
             };
             presets = presets.sort(sortFunction);
             return presets
-        };
-        return wizardData;
+        }
     };
-    return singleton();
+    ReconfigureVPoolData.prototype = $.extend({}, BaseContainer.prototype, functions);
+    return ReconfigureVPoolData;
+
 });
