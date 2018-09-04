@@ -104,6 +104,10 @@ class APIClient(object):
                   'headers': self._base_headers,
                   'verify': False,
                   'timeout': timeout}
+        # Requests library can both take in 'data' or 'json' keyword.
+        # When data is given: no extra heading is added and the data is serialized as json
+        # When json is given: the 'Content type: Application/json' header is added.
+        # The loop is to provide both options
         for key, val in [('json', json), ('data', data)]:
             if val is not None:
                 kwargs[key] = val
@@ -140,7 +144,7 @@ class APIClient(object):
         return self._base_url, self._base_headers
 
     def extract_data(self, response_data, old_key=None):
-        # type: (dict, str) -> any
+        # type: (dict, Optional[str]) -> any
         """
         Extract the data from the API
         For backwards compatibility purposes (older asd-managers might not wrap their data)
