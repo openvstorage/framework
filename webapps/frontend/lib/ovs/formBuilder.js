@@ -122,7 +122,7 @@ define([
         var target = field;
         var arrayType = false;
         var inputType = 'text';
-        var display = undefined;
+        var display = [];
         var extender = undefined;
         var inputItems = undefined;
         var widgetName = undefined;
@@ -313,17 +313,16 @@ define([
                 var widgetName = gatheredData.widgetType;
                 var formItem = generateFormItem(observable, field, group, display, target, inputType, inputItems, linkedObservable, fieldMapping, widgetName);
                 var insertIndex = getInsertIndex(formItem, questions);
-                if (arrayType === true) {
-                    formItem().extendable(true);
-                    if (questions().length !== 0 && insertIndex !== 0) {
-                        var previousItem = questions()[insertIndex -1];
-                        // The id consists of the field and an index.
-                        var regex = new RegExp('^' + formItem().field());
-                        var previousId = previousItem().id().replace(regex, '');
-                        if ($.isNumeric(previousId)) {
-                            previousItem().extendable(false);
+                if (arrayType) {
+                    // Other inputs for this field may no longer get extended
+                    $.each(questions(), function(index, question) {
+                        question = question();
+                        if (question.field() === formItem().field()) {
+                            question.extendable(false)
                         }
-                    }
+                    });
+                    // Current item is extendable though
+                    formItem().extendable(true);
                 }
                 questions.splice(insertIndex, 0, formItem);  // Insert the item where it belongs
             }

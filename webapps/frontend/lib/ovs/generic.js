@@ -101,7 +101,13 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         }
         return undefined;
     }
-    function formatPercentage(value) {
+    function formatPercentage(value, allowNan) {
+        if (isNaN(value)) {
+            if (!allowNan) {
+                throw Error('Non-numeric value passed to format')
+            }
+            return "0 %";
+        }
         value = Math.round(value * 10000) / 100;
         return formatNumber(value) + ' %';
     }
