@@ -106,6 +106,13 @@ define([
             return { value: reasons.length === 0, reasons: reasons, fields: fields };
         });
 
+        self.canShowAdvancedWarning = ko.pureComputed(function() {
+            return self.advancedSettings() && !self.acceptedAdvancedSettings()
+        });
+        self.canShowAdvancedConfig = ko.pureComputed(function(){
+            return self.advancedSettings() && self.acceptedAdvancedSettings()
+        });
+
         // Subscriptions
         self.advancedSettings.subscribe(function(newValue) {
             self.data.configParams.advanced(newValue);

@@ -18,7 +18,10 @@ define(['jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared', 'ovs/errors',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/configuration',
     'viewmodels/services/backend', 'viewmodels/services/storagerouter', 'viewmodels/services/vpool'
-],function($, ko, generic, api, shared, errors, StorageRouter, VPool, StorageDriverParams, backendService, storageRouterService, vpoolService){
+],function($, ko,
+           generic, api, shared, errors,
+           StorageRouter, VPool, StorageDriverParams,
+           backendService, storageRouterService, vpoolService){
     "use strict";
     // This data is not a singleton but a constructor
     return function(storageRouter, vPool) {

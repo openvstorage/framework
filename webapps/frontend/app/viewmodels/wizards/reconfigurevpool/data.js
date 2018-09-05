@@ -16,10 +16,10 @@
 /*global define */
 define(['jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/shared/base_container',
+    'viewmodels/containers/shared/base_container', 'viewmodels/containers/storagedriver/configuration',
     'viewmodels/services/storagerouter'],
     function($, ko, generic, api, shared,
-             BaseContainer,
+             BaseContainer, StorageDriverParams,
              StoragerouterService){
 
     function ReconfigureVPoolData(vpool, storagerouter, storagedriver){
@@ -45,14 +45,15 @@ define(['jquery', 'knockout',
         self.storageDriver = storagedriver || {};
         self.cachingData = vpool.getCachingData(storagerouter.guid(), true);
         self.configParams = vpool.getConfiguration(true);
+        self.backendModel = vpool.getBackendInfo(true);  // Associated backend model of the vpool
         self.loadingBackends = ko.observable(false);
         self.globalWriteBufferMax = ko.observable(null);
         self.srPartitions = ko.observable(null);
         self.backends = ko.observableArray([]);
         self.invalidBackendInfo = ko.observable(false);
-        self.globalWriteBuffer = ko.observable(undefined).extend({numeric: {min: 1, max: 10240, allowUndefined: true}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }})
         self.proxyAmount = ko.observable(storagedriver.albaProxyGuids().length).extend({numeric: {min: 1, max: 16}});
         self.albaPresetMap = ko.observable({});
+        self.storageDriverParams = new StorageDriverParams()
 
         // Fire up some asynchronous calls
         self.loadBackends();
@@ -61,8 +62,8 @@ define(['jquery', 'knockout',
                 self.srPartitions(data.srData.partitions);
                 var sdGlobalWriteBuffer =  self.storageDriver.vpoolBackendInfo().global_write_buffer;
                 var totalBuffer = data.writeCacheSize + sdGlobalWriteBuffer;
-                self.globalWriteBuffer(sdGlobalWriteBuffer / Math.pow(1024, 3));
                 self.globalWriteBufferMax(totalBuffer / Math.pow(1024, 3));
+                self.storageDriverParams.globalWriteBuffer(self.globalWriteBufferMax());
             });
 
         // Computed

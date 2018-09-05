@@ -36,6 +36,13 @@ define([
         self.canContinue = ko.pureComputed(function() {
             return { value: true, reasons: [], fields: [] };
         });
+        self.canShowFragmentCacheQuota = ko.pureComputed(function() {
+            return self.data.cachingData.fragment_cache.isUsed() && ['', undefined].contains(self.data.cachingData.block_cache.quota())
+        });
+        self.canShowBlockCacheQuota = ko.pureComputed(function() {
+            return self.data.cachingData.block_cache.isUsed() && ['', undefined].contains(self.data.cachingData.block_cache.quota())
+        });
+
 
         // Functions
         self.formatFloat = function(value) {
@@ -46,8 +53,8 @@ define([
                 vpool_updates: ko.mapping.toJS(self.data.configParams),
                 storagedriver_updates: ko.mapping.toJS(self.data.cachingData)
             };
-            postData.storagedriver_updates.proxy_amount = self.data.proxyAmount();
-            postData.storagedriver_updates.global_write_buffer = self.data.globalWriteBuffer();
+            postData.storagedriver_updates.proxy_amount = self.data.storageDriverParams.proxyAmount();
+            postData.storagedriver_updates.global_write_buffer = self.data.storageDriverParams.globalWriteBuffer();
             self.loadingUpdateImpact(true);
             return StoragedriverService.calculateUpdateImpact(self.data.storageDriver.guid(), postData).then(function(result) {
                 console.log(result);

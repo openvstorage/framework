@@ -113,7 +113,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <label for="advanced" class="help-block" data-i18n="ovs:wizards.add_vpool.gather_config.advanced.advanced_text" style="padding-left: 10px; display: inline-block;"></label>
         </div>
     </div>
-    <div data-bind="visible: $root.advancedSettings() && !$root.acceptedAdvancedSettings()">
+    <div data-bind="visible: $root.canShowAdvancedWarning">
         <div class="alert alert-warning">
             <p data-i18n="[html]ovs:wizards.add_vpool.gather_config.advanced.advanced_warning"></p>
         </div>
@@ -124,7 +124,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
         </div>
     </div>
-    <div data-bind="visible: $root.advancedSettings() && $root.acceptedAdvancedSettings()">
+    <div data-bind="visible: $root.canShowAdvancedConfig">
         <p class="help-block" data-i18n="ovs:wizards.add_vpool.gather_config.advanced.calculate_message" style="padding-left: 10px; display: inline-block;"></p>
         <div class="form-group">
             <label class="col-lg-4 control-label" for="number_of_scos_in_tlog" data-i18n="ovs:wizards.add_vpool.gather_config.advanced.number_of_scos_in_tlog"></label>

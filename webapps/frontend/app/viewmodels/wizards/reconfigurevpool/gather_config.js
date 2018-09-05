@@ -15,8 +15,10 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout'
-], function ($, ko) {
+    'jquery', 'knockout',
+    'viewmodels/services/storagedriver'
+], function ($, ko,
+             StoragedriverService) {
     "use strict";
     return function (stepOptions) {
         var self = this;
@@ -29,11 +31,23 @@ define([
         self.dtlModes = ko.observableArray([]);
         self.dtlTransportModes = ko.observableArray([]);
 
+        self.advancedSettings = ko.observable();
+        self.acceptedAdvancedSettings = ko.observable();
+
         // Computed
         self.canContinue = ko.pureComputed(function () {
             var reasons = [], fields = [];
             return {value: reasons.length === 0, reasons: reasons, fields: fields};
         });
+
+        self.canShowAdvancedWarning = ko.pureComputed(function() {
+            return self.advancedSettings() && !self.acceptedAdvancedSettings()
+        });
+        self.canShowAdvancedConfig = ko.pureComputed(function(){
+            return self.advancedSettings() && self.acceptedAdvancedSettings()
+        });
+
+
         self.dtlMode = ko.computed({
             deferEvaluation: true,  // Wait with computing for an actual subscription
             write: function (mode) {
@@ -52,7 +66,7 @@ define([
             }
         });
         self.globalWriteBufferOverAllocation = ko.pureComputed(function() {
-           return self.data.globalWriteBufferMax() < self.data.globalWriteBuffer();
+           return self.data.globalWriteBufferMax() < self.data.storageDriverParams.globalWriteBuffer();
         });
         self.canContinue = ko.pureComputed(function () {
             var reasons = [], fields = [];
@@ -64,7 +78,7 @@ define([
             var total_available = 0 ;
             var largest_ssd = 0 ;
             var largest_sata = 0;
-            var amount_of_proxies = self.data.proxyAmount();
+            var amount_of_proxies = self.data.storageDriverParams.proxyAmount()
             var maximum = amount_of_proxies;
             if (self.data.srPartitions() === undefined || self.data.srPartitions()['WRITE'] === undefined) {
                 fields.push('writeBufferGlobal');
@@ -83,7 +97,7 @@ define([
                 if (useLocalFC || useLocalBC) {
                     var proxies = useLocalFC && useLocalBC ? amount_of_proxies * 2 : amount_of_proxies;
                     var proportion = (largest_ssd || largest_sata) * 100.0 / total_available ;
-                    var available = proportion * self.data.globalWriteBuffer() / 100 * 0.10;  // Only 10% is used on the largest WRITE partition for fragment caching
+                    var available = proportion * self.data.storageDriverParams.globalWriteBuffer() * Math.pow(1024, 3) / 100 * 0.10;  // Only 10% is used on the largest WRITE partition for fragment caching
                     var fragment_size = available / proxies;
                     if (fragment_size < Math.pow(1024, 3)) {
                         while (maximum > 0) {
@@ -105,6 +119,14 @@ define([
             return { value: reasons.length === 0, reasons: reasons, fields: fields };
         });
 
+                // Subscriptions
+        self.advancedSettings.subscribe(function(newValue) {
+            self.data.configParams.advanced(newValue);
+            if (newValue === false) {
+                self.acceptedAdvancedSettings(newValue)
+            }
+        });
+
         // Durandal
         self.activate = function () {
             if (self.activated === true){
@@ -121,7 +143,15 @@ define([
                 }
                 self.dtlTransportModes.push(dtlTransportMode);
             });
+            // Enable syncing of these config parameters
+            self.data.configParams.subscribeConfigurations();
+            self.data.configParams.advanced_config.subscribeConfigurations();
             self.activated = true;
+        };
+        self.deactivate = function() {
+            // Throw away the subscriptions to avoid memory leaks
+            self.data.configParams.unSubscribeConfigurations();
+            self.data.configParams.advanced_config.unSubscribeConfigurations();
         };
     };
 });
