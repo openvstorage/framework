@@ -219,7 +219,7 @@ define([
                     vPool: self.vPool(),
                     storageRouter: sr});
                 // Setup listener for when the Modal is closed
-                wizard.closing.always(function() {
+                wizard.closing.fail(function() {
                     self.updatingStorageRouters(false);
                 });
                 wizard.completed.always(function() {
@@ -246,7 +246,6 @@ define([
         self.reconfigureStorageRouter = function(sr, sd) {
             self.updatingStorageRouters(true);
             if (self.srSDMap().hasOwnProperty(sr.guid())) {
-                var deferred = $.Deferred();
                 var wizard = new ReconfigureVPool({
                         modal: true,
                         completed: deferred,
@@ -254,30 +253,24 @@ define([
                         storageRouter: sr,
                         storageDriver: sd
                     });
-                wizard.closing.always(function() {
-                    deferred.resolve();
-                });
-                dialog.show(wizard);
-                deferred.always(function() {
+                wizard.closing.fail(function() {
                     self.updatingStorageRouters(false);
                 });
+                wizard.completed.always(function(){
+                    self.updatingStorageRouters(false);
+                });
+                dialog.show(wizard);
             }
         };
         self.generateHPRMConfigFiles = function(sr) {
             self.updatingStorageRouters(true);
-
-            var deferred = $.Deferred(),
-                wizard = new CreateHPRMConfigsWizard({
-                    modal: true,
-                    completed: deferred,
-                    vPool: self.vPool(),
-                    storageRouter: sr
-                });
-            wizard.closing.always(function() {
-                deferred.resolve();
+            var wizard = new CreateHPRMConfigsWizard({
+                modal: true,
+                vPool: self.vPool(),
+                storageRouter: sr
             });
             dialog.show(wizard);
-            deferred.always(function() {
+            wizard.completed.always(function() {
                 self.updatingStorageRouters(false);
             });
         };
