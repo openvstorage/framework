@@ -17,7 +17,7 @@
 define([
     'jquery', 'knockout', 'ovs/generic',
     '../build', './data', './gather_config', './gather_vpool', './gather_fragment_cache', './gather_block_cache', './confirm'
-], function($, ko, generic, Build, data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
+], function($, ko, generic, Build, Data, GatherConfig, GatherVPool, GatherFragmentCache, GatherBlockCache, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -29,20 +29,21 @@ define([
         var defaultTitle = $.t('ovs:wizards.reconfigure_vpool.title', {'sr_name': options.storageRouter.name()});
         self.title(generic.tryGet(options, 'title', defaultTitle));
 
-        self.steps([new GatherVPool(), new GatherFragmentCache(), new GatherBlockCache(), new GatherConfig(), new Confirm()]);
+        var data = new Data(options.vPool,
+                            options.storageRouter,
+                            options.storageDriver);
+
+        var stepOptions = {
+            data: data
+        };
+
+        self.steps([new GatherVPool(stepOptions),
+                    new GatherFragmentCache(stepOptions),
+                    new GatherBlockCache(stepOptions),
+                    new GatherConfig(stepOptions),
+                    new Confirm(stepOptions)]);
 
         self.step(0);
         self.activateStep();
-
-        // Cleaning data
-        generic.cleanObject(data, 0, ['albaPresetMap']);
-        data.albaPresetMap({});  // set this to an empty object as cleanObject will set it to undefined
-        // Set current data
-        data.vPool(options.vPool);
-        data.storageRouter(options.storageRouter);
-        data.storageDriver(options.storageDriver);
-        data.completed = options.completed;
-        // Fill in all wizard data which is derived from the options above
-        data.fillData()
     };
 });

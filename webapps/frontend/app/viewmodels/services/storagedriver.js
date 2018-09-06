@@ -17,20 +17,20 @@
 /**
  * Service to help with StorageDriver related tasks
  */
-define([
-], function() {
+define(['ovs/api'
+], function(api) {
 
     /**
      * Returns a singleton instance of this service (same instance is served throughout the application)
      */
-    function StorageDriverService(){
+    function StorageDriverService() {
         var self = this;
 
         // Constants
         self.minNonDisposableScosFactor = 1.5;
         self.defaultNumberOfScosInTlog = 4;
 
-        self.tlogMultiplierMap  = {  // Maps sco size to a tlog_multiplier
+        self.tlogMultiplierMap = {  // Maps sco size to a tlog_multiplier
             4: 16,
             8: 8,
             16: 4,
@@ -45,7 +45,7 @@ define([
          * This uses the mapping to have the simple mode available
          * @return {object}
          */
-        self.calculateAdvancedFactors = function(sco_size, write_buffer) {
+        self.calculateAdvancedFactors = function (sco_size, write_buffer) {
             var numberOfScosInTlog = self.tlogMultiplierMap[sco_size];
             var nonDisposableScoFactor = write_buffer / numberOfScosInTlog / sco_size;
             return {
@@ -57,8 +57,18 @@ define([
          * Calculate the number of scos in tlog and the non disposable scos factor
          * @return {object}
          */
-        self.calculateVolumeWriteBuffer = function(numberOfScosInTlog, nonDisposableScoFactor, scoSize) {
+        self.calculateVolumeWriteBuffer = function (numberOfScosInTlog, nonDisposableScoFactor, scoSize) {
             return nonDisposableScoFactor * (numberOfScosInTlog * scoSize);
+        };
+
+        /**
+         * Calculate the impact of the update of the storagedriver
+         * @param storagedriverguid Guid of the storagedriver that will be updated
+         * @param postData data to update of the storagedriver
+         * @returns {*|void}
+         */
+        self.calculateUpdateImpact = function(storagedriverguid, postData) {
+            return api.post('storagedrivers/{0}/calculate_update_impact'.format([storagedriverguid]), {data: postData})
         };
     }
     return new StorageDriverService()

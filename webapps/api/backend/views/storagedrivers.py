@@ -92,6 +92,7 @@ class StorageDriverViewSet(viewsets.ViewSet):
         :return: Data on what actions would be taken
         :rtype: object
         """
-        # TODO: Chuffie, dit is hier voor uw edit vPool i guess?
+
+
         vpool_updates.update(storagedriver_updates)
         return vpool_updates

@@ -154,15 +154,14 @@ define([
             }).promise();
         };
         self.loadStorageRouters = function() {
-            return $.Deferred(function (deferred) {
+            $.when().then (function () {
                 if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
                     self.loadStorageRouterHandle = storagerouterService.loadStorageRouters()
                         .done(function (data) {
                             self.vDisk.storageRouterGuids(data.data);
                         })
-                        .always(deferred.resolve());
                 }
-            }).promise();
+            });
         };
         self.refreshSnapshots = function() {
             // Not in use, for mapping only
