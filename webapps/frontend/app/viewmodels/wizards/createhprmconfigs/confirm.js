@@ -101,16 +101,10 @@ define([
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
                         window.location.href = 'downloads/' + data;
-                        if (self.data.completed !== undefined) {
-                            self.data.completed.resolve(true);
-                        }
                         generic.alertSuccess($.t('ovs:wizards.create_hprm_configs.confirm.success'),
                                              $.t('ovs:wizards.create_hprm_configs.confirm.success_msg', {vpool: self.data.vPool().name()}));
                     })
                     .fail(function(error) {
-                        if (self.data.completed !== undefined) {
-                            self.data.completed.resolve(false);
-                        }
                         error = generic.extractErrorMessage(error);
                         generic.alertError($.t('ovs:generic.error'),
                                            $.t('ovs:wizards.create_hprm_configs.confirm.failure_msg', {why: error,

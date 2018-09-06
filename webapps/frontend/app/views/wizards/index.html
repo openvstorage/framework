@@ -19,7 +19,7 @@ but WITHOUT ANY WARRANTY of any kind.
     <div data-bind="css: { 'modal-content': modal() }">
         <form class="form-horizontal" data-bind="attr: {id: id}">
             <div class="modal-header" data-bind="visible: modal()">
-                <button type="button" class="close" data-bind="click: function() { close(false); }">&times;</button>
+                <button type="button" class="close" data-bind="click: cancel">&times;</button>
                 <h3 data-bind="text: title"></h3>
             </div>
             <h2 data-bind="visible: !modal(), text: title"></h2>
@@ -32,7 +32,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <div data-bind="css: { 'modal-footer': modal() }">
                 <div class="pull-left">
                     <button type="button" class="btn btn-default" name="cancel"
-                            data-bind="click: function() { close(false); }" data-i18n="ovs:generic.cancel">
+                            data-bind="click: cancel" data-i18n="ovs:generic.cancel">
                     </button>
                 </div>
                 <div class="pull-right">

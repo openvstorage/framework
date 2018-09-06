@@ -32,11 +32,11 @@ define([
         self.steps       = ko.observableArray([]);
         self.loadingNext = ko.observable(false);
         self.id          = ko.observable(generic.getHash());
+        self.canceled    = ko.observable(false);
 
         // Deferreds
         self.closing   = $.Deferred();  // Track if the wizard is closing
-        self.finishing = $.Deferred();  // Track if the wizard is finishing. Rejects if the finish has errors
-        self.completed = $.Deferred();  // Track if the final steps finish has been completed
+        self.completed = $.Deferred();  // Track if the final steps of the finish has been completed
 
         // Builded variable
         self.activeStep = activator.create();
@@ -163,6 +163,13 @@ define([
             }
         };
         /**
+         * Cancel the current wizard
+         */
+        self.cancel = function() {
+            self.canceled(true);
+            self.close(false, new Error('Wizard was canceled'))
+        };
+        /**
          * Closes the current modal
          * @param success: Indicator to whether or not the wizard closed with success
          * @type success: bool
@@ -246,11 +253,9 @@ define([
                 // Handle finishing of the chain
                 .then(function(data) {
                     self.close(true, data);
-                    self.finishing.resolve(data);
                 }, function(error) {
                     if (error.abort === false) {
                         self.close(false, error);
-                        self.finishing.reject(error);
                     }
                 })
                 .always(function() {

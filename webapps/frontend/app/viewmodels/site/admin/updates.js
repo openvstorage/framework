@@ -309,7 +309,7 @@ define([
                 modal: true,
                 storagerouter: self.storageRouters()[0]
             });
-            wizard.finishing.always(function() {
+            wizard.closing.done(function() {
                 self.updateInitiated(true);
             });
             dialog.show(wizard);
