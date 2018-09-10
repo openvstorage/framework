@@ -21,7 +21,6 @@ Generic system module, executing statements on local node
 import os
 from ovs_extensions.caching.decorators import cache_file
 from ovs_extensions.generic.system import System as _System
-from ovs.extensions.packages.packagefactory import PackageFactory
 
 
 class System(_System):
@@ -69,6 +68,8 @@ class System(_System):
         :return: The name of the release
         :rtype: str
         """
+        # Avoid circular reference from Configuration
+        from ovs.extensions.packages.packagefactory import PackageFactory
         try:
             if client is not None:
                 return client.run(['cat', cls.RELEASE_NAME_FILE]).strip()
@@ -90,3 +91,13 @@ class System(_System):
         if storagerouter is None:
             raise RuntimeError('Could not find the local StorageRouter')
         return storagerouter
+
+    @staticmethod
+    def get_component_identifier():
+        # type: () -> str
+        """
+        Retrieve the identifier of the component
+        :return: The ID of the component
+        :rtype: str
+        """
+        return 'framework'
