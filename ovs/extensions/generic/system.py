@@ -29,7 +29,6 @@ class System(_System):
     """
 
     OVS_ID_FILE = '/etc/openvstorage_id'
-    RELEASE_NAME_FILE = '/opt/OpenvStorage/config/release_name'
     _machine_id = {}
 
     def __init__(self):
@@ -58,26 +57,6 @@ class System(_System):
     def read_my_machine_id(cls):
         with open(cls.OVS_ID_FILE, 'r') as the_file:
             return the_file.read().strip()
-
-    @classmethod
-    def get_release_name(cls, client=None):
-        """
-        Retrieve the release name
-        :param client: Client on which to retrieve the release name
-        :type client: ovs_extensions.generic.sshclient.SSHClient
-        :return: The name of the release
-        :rtype: str
-        """
-        # Avoid circular reference from Configuration
-        from ovs.extensions.packages.packagefactory import PackageFactory
-        try:
-            if client is not None:
-                return client.run(['cat', cls.RELEASE_NAME_FILE]).strip()
-            with open(cls.RELEASE_NAME_FILE, 'r') as the_file:
-                return the_file.read().strip()
-        except:
-            manager = PackageFactory.get_manager()
-            return manager.get_release_name()
 
     @classmethod
     def get_my_storagerouter(cls):
