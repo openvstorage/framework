@@ -27,6 +27,8 @@ class PackageFactory(_PackageFactory):
     """
     Factory class returning specialized classes
     """
+    # Allow the user to add a custom release name
+    RELEASE_NAME_FILE = '/opt/OpenvStorage/config/release_name'
     _logger = Logger('extensions-packages')
 
     def __init__(self):
@@ -91,3 +93,21 @@ class PackageFactory(_PackageFactory):
                     'mutually_exclusive': {cls.PKG_VOLDRV_BASE, cls.PKG_VOLDRV_SERVER}}
         else:
             raise ValueError('Unsupported edition found: "{0}"'.format(edition))
+
+    @classmethod
+    def get_release_name(cls, client=None):
+        """
+        Retrieve the release name
+        :param client: Client on which to retrieve the release name
+        :type client: ovs_extensions.generic.sshclient.SSHClient
+        :return: The name of the release
+        :rtype: str
+        """
+        try:
+            if client is not None:
+                return client.run(['cat', cls.RELEASE_NAME_FILE]).strip()
+            with open(cls.RELEASE_NAME_FILE, 'r') as the_file:
+                return the_file.read().strip()
+        except:
+            manager = cls.get_manager()
+            return manager.get_release_name()

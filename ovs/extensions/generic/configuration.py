@@ -26,6 +26,7 @@ import string
 from ovs_extensions.caching.decorators import cache_file
 from ovs_extensions.generic.configuration import Configuration as _Configuration, ConnectionException, NotFoundException
 from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
+from ovs.extensions.generic.system import System
 
 
 class Configuration(_Configuration):
@@ -122,6 +123,7 @@ class Configuration(_Configuration):
                     base_cfg['messagequeue'][key] = value
         for key, value in base_cfg.iteritems():
             cls.set('/ovs/framework/{0}'.format(key), value, raw=False)
+        cls.register_usage(System.get_component_identifier())
 
     @classmethod
     @cache_file(CONFIG_STORE_LOCATION)

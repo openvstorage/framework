@@ -21,7 +21,6 @@ Generic system module, executing statements on local node
 import os
 from ovs_extensions.caching.decorators import cache_file
 from ovs_extensions.generic.system import System as _System
-from ovs.extensions.packages.packagefactory import PackageFactory
 
 
 class System(_System):
@@ -30,7 +29,6 @@ class System(_System):
     """
 
     OVS_ID_FILE = '/etc/openvstorage_id'
-    RELEASE_NAME_FILE = '/opt/OpenvStorage/config/release_name'
     _machine_id = {}
 
     def __init__(self):
@@ -61,24 +59,6 @@ class System(_System):
             return the_file.read().strip()
 
     @classmethod
-    def get_release_name(cls, client=None):
-        """
-        Retrieve the release name
-        :param client: Client on which to retrieve the release name
-        :type client: ovs_extensions.generic.sshclient.SSHClient
-        :return: The name of the release
-        :rtype: str
-        """
-        try:
-            if client is not None:
-                return client.run(['cat', cls.RELEASE_NAME_FILE]).strip()
-            with open(cls.RELEASE_NAME_FILE, 'r') as the_file:
-                return the_file.read().strip()
-        except:
-            manager = PackageFactory.get_manager()
-            return manager.get_release_name()
-
-    @classmethod
     def get_my_storagerouter(cls):
         """
         Returns unique machine storagerouter id
@@ -90,3 +70,13 @@ class System(_System):
         if storagerouter is None:
             raise RuntimeError('Could not find the local StorageRouter')
         return storagerouter
+
+    @staticmethod
+    def get_component_identifier():
+        # type: () -> str
+        """
+        Retrieve the identifier of the component
+        :return: The ID of the component
+        :rtype: str
+        """
+        return 'framework'

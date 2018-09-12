@@ -35,6 +35,7 @@ from ovs_extensions.api.exceptions import HttpMethodNotAllowedException
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
+from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
@@ -65,7 +66,7 @@ class MetadataView(View):
         try:
             # Gather release name
             try:
-                data['release']['name'] = System.get_release_name()
+                data['release']['name'] = PackageFactory.get_release_name()
             except:
                 MetadataView._logger.exception('Could not load release name')
 
