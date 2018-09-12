@@ -25,6 +25,7 @@ from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 
+
 class MigrationController(object):
     """
     This controller contains (part of the) migration code. It runs out-of-band with the updater so we reduce the risk of
@@ -53,6 +54,7 @@ class MigrationController(object):
         from ovs.extensions.db.arakooninstaller import ArakoonInstaller
         from ovs.extensions.generic.configuration import Configuration
         from ovs.extensions.generic.sshclient import SSHClient
+        from ovs.extensions.generic.system import System
         from ovs_extensions.generic.toolbox import ExtensionsToolbox
         from ovs.extensions.migration.migration.ovsmigrator import ExtensionMigrator
         from ovs.extensions.packages.packagefactory import PackageFactory
@@ -653,5 +655,10 @@ class MigrationController(object):
                 Configuration.set(mds_catch_up_migration_key, True)
             except:
                 MigrationController._logger.exception('Integration of mds_catch_up failed')
+
+        ###################################################
+        # The components need to register themselves to avoid throwing the configuration away
+        if System.get_component_identifier() not in Configuration.get(Configuration.get_registration_key(), default=[]):
+            Configuration.register_usage(System.get_component_identifier())
 
         MigrationController._logger.info('Finished out of band migrations')

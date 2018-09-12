@@ -24,7 +24,7 @@ import random
 import string
 # noinspection PyUnresolvedReferences
 from ovs_extensions.caching.decorators import cache_file
-from ovs_extensions.generic.configuration import Configuration as _Configuration, ConnectionException, NotFoundException
+from ovs_extensions.generic.configuration import Configuration as _Configuration
 from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
 from ovs.extensions.generic.system import System
 
