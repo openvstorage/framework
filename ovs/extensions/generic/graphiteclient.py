@@ -14,8 +14,6 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-import time
-import socket
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.configuration.exceptions import ConfigurationNotFoundException as NotFoundException
 from ovs_extensions.generic.graphiteclient import GraphiteClient as _graphite_client
@@ -39,14 +37,14 @@ class GraphiteClient(_graphite_client):
         :param database: name of the database
         :type database: str
         """
+        graphite_data = {}
         if all(p is None for p in [ip, port]):
             # Nothing specified
-            try:
-                graphite_data = Configuration.get(self.CONFIG_PATH)
-            except NotFoundException:
+            graphite_data = self.get_graphite_config()
+            if not graphite_data:
                 raise RuntimeError('No graphite data found in config path `{0}`'.format(self.CONFIG_PATH))
 
-        ip = ip or graphite_data['host']
+        ip = ip or graphite_data['ip']
         port = port or graphite_data.get('port', 2003)
 
         ExtensionsToolbox.verify_required_params(verify_keys=True,
@@ -86,3 +84,17 @@ class GraphiteClient(_graphite_client):
             for fieldkey, fieldvalue in datapointset['fields'].items():
                 tmp_path = '{0}.{1}'.format(path, fieldkey)
                 self.send(tmp_path, fieldvalue)
+
+    @classmethod
+    def get_graphite_config(cls):
+        # type: () -> Dict[str, Union[str, int]]
+        """
+        Retrieve the graphite config (if any)
+        :return:
+        """
+        try:
+            graphite_data = Configuration.get(cls.CONFIG_PATH)
+            return {'ip': graphite_data['host'],
+                    'port': graphite_data.get('port', 2003)}
+        except NotFoundException:
+            return {}
