@@ -35,7 +35,6 @@ define([
             new GatherBlockCache({data: data, customlocal: true, allowlocalbackend: true}),
             new Confirm()
         ]);
-        data.completed = options.completed;
         self.step(0);
         self.activateStep();
 

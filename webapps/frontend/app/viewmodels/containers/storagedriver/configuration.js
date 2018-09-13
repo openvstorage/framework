@@ -27,7 +27,7 @@ define([
     var ConfigurationViewModel = function(data) {
         var self = this;
         self.storageIP = ko.observable('').extend({regex: generic.ipRegex});
-        self.proxyAmount = ko.observable(2).extend({numeric: {min: 1, max: 16}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
+        self.proxyAmount = ko.observable(2).extend({numeric: {min: 1, max: 16}});
         self.globalWriteBuffer = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}, rateLimit: { method: "notifyWhenChangesStop", timeout: 800 }});
 
         ko.mapping.fromJS(data, configurationMapping, self)  // Bind the data into this

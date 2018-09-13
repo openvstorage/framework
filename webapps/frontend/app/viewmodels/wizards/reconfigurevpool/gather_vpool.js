@@ -16,17 +16,15 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/shared', 'ovs/api', 'ovs/generic',
-    'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/storagedriver/storagedriver',
-    'viewmodels/containers/vpool/vpool',
-    './data'
-], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, data) {
+    'ovs/shared'
+], function ($, ko,
+             shared) {
     "use strict";
-    return function () {
+    return function (stepOptions) {
         var self = this;
 
         // Variables
-        self.data   = data;
+        self.data   = stepOptions.data;
         self.shared = shared;
 
         // Computed
@@ -38,7 +36,7 @@ define([
             /**
              * Compute a preset to look like presetName: (1,1,1,1),(2,1,2,1)
              */
-            var vpool = self.data.vPool();
+            var vpool = self.data.vPool;
             if (vpool === undefined || (vpool.backendPolicies().length === 0 && vpool.backendPreset === undefined)) {
                return undefined
             }

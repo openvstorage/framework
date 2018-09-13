@@ -24,17 +24,16 @@ import random
 import string
 # noinspection PyUnresolvedReferences
 from ovs_extensions.caching.decorators import cache_file
+# ConnectionException, NotFoundException are here for backwards compatibility
 from ovs_extensions.generic.configuration import Configuration as _Configuration, ConnectionException, NotFoundException
+from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
+from ovs.extensions.generic.system import System
 
 
 class Configuration(_Configuration):
     """
     Extends the 'default' configuration class
     """
-    ARAKOON_NAME = 'cacc'
-    ARAKOON_NAME_UNITTEST = 'unittest-cacc'
-    CACC_LOCATION = '/opt/OpenvStorage/config/arakoon_cacc.ini'
-    CONFIG_STORE_LOCATION = '/opt/OpenvStorage/config/framework.json'
 
     base_config = {'cluster_id': None,
                    'external_config': None,
@@ -125,6 +124,7 @@ class Configuration(_Configuration):
                     base_cfg['messagequeue'][key] = value
         for key, value in base_cfg.iteritems():
             cls.set('/ovs/framework/{0}'.format(key), value, raw=False)
+        cls.register_usage(System.get_component_identifier())
 
     @classmethod
     @cache_file(CONFIG_STORE_LOCATION)
@@ -135,7 +135,7 @@ class Configuration(_Configuration):
         :return: The configured store
         :rtype: str
         """
-        with open(cls.CONFIG_STORE_LOCATION) as config_file:
+        with open(CONFIG_STORE_LOCATION) as config_file:
             contents = json.load(config_file)
             return contents['configuration_store']
 

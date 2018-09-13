@@ -114,7 +114,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         </div>
                     <!-- /ko -->
                     <!-- ko if: $root.data.loadingBackends() === false && ($root.blockCacheBackends() !== undefined && $root.blockCacheBackends().length > 0) -->
-                        <span data-bind="visible: ($root.data.vPool() === undefined || $root.blockCacheBackend() !== undefined),
+                        <span data-bind="visible: (!!$root.data.vPool || $root.blockCacheBackend() !== undefined),
                                          dropdown: {
                                              key: 'guid', keyisfunction: false,
                                              items: $root.blockCacheBackends, target: $root.blockCacheBackend,

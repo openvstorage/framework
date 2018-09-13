@@ -102,7 +102,7 @@ define([
                 newConfig: self.newStatsMonkeyConfig,
                 origConfig: new StatsMonkeyConfigVM(self.origStatsMonkeyConfig.toJS())
             });
-            wizard.closing.always(function() {
+            wizard.closing.fail(function() {
                 if (self.origStatsMonkeyConfig.isInitialized() === false) {
                     var index = self.selectedSupportSettings.indexOf('stats_monkey');
                     if (index > -1) {
@@ -110,7 +110,7 @@ define([
                     }
                 }
             });
-            wizard.finishing.always(function() {
+            wizard.completed.done(function() {
                 if (self.supportSettingsChanged() === true) {
                     self.save();
                 }

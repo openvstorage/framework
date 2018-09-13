@@ -25,6 +25,7 @@ import time
 import pika
 import uuid
 import argparse
+from ovs_extensions.constants.config import ARAKOON_NAME, CACC_LOCATION
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
 from ovs.extensions.db.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
@@ -141,9 +142,9 @@ class Watcher(object):
                     self.log_message('  Error during configuration store test: {0}'.format(ex), 2)
                     return False
 
-                with open(Configuration.CACC_LOCATION) as config_file:
+                with open(CACC_LOCATION) as config_file:
                     contents = config_file.read()
-                config = ArakoonClusterConfig(cluster_id=Configuration.ARAKOON_NAME, load_config=False)
+                config = ArakoonClusterConfig(cluster_id=ARAKOON_NAME, load_config=False)
                 config.read_config(contents=contents)
                 client = ArakoonInstaller.build_client(config)
                 contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
@@ -153,12 +154,12 @@ class Watcher(object):
                     except Exception as ex:
                         self.log_message('  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
                         return False
-                    temp_filename = '{0}~'.format(Configuration.CACC_LOCATION)
+                    temp_filename = '{0}~'.format(CACC_LOCATION)
                     with open(temp_filename, 'w') as config_file:
                         config_file.write(contents)
                         config_file.flush()
                         os.fsync(config_file)
-                    os.rename(temp_filename, Configuration.CACC_LOCATION)
+                    os.rename(temp_filename, CACC_LOCATION)
                     Watcher.LOG_CONTENTS = contents
                 self.log_message('  Configuration store OK', 0)
 

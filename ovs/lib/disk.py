@@ -17,14 +17,16 @@
 """
 DiskController module
 """
+from ovs.constants.s3 import S3_BASE
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.disk import DiskTools, Disk as GenericDisk, Partition as GenericPartition
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs_extensions.generic.system import System
 from ovs.lib.helpers.decorators import ovs_task
-
 
 class DiskController(object):
     """
@@ -49,7 +51,8 @@ class DiskController(object):
             DiskController._logger.exception('Could not connect to StorageRouter {0}'.format(storagerouter.ip))
             raise
 
-        disks, name_alias_mapping = DiskTools.model_devices(client)
+        s3 = Configuration.get(S3_BASE.format(storagerouter.machine_id), default=False)
+        disks, name_alias_mapping = DiskTools.model_devices(client, s3=s3)
         disks_by_name = dict((disk.name, disk) for disk in disks)
         alias_name_mapping = name_alias_mapping.reverse_mapping()
         # Sync the model

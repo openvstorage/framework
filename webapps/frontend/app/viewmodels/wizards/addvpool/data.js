@@ -18,7 +18,10 @@ define(['jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared', 'ovs/errors',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/configuration',
     'viewmodels/services/backend', 'viewmodels/services/storagerouter', 'viewmodels/services/vpool'
-],function($, ko, generic, api, shared, errors, StorageRouter, VPool, StorageDriverParams, backendService, storageRouterService, vpoolService){
+],function($, ko,
+           generic, api, shared, errors,
+           StorageRouter, VPool, StorageDriverParams,
+           backendService, storageRouterService, vpoolService){
     "use strict";
     // This data is not a singleton but a constructor
     return function(storageRouter, vPool) {
@@ -41,7 +44,6 @@ define(['jquery', 'knockout',
         self.loadStorageRoutersHandle           = undefined;
 
         // Observables
-        self.enableAdvancedConfig               = ko.observable(false);      // @todo remove this check and in the gather_config part when advanced config is done
         self._storageRouter                     = ko.observable(storageRouter);
         self.vPool                              = ko.observable(vPool);
         self.isExtend                           = ko.observable(isExtend);
