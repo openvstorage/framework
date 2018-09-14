@@ -658,7 +658,9 @@ class MigrationController(object):
 
         ###################################################
         # The components need to register themselves to avoid throwing the configuration away
-        if System.get_component_identifier() not in Configuration.get(Configuration.get_registration_key(), default=[]):
-            Configuration.register_usage(System.get_component_identifier())
+        for storagerouter in StorageRouterList.get_storagerouters():
+            registration_key = Configuration.generate_registration_key(storagerouter.machine_id)
+            if System.get_component_identifier() not in Configuration.get(registration_key, default=[]):
+                Configuration.register_usage(System.get_component_identifier(), registration_key)
 
         MigrationController._logger.info('Finished out of band migrations')
