@@ -1,12 +1,32 @@
+# Copyright (C) 2016 iNuron NV
+#
+# This file is part of Open vStorage Open Source Edition (OSE),
+# as available from
+#
+#      http://www.openvstorage.org and
+#      http://www.openvstorage.com.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+# as published by the Free Software Foundation, in version 3 as it comes
+# in the LICENSE.txt file of the Open vStorage OSE distribution.
+#
+# Open vStorage is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY of any kind.
+
 from ovs.extensions.storageserver.storagedriverconfig.generic_config import GenericConfig
 
+
 class VolumeManagerConfig(GenericConfig):
+    """
+    Volumemanager config container of the storagedriver config
+    """
     def __init__(self, clean_interval, metadata_path, tlog_path, default_cluster_size=None, dtl_throttle_usecs=None, non_disposable_scos_factor=None,
                  number_of_scos_in_tlog=None, read_cache_default_behaviour=None, read_cache_default_mode=None, sap_persist_interval=None,
                  sco_written_to_backend_action=None, required_tlog_freespace=None, required_meta_freespace=None, freespace_check_interval=None,
                  metadata_cache_capacity=None, metadata_mds_slave_max_tlogs_behind=None, arakoon_metadata_sequence_size=None, open_scos_per_volume=None,
-                 dtl_busy_loop_usecs=None,  dtl_queue_depth= None, dtl_write_trigger=None, dtl_request_timeout_ms=None,
-                 dtl_connect_timeout_ms=None, dtl_check_interval_in_seconds=None,  **kwargs):
+                 dtl_busy_loop_usecs=None,  dtl_queue_depth=None, dtl_write_trigger=None, dtl_request_timeout_ms=None,
+                 dtl_connect_timeout_ms=None, dtl_check_interval_in_seconds=None, *args,**kwargs):
         """
         Initiate the volumedriverfs config: volumemanager
         :param clean_interval: Interval between runs of scocache cleanups, in seconds. scocache_cleanup_trigger / clean_interval should be larger than the aggregated write speed to the scocache.
@@ -32,7 +52,6 @@ class VolumeManagerConfig(GenericConfig):
         :param dtl_request_timeout_ms:  Timeout for DTL requests
         :param dtl_connect_timeout_ms: Timeout for connection attempts to the DTL - 0: wait forever / the OS to signal errors
         :param dtl_check_interval_in_seconds: Interval between checks of the DTL state of volumes
-        :param kwargs:
         """
         self.clean_interval = clean_interval
         self.metadata_path = metadata_path
