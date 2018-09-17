@@ -14,18 +14,68 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['jquery', 'ovs/generic'], function($, generic) {
+define(['jquery', 'jqp/pnotify'],
+    function($) {
     "use strict";
-    function handleEvent(data) {
-        //if (data.type === 'foobar') {
-        //    generic.alertInfo(
-        //        $.t('ovs:events.' + data.type),
-        //        $.t('ovs:events.' + data.type + '_content', data.metadata)
-        //    );
-        //}
-    }
+    /**
+     * Displays notifications as pop-over
+     * @constructor
+     */
+    var BoxTypes = Object.freeze({
+        INFO: 'info',
+        SUCCESS: 'success',
+        WARNING: 'notice',
+        ERROR: 'error'
+    });
 
-    return {
-        handleEvent: handleEvent
+    function NotificationService(){ }
+    var functions = {
+        /**
+         * Creates an alert box
+         * @param title: Title of the box
+         * @param message: Message of the box
+         * @param type: Type of box
+         * @returns {*}
+         */
+        alert: function(title, message, type) {
+            var data = {
+                title: title,
+                text: message,
+                delay: 6000,
+                hide: type !== BoxTypes.ERROR
+            };
+            if (type !== undefined) {
+                data.type = type;
+            }
+            return $.pnotify(data);
+        },
+        alertInfo: function(title, message) {
+            return this.alert(title, message, BoxTypes.INFO);
+        },
+        alertSuccess: function(title, message) {
+            return this.alert(title, message, BoxTypes.SUCCESS);
+        },
+        alertWarning: function(title, message) {
+            return this.alert(title, message, BoxTypes.WARNING);
+        },
+        alertError: function(title, message) {
+            return this.alert(title, message, BoxTypes.ERROR);
+        },
+        /**
+         * Notify the user about a certain event
+         * Alerts a small information window
+         * @param data
+         */
+        handleEvent: function(data) {
+            // if (data.type === 'foobar') {
+            //     this.alertInfo(
+            //         $.t('ovs:events.' + data.type),
+            //         $.t('ovs:events.' + data.type + '_content', data.metadata)
+            //     )
+            // }
+        }
     };
+
+    NotificationService.prototype = $.extend({}, functions);
+    return new NotificationService()
 });

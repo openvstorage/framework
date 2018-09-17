@@ -14,102 +14,395 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define, window, document, location */
-define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
+define(['jquery', 'knockout'], function($, ko) {
     "use strict";
 
-    // Constants
-    var ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
-    var hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
-    var nameRegex = /^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$/;
-    var vdiskNameRegex = /^[0-9a-zA-Z][\-_a-zA-Z0-9]+[a-zA-Z0-9]$/;
+    /**
+     * Generic Service which holds generic methods
+     * Wraps around the pnotify plugin for jquery
+     * @constructor
+     */
+    function GenericService() {
+        // Add a number of methods to the prototypes of built in objects
+        this.patchPrototypes()
+    }
 
+    // Public
+    var properties = {
+        ipRegex: /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/,
+        hostRegex: /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/,
+        nameRegex: /^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$/,
+        vdiskNameRegex: /^[0-9a-zA-Z][\-_a-zA-Z0-9]+[a-zA-Z0-9]$/
+    };
+
+    var patchFunctions = {
+        /**
+         * Adds a number of methods to the built in objects
+         */
+        patchPrototypes: function(){
+            /**
+             * Retrieve an item at the requested index
+             * @param index: Index to search item om
+             * @param prop: Optional: property to retrieve instead of the full object
+             */
+            Array.prototype.getItemUnwrap = function(index, prop) {
+                var foundItem = undefined;
+                if (index > this.length - 1 || index < 0){
+                    return foundItem;
+                }
+                foundItem = ko.unwrapObservable(this[index]);
+                if (typeof prop !== 'undefined') {
+                    foundItem = ko.unwrapObservable(foundItem[prop]);
+                }
+                return foundItem;
+            };
+            /**
+             * Only works on a sorted list
+             * Returns the index of the item search for or -1 if not found
+             * Faster than indexing or contains
+             * Worst case time: O(log(n)
+             * @param value: Value to look for
+             * @param prop: Optional prop to get from the found value
+             * @returns {Number}
+             */
+            Array.prototype.brSearch = function(value, prop) {
+                if (this.length === 0) {
+                    return -1;
+                }
+                var middleIndex = Math.floor(this.length / 2);
+                var middleItem = this.getItemUnwrap(middleIndex, prop);
+                if (this.length === 1 && middleItem !== value) {
+                    return -1;  // Item not present
+                }
+                if (value === middleItem) {
+                    return middleIndex;
+                }
+                if (value > middleItem) {
+                    var additionalIndex = this.slice(middleIndex + 1, this.length).brSearch(value, prop);
+                    if (additionalIndex === -1) {
+                        return -1;
+                    }
+                    return middleIndex + 1 + additionalIndex;
+                }
+                return this.slice(0, middleIndex).brSearch(value, prop);
+            };
+            /**
+             * Only works on a sorted list
+             * Returns the index of the 1st element found (in case multiple identical would be present) or -1 if none found
+             * Faster than indexing or contains
+             * Worst case time: O(log(n)
+             * @param value: Value to look for
+             * @param prop: Optional prop to get from the found value
+             * @param start: Start index to start looking for the value
+             * @param end: End index to stop looking for the value
+             * @returns {Number}
+             */
+            Array.prototype.brSearchFirst = function(value, prop, start, end) {
+                start = start === undefined ? 0 : start;
+                end = end === undefined ? this.length - 1 : end;
+                if (end < start) {
+                    return -1;
+                }
+                var middleIndex = Math.floor(start + (end - start) / 2);
+                var middleItem = this.getItemUnwrap(middleIndex, prop);
+                var previousItem = this.getItemUnwrap(middleIndex - 1, prop);
+                if ((previousItem === undefined || value > previousItem) && middleItem === value) {
+                    return middleIndex;
+                }
+                if (value > middleItem) {
+                    // Don't use slice here since we potentially lose duplicate values
+                    return this.brSearchFirst(value, prop, (middleIndex + 1), end);
+                }
+                return this.brSearchFirst(value, prop, start, (middleIndex - 1));
+            };
+            /**
+             * Only works on a sorted list
+             * Returns the index of the last element found (in case multiple identical would be present) or -1 if none found
+             * Faster than indexing or contains
+             * Worst case time: O(log(n)
+             * @param value: Value to look for
+             * @param prop: Optional prop to get from the found value
+             * @param start: Start index to start looking for the value
+             * @param end: End index to stop looking for the value
+             * @returns {Number}
+             */
+            Array.prototype.brSearchLast = function(value, prop, start, end) {
+                start = start === undefined ? 0 : start;
+                end = end === undefined ? this.length - 1 : end;
+                if (end < start) {
+                    return -1;
+                }
+                var middleIndex = Math.floor(start + (end - start) / 2);
+                var middleItem = this.getItemUnwrap(middleIndex, prop);
+                var nextItem = this.getItemUnwrap(middleIndex + 1, prop);
+                if ((nextItem === undefined || value < nextItem) && middleItem === value) {
+                    return middleIndex;
+                }
+                if (value < middleItem) {
+                    // Don't use slice here since we potentially lose duplicate values
+                    return this.brSearchLast(value, prop, start, (middleIndex - 1));
+                }
+                return this.brSearchLast(value, prop, (middleIndex + 1), end);
+            };
+            /**
+             * Check if the arrays are identical
+             * @param other: Other array to check
+             * @returns {boolean}
+             */
+            Array.prototype.equals = function(other) {
+                if (!other) {
+                    return false;
+                }
+                if (this.length !== other.length) {
+                    return false;
+                }
+
+                for (var i = 0; i < this.length; i += 1) {
+                    if (this[i] instanceof Array && other[i] instanceof Array) {
+                        if (!arrayEquals(this[i], other[i])) {
+                            return false;
+                        }
+                    } else if (this[i] !== other[i]) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            /**
+             * Check if the array contains the given element
+             * Alternative to indexOf. Faster on smaller arrays
+             * @param element: Element to look for in the array
+             * @returns {boolean}
+             */
+            Array.prototype.contains = function(element) {
+                for (var i = 0; i < this.length; i += 1) {
+                    if (element === this[i]) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            /**
+             * Removes an element from the list
+             * @param element: Element to remove
+             */
+            Array.prototype.remove = function(element) {
+                var index = this.indexOf(element);
+                if (index > -1) {
+                    this.splice(index, 1);
+                }
+            };
+            /**
+             * Format a string. Strings to format should contain '{INDEX}'
+             * The {} parts will be substituted by the string supplied in the arguments array
+             * Accepts any number of arguments. The position of the arguments is used for substitutions
+             * @returns {string}
+             */
+            String.prototype.format = function () {
+                var args = Array.prototype.slice.call(arguments);
+                return this.replace(String.prototype.format.regex, function(item) {
+                    var intVal = parseInt(item.substring(1, item.length - 1));
+                    var replace;
+                    if (intVal >= 0) {
+                        replace = args[intVal];
+                    } else if (intVal === -1) {
+                        replace = "{";
+                    } else if (intVal === -2) {
+                        replace = "}";
+                    } else {
+                        replace = "";
+                    }
+                    return replace;
+                });
+            };
+            /**
+             * Add the regex prop to the format function. This will avoid re-declarating the same regex over and over
+             * @type {RegExp}
+             */
+            String.prototype.format.regex = new RegExp("{-?[0-9]+}", "g");
+            /**
+             * Stringifies the object and avoids circular references
+             * Proven useful while debugging complex object
+             * @param obj: Object to stringify
+             * @param replacer: Replacer function which accepts a key value pair (see stringify doc)
+             * @param space: Identation space (see stringify doc)
+             * @returns {string}
+             */
+            JSON.stringifyOnce = function (obj, replacer, space) {
+                var cache = [];
+                var json = JSON.stringify(obj, function(key, value) {
+                    if (typeof value === 'object' && value !== null) {
+                        if (cache.indexOf(value) !== -1) {
+                            // Circular reference found, discard key
+                            return;
+                        }
+                        // Store value in our collection
+                        cache.push(value);
+                    }
+                    return replacer ? replacer(key, value) : value;
+                }, space);
+                cache = null;
+                return json;
+            };
+        }
+    };
+    var promiseFunctions = {
+        /**
+         * Asynchronously sleep. Used to chain methods
+         * @param time: Time to sleep (milliseconds)
+         * @param value: Value to resolve/reject into
+         * @param reject: Reject value
+         * @returns {Promise}
+         */
+        delay: function(time, value, reject) {
+            return new $.Deferred(function(deferred) {
+                setTimeout(function() {
+                    if (reject) {
+                        return deferred.reject(value)
+                    }
+                    return deferred.resolve(value)
+                })
+            }).promise()
+        },
+        /**
+         * Chain promises more neatly instead of writing .then yourselves
+         * Used the .then(function()) {return new Promise)
+         * All of the data of the previous callback can be used in the next one (eg. chainPromises([api.get('test'), function(testAPIData) { console.log(testAPIData}]
+         * Calling .done on the return value will ensure that all previous chained promises have been completed
+         * @param callbackList: list of callbacks to use
+         */
+        chainPromises: function(callbackList) {
+            return callbackList.reduce(function(chain, func){
+                chain ? chain.then(func) : func();
+            }, null)
+        }
+    };
+    var formatFunction = {
+        /**
+         * Round a numeric value down to a number of decimals to display
+         * @param value: Value to round
+         * @param decimals: Number of decimals to display
+         * @returns {number}
+         */
+        round: function(value, decimals) {
+            decimals = decimals || 0;
+            if (decimals === 0) {
+                return Math.round(value);
+            }
+            var factor = Math.pow(10, decimals);
+            return Math.round(value * factor) / factor;
+        },
+        /**
+         * Round a numeric value up to a number of decimals to display
+         * @param value: Value to ceil
+         * @param decimals: Number of decimals to display
+         * @returns {number}
+         */
+        ceil: function(value, decimals) {
+            decimals = decimals || 0;
+            if (decimals === 0) {
+                return Math.ceil(value);
+            }
+            var factor = Math.pow(10, decimals);
+            return Math.ceil(value * factor) / factor;
+        },
+        /**
+         * Parse a numeric value to a string contains the requested amount of decimals
+         * @param value: Value to parse
+         * @param decimals: Number of decimals to use
+         * @returns {string}
+         */
+        setDecimals: function(value, decimals) {
+            decimals = decimals || 2;
+            var parts = [];
+            if (isNaN(value)) {
+                parts = ["0"];
+            } else {
+                parts = value.toString().split('.');
+            }
+
+            if (decimals <= 0) {
+                return parts[0];
+            }
+            if (parts.length === 1) {
+                var i, newString = '';
+                for (i = 0; i < decimals; i += 1) {
+                    newString += '0';
+                }
+                parts.push(newString);
+            }
+            while (parts[1].length < decimals) {
+                parts[1] = parts[1] + '0';
+            }
+            return parts[0] + '.' + parts[1];
+        },
+        /**
+         * Format the number of bytes to a readable format
+         * @param value: Byte value
+         * @returns {string}
+         */
+        formatBytes: function(value) {
+            var units, counter;
+            units = ['b', 'kib', 'mib', 'gib', 'tib', 'pib'];
+            counter = 0;
+            while (value >= 1000) {
+                value = value / 1024;
+                counter += 1;
+            }
+            return this.setDecimals(this.round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter]);
+        },
+        /**
+         * Format a number of bytes /s to a readable format
+         * @param value: Byte value
+         * @returns {string}
+         */
+        formatSpeed: function(value) {
+            var units, counter;
+            units = ['b', 'kib', 'mib', 'gib', 'tib', 'pib'];
+            counter = 0;
+            while (value >= 1000) {
+                value = value / 1024;
+                counter += 1;
+            }
+            return this.setDecimals(this.round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter] + 's');
+        },
+        /**
+         * Formats a value to contain a seperator which makes bigger numbers easier to read
+         * @param value: Number value
+         * @returns {string}
+         */
+        formatNumber: function(value) {
+            if (typeof value !== "undefined") {
+                value = this.round(value).toString();
+                var regex = /(\d+)(\d{3})/;
+                while (regex.test(value)) {
+                    value = value.replace(regex, '$1' + $.t('ovs:generic.thousandseparator') + '$2');
+                }
+            }
+            return value;
+        },
+        /**
+         * Format a percentage
+         * @param value: Percentage value to format
+         * @param allowNan: Convert NaN values to 0 %
+         * @returns {string}
+         */
+        formatPercentage: function(value, allowNan) {
+            if (isNaN(value)) {
+                if (!allowNan) {
+                    throw Error('Non-numeric value passed to format')
+                }
+                return "0 %";
+            }
+            value = Math.round(value * 10000) / 100;
+            return this.formatNumber(value) + ' %';
+        }
+    };
     function getTimestamp() {
         return new Date().getTime();
     }
     function deg2rad(deg) {
         return deg * Math.PI / 180;
-    }
-    function setDecimals(value, decimals) {
-        decimals = decimals || 2;
-        var parts = [];
-        if (isNaN(value)) {
-            parts = ["0"];
-        } else {
-            parts = value.toString().split('.');
-        }
-
-        if (decimals <= 0) {
-            return parts[0];
-        }
-
-        if (parts.length === 1) {
-            var i, newString = '';
-            for (i = 0; i < decimals; i += 1) {
-                newString += '0';
-            }
-            parts.push(newString);
-        }
-        while (parts[1].length < decimals) {
-            parts[1] = parts[1] + '0';
-        }
-        return parts[0] + '.' + parts[1];
-    }
-    function round(value, decimals) {
-        decimals = decimals || 0;
-        if (decimals === 0) {
-            return Math.round(value);
-        }
-        var factor = Math.pow(10, decimals);
-        return Math.round(value * factor) / factor;
-    }
-    function ceil(value, decimals) {
-        decimals = decimals || 0;
-        if (decimals === 0) {
-            return Math.ceil(value);
-        }
-        var factor = Math.pow(10, decimals);
-        return Math.ceil(value * factor) / factor;
-    }
-    function formatBytes(value) {
-        var units, counter;
-        units = ['b', 'kib', 'mib', 'gib', 'tib', 'pib'];
-        counter = 0;
-        while (value >= 1000) {
-            value = value / 1024;
-            counter += 1;
-        }
-        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter]);
-    }
-    function formatSpeed(value) {
-        var units, counter;
-        units = ['b', 'kib', 'mib', 'gib', 'tib', 'pib'];
-        counter = 0;
-        while (value >= 1000) {
-            value = value / 1024;
-            counter += 1;
-        }
-        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter] + 's');
-    }
-    function formatNumber(value) {
-        if (value !== undefined) {
-            value = round(value).toString();
-            var regex = /(\d+)(\d{3})/;
-            while (regex.test(value)) {
-                value = value.replace(regex, '$1' + $.t('ovs:generic.thousandseparator') + '$2');
-            }
-            return value;
-        }
-        return undefined;
-    }
-    function formatPercentage(value, allowNan) {
-        if (isNaN(value)) {
-            if (!allowNan) {
-                throw Error('Non-numeric value passed to format')
-            }
-            return "0 %";
-        }
-        value = Math.round(value * 10000) / 100;
-        return formatNumber(value) + ' %';
     }
     function padRight(value, character, length) {
         while (value.length < length) {
@@ -131,9 +424,6 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
                 observable(object[key]);
             }
         }
-    }
-    function lower(value) {
-        return value.toLowerCase();
     }
     function alert(title, message, type) {
         var data = {
@@ -610,178 +900,23 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         });
     }
 
-    function isObject(o) {
-        return o instanceof Object && o.constructor === Object;
-    }
+    /**
+     * Determines if the specified object is...an object. ie. Not an array, string, etc.
+     * @method isObject
+     * @param {object} object The object to check.
+     * @return {boolean} True if matches the type, false otherwise.
+     */
+    function isObject(object) {
+        return object === Object(obj);
+    };
 
     function isFunction(functionToCheck) {
         var getType = {};
         return functionToCheck && getType.toString.call(functionToCheck) === '[object Function]';
     }
-    /**
-     * Chain promises more neatly instead of writing .then yourselves
-     * Used the .then(function()) {return new Promise)
-     * All of the data of the previous callback can be used in the next one (eg. chainPromises([api.get('test'), function(testAPIData) { console.log(testAPIData}]
-     * Calling .done on the return value will ensure that all previous chained promises have been completed
-     * @param callbackList: list of callbacks to use
-     */
-    function chainPromises(callbackList) {
-        return callbackList.reduce(function(chain, func){
-            chain ? chain.then(func) : func();
-        }, null)
-    }
-    function _arrayGetItem(array, prop, index){
-        var foundItem = undefined;
-        if (index > array.length - 1 || index < 0){
-            return foundItem;
-        }
-        foundItem = array[index];
-        if (ko.isObservable(foundItem)) {
-            foundItem = foundItem();
-        }
-        if (typeof prop !== 'undefined') {
-            foundItem = foundItem[prop];
-            if (ko.isObservable(foundItem)) {
-                foundItem = foundItem();
-            }
-        }
-        return foundItem;
-    }
-    function _arrayBinarySearch(array, value, prop){
-        /**
-         * Only works on a sorted list
-         * Returns the index of the item search for or -1 if not found
-         * Faster than indexing or contains
-         * Worst case time: O(log(n)
-         * @returns: Number
-         */
-        if (array.length === 0) {
-            return -1;
-        }
-        var middleIndex = Math.floor(array.length / 2);
-        var middleItem = _arrayGetItem(array, prop, middleIndex);
-        if (array.length === 1 && middleItem !== value) {
-            return -1;  // Item not present
-        }
-        if (value === middleItem) {
-            return middleIndex;
-        }
-        if (value > middleItem) {
-            var additionalIndex = array.slice(middleIndex + 1, array.length).brSearch(value, prop);
-            if (additionalIndex === -1) {
-                return -1;
-            }
-            return middleIndex + 1 + additionalIndex;
-        }
-        return array.slice(0, middleIndex).brSearch(value, prop);
-    }
-    function _arrayBinarySearchFirst(array, value, prop, startIndex, stopIndex){
-        /**
-         * Only works on a sorted list
-         * Returns the index of the 1st element found (in case multiple identical would be present) or -1 if none found
-         * Faster than indexing or contains
-         * Worst case time: O(log(n)
-         * @returns: Number
-         */
-        startIndex = startIndex === undefined ? 0 : startIndex;
-        stopIndex = stopIndex === undefined ? array.length - 1 : stopIndex;
-        if (stopIndex < startIndex) {
-            return -1;
-        }
-        var middleIndex = Math.floor(startIndex + (stopIndex - startIndex) / 2);
-        var middleItem = _arrayGetItem(array, prop, middleIndex);
-        var previousItem = _arrayGetItem(array, prop, middleIndex - 1);
-        if ((previousItem === undefined || value > previousItem) && middleItem === value) {
-            return middleIndex;
-        }
-        if (value > middleItem) {
-            // Don't use slice here since we potentially lose duplicate values
-            return array.brSearchFirst(value, prop, (middleIndex + 1), stopIndex);
-        }
-        return array.brSearchFirst(value, prop, startIndex, (middleIndex - 1));
-    }
-    function _arrayBinarySearchLast(array, value, prop, startIndex, stopIndex) {
-        /**
-         * Only works on a sorted list
-         * Returns the index of the last element found (in case multiple identical would be present) or -1 if none found
-         * Faster than indexing or contains
-         * Worst case time: O(log(n)
-         * @returns: Number
-         */
-        startIndex = startIndex === undefined ? 0 : startIndex;
-        stopIndex = stopIndex === undefined ? array.length - 1 : stopIndex;
-        if (stopIndex < startIndex) {
-            return -1;
-        }
-        var middleIndex = Math.floor(startIndex + (stopIndex - startIndex) / 2);
-        var middleItem = _arrayGetItem(array, prop, middleIndex);
-        var nextItem = _arrayGetItem(array, prop, middleIndex + 1);
-        if ((nextItem === undefined || value < nextItem) && middleItem === value) {
-            return middleIndex;
-        }
-        if (value < middleItem) {
-            // Don't use slice here since we potentially lose duplicate values
-            return array.brSearchLast(value, prop, startIndex, (middleIndex - 1));
-        }
-        return array.brSearchLast(value, prop, (middleIndex + 1), stopIndex);
-    }
 
-    Array.prototype.brSearch = function(value, prop) {
-        return _arrayBinarySearch(this, value, prop);
-    };
-    Array.prototype.brSearchFirst = function(value, prop, start, end) {
-        return _arrayBinarySearchFirst(this, value, prop, start, end);
-    };
-    Array.prototype.brSearchLast = function(value, prop, start, end) {
-        return _arrayBinarySearchLast(this, value, prop, start, end);
-    };
-    Array.prototype.equals = function(array) {
-        return arrayEquals(this, array);
-    };
-    Array.prototype.contains = function(element) {
-        return arrayHasElement(this, element);
-    };
-    Array.prototype.remove = function(element) {
-        return removeElement(this, element);
-    };
-
-    String.prototype.format = function (args) {
-			var str = this;
-			return str.replace(String.prototype.format.regex, function(item) {
-				var intVal = parseInt(item.substring(1, item.length - 1));
-				var replace;
-				if (intVal >= 0) {
-					replace = args[intVal];
-				} else if (intVal === -1) {
-					replace = "{";
-				} else if (intVal === -2) {
-					replace = "}";
-				} else {
-					replace = "";
-				}
-				return replace;
-			});
-		};
-    String.prototype.format.regex = new RegExp("{-?[0-9]+}", "g");
-
-    JSON.stringifyOnce = function (obj, replacer, space) {
-        // Function to remove all circular references (could prove useful while debugging).
-        // Usage: JSON.stringifyOnce(ko.toJS(item));
-        var cache = [];
-        var json = JSON.stringify(obj, function(key, value) {
-            if (typeof value === 'object' && value !== null) {
-                if (cache.indexOf(value) !== -1) {
-                    // Circular reference found, discard key
-                    return;
-                }
-                // Store value in our collection
-                cache.push(value);
-            }
-            return replacer ? replacer(key, value) : value;
-        }, space);
-        cache = null;
-        return json;
-    };
+    GenericService.prototype = $.extend({}, properties, patchFunctions, promiseFunctions, formatFunction);
+    return new GenericService();
 
     return {
         // Vars
@@ -817,7 +952,6 @@ define(['jquery', 'knockout', 'jqp/pnotify'], function($, ko) {
         isObject: isObject,
         keys: keys,
         log: log,
-        lower: lower,
         makeChildrenObservables: makeChildrenObservables,
         merge: merge,
         objectEquals: objectEquals,

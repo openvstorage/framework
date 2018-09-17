@@ -212,7 +212,7 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.nodeType, data, 'node_type');
             generic.trySet(self.rdmaCapable, data, 'rdma_capable');
-            generic.trySet(self.status, data, 'status', generic.lower);
+            generic.trySet(self.status, data, 'status', 'failure');
             generic.trySet(self.features, data, 'features');
             if (data.hasOwnProperty('recovery_domains')) {
                 self.recoveryDomainGuids(data.recovery_domains);
