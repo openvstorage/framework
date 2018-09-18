@@ -275,7 +275,7 @@ define([
             });
         };
         self.removeStorageRouter = function(sr) {
-            var single = generic.keys(self.srSDMap()).length === 1;
+            var single = Object.keys(self.srSDMap()).length === 1;
             if (self.srSDMap().hasOwnProperty(sr.guid()) && self.srSDMap()[sr.guid()].canBeDeleted() === true && self.refreshList().length === 0) {
                 self.updatingStorageRouters(true);
                 app.showMessage(

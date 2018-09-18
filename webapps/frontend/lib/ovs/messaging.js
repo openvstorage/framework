@@ -87,7 +87,7 @@ define([
             self.running = false;
         };
         self.sendSubscriptions = function() {
-            return api.post('messages/' + self.subscriberID + '/subscribe', { data: generic.keys(self.subscriptions) });
+            return api.post('messages/' + self.subscriberID + '/subscribe', { data: Object.keys(self.subscriptions) });
         };
         self.wait = function() {
             generic.xhrAbort(self.requestHandle);
@@ -97,7 +97,7 @@ define([
                 log: false
             })
                 .done(function(data) {
-                    var i, subscriptions = generic.keys(self.subscriptions), resubscribe = false;
+                    var i, subscriptions = Object.keys(self.subscriptions), resubscribe = false;
                     self.lastMessageID = data.last_message_id;
                     for (i = 0; i < data.messages.length; i += 1) {
                         self.broadcast(data.messages[i]);

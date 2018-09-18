@@ -76,6 +76,6 @@ define(['jquery', 'jqp/pnotify'],
         }
     };
 
-    NotificationService.prototype = $.extend({}, functions);
+    NotificationService.prototype = functions;
     return new NotificationService()
 });

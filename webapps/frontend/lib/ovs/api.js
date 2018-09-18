@@ -15,8 +15,12 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define, window */
 define([
-    'jquery', 'ovs/shared', 'ovs/generic'
-], function($, shared, generic) {
+    'jquery',
+    'ovs/shared', 'ovs/generic',
+    'ovs/services/xhr', 'ovs/services/log'
+], function($,
+            shared, generic,
+            xhrService, logService) {
     'use strict';
     var APITypes = Object.freeze({
         GET: 'GET',
@@ -38,9 +42,9 @@ define([
         UNAUTHORIZED: 401,
         BAD_GATEWAY: 502,
         REQUEST_UNCOMPLETE: 0  // Browser implementation. When the request is not complete, the statuscode will be 0 by default
-    })
-    function APIService() {
+    });
 
+    function APIService() {
         self.default_timeout = 120 * 1000;  // Milliseconds
         self.default_relay = {relay: ''}
     }
@@ -61,32 +65,45 @@ define([
         },
         patch: function(api, options) {
             return sendRequest.call(this, api, options, APITypes.PATCH);
+        },
+        /**
+         * Validate which nodes are responsive and possibly migrate the UI over to a responsive one
+         * @param nodes: Nodes to check
+         */
+        validate: function(nodes) {
+            var i, node, check, checkAndRedirect;
+            check = function(node) {
+                return $.ajax(node + '/api/?timestamp=' + (new Date().getTime()), {
+                    type: 'GET',
+                    contentType: 'application/json',
+                    dataType: 'json',
+                    timeout: 5000,
+                    headers: { Accept: 'application/json' }
+                });
+            };
+            checkAndRedirect = function(node) {
+                check(node)
+                    .done(function() {
+                        window.location.href = node;
+                    });
+            };
+            check('https://' + window.location.hostname)
+                .fail(function() {
+                    for (i = 0; i < nodes.length; i += 1) {
+                        node = nodes[i];
+                        checkAndRedirect('https://' + node);
+                    }
+                    window.setTimeout(function() {
+                        location.reload(true);
+                    }, 5000);
+                });
         }
     };
 
     // Private
-    /**
-     * Asynchronously sleep. Used to chain methods
-     * @param time: Time to sleep (milliseconds)
-     * @param value: Value to resolve/reject into
-     * @param reject: Reject value
-     * @returns {Promise}
-     */
-    function delay(time, value, reject) {
-        return new $.Deferred(function(deferred) {
-            setTimeout(function() {
-                if (reject) {
-                    return deferred.reject(value)
-                }
-                return deferred.resolve(value)
-            })
-        }).promise()
-    }
-
     function sendRequest(api, options, type) {
-        var self = this;
         options = options || {};
-
+        var log = generic.tryGet(options, 'log', true);
         var querystring = [],
             deferred = $.Deferred();
         var callData = {
@@ -97,7 +114,7 @@ define([
         };
         var queryParams = options.queryparams || {};
         var relayParams = options.relayParams || {relay: ''};
-        var data = generic.tryGet(options, 'data');
+        var data = options.data || {};
 
         if (generic.objectEquals(relayParams, {})) {
             relayParams = {relay: ''}
@@ -139,8 +156,8 @@ define([
         return $.ajax(call, callData)
             .then(function(data) {
                 var timing = generic.getTimestamp() - start;
-                if (timing > 1000 && log === true) {
-                    generic.log('API call to ' + call + ' took ' + timing + 'ms', 'info')
+                if (timing > 1000 && log) {
+                    logService.log('API call to ' + call + ' took ' + timing + 'ms', 'info')
                 }
                 return data;
             })
@@ -150,45 +167,26 @@ define([
                 // Check if it is not the browser navigating away but an actual error
                 if (error.readyState === ReadyStates.DONE) {
                     if (error.status === StatusCodes.BAD_GATEWAY) {
-                        generic.validate(shared.nodes);
-                        window.setTimeout(function () {
-                        deferred.reject({
-                            status: error.status,
-                            statusText: error.statusText,
-                            readyState: error.readyState,
-                            responseText: error.responseText
-                        });
-                    }, 11000);
+                        validate(shared.nodes);
+                        return generic.delay(11 * 1000, error, true)
                     } else if ([StatusCodes.FORBIDDEN, StatusCodes.UNAUTHORIZED].contains(error.status)) {
                         var responseData = $.parseJSON(error.responseText);
                         if (responseData.error === 'invalid_token') {
                             shared.authentication.logout();
                         }
-
-                        deferred.reject({
-                            status: error.status,
-                            statusText: error.statusText,
-                            readyState: error.readyState,
-                            responseText: error.responseText
-                        });
+                        throw error;
                     }
                 } else if (error.readyState === ReadyStates.UNSENT && error.status === StatusCodes.REQUEST_UNCOMPLETE) {
-                    generic.validate(shared.nodes);
-                    window.setTimeout(function () {
-                        deferred.reject({
-                            status: error.status,
-                            statusText: error.statusText,
-                            readyState: error.readyState,
-                            responseText: error.responseText
-                        });
-                    }, 11000);
+                    validate(shared.nodes);
+                    return generic.delay(11 * 1000, error, true)
                 }
                 // Throw it again
                 throw error;
             });
     }
 
-    APIService.prototype = Object.extend(APIService.prototype, functions);
+    // Inheriting from the xhrService. Should be obsolete once all dependency loading is resolved
+    APIService.prototype = $.extend(APIService.prototype, functions, xhrService.prototype);
     return new APIService();
 });
 

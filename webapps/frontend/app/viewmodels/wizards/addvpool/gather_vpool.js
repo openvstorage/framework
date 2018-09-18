@@ -87,7 +87,7 @@ define([
                 if (partitions !== undefined) {
                 $.each(partitions, function (role, partitions) {
                     if (requiredRoles.contains(role) && partitions.length > 0) {
-                        generic.removeElement(requiredRoles, role);
+                        requiredRoles.remove(role)
                     }
                 });
                 $.each(requiredRoles, function (index, role) {

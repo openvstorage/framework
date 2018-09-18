@@ -344,7 +344,7 @@ define([
                         sorting.directions[key] = false;
                     } else {
                         delete sorting.directions[key];
-                        generic.removeElement(sorting.sequence, key);
+                        sorting.sequence.remove(key);
                     }
                 } else {
                     sorting.sequence.push(key);

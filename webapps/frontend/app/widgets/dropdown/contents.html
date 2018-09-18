@@ -26,9 +26,9 @@ but WITHOUT ANY WARRANTY of any kind.
                                                              $parent.target() !== undefined && $parent.target()[$parent.key()] === $data[$parent.key()]
                                ) : $parent.target() === $data
                            ),
-                           disabled: $data !== undefined && $data.hasOwnProperty('disabled') && $parent.extract($data.disabled) === true
+                           disabled: $data !== undefined && $data.hasOwnProperty('disabled') && ko.utils.unwrapObservable($data.disabled) === true
                        },
-                       click: function() { if ($data === undefined || !$data.hasOwnProperty('disabled') || $parent.extract($data.disabled) !== true) { $parent.useFree(false); $parent.set($data); } },
+                       click: function() { if ($data === undefined || !$data.hasOwnProperty('disabled') || ko.utils.unwrapObservable($data.disabled) !== true) { $parent.useFree(false); $parent.set($data); } },
                        attr: { id: ($parent.target.hasOwnProperty('identifier') ? ('dropdown-button-' + $parent.target.identifier + '-' + $data.replace(/\//g, '')) : undefined) }">
             <a style="white-space: nowrap;">
                 <span data-bind="visible: $parent.multi()" style="cursor: inherit;">

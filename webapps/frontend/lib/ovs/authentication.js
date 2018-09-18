@@ -16,8 +16,9 @@
 /*global define, window */
 define([
     'plugins/router', 'jquery', 'knockout',
-    'ovs/generic', 'ovs/shared'
-], function(router, $, ko, generic, shared){
+    'ovs/shared', 'ovs/api'
+], function(router, $, ko,
+            shared, api){
     "use strict";
     return function() {
         var self = this;
@@ -59,7 +60,7 @@ define([
                     .fail(function(xmlHttpRequest) {
                         // We check whether we actually received an error, and it's not the browser navigating away
                         if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
-                            generic.validate(shared.nodes);
+                            api.validate(shared.nodes);
                         } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
                             self.accessToken(undefined);
                             deferred.reject({
@@ -69,7 +70,7 @@ define([
                                 responseText: xmlHttpRequest.responseText
                             });
                         } else if (xmlHttpRequest.readyState === 0 && xmlHttpRequest.status === 0) {
-                            generic.validate(shared.nodes);
+                            api.validate(shared.nodes);
                         }
                     });
             }).promise();

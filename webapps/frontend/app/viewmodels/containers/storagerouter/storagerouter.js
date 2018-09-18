@@ -212,7 +212,8 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.nodeType, data, 'node_type');
             generic.trySet(self.rdmaCapable, data, 'rdma_capable');
-            generic.trySet(self.status, data, 'status', 'failure');
+            // Lowercase the status for translation
+            generic.trySet(self.status, data, 'status', function(x) { return x.toLowerCase()});
             generic.trySet(self.features, data, 'features');
             if (data.hasOwnProperty('recovery_domains')) {
                 self.recoveryDomainGuids(data.recovery_domains);

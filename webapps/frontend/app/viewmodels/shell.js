@@ -17,7 +17,7 @@
 define([
     'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
-    'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/notifications', 'ovs/pluginloader',
+    'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/services/notifications', 'ovs/pluginloader',
     'viewmodels/services/user', 'viewmodels/services/misc'
 ], function ($, router, system, activator, bootstrap, i18n,
              shared, routing, Messaging, generic, Tasks,

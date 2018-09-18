@@ -216,7 +216,7 @@ define([
                                     .then(function (data) {
                                         storageRouter.metadata(data);
                                         storageRouter.versions(data.metadata.versions);
-                                        storageRouter.packageNames(generic.keys(data.metadata.versions));
+                                        storageRouter.packageNames(Object.keys(data.metadata.versions));
                                         storageRouter.packageNames.sort(function (name1, name2) {
                                             return name1 < name2 ? -1 : 1;
                                         });

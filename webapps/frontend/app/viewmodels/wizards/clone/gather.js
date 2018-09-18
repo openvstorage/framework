@@ -18,8 +18,12 @@ define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vdisk/vdisk',
+    'viewmodels/services/vdisk',
     './data'
-], function($, ko, api, generic, StorageRouter, VDisk, data) {
+], function($, ko, api, generic,
+            StorageRouter, VDisk,
+            vdiskService,
+            data) {
     "use strict";
     return function() {
         var self = this;
@@ -54,7 +58,7 @@ define([
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
         self.cleanedName = ko.computed(function() {
-            return generic.cleanDeviceName(self.data.name());
+            return vdiskService.cleanDeviceName(self.data.name());
         });
 
         // Functions
