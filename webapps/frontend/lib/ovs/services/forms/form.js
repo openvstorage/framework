@@ -63,18 +63,45 @@ define([
             'group': 1,
             'displayOn': ['gather']
            }
+     * @param translationPrefix: Translation prefix to use in the form.
+     * It will use the prefix + field to make translations
+     * If there is a translation of prefix + field + _help, it will display the help text too
+     * Can be changed using setTranslationPrefix
+     * @param displayPage: Page to display the form on. Used to control which questions to display in case of multipaged forms
+     * Can be changed using setDisplayPage
      * @constructor
      */
-    function Form(metadata, formMapping) {
+    function Form(metadata, formMapping, translationPrefix, displayPage) {
+        var self = this;
+
         this.metadata = metadata;
         this.formMapping = formMapping;
         this.fieldMapping = {};
         this.questions = ko.observableArray([]);
+        // FormItems use this prefix for their translation and help text computed
+        this.translationPrefix = ko.observable(translationPrefix);
+        this.displayPage = ko.observable(displayPage);
         // Get questions and type mapping
         this.generateQuestions();
 
+        // Used to cache form validation
+        this.validation = ko.pureComputed(function(){
+            return self.validateForm()
+        })
+
     }
     Form.prototype = {
+        /**
+         * Set the translation prefix of the form. Used when switching from pages for different translations
+         * @param translationPrefix
+         * @returns {*}
+         */
+        setTranslationPrefix: function(translationPrefix) {
+            return this.translationPrefix(translationPrefix)
+        },
+        setDisplayPage: function(displayPage) {
+            return this.displayPage(displayPage)
+        },
         /**
          *
          * @param metadata: Metadata to base form generation on. This is an object with possible actions and metadata about that action
@@ -113,14 +140,14 @@ define([
         generateQuestions: function() {
             var self = this;
             $.each(Form.prototype.getFieldTypesFromMetadata(this.metadata), function(index, fieldTypeMap) {
-                var formItemData = Form.prototype.gatherItemData.call(self, fieldTypeMap.field, fieldTypeMap.type);
-                self.questions.push(formItemData.toFormItem(self.fieldMapping));
+                var formItem = Form.prototype.generateFormItem.call(self, fieldTypeMap.field, fieldTypeMap.type);
+                self.questions.push(formItem);
             });
             this.questions.sort(function (a, b) {
-                if (a.group() === b.group()) {
-                    return a.id().localeCompare(b.id());
+                if (a.group === b.group) {
+                    return a.id.localeCompare(b.id);
                 }
-                return a.group() < b.group() ? -1 : 1;
+                return a.group < b.group ? -1 : 1;
             });
         },
 
@@ -144,15 +171,16 @@ define([
         /**
          * Validates a form based on questions this formbuilder could make.
          * @param translatePrefix: Translation prefix to use. Appends the field of the form to the prefix
-         * and tries to fetch the translation
+         * and tries to fetch the translation. Defaults to translationPrefix of the form + 'invalid_FIELD'
          */
         validateForm: function(translatePrefix) {
+            translatePrefix = translatePrefix || this.translationPrefix() + 'invalid_';
             var reasons = [], fields = [];
             $.each(ko.utils.unwrapObservable(this.questions), function(index, formItem){
                 var observable = formItem.data;
-                if (observable() === undefined || (typeof observable.valid === 'function' && !observable.valid())){
-                    fields.push(formItem.id());
-                    reasons.push($.t(translatePrefix + formItem.field()))
+                if (observable() === undefined || (generic.isFunction(observable.valid) && !observable.valid())){
+                    fields.push(formItem.id);
+                    reasons.push($.t(translatePrefix + formItem.field))
                 }
             });
             return {value: reasons.length === 0, reasons: reasons, fields: fields};
@@ -163,12 +191,12 @@ define([
          */
         getInsertIndex: function(formItem) {
             var questions = ko.utils.unwrapObservable(this.questions);
-            var formItemGroup = formItem.group();
-            if (questions.length === 0 || formItemGroup < questions[0]().group()) {
+            var formItemGroup = formItem.group;
+            if (questions.length === 0 || formItemGroup < questions[0].group) {
                 return 0
             }
-            if (formItemGroup > questions[questions().length - 1]().group()) {
-                return questions().length - 1
+            if (formItemGroup > questions[questions.length - 1].group) {
+                return questions.length - 1
             }
             // Get a quick search of to see if the group value is actually in
             var insertIndex = -1;
@@ -181,7 +209,7 @@ define([
             else {
                 // No grouped items found for this group. Just insert a new group
                 $.each(questions, function(index, _formItem){
-                    if (_formItem().group() > formItemGroup) {
+                    if (_formItem().group > formItemGroup) {
                         insertIndex = index + 1;
                         return false; // Break
                     }
@@ -190,62 +218,19 @@ define([
             return insertIndex
         },
         /**
-         * Used to insert a new question dynamically into the form
-         * Think of a PLUS icon to add new entries to a list
-         * These items should always be grouped with a separate group
-         * @param field: Field to insert a form item for
+         * Generate a form item for a given field and type
+         * @param field: Field to generate item for
+         * @param type: Type to use for generation
          */
-        insertGeneratedFormItem: function(field){
-            for (var fieldTypeMap in Form.prototype.getFieldTypesFromMetadata(this.metadata)) {
-                if (field === fieldTypeMap.field) {
-                    var formItemData = Form.prototype.gatherItemData(fieldTypeMap.field, fieldTypeMap.type);
-                    var formItem = formItemData.toFormItem(this.fieldMapping);
-                    var insertIndex = Form.prototype.getInsertIndex(formItem);
-                    if (formItemData.arrayType) {
-                        // Other inputs for this field may no longer get extended
-                        $.each(this.questions(), function(index, question) {
-                            question = question();
-                            if (question.field() === formItem().field()) {
-                                question.extendable(false)
-                            }
-                        });
-                        // Current item is extendable though
-                        formItem().extendable(true);
-                    }
-                    this.questions.splice(insertIndex, 0, formItem);  // Insert the item where it belongs
-                }
-
-            }
-        },
-        /**
-         * Remove an item from the form
-         * @param index: Required param. Index of the item to remove
-         */
-        removeFormItem: function(index) {
-            var formItem =this.questions.splice(ko.utils.unwrapObservable(index), 1)[0];
-            // Remove left over data entries
-            this.fieldMapping[formItem().field()].observable.remove(formItem().data);
-            var ids = this.fieldMapping[formItem().field()].ids;
-            var spliceIndex = ids.indexOf(formItem().id());
-            ids.splice(spliceIndex, 1);
-        },
-        /**
-         * Gather all relevant data to generate a form item
-         * @param field: Field to generate the form item from
-         * @param type: Type to generate the form item from
-         * @returns {FormItemData}
-         */
-        gatherItemData: function(field, type) {
-            // Defaults
+        generateFormItem: function(field, type) {
+            // Gather all data from the form and link up the observable
             var group = 0;
             var target = field;
             var arrayType = false;
             var inputType = 'text';
             var display = [];
-            var extender = undefined;
-            var inputItems = undefined;
-            var widgetName = undefined;
-            var value = undefined;
+            var inputTextFormatFunc = function(item) { return item; };
+            var extender, inputItems, widgetName, value;
             // Check if list of known types
             if (type !== undefined && type.startsWith(listPrefix)) {
                 arrayType = true;
@@ -256,6 +241,7 @@ define([
                 if (keyMap.key in keyMap.mapping){
                     target = keyMap.mapping[keyMap.key].fieldMap || target;
                     inputItems = keyMap.mapping[keyMap.key].inputItems || inputItems;
+                    inputTextFormatFunc = keyMap.mapping[keyMap.key].inputTextFormatFunc || inputTextFormatFunc;
                     inputType = keyMap.mapping[keyMap.key].inputType || inputType;
                     group = keyMap.mapping[keyMap.key].group || group;
                     display = keyMap.mapping[keyMap.key].displayOn || display;
@@ -285,77 +271,130 @@ define([
                     observable = observable.extend(extender)
                 }
             }
-            return new FormItemData(field, observable, target, arrayType, inputItems, inputType, group, display, extender, linkedObservable, widgetName)
+            // Cast all data into a usable object
+            var id = field;
+            var extendable = false;
+            // The linkedObservable can be the container for multiple formItems data
+            if (linkedObservable && linkedObservable.isObservableArray) {
+                extendable = true;
+                if (!linkedObservable().contains(observable)) {
+                    id += linkedObservable.push(observable) - 1;  // Push returns the amount of elements in the observableArray
+                }
+            }
+            // Link item to the form
+            if (linkedObservable && linkedObservable.isObservableArray) {
+                var ids = [];
+                if (field in this.fieldMapping){
+                    ids = this.fieldMapping[field].ids
+                }
+                ids.push(id);
+                this.fieldMapping[field] = {'observable': linkedObservable, 'ids': ids};
+            }
+            else {
+                this.fieldMapping[field] = {'observable': observable, 'ids': [id]};
+            }
+            var formInput = new FormInput(inputType, inputItems, widgetName, inputTextFormatFunc);
+            return new FormItem(this, id, observable, field, group, display, target, formInput, extendable)
+        },
+        /**
+         * Used to insert a new question dynamically into the form
+         * Think of a PLUS icon to add new entries to a list
+         * These items should always be grouped with a separate group
+         * @param field: Field to insert a form item for
+         */
+        insertGenerateFormItem: function(field){
+            var self = this;
+            $.each(Form.prototype.getFieldTypesFromMetadata(self.metadata), function(index, fieldTypeMap){
+                if (field === fieldTypeMap.field) {
+                    var formItem = Form.prototype.generateFormItem.call(self, fieldTypeMap.field, fieldTypeMap.type);
+                    var insertIndex = Form.prototype.getInsertIndex.call(self, formItem);
+                    if (formItem.extendable()) {
+                        // Other inputs for this field may no longer get extended
+                        $.each(self.questions(), function(index, question) {
+                            if (question.field === formItem.field) {
+                                question.extendable(false)
+                            }
+                        });
+                    }
+                    self.questions.splice(insertIndex, 0, formItem);  // Insert the item where it belongs
+                }
+
+            })
+        },
+        /**
+         * Remove an item from the form
+         * @param index: Required param. Index of the item to remove
+         */
+        removeFormItem: function(index) {
+            var formItem =this.questions.splice(ko.utils.unwrapObservable(index), 1)[0];
+            // Remove left over data entries
+            this.fieldMapping[formItem.field].observable.remove(formItem.data);
+            var ids = this.fieldMapping[formItem.field].ids;
+            var spliceIndex = ids.indexOf(formItem.id);
+            ids.splice(spliceIndex, 1);
         }
     };
 
     /**
-     * Creates a new FormItemData. These are objects that hold all metadata about an input item
-     * @param field: Field to represent
-     * @param observable: Observable which holds the data about the object
-     * @param target: Name of the property within the formData (Optional)
-     * @param arrayType: Holds an array as data (Optional)
-     * @param inputItems: List of items that can be chosen from (like in dropdowns) (Optional)
-     * @param inputType: Name of the input type (Optional)
-     * @param group: Group to display the item in (Optional)
-     * @param display: Page to display this item on (Optional)
-     * @param extender: Possible extender to extend the data observable with (Optional)
-     * @param linkedObservable: Used with array types. Contains all observables to track (Optional)
-     * @param widgetName: Name of the widget to use (if any) (Optional)
+     * Represents a form input type
+     * @param type: Type of the input
+     * @param items: Items for the input
+     * @param widgetName: Name of the widget to use. Required when type == widget
+     * @param textFormatFunc: Text format function. Used to format dropdown texts
      * @constructor
      */
-    function FormItemData(field, observable, target, arrayType, inputItems, inputType, group, display, extender, linkedObservable, widgetName) {
+    function FormInput(type, items, widgetName, textFormatFunc) {
+        this.type = type;
+        this.items = items;
+        this.widgetName = widgetName;
+        this.textFormatFunc = textFormatFunc;
+    }
+
+    /**
+     * Represent a form item
+     * @param form: Form that the item is a part of
+     * @param id: ID of the item. Used for labeling
+     * @param data: Data observable which will holds the data entered
+     * @param field: Field that the item represent
+     * @param group: Display group
+     * @param display: Pages to display the item on
+     * @param mappedField: Name of the property within the formData
+     * @param input: Input type to use
+     * @param extendable: Checks if the item is extendable
+     * @constructor
+     */
+    function FormItem(form, id, data, field, group, display, mappedField, input, extendable) {
+        var self = this;
+
+        this.form = form;
+        this.id = id;
         this.field = field;
-        this.target = target;
-        this.arrayType = arrayType;
-        this.inputItems = inputItems;
-        this.inputType = inputType;
         this.group = group;
         this.display = display;
-        this.extender = extender;
-        this.observable = observable;
-        this.linkedObservable = linkedObservable;
-        this.wdigetName = widgetName;
+        this.mappedField = mappedField;
+        this.input = input;
+        // Observables
+        this.extendable = ko.observable(extendable);  // Adjusted when inserting a new item
+        this.data = data; // Observable
+
+        this.hasHelpText = ko.pureComputed(function() {
+            var key = self.helpTextTranslation();
+            return key !== $.t(key);
+        });
+        this.translation = ko.pureComputed(function() {
+            return self.form.translationPrefix() + self.field;
+        });
+        this.extendTranslation = ko.pureComputed(function() {
+            return self.form.translationPrefix() + 'add_' + self.field;
+        });
+        this.helpTextTranslation = ko.pureComputed(function() {
+            return self.form.translationPrefix() + self.field + '_help';
+        });
+        this.canDisplay = ko.pureComputed(function() {
+            return self.display.length === 0 || self.display.contains(self.form.displayPage());
+        });
+
     }
-    FormItemData.prototype = {
-        toFormItem: function(fieldMapping) {
-            var id = this.field;
-            var extendable = false;
-            // The linkedObservable can be the container for multiple formItems data
-            if (this.linkedObservable && this.linkedObservable.isObservableArray) {
-                extendable = true;
-                if (!this.linkedObservable().contains(this.observable)) {
-                    id += this.linkedObservable.push(this.observable) - 1;  // Push returns the amount of elements in the observableArray
-                }
-            }
-            // Link item to the form
-            if (this.linkedObservable && this.linkedObservable.isObservableArray) {
-                var ids = [];
-                if (this.field in fieldMapping){
-                    ids = fieldMapping[this.field].ids
-                }
-                ids.push(id);
-                fieldMapping[this.field] = {'observable': this.linkedObservable, 'ids': ids};
-            }
-            else {
-                fieldMapping[this.field] = {'observable': this.observable, 'ids': [id]};
-            }
-            return {
-                'id': ko.observable(id),
-                'data': this.observable,  // Item corresponding to this input
-                'field': ko.observable(this.field),
-                'group': ko.observable(this.group),
-                'display': ko.observable(this.display),
-                'mappedField': ko.observable(this.target),
-                'input': ko.observable({
-                    'type': this.inputType,  // If type = dropdown, will be populated with items
-                    'items': this.inputItems,
-                    'widgetName': this.widgetName  // if type = widget, a name will be filled in here
-                }),
-                'extendable': ko.observable(extendable)
-            }
-        }
-    };
     return Form;
 
 });
