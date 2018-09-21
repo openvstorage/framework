@@ -17,7 +17,7 @@
 define([
     'jquery', 'knockout',
     'plugins/router',
-    'ovs/api', 'ovs/shared', 'ovs/generic', 'ovs/pluginloader',
+    'ovs/api', 'ovs/shared', 'ovs/generic', 'ovs/services/pluginloader',
     './data', './constants',
     'viewmodels/containers/backend/backend', 'viewmodels/containers/backend/backendtype',
     'viewmodels/services/backend'

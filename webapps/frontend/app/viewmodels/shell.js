@@ -17,11 +17,11 @@
 define([
     'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
-    'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/services/notifications', 'ovs/pluginloader',
+    'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/services/notifications', 'ovs/services/pluginloader', 'ovs/services/cookie',
     'viewmodels/services/user', 'viewmodels/services/misc'
 ], function ($, router, system, activator, bootstrap, i18n,
              shared, routing, Messaging, generic, Tasks,
-             Authentication, cssLoader, notifications, pluginLoader,
+             Authentication, cssLoader, notifications, pluginLoader, cookieService,
              userService, miscService) {
     "use strict";
     // Initially load in all routes
@@ -97,17 +97,17 @@ define([
             });
             var token = window.localStorage.getItem('accesstoken'), state, expectedState;
             if (token === null) {
-                token = generic.getCookie('accesstoken');
+                token = cookieService.getCookie('accesstoken');
                 if (token !== null) {
-                    state = generic.getCookie('state');
+                    state = cookieService.getCookie('state');
                     expectedState = window.localStorage.getItem('state');
                     if (state === null || state !== expectedState) {
                         token = null;
                     } else {
                         window.localStorage.setItem('accesstoken', token);
                     }
-                    generic.removeCookie('accesstoken');
-                    generic.removeCookie('state');
+                    cookieService.removeCookie('accesstoken');
+                    cookieService.removeCookie('state');
                 }
             }
             if (token !== null) {

@@ -39,6 +39,14 @@ define([
 
         // Functions
         self.login = function(username, password) {
+            // return api.post('/api/oauth2/token/', {
+            //     contentType: 'application/x-www-form-urlencoded',
+            //     data: {
+            //         grant_type: 'password',
+            //         username: username,
+            //         password: password
+            //     }
+            // })
             return $.Deferred(function(deferred) {
                 var callData = {
                     type: 'post',

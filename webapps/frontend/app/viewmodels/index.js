@@ -16,9 +16,9 @@
 /*global define, window */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
-    'ovs/shared', 'ovs/generic',
+    'ovs/shared', 'ovs/generic', 'ovs/api',
     'jqp/timeago'
-], function(router, dialog, $, shared, generic) {
+], function(router, dialog, $, shared, generic, api) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];
@@ -81,6 +81,7 @@ define([
                     shared.nodes = metadata.storagerouter_ips;
                     shared.identification(metadata.identification);
                     window.localStorage.setItem('nodes', JSON.stringify(shared.nodes));
+                    api.testRedirect()
                 });
         }
     };

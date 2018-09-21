@@ -262,6 +262,15 @@ define(['jquery', 'knockout',
     };
     var promiseFunctions = {
         /**
+         * Determine if the passed object is a promise
+         * @param obj: Object to test
+         * @returns {boolean}
+         */
+        isPromise: function(obj) {
+            return obj && typeof obj.then === 'function' &&
+              String($.Deferred().then) === String(obj.then);
+        },
+        /**
          * Asynchronously sleep. Used to chain methods
          * @param time: Time to sleep (milliseconds)
          * @param value: Value to resolve/reject into
@@ -289,6 +298,129 @@ define(['jquery', 'knockout',
             return callbackList.reduce(function(chain, func){
                 chain ? chain.then(func) : func();
             }, null)
+        },
+        /**
+         * Augmentation of $.when. $.when aborts when one of the supplied arguments would reject
+         * This variation returns all responses of every promise
+         * Behaviour:
+         *  - done: Called when all promises are resolved
+         *  - Called when all promises have a final state (resolved/rejected) and at least one of them is rejected.
+         *  - Always: Called when all promises have a final state (resolved/rejected)
+         *  - progress: Initially called when at least one promise notified a "progress" by deferred.notify()
+         *  and all other promises are either resolved/rejected/progressed.
+         *  After that, this callback will continue to be invoked for each individual pending promise "progress" notification
+         *  until all of them are finalized.
+         */
+        whenAll: function() {
+            var masterDeferred = $.Deferred();
+            var deferreds = [];
+            var progressDeferreds = [];
+            var allFulfilled = false;  // Track if all passed promises are done
+            var initialProgress = true;
+            var hasRejected = false;  // Track if any promise rejected
+
+            /**
+             * Notifies the master deferred, which is the result of all passed promises
+             * Notifying calls all callbacks hooked to this deferred, resolving the current promises
+             */
+			function notifyMasterDeferred() {
+			    var args;
+			    if (progressDeferreds.length > 1) {
+			        // Notify for every progressDeferred. progressDeferred.__latestArgs__ contains the result of the promise
+                    // and these results are subsequently used to notify
+			        args = $.makeArray(progressDeferreds).map(function(progressDeferred) {
+			            if (progressDeferred.__latestArgs__.length > 1) {
+			                return $.makeArray(progressDeferred.__latestArgs__)
+			            }
+			            else if (progressDeferred.__latestArgs__.length === 1) {
+			                return progressDeferred.__latestArgs__[0]
+			            }
+			            return void 0  // Undefined. Used to combat undefined = 1 overriden
+                    })
+                } else {
+			        // Results were passed for a single promise. Notify used the results
+			        args = arguments
+                }
+				masterDeferred.notify.apply(masterDeferred, args);
+			}
+
+            /**
+             * Resolve the given deferred. Used as callback for each promise passed to the parent function
+             * Resolved progressDeferred which are used to track the total state of all promises
+             * @param progressDeferred: Deferred to track progress
+             * @param deferred: Deferred that wraps around the promise
+             */
+			function afterFulfillment(progressDeferred, deferred) {
+			    var args = Array.prototype.slice.call(arguments, 2); // Additional arguments. Contains results of the promise
+                deferred.resolve.apply(deferred, args);
+                if (initialProgress) {
+                    progressDeferred.__latestArgs__ = args;
+                    progressDeferred.resolve.apply(progressDeferred, args);
+                }
+            }
+
+            // Track state of every promise
+            $.each(arguments, function(index, promise) {
+                var deferred = $.Deferred();  // Deferred to track if the API call succeeded
+                var progressDeferred = $.Deferred();  // Deferred to track the progress of the API calls
+                if (promise && promise.then) {
+                    promise.then(
+                        function() {
+                            var args = Array.prototype.slice.call(arguments);
+                            afterFulfillment.apply(this, [progressDeferred, deferred].concat(args)) // Success
+                        },
+                        function() {  // Fail
+                            var args = Array.prototype.slice.call(arguments);
+                            hasRejected = true;
+                            afterFulfillment.apply(this, [progressDeferred, deferred].concat(args));
+                        },
+                        function() {  // Progress notification
+                            progressDeferred.__latestArgs__ = arguments;
+                            if (initialProgress) {
+                                // Progress received while there are still promises who aren't fulfilled/progressed
+                                progressDeferred.resolve.apply(progressDeferred, arguments);
+                            }
+                            // All promises are either fulfilled or progressed. Notify the progress of this promise
+                            else {
+                                notifyMasterDeferred.apply(null, arguments);
+                            }
+                        }
+                    );
+                }
+                else {
+                    // Passed argument was not a promise
+                    deferred.resolve(promise);
+                    progressDeferred.__latestArgs__ = [promise];
+                    progressDeferred.resolve(promise);
+                }
+                deferreds.push(deferred);
+                progressDeferreds.push(progressDeferred);
+            });
+
+            $.when.apply($, deferreds).done(function() {
+                allFulfilled = true;
+                var fn;
+                if (hasRejected) {
+                    // One or more promise was reject. Reject the whole master promise
+                    fn = masterDeferred.reject;
+                } else {
+                    fn = masterDeferred.resolve;
+                }
+                // Reject or resolve with the results of every promise
+                fn.apply(masterDeferred, arguments);
+            });
+            /*
+             If all progressDeferred are done, the master deferred should send out a progressed signal.
+             */
+            $.when.apply($, progressDeferreds).done(function() {
+                if (!allFulfilled) {
+                    // Not all promises have been completed but progress notifications were for every call:
+                    // propagate these notifications through the masterDeferred
+                    notifyMasterDeferred.apply(null, arguments);
+                    initialProgress = false;
+                }
+            });
+            return masterDeferred.promise();
         }
     };
     var formatFunction = {
