@@ -20,75 +20,75 @@ define([
 ], function(router, $, ko,
             shared, api){
     "use strict";
-    return function() {
+
+    /**
+     * Authentication service
+     * Handles authentication
+     * @constructor
+     */
+    function Authentication() {
         var self = this;
 
         // Variables
-        self.onLoggedIn  = [];
+        self.onLoggedIn = [];
         self.onLoggedOut = [];
-        self.required    = false;
-        self.metadata    = {};
+        self.required = false;
+        self.metadata = {};
 
         // Observables
         self.accessToken = ko.observable();
 
         // Computed
-        self.loggedIn = ko.computed(function() {
-            return self.accessToken() !== undefined;
+        self.loggedIn = ko.pureComputed(function () {
+            return !!(self.accessToken())
         });
+    }
 
-        // Functions
-        self.login = function(username, password) {
-            // return api.post('/api/oauth2/token/', {
-            //     contentType: 'application/x-www-form-urlencoded',
-            //     data: {
-            //         grant_type: 'password',
-            //         username: username,
-            //         password: password
-            //     }
-            // })
-            return $.Deferred(function(deferred) {
-                var callData = {
-                    type: 'post',
-                    data: {
-                        grant_type: 'password',
-                        username: username,
-                        password: password
-                    },
-                    contentType: 'application/x-www-form-urlencoded',
-                    headers: { Accept: 'application/json; version=*' }
-                };
-                $.ajax('/api/oauth2/token/', callData)
-                    .done(function(result) {
-                        self.accessToken(result.access_token);
-                        window.localStorage.setItem('accesstoken', result.access_token);
-                        self.dispatch(true)
-                            .always(deferred.resolve);
-                    })
-                    .fail(function(xmlHttpRequest) {
-                        // We check whether we actually received an error, and it's not the browser navigating away
-                        if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
-                            api.validate(shared.nodes);
-                        } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                            self.accessToken(undefined);
-                            deferred.reject({
-                                status: xmlHttpRequest.status,
-                                statusText: xmlHttpRequest.statusText,
-                                readyState: xmlHttpRequest.readyState,
-                                responseText: xmlHttpRequest.responseText
-                            });
-                        } else if (xmlHttpRequest.readyState === 0 && xmlHttpRequest.status === 0) {
-                            api.validate(shared.nodes);
-                        }
-                    });
-            }).promise();
-        };
-        self.logout = function() {
-            var remote = self.metadata.mode === 'remote';
-            self.accessToken(undefined);
-            self.metadata = {};
+    Authentication.prototype = {
+        /**
+         * Register a new callback once the service has logged in
+         * @param callback: Callback function
+         */
+        addLogInCallback: function(callback) {
+            this.onLoggedIn.push(callback)
+        },
+        /**
+         * Register a new callback once the services has logged out
+         * @param callback: Callback function
+         */
+        addLogOutCallback: function(callback) {
+            this.onLoggedOut.push(callback)
+        },
+        /**
+         * Log in
+         * @param username: Username to login with
+         * @param password: Password to login with
+         * @return {Promise<T>}
+         */
+        login: function(username, password) {
+            var self = this;
+            return api.post('/oauth2/token/', {
+                contentType: 'application/x-www-form-urlencoded',
+                data: {
+                    grant_type: 'password',
+                    username: username,
+                    password: password
+                }
+            }).then(function(result) {
+                self.accessToken(result.access_token);
+                window.localStorage.setItem('accesstoken', result.access_token);
+                return self.dispatch.call(self, true)
+            });
+        },
+        /**
+         * Logout of the application
+         */
+        logout: function() {
+            var remote = this.metadata.mode === 'remote';
+            this.accessToken(undefined);
+            this.metadata = {};
             window.localStorage.removeItem('accesstoken');
-            self.dispatch(false)
+            this.dispatch(false)
                 .always(function() {
                     if (remote === true) {
                         window.location.href = 'https://' + window.location.host + '/';
@@ -96,25 +96,35 @@ define([
                         router.navigate('');
                     }
                 });
-        };
-        self.dispatch = function(login) {
+        },
+        /**
+         * Resolve all registered callbacks
+         * The callbacks were either registered to happen when the user logs in or when the user logs out
+         * @param login: Was the user logged in or not
+         * @return {Promise<T>}
+         */
+        dispatch: function(login) {
             var i, events = [];
             if (login) {
-                for (i = 0; i < self.onLoggedIn.length; i += 1) {
-                    events.push(self.onLoggedIn[i]());
+                for (i = 0; i < this.onLoggedIn.length; i += 1) {
+                    events.push(this.onLoggedIn[i]());
                 }
             } else {
-                for (i = 0; i < self.onLoggedOut.length; i += 1) {
-                    events.push(self.onLoggedOut[i]());
+                for (i = 0; i < this.onLoggedOut.length; i += 1) {
+                    events.push(this.onLoggedOut[i]());
                 }
             }
             return $.when.apply($, events);
-        };
-        self.validate = function() {
-            return self.loggedIn();
-        };
-        self.header = function() {
-            return 'Bearer ' + self.accessToken();
-        };
+        },
+        /**
+         * Generate the beared token
+         * @return {string}
+         */
+        generateBearerToken: function() {
+            return 'Bearer ' + this.accessToken();
+        }
+
     };
+    // Return a new instance. Only one of these will be available throughout the application
+    return new Authentication()
 });

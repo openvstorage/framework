@@ -19,7 +19,13 @@ define([
     'ovs/shared', 'ovs/api', 'ovs/generic'
 ], function($, shared, api, generic) {
     "use strict";
-    return function() {
+
+    /**
+     * Establish communication with the server
+     * Uses longpolling to retrieve message from the server
+     * @constructor
+     */
+    function Messaging() {
         var self = this;
 
         self.shared        = shared;
@@ -29,102 +35,151 @@ define([
         self.abort         = false;
         self.subscriptions = {};
         self.running       = false;
-
-        self.getSubscriptions = function(type) {
-            var callbacks,
-                subscription = self.subscriptions[type];
-            if (subscription === undefined) {
+    }
+    Messaging.prototype = {
+        /**
+         * Retrieve all the subscriptions
+         * @param type: Type of subscription
+         * @return {*}
+         */
+        getSubscriptions: function(type) {
+            var callbacks;
+            var subscription = this.subscriptions[type];
+            if (!subscription) {
                 callbacks = $.Callbacks();
                 subscription = {
                     publish    : callbacks.fire,
                     subscribe  : callbacks.add,
                     unsubscribe: callbacks.remove
                 };
-                if (type !== undefined) {
-                    self.subscriptions[type] = subscription;
+                if (type) {
+                    this.subscriptions[type] = subscription;
                 }
             }
             return subscription;
-        };
-        self.subscribe = function(type, callback) {
-            self.getSubscriptions(type).subscribe(callback);
-            if (self.running) {
-                self.sendSubscriptions();
+        },
+        /**
+         * Subscribe to a new message type
+         * @param type: Type of message
+         * @param callback: Callback to execute on receiving the message
+         */
+        subscribe: function(type, callback) {
+            this.getSubscriptions(type).subscribe(callback);
+            if (this.running) {
+                this.sendSubscriptions();
             }
-        };
-        self.unsubscribe = function(type, callback) {
-            self.getSubscriptions(type).unsubscribe(callback);
-        };
-        self.broadcast = function(message) {
-            var subscription = self.getSubscriptions(message.type);
+        },
+        /**
+         * Unsubscribe
+         * @param type: Type of message
+         * @param callback: Callback to remove
+         */
+        unsubscribe: function(type, callback) {
+            this.getSubscriptions(type).unsubscribe(callback);
+        },
+        /**
+         * Fire all callbacks
+         * @param message: Message to broadcast
+         */
+        broadcast: function(message) {
+            var subscription = this.getSubscriptions(message.type);
             subscription.publish.apply(subscription, [message.body]);
-        };
-        self.getLastMessageID = function() {
-            return api.get('messages/' + self.subscriberID + '/last');
-        };
-        self.start = function() {
-            return $.Deferred(function(deferred) {
-                self.abort = false;
-                self.getLastMessageID()
-                    .then(function (messageID) {
-                        self.lastMessageID = messageID;
-                    })
-                    .then(self.sendSubscriptions)
-                    .done(function () {
-                        self.running = true;
-                        self.wait();
-                        deferred.resolve();
-                    })
-                    .fail(function () {
-                        deferred.reject();
-                        throw "Last message id could not be loaded.";
-                    });
-            }).promise();
-        };
-        self.stop = function() {
-            self.abort = true;
+        },
+        /**
+         * Retrieve the last message sent
+         * @return {Promise<String>}
+         */
+        getLastMessageID: function() {
+            return api.get('messages/' + this.subscriberID + '/last');
+        },
+        /**
+         * Start messaging
+         */
+        start: function() {
+            var self = this;
+            self.abort = false;
+            self.getLastMessageID()
+                .then(function (messageID) {
+                    self.lastMessageID = messageID;
+                })
+                .then(self.sendSubscriptions.bind(self))
+                .then(function (data) {
+                    self.running = true;
+                    self.wait();
+                    return data
+                }, function(error) {
+                    throw "Last message id could not be loaded. ({0})".format([error]);
+                })
+        },
+        /**
+         * Stop messaging
+         */
+        stop: function() {
+            this.abort = true;
+            generic.xhrAbort(this.requestHandle);
+            this.running = false;
+        },
+        sendSubscriptions: function() {
+            return api.post('messages/' + this.subscriberID + '/subscribe', { data: Object.keys(this.subscriptions) })
+        },
+        /**
+         * Wait for new messages
+         * Resolves when the messaging stops
+         */
+        wait: function() {
+            var self = this;
             generic.xhrAbort(self.requestHandle);
-            self.running = false;
-        };
-        self.sendSubscriptions = function() {
-            return api.post('messages/' + self.subscriberID + '/subscribe', { data: Object.keys(self.subscriptions) });
-        };
-        self.wait = function() {
-            generic.xhrAbort(self.requestHandle);
-            self.requestHandle = api.get('messages/' + self.subscriberID + '/wait', {
+            return self.requestHandle = api.get('messages/' + self.subscriberID + '/wait', {
                 queryparams: { 'message_id': self.lastMessageID },
                 timeout: 1000 * 60 * 1.25,
                 log: false
             })
-                .done(function(data) {
-                    var i, subscriptions = Object.keys(self.subscriptions), resubscribe = false;
+                .then(function(data) {
+                    var subscriptions = Object.keys(self.subscriptions);
+                    var resubscribe = false;
                     self.lastMessageID = data.last_message_id;
-                    for (i = 0; i < data.messages.length; i += 1) {
-                        self.broadcast(data.messages[i]);
-                    }
-                    for (i = 0; i < subscriptions.length; i += 1) {
-                        if ($.inArray(subscriptions[i], data.subscriptions) === -1) {
+                    // Broadcast the message
+                    $.each(data.messages, function(index, message) {
+                        self.broadcast.call(self, message);
+                    });
+                    $.each(subscriptions, function(index, subscription) {
+                        if (data.subscriptions.contains(subscription)) {
                             resubscribe = true;
+                            return false;  // Break
                         }
-                    }
+                    });
                     if (resubscribe) {
-                        self.sendSubscriptions()
-                        .always(function() {
-                            if (!self.abort) {
-                                self.wait();
-                            }
-                        });
+                        return self.sendSubscriptions.call(self)
+                            .then(function(data) {
+                                if (!self.abort) {
+                                    return self.wait();
+                                }
+                                return data
+                            }, function(error) {
+                                // Cycle must continue
+                                if (!self.abort) {
+                                    return self.wait();
+                                }
+                                throw error
+                            })
                     } else if (!self.abort) {
-                        self.wait();
+                        return self.wait();
                     }
+                    return data
+                }, function(error) {
+                    console.warn('Error during longpolling messages ({0}). Restarting in 5 seconds.'.format([error]));
+                    // Restart within 5 seconds on failure
+                    return $.when().then(function(){
+                        if (!self.abort) {
+                            return generic.delay(5 * 1000).then(function() {
+                                return self.start.call(self)
+                                    .always(shared.tasks.validateTasks)
+                            })
+                        }
+                        throw error
+                    })
                 })
-                .fail(function() {
-                    if (!self.abort) {
-                        window.setTimeout(function() {
-                            self.start().always(shared.tasks.validateTasks);
-                        }, 5000);
-                    }
-                });
-        };
+        }
     };
+    return new Messaging()
 });

@@ -16,53 +16,17 @@
 /*global define */
 define([
     'jquery',
-    'ovs/shared', 'ovs/generic', 'ovs/api'
-], function($, shared, generic, api) {
+    'ovs/messaging', 'ovs/generic', 'ovs/api'
+], function($, messaging, generic, api) {
     "use strict";
-    return function() {
+    function Tasks() {
         var self = this;
-
-        self.shared      = shared;
         self.hooks       = {};
         self.taskIDQueue = [];
 
-        self.wait = function(taskID) {
-            var i;
-            for (i = 0; i < self.taskIDQueue.length; i += 1){
-                if (self.taskIDQueue[i].id === taskID) {
-                    return self.load(taskID);
-                }
-            }
-            self.hooks[taskID] = $.Deferred();
-            return self.hooks[taskID].promise();
-        };
-        self.load = function(taskID) {
-            return api.get('tasks/' + taskID)
-                .then(
-                    function(data) {
-                        if (data.successful) {
-                            return data.result;
-                        } else {
-                            throw data.result
-                        }
-                    })
-        };
-        self.validateTasks = function() {
-            $.each(self.hooks, function(taskID, deferred) {
-                api.get('tasks/' + taskID)
-                    .done(function(data) {
-                        if (data.ready === true) {
-                            if (data.successful === true) {
-                                deferred.resolve(data.result);
-                            } else {
-                                deferred.reject(data.result);
-                            }
-                        }
-                    });
-            });
-        };
-
-        self.shared.messaging.subscribe('TASK_COMPLETE', function(taskID) {
+        // On task complete events, the task result should be loaded
+        // @todo make this obsolete. The wait function should always resolve and not rely on messaging
+        messaging.subscribe('TASK_COMPLETE', function(taskID) {
             if (self.hooks.hasOwnProperty(taskID)) {
                 self.load(taskID)
                     .done(self.hooks[taskID].resolve)
@@ -78,5 +42,86 @@ define([
                 self.taskIDQueue = newQueue;
             }
         });
+
+        // Bind all prototype method to this instance. Used for backwards compatibility
+        $.each(Tasks.prototype, function(key, value) {
+            if (generic.isFunction(value)) {
+                self[key] = value.bind(self)
+            }
+        })
+    }
+    Tasks.prototype = {
+        /**
+         * Wait until a task is resolved
+         * Currently relies on messaging to resolve the task (see messaging.subscribe) in the constructor
+         * @param taskID: ID of the task to wait for
+         * @return {Promise<T>}
+         */
+        wait: function(taskID) {
+            for (var i = 0; i < this.taskIDQueue.length; i += 1){
+                var task = this.taskIDQueue[i];
+                if (task.id === taskID) {
+                    return this.load(taskID);
+                }
+            }
+            this.hooks[taskID] = $.Deferred();
+            return this.hooks[taskID].promise();
+        },
+        /**
+         * Alternative to wait. Does not rely on messaging but instead longpolls on the task state
+         * Might not be the better alternative as server side does not implement any longpolling like the messaging does
+         * @param taskID: ID of the task to wait for
+         * @return {Promise<T>}
+         */
+        waitPoll: function(taskID) {
+            var self = this;
+            return api.get('tasks/' + taskID)
+                .then(function(data) {
+                    if (!data.ready) {
+                        return generic.delay(1000).then(function() {
+                            return self.waitPoll(taskID)
+                        })
+                    }
+                    if (data.successful) {
+                        return data.result;
+                    } else {
+                        throw data.result
+                    }
+                })
+        },
+        /**
+         * Load task results
+         * @param taskID: ID of the task
+         * @return {Promise<T>}
+         */
+        load: function(taskID) {
+            return api.get('tasks/' + taskID)
+                .then(function(data) {
+                    if (data.successful) {
+                        return data.result;
+                    } else {
+                        throw data.result
+                    }})
+        },
+        /**
+         * Validate all tasks
+         * Checks the current hooks and resolves where possible
+         */
+        validateTasks: function() {
+            $.each(this.hooks, function(taskID, deferred) {
+                api.get('tasks/' + taskID)
+                    .done(function(data) {
+                        if (data.ready === true) {
+                            if (data.successful === true) {
+                                deferred.resolve(data.result);
+                            } else {
+                                deferred.reject(data.result);
+                            }
+                        }
+                    });
+            });
+        }
     };
+
+    return new Tasks()
 });

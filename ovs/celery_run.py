@@ -167,6 +167,7 @@ else:
 def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs=None, **kwds):
     """
     Hook for celery post-run event
+    The front-end uses these events to resolve the tasks instead of longpolling on the task api
     """
     _ = sender, task, args, kwargs, kwds
     try:

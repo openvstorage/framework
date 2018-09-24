@@ -60,15 +60,18 @@ define([
          * @param url: URL to simulate for
          */
         simulateReply: function(url) {
-            var self = this;
-            $.each(this.replies, function(key, data) {
+            for (var key in this.replies) {
+                if (!this.replies.hasOwnProperty(key)) {
+                    continue
+                }
+                var data = this.replies[key];
                 if (url.startsWith(key)){
                     if (data.error) {
                         throw data.data
                     }
                     return data.data
                 }
-            });
+            }
         },
         addReply: function(url, data, error) {
             if (!url.startsWith('/api')) {
@@ -85,7 +88,7 @@ define([
         this.testReplies = new MockedReplies();
 
         this.defaultTimeout = 120 * 1000;  // Milliseconds
-        this.defaultRelay = {relay: ''}
+        this.defaultRelay = {relay: ''};
         this.defaultContentType = 'application/json'
     }
 
@@ -209,7 +212,7 @@ define([
         var callData = {
             type: type,
             timeout: generic.tryGet(options, 'timeout', this.defaultTimeout),
-            contentType: generic.tryGet(options, 'contentType', this.contentType),
+            contentType: generic.tryGet(options, 'contentType', this.defaultContentType),
             headers: { Accept: 'application/json; version=*' }
         };
         var queryParams = options.queryparams || {};
@@ -242,11 +245,15 @@ define([
                 querystring.push(key + '=' + encodeURIComponent(queryParams[key]));
             }
         }
-        if (callData.contentType === this.defaultContentType && (type !== 'GET' || !$.isEmptyObject(data))) {
-            callData.data = JSON.stringify(data);
+        if (type !== 'GET' || !$.isEmptyObject(data)) {
+            if (callData.contentType === this.defaultContentType) {
+                callData.data = JSON.stringify(data);
+            } else {
+                callData.data = data;
+            }
         }
-        if (shared.authentication.validate()) {
-            callData.headers.Authorization = shared.authentication.header();
+        if (shared.authentication.loggedIn()) {
+            callData.headers.Authorization = shared.authentication.generateBearerToken();
         }
         var start = generic.getTimestamp();
         var call = '/api/' + relayParams.relay + api + (api === '' ? '?' : '/?') + querystring.join('&');
@@ -265,7 +272,7 @@ define([
                 if (error.readyState === ReadyStates.DONE) {
                     if (error.status === StatusCodes.BAD_GATEWAY) {
                         // Current API host is not responding
-                        return self.failover.call(self);
+                        return self.failover();
                     } else if ([StatusCodes.FORBIDDEN, StatusCodes.UNAUTHORIZED].contains(error.status)) {
                         var responseData = $.parseJSON(error.responseText);
                         if (responseData.error === 'invalid_token') {
@@ -276,13 +283,17 @@ define([
                 } else if (error.readyState === ReadyStates.UNSENT && error.status === StatusCodes.REQUEST_UNCOMPLETE) {
                     // Default state of an XHR. Could mean a timeout.
                     // Relay might be given. The relay could have timed out because it took too long to fetch
-                    return self.failover.call(self);
+                    return self.failover();
                 }
                 // Throw it again
                 throw error;
             });
     }
 
+    /**
+     * Test the redirection functionality
+     * Used for testing
+     */
     function testRedirect() {
         var api = new APIService();
         api.testMode = true;
@@ -290,7 +301,7 @@ define([
         api.get('test')
     }
     // Inheriting from the xhrService. Should be obsolete once all dependency loading is resolved
-    APIService.prototype = $.extend({}, functions, xhrService.prototype, {testRedirect: testRedirect});
+    APIService.prototype = $.extend({}, functions, xhrService.prototype);
     return new APIService();
 });
 

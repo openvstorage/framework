@@ -20,8 +20,8 @@ define([
     'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/services/notifications', 'ovs/services/pluginloader', 'ovs/services/cookie',
     'viewmodels/services/user', 'viewmodels/services/misc'
 ], function ($, router, system, activator, bootstrap, i18n,
-             shared, routing, Messaging, generic, Tasks,
-             Authentication, cssLoader, notifications, pluginLoader, cookieService,
+             shared, routing, messaging, generic, tasks,
+             authentication, cssLoader, notifications, pluginLoader, cookieService,
              userService, miscService) {
     "use strict";
     // Initially load in all routes
@@ -59,13 +59,17 @@ define([
                 });
         };
         self.activate = function () {
-            self.shared.messaging = new Messaging();
-            self.shared.authentication = new Authentication();
-            self.shared.tasks = new Tasks();
+            // Setup shared with all instances
+            self.shared.messaging = messaging;
+            self.shared.authentication = authentication;
+            self.shared.tasks = tasks;
             self.shared.routing = routing;
 
-            self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
-            self.shared.authentication.onLoggedIn.push(function () {
+            // Register some callbacks
+            authentication.addLogInCallback(function() {  // See if messaging works
+                return messaging.start.call(messaging)
+            });
+            authentication.addLogInCallback(function () {  // Retrieve the current user details
                 return $.when().then(function() {
                     return miscService.metadata()
                         .then(function (metadata) {
@@ -88,10 +92,10 @@ define([
                         })
                         .then(self._translate)
             });
-            self.shared.authentication.onLoggedIn.push(function () {
-                self.shared.messaging.subscribe('EVENT', notifications.handleEvent);
+            authentication.addLogInCallback(function () {  // Handle event type messages
+                self.shared.messaging.subscribe.call(messaging, 'EVENT', notifications.handleEvent);
             });
-            self.shared.authentication.onLoggedOut.push(function () {
+            authentication.addLogOutCallback(function () {
                 self.shared.language = self.shared.defaultLanguage;
                 return self._translate();
             });
