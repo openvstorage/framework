@@ -16,8 +16,11 @@
 /*global define */
 define([
     'jquery',
-    'ovs/messaging', 'ovs/generic', 'ovs/api'
-], function($, messaging, generic, api) {
+    'ovs/generic', 'ovs/api',
+    'ovs/services/messaging'
+], function($,
+            generic, api,
+            messaging) {
     "use strict";
     function Tasks() {
         var self = this;

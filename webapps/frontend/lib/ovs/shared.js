@@ -14,20 +14,26 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['knockout'], function(ko){
+define([
+    'knockout',
+    'ovs/routing',
+    'ovs/services/messaging', 'ovs/services/authentication', 'ovs/services/tasks'],
+    function(ko,
+             routing,
+             messaging, authentication, tasks){
     "use strict";
     var singleton = function() {
         var pluginData = {};
         return {
-            messaging      : undefined,
-            tasks          : undefined,
-            authentication : undefined,
+            messaging      : messaging,
+            tasks          : tasks,
+            authentication : authentication,
             defaultLanguage: 'en-US',
             language       : 'en-US',
             mode           : ko.observable('full'),
-            routing        : undefined,
+            routing        : routing,
             footerData     : ko.observable(ko.observable()),
-            nodes          : undefined,
+            nodes          : [],
             identification : ko.observable(),
             releaseName    : '',
             pluginData     : pluginData,

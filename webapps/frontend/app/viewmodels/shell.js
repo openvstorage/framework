@@ -16,13 +16,13 @@
 /*global define, window, require */
 define([
     'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
-    'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
-    'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/services/notifications', 'ovs/services/pluginloader', 'ovs/services/cookie',
-    'viewmodels/services/user', 'viewmodels/services/misc'
+    'ovs/shared', 'ovs/routing', 'ovs/generic',
+    'ovs/plugins/cssloader', 'ovs/plugins/pluginloader',
+    'viewmodels/services/misc'
 ], function ($, router, system, activator, bootstrap, i18n,
-             shared, routing, messaging, generic, tasks,
-             authentication, cssLoader, notifications, pluginLoader, cookieService,
-             userService, miscService) {
+             shared, routing, generic,
+             cssLoader, pluginLoader,
+             miscService) {
     "use strict";
     // Initially load in all routes
     router.map(routing.mainRoutes)
@@ -31,14 +31,6 @@ define([
 
     return function () {
         var self = this;
-
-        self._translate = function () {
-            return $.when().then(function () {
-                i18n.setLng(self.shared.language, function () {
-                    $('html').i18n(); // Force retranslation of complete UI
-                });
-            })
-        };
 
         self.shared = shared;
         self.router = router;
@@ -59,64 +51,6 @@ define([
                 });
         };
         self.activate = function () {
-            // Setup shared with all instances
-            self.shared.messaging = messaging;
-            self.shared.authentication = authentication;
-            self.shared.tasks = tasks;
-            self.shared.routing = routing;
-
-            // Register some callbacks
-            authentication.addLogInCallback(function() {  // See if messaging works
-                return messaging.start.call(messaging)
-            });
-            authentication.addLogInCallback(function () {  // Retrieve the current user details
-                return $.when().then(function() {
-                    return miscService.metadata()
-                        .then(function (metadata) {
-                                if (!metadata.authenticated) {
-                                    // This shouldn't be the case, but is checked anyway.
-                                    self.shared.authentication.logout();
-                                    throw new Error('User was not logged in. Logging out')
-                                }
-                                self.shared.authentication.metadata = metadata.authentication_metadata;
-                                self.shared.user.username(metadata.username);
-                                self.shared.user.guid(metadata.userguid);
-                                self.shared.user.roles(metadata.roles);
-                                self.shared.releaseName = metadata.release.name;
-                                return self.shared.user.guid()
-                            })
-                        })
-                        .then(userService.fetchUser)
-                        .then(function (data) {
-                            self.shared.language = data.language;
-                        })
-                        .then(self._translate)
-            });
-            authentication.addLogInCallback(function () {  // Handle event type messages
-                self.shared.messaging.subscribe.call(messaging, 'EVENT', notifications.handleEvent);
-            });
-            authentication.addLogOutCallback(function () {
-                self.shared.language = self.shared.defaultLanguage;
-                return self._translate();
-            });
-            var token = window.localStorage.getItem('accesstoken'), state, expectedState;
-            if (token === null) {
-                token = cookieService.getCookie('accesstoken');
-                if (token !== null) {
-                    state = cookieService.getCookie('state');
-                    expectedState = window.localStorage.getItem('state');
-                    if (state === null || state !== expectedState) {
-                        token = null;
-                    } else {
-                        window.localStorage.setItem('accesstoken', token);
-                    }
-                    cookieService.removeCookie('accesstoken');
-                    cookieService.removeCookie('state');
-                }
-            }
-            if (token !== null) {
-                self.shared.authentication.accessToken(token);
-            }
             return $.when().then(function() {
                     return miscService.metadata()
                         // @todo handle failures - do a promise retry and swallow error on x'th retry

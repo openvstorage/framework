@@ -16,9 +16,13 @@
 /*global define, window */
 define([
     'plugins/router', 'jquery', 'knockout',
-    'ovs/shared', 'ovs/api'
+    'ovs/shared', 'ovs/api',
+    'ovs/services/messaging', 'ovs/services/translation', 'ovs/services/cookie',
+    'viewmodels/services/user'
 ], function(router, $, ko,
-            shared, api){
+            shared, api,
+            messaging, translation, cookieService,
+            userService){
     "use strict";
 
     /**
@@ -30,8 +34,40 @@ define([
         var self = this;
 
         // Variables
-        self.onLoggedIn = [];
-        self.onLoggedOut = [];
+        self.onLoggedIn = [
+            messaging.start,
+            function () {
+                // Retrieve the current user details
+                return $.when().then(function() {
+                    return miscService.metadata()
+                        .then(function (metadata) {
+                                if (!metadata.authenticated) {
+                                    // This shouldn't be the case, but is checked anyway.
+                                    self.shared.authentication.logout();
+                                    throw new Error('User was not logged in. Logging out')
+                                }
+                                shared.authentication.metadata = metadata.authentication_metadata;
+                                shared.user.username(metadata.username);
+                                shared.user.guid(metadata.userguid);
+                                shared.user.roles(metadata.roles);
+                                shared.releaseName = metadata.release.name;
+                                return self.shared.user.guid()
+                            })
+                        })
+                        .then(userService.fetchUser)
+                        .then(function (data) {
+                            translation.setLanguage(data.language);
+                            self.shared.language = data.language;
+                        })
+            },
+            function () {  // Handle event type messages
+                messaging.subscribe('EVENT', notifications.handleEvent);
+            }
+        ];
+        self.onLoggedOut = [
+            function() { language.resetLanguage()},
+            function() { return $.when().then(function() { messaging.stop.call(messaging)})}
+        ];
         self.required = false;
         self.metadata = {};
 
@@ -42,9 +78,36 @@ define([
         self.loggedIn = ko.pureComputed(function () {
             return !!(self.accessToken())
         });
+
+        // Retrieve the token once this file is loaded.
+        self.retrieveToken()
     }
 
     Authentication.prototype = {
+        /**
+         * Retrieves the authentication (if any)
+         */
+        retrieveToken: function() {
+            var token = window.localStorage.getItem('accesstoken'), state, expectedState;
+            if (token === null) {
+                token = cookieService.getCookie('accesstoken');
+                if (token !== null) {
+                    state = cookieService.getCookie('state');
+                    expectedState = window.localStorage.getItem('state');
+                    if (state === null || state !== expectedState) {
+                        token = null;
+                    } else {
+                        window.localStorage.setItem('accesstoken', token);
+                    }
+                    cookieService.removeCookie('accesstoken');
+                    cookieService.removeCookie('state');
+                }
+            }
+            if (token !== null) {
+                this.accessToken(token);
+            }
+            return token
+        },
         /**
          * Register a new callback once the service has logged in
          * @param callback: Callback function

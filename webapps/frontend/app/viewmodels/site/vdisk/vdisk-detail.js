@@ -16,7 +16,7 @@
 /*global define */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/services/pluginloader',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/plugins/pluginloader',
     'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/vpool/vpool',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/domain/domain',
     'viewmodels/wizards/clone/index', 'viewmodels/wizards/vdiskmove/index', 'viewmodels/wizards/rollback/index', 'viewmodels/wizards/snapshot/index',
