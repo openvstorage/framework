@@ -30,21 +30,21 @@ but WITHOUT ANY WARRANTY of any kind.
                 <td>
                     <i data-bind="attr: { id: 'vd-template-delete' + guid() },
                                   click: function() {
-                                      if ($root.shared.user.roles().contains('write')) {
+                                      if ($root.canWrite()) {
                                           $root.deleteVDT($data.guid());
                                       }
                                   },
-                                  style: { color: $root.shared.user.roles().contains('write') && childrenGuids().length === 0 ? 'black' : 'lightgrey' },
+                                  style: { color: $root.canWrite() && childrenGuids().length === 0 ? 'black' : 'lightgrey' },
                                   tooltip: childrenGuids().length > 0 ? 'ovs:vtemplates.has_children' : 'ovs:vtemplates.remove'"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
                     <i data-bind="attr: { id: 'vd-template-create-' + guid() },
                                   click: function() {
-                                      if ($root.shared.user.roles().contains('write')) {
+                                      if ($root.canWrite()) {
                                           $root.createFromVDT($data.guid());
                                       }
                                   },
                                   tooltip: 'ovs:vtemplates.clone',
-                                  style: { color: $root.shared.user.roles().contains('write') ? 'black' : 'lightgrey' }"
+                                  style: { color: $root.canWrite() ? 'black' : 'lightgrey' }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.fromtemplate"></i>
                 </td>
             </tr>

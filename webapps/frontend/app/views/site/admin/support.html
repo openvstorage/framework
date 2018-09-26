@@ -39,7 +39,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             <span data-bind="text: name"></span>
                             <button type="button" class="btn btn-mini btn-default hand" id="buttonDownload" style="margin-left: 0.7em;"
                                     data-bind="click: downloadLogfiles,
-                                               enable: $root.shared.user.roles().contains('manage') && downLoadingLogs() === false,
+                                               enable: $root.canManage() && downLoadingLogs() === false,
                                                tooltip: downloadLogState()">
                                 <span class="hand fa" data-bind="visible: downLoadingLogs() === false" data-i18n="[html]ovs:icons.download"></span>
                                 <span class="hand fa fa-spin" data-bind="visible: downLoadingLogs() === true" data-i18n="[html]ovs:icons.loading"></span>
@@ -67,7 +67,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         <!-- ko if: $data.func -->
                             <button type="button" class="btn btn-mini btn-default hand" id="buttonEditConfig" style="margin-left: 0.7em;"
                                     data-bind="click: function() {$data.func(true);},
-                                               enable: $root.shared.user.roles().contains('manage') && $root.selectedSupportSettings().contains('stats_monkey') && $root.origStatsMonkeyConfig.isInitialized(),
+                                               enable: $root.canEditSettings(),
                                                tooltip: 'ovs:wizards.stats_monkey_configure.configure_edit'">
                                 <span class="hand fa" data-i18n="[html]ovs:icons.edit"></span>
                             </button>
@@ -75,7 +75,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         <br />
                     <!-- /ko -->
                     <button type="button" class="btn btn-mini btn-default hand"
-                            data-bind="click: save, enable: !saving() && supportSettingsChanged() && $root.shared.user.roles().contains('manage')"
+                            data-bind="click: save, enable: !saving() && supportSettingsChanged() && $root.canManage()"
                             data-i18n="ovs:support.settings.save">
                     </button>
                 </div>

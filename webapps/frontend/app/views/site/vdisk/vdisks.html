@@ -25,7 +25,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <div class="pull-right h2">
                     <div data-bind="searchbar: { query: vdiskSearch, defaultField: 'name', placeholder: 'ovs:vdisks.search', defaultQuery: query}" style="display: inline-block;"></div>
                     <button class="btn btn-default" id="buttonAddVdisk"
-                            data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage') && runningVPool()">
+                            data-bind="click: addVDisk, enable: canAddVDisk()">
                         <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
                         <span data-i18n="ovs:vdisks.add"></span>
                     </button>

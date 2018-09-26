@@ -17,9 +17,13 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/services/authentication',
     'viewmodels/containers/storagerouter/storagerouter',
     'viewmodels/wizards/update/index'
-], function($, dialog, ko, shared, generic, Refresher, api, StorageRouter, UpdateWizard) {
+], function($, dialog, ko,
+            shared, generic, Refresher, api,
+            authentication,
+            StorageRouter, UpdateWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -43,6 +47,22 @@ define([
         self.storageRouters  = ko.observableArray([]);
         self.updateInitiated = ko.observable(false);
 
+        // Computed
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
+        self.canRefresh = ko.pureComputed(function() {
+            return self.canManage() && !self.refreshing() && self.loadedInfo() && !self.updateInitiated() &&
+                !self.collectiveStatus().updatesOngoing && !self.collectiveStatus().updatesChecking
+        });
+        self.canUpdate = ko.pureComputed(function() {
+             return self.canManage() && !self.collectiveStatus().updatesOngoing && self.collectiveStatus().updatesAvailable
+                 && !self.refreshing() && self.loadedInfo()
+        });
+        self.canShowUpdate = ko.pureComputed(function() {
+            return self.collectiveStatus().atFunctional && !self.collectiveStatus().updatesChecking &&
+                !self.collectiveStatus().updatesOngoing && !self.updateInitiated() && self.loadedInfo()
+        });
         // Functions
         self.loadStorageRouters = function() {
             return $.Deferred(function(deferred) {

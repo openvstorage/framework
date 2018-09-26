@@ -68,28 +68,28 @@ requirejs.config({
 
 define([
     'durandal/system', 'durandal/app', 'durandal/viewLocator', 'durandal/binder', 'jquery', 'i18next', 'plugins/dialog',
-    'ovs/shared',
+    'ovs/services/translation',
     'viewmodels/wizards/context',
+    // The following imports are not usuable imports but load in additional helpers and extend other objects
     'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions', 'ovs/extensions/knockout-extenders',
     'bootstrap',
-    'knockout-dictionary' // Ko plugins
-],  function(system, app, viewLocator, binder, $, i18n, dialog, shared, wizardContext) {
+    'knockout-dictionary',
+    'ovs/interceptors/http'
+],  function(system, app, viewLocator, binder, $, i18n, dialog,
+             translation,
+             wizardContext) {
     "use strict";
     system.debug(true);  // To be changed when building production
-    shared.defaultLanguage = shared.language = window.navigator.userLanguage || window.navigator.language || 'en-US';
+    // Initialize translation
     var i18nOptions = {
         detectFromHeaders: false,
-        lng: shared.defaultLanguage,
+        lng: translation.defaultLanguage,
         fallbackLng: 'en-US',
         ns: 'ovs',
         resGetPath: requirejs.toUrl('/locales/__lng__/__ns__.json'),
         useCookie: false,
         useLocalStorage: false
     };
-
-    if (window.localStorage.hasOwnProperty('nodes') && window.localStorage.nodes !== null) {
-        shared.nodes = $.parseJSON(window.localStorage.nodes);
-    }
 
     i18n.init(i18nOptions, function() {
         app.title = $.t('ovs:title');

@@ -36,7 +36,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-edit"
                         data-bind="click: function() { if (edit()) { save(); } else { edit(true); } },
-                                   enable: loaded() && $root.shared.user.roles().contains('manage') && !$root.markingOffline() && !$root.refreshing(),
+                                   enable: $root.canEdit(),
                                    tooltip: 'ovs:storagerouters.detail.edit'">
                     <span class="hand fa" data-bind="visible: edit() && !saving()" data-i18n="[html]ovs:icons.save"></span>
                     <span class="hand fa fa-spin" data-bind="visible: edit() && saving()" data-i18n="[html]ovs:icons.loading"></span>
@@ -44,14 +44,14 @@ but WITHOUT ANY WARRANTY of any kind.
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-refresh"
                         data-bind="click: $root.refresh,
-                                   enable: $root.shared.user.roles().contains('manage') && !$root.markingOffline(),
+                                   enable: $root.canRefresh(),
                                    tooltip: 'ovs:storagerouters.detail.refreshtt'">
                     <span class="hand fa" data-bind="visible: !$root.refreshing()" data-i18n="[html]ovs:icons.load"></span>
                     <span class="hand fa fa-spin" data-bind="visible: $root.refreshing()" data-i18n="[html]ovs:icons.loading"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-mark-offline"
                         data-bind="click: $root.markoffline,
-                                   enable: $root.shared.user.roles().contains('manage') && !$root.refreshing(),
+                                   enable: $root.canMarkOffline(),
                                    tooltip: 'ovs:storagerouters.detail.offline.mark'">
                     <span class="hand fa" data-bind="visible: !$root.markingOffline()" data-i18n="[html]ovs:icons.markoffline"></span>
                     <span class="hand fa fa-spin" data-bind="visible: $root.markingOffline()" data-i18n="[html]ovs:icons.loading"></span>
@@ -159,10 +159,10 @@ but WITHOUT ANY WARRANTY of any kind.
     </div>
     <div>
         <ul class="nav nav-tabs">
-            <li class="active" data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage')">
+            <li class="active" data-bind="tooltip: 'ovs:generic.management', visible: $root.canManage()">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
-            <li data-bind="tooltip: 'ovs:generic.disks', visible: $root.shared.user.roles().contains('manage')">
+            <li data-bind="tooltip: 'ovs:generic.disks', visible: $root.canManage()">
                 <a href="#disks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.disks"></a>
             </li>
             <li data-bind="tooltip: 'ovs:generic.vdisks'">
@@ -170,7 +170,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </li>
         </ul>
         <div class="tab-content">
-            <div class="tab-pane active" id="management" style="padding: 15px;" data-bind="visible: $root.shared.user.roles().contains('manage')">
+            <div class="tab-pane active" id="management" style="padding: 15px;" data-bind="visible: $root.canManage()">
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>
@@ -239,7 +239,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     </tbody>
                 </table>
             </div>
-            <div class="tab-pane" id="disks" style="padding: 15px;" data-bind="visible: $root.shared.user.roles().contains('manage')">
+            <div class="tab-pane" id="disks" style="padding: 15px;" data-bind="visible: $root.canManage()">
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr style="padding-bottom: 10px;">
@@ -247,7 +247,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td>
                                 <h4 class="pull-left" data-i18n="ovs:storagerouters.detail.disks.title"></h4>
                                 <button class="btn btn-default pull-right hand" id="buttonRescanDisks"
-                                        data-bind="click: $root.rescanDisks, enable: $root.shared.user.roles().contains('manage')">
+                                        data-bind="click: $root.rescanDisks, enable: $root.canManage()">
                                     <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>&nbsp;
                                     <span data-i18n="ovs:generic.rescan" class="hand"></span>
                                 </button>
@@ -300,7 +300,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     </span>
                                                     <span style="position: absolute; top: 0; right: 7px;"
                                                           data-bind="visible: !small
-                                                                              && $root.shared.user.roles().contains('manage')
+                                                                              && $root.canManage()
                                                                               && !['swap', 'linux_raid_member', 'LVM2_member'].contains(filesystem())
                                                                               && !roles().contains('BACKEND')">
                                                         <span data-bind="position: absolute; top: 0; left: 0">

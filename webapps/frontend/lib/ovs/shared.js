@@ -15,39 +15,34 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'knockout',
-    'ovs/routing',
-    'ovs/services/messaging', 'ovs/services/authentication', 'ovs/services/tasks'],
-    function(ko,
-             routing,
-             messaging, authentication, tasks){
+    'knockout', 'jquery',
+    'ovs/routing'],
+    function(ko, $,
+             routing){
     "use strict";
-    var singleton = function() {
-        var pluginData = {};
-        return {
-            messaging      : messaging,
-            tasks          : tasks,
-            authentication : authentication,
-            defaultLanguage: 'en-US',
-            language       : 'en-US',
-            mode           : ko.observable('full'),
-            routing        : routing,
-            footerData     : ko.observable(ko.observable()),
-            nodes          : [],
-            identification : ko.observable(),
-            releaseName    : '',
-            pluginData     : pluginData,
-            user           : {
-                username: ko.observable(),
-                guid    : ko.observable(),
-                roles   : ko.observableArray([])
-            },
-            hooks          : {
-                dashboards: [],
-                wizards   : {},
-                pages     : {}
-            }
+    var modes = Object.freeze({
+        FULL: 'full'
+    });
+
+    function Shared() {
+        var self = this;
+
+        self.mode           = ko.observable(modes.FULL);
+        self.routing        = routing;
+        self.footerData     = ko.observable(ko.observable());
+        self.identification = ko.observable();
+        self.releaseName    = '';
+        self.pluginData     = {};
+        self.hooks          = {
+            dashboards: [],
+            wizards: {},
+            pages: {}
         };
-    };
-    return singleton();
+
+        self.fullMode = ko.pureComputed(function() {
+            return self.mode() === modes.FULL
+        })
+    }
+    Shared.prototype = { };
+    return new Shared();
 });

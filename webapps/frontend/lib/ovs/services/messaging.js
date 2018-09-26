@@ -16,8 +16,9 @@
 /*global define, window */
 define([
     'jquery',
-    'ovs/shared', 'ovs/api', 'ovs/generic'
-], function($, shared, api, generic) {
+    'ovs/api', 'ovs/generic'
+], function($,
+            api, generic) {
     "use strict";
 
     /**
@@ -28,7 +29,6 @@ define([
     function Messaging() {
         var self = this;
 
-        self.shared        = shared;
         self.subscriberID  = Math.random().toString().substr(3, 10);
         self.lastMessageID = 0;
         self.requestHandle = undefined;
@@ -173,7 +173,6 @@ define([
                         if (!self.abort) {
                             return generic.delay(5 * 1000).then(function() {
                                 return self.start.call(self)
-                                    .always(shared.tasks.validateTasks)
                             })
                         }
                         throw error

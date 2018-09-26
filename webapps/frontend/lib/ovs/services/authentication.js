@@ -16,15 +16,34 @@
 /*global define, window */
 define([
     'plugins/router', 'jquery', 'knockout',
-    'ovs/shared', 'ovs/api',
-    'ovs/services/messaging', 'ovs/services/translation', 'ovs/services/cookie',
+    'ovs/api',
+    'ovs/services/release', 'ovs/services/messaging', 'ovs/services/translation', 'ovs/services/cookie',
     'viewmodels/services/user'
 ], function(router, $, ko,
-            shared, api,
-            messaging, translation, cookieService,
+            api,
+            releaseService, messaging, translation, cookieService,
             userService){
     "use strict";
 
+    function User(guid, username, roles) {
+        var self = this;
+
+        // Public
+        self.guid = ko.observable(guid || null);
+        self.username = ko.observable(username || null);
+        self.roles = ko.observableArray(roles || []);
+
+        // Computed
+        self.canManage = ko.pureComputed(function() {
+            return self.roles().contains('write')
+        });
+        self.canWrite = ko.pureComputed(function() {
+            return self.roles().contains('write')
+        });
+        self.canRead = ko.pureComputed(function() {
+            return self.roles().contains('read')
+        })
+    }
     /**
      * Authentication service
      * Handles authentication
@@ -35,7 +54,7 @@ define([
 
         // Variables
         self.onLoggedIn = [
-            messaging.start,
+            messaging.start.call(messaging),
             function () {
                 // Retrieve the current user details
                 return $.when().then(function() {
@@ -43,34 +62,33 @@ define([
                         .then(function (metadata) {
                                 if (!metadata.authenticated) {
                                     // This shouldn't be the case, but is checked anyway.
-                                    self.shared.authentication.logout();
+                                    self.logout();
                                     throw new Error('User was not logged in. Logging out')
                                 }
-                                shared.authentication.metadata = metadata.authentication_metadata;
-                                shared.user.username(metadata.username);
-                                shared.user.guid(metadata.userguid);
-                                shared.user.roles(metadata.roles);
-                                shared.releaseName = metadata.release.name;
-                                return self.shared.user.guid()
+                                self.metadata = metadata.authentication_metadata;
+                                self.user.username(metadata.username);
+                                self.user.guid(metadata.userguid);
+                                self.user.roles(metadata.roles);
+                                releaseService.releaseName = metadata.release.name;
+                                return self.user.guid()
                             })
                         })
                         .then(userService.fetchUser)
                         .then(function (data) {
-                            translation.setLanguage(data.language);
-                            self.shared.language = data.language;
+                            translation.setLanguage.call(translation, data.language);
                         })
             },
             function () {  // Handle event type messages
-                messaging.subscribe('EVENT', notifications.handleEvent);
+                messaging.subscribe.call(messaging, 'EVENT', notifications.handleEvent);
             }
         ];
         self.onLoggedOut = [
-            function() { language.resetLanguage()},
+            function() { translation.resetLanguage.call(translation)},
             function() { return $.when().then(function() { messaging.stop.call(messaging)})}
         ];
         self.required = false;
         self.metadata = {};
-
+        self.user = new User();
         // Observables
         self.accessToken = ko.observable();
 
@@ -167,16 +185,14 @@ define([
          * @return {Promise<T>}
          */
         dispatch: function(login) {
-            var i, events = [];
-            if (login) {
-                for (i = 0; i < this.onLoggedIn.length; i += 1) {
-                    events.push(this.onLoggedIn[i]());
-                }
-            } else {
-                for (i = 0; i < this.onLoggedOut.length; i += 1) {
-                    events.push(this.onLoggedOut[i]());
-                }
+            var events = [];
+            var arr = this.onLoggedIn;
+            if (!login) {
+                arr = this.onLoggedOut;
             }
+            $.each(arr, function(index, promise) {
+                events.push(promise)
+            });
             return $.when.apply($, events);
         },
         /**

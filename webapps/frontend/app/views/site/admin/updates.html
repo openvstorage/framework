@@ -20,11 +20,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <h2 class="pull-left" data-i18n="ovs:updates.title"></h2>
         <button class="btn btn-default pull-right" id="buttonRefreshUpdates"
                 data-bind="click: refresh,
-                           enable: $root.shared.user.roles().contains('manage') &&
-                                   refreshing() === false && loadedInfo() === true &&
-                                   updateInitiated() === false &&
-                                   collectiveStatus().updatesOngoing === false &&
-                                   collectiveStatus().updatesChecking === false"
+                           enable: $root.canRefresh()"
                 style="margin-top: 20px;">
             <span class="fa" data-i18n="[html]ovs:icons.load"></span>&nbsp;
             <span data-i18n="ovs:generic.refresh"></span>
@@ -161,15 +157,8 @@ but WITHOUT ANY WARRANTY of any kind.
     <div>
         <button class="btn btn-default hand"
                 data-bind="click: showUpdateWizard,
-                           enable: $root.shared.user.roles().contains('manage') &&
-                                   collectiveStatus().updatesOngoing === false &&
-                                   collectiveStatus().updatesAvailable === true &&
-                                   refreshing() === false && loadedInfo() === true,
-                           visible: collectiveStatus().atFunctional === true &&
-                                    collectiveStatus().updatesChecking === false &&
-                                    collectiveStatus().updatesOngoing === false &&
-                                    updateInitiated() === false &&
-                                    loadedInfo() === true"
+                           enable: $root.canUpdate(),
+                           visible: $root.canShowUpdate()"
                 id="buttonUpdate"
                 style="margin-top: 20px;">
             <span data-i18n="ovs:updates.button" class="hand"></span>

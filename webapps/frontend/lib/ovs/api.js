@@ -16,10 +16,10 @@
 /*global define, window */
 define([
     'jquery',
-    'ovs/shared', 'ovs/generic',
+    'ovs/generic',
     'ovs/services/xhr', 'ovs/services/log'
 ], function($,
-            shared, generic,
+            generic,
             xhrService, logService) {
     'use strict';
     var APITypes = Object.freeze({
@@ -89,11 +89,25 @@ define([
 
         this.defaultTimeout = 120 * 1000;  // Milliseconds
         this.defaultRelay = {relay: ''};
-        this.defaultContentType = 'application/json'
+        this.defaultContentType = 'application/json';
+
+        this.nodes= [];
+        if (window.localStorage.hasOwnProperty('nodes') && window.localStorage.nodes !== null) {
+            this.nodes = $.parseJSON(window.localStorage.nodes);
+        }
+
     }
 
     // Public
     var functions = {
+        /**
+         * Set the IP of nodes of this cluster
+         * @param nodes
+         */
+        setNodes: function(nodes) {
+            this.nodes = nodes;
+            window.localStorage.setItem('nodes', JSON.stringify(nodes));
+        },
         get: function(api, options) {
             return sendRequest.call(this, api, options, APITypes.GET);
         },
@@ -114,7 +128,7 @@ define([
          * @returns {Promise<T>}
          */
         failover: function() {
-            getResponsiveNodes().then(function(candidates) {
+            getResponsiveNodes.call(this).then(function(candidates) {
                 if (! candidates) {
                     console.error('No API is currently responsive. Reloading in the 5 seconds in hopes of fixing the issue');
                     window.setTimeout(function() {
@@ -166,7 +180,7 @@ define([
      * @returns {Promise<Array<String>>}
      */
     function getResponsiveNodes(nodes) {
-        nodes = nodes || shared.nodes;
+        nodes = nodes || this.nodes;
 
         function filterAndReturnURL() {
             var args = Array.prototype.slice.call(arguments);
@@ -204,6 +218,15 @@ define([
         })
     }
     // Private
+    /**
+     * Send a request towards the server
+     * Authentication is handled by the http interceptor
+     * Most frequent errors are handled by the http interceptor
+     * @param api: API call to make
+     * @param options: Options to take in consideration
+     * @param type: Type of call
+     * @return {Promise<T>}
+     */
     function sendRequest(api, options, type) {
         var self = this;
         options = options || {};
@@ -252,9 +275,6 @@ define([
                 callData.data = data;
             }
         }
-        if (shared.authentication.loggedIn()) {
-            callData.headers.Authorization = shared.authentication.generateBearerToken();
-        }
         var start = generic.getTimestamp();
         var call = '/api/' + relayParams.relay + api + (api === '' ? '?' : '/?') + querystring.join('&');
         return sendAjax.call(this, call, callData)
@@ -265,29 +285,6 @@ define([
                 }
                 return data;
             })
-            .then(function(data){
-                return data
-            }, function(error) {
-                // Check if it is not the browser navigating away but an actual error
-                if (error.readyState === ReadyStates.DONE) {
-                    if (error.status === StatusCodes.BAD_GATEWAY) {
-                        // Current API host is not responding
-                        return self.failover();
-                    } else if ([StatusCodes.FORBIDDEN, StatusCodes.UNAUTHORIZED].contains(error.status)) {
-                        var responseData = $.parseJSON(error.responseText);
-                        if (responseData.error === 'invalid_token') {
-                            shared.authentication.logout();
-                        }
-                        throw error;
-                    }
-                } else if (error.readyState === ReadyStates.UNSENT && error.status === StatusCodes.REQUEST_UNCOMPLETE) {
-                    // Default state of an XHR. Could mean a timeout.
-                    // Relay might be given. The relay could have timed out because it took too long to fetch
-                    return self.failover();
-                }
-                // Throw it again
-                throw error;
-            });
     }
 
     /**

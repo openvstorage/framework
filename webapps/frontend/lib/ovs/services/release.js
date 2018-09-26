@@ -13,29 +13,20 @@
 //
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
-/*global define, window */
-define([
-    'jquery', 'ovs/shared', 'ovs/generic'
-], function($, shared, generic) {
-    'use strict';
+/*global define */
+define([],
+    function() {
+    "use strict";
 
     /**
-     * Set of helpers related to promises
+     * Contains the release name
+     * ReleaseName is currently filled in after logging in in the authentication service
      * @constructor
      */
-    function GenericPromise() {}
+    function ReleaseService(){
+        this.releaseName = ''
+    }
 
-    var functions = {
-        /**
-         * Retries a promise at most maxRetries times
-         * @param otherArgs: Arguem
-         * @param maxRetries
-         * @param promise
-         */
-        retryPromiseAtMost: function() {
-            throw new Error('Needs to be implemented')
-        }
-    };
-    GenericPromise.prototype = functions;
-    return new GenericPromise()
+    ReleaseService.prototype = {};
+    return new ReleaseService()
 });

@@ -24,8 +24,9 @@ define(['jquery', 'i18next'],
      * @constructor
      */
     function TranslationService(){
-        this.defaultLanguage = defaultLanguage;
-        this.language = defaultLanguage;
+        var lang = window.navigator.userLanguage || window.navigator.language || defaultLanguage;
+        this.defaultLanguage = lang;
+        this.language = lang;
     }
     TranslationService.prototype = {
         /**

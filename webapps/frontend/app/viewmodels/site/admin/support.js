@@ -17,11 +17,13 @@
 define([
     'knockout', 'jquery', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher',
-    '../../containers/support/statsmonkey', '../../containers/storagerouter/storagerouter',
-    '../../wizards/statsmonkeyconfigure/index',
+    'ovs/services/authentication',
+    'viewmodels/containers/support/statsmonkey', 'viewmodels/containers/storagerouter/storagerouter',
+    'viewmodels/wizards/statsmonkeyconfigure/index',
     'viewmodels/services/storagerouter'
 ], function(ko, $, dialog,
             shared, generic, Refresher,
+            authentication,
             StatsMonkeyConfigVM, StorageRouter,
             StatsMonkeyConfigureWizard,
             storagerouterService) {
@@ -69,6 +71,12 @@ define([
             return timestamp;
         });
 
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
+        self.canEditSettings = ko.pureComputed(function() {
+            return self.canManage() && self.selectedSupportSettings().contains('stats_monkey') && self.origStatsMonkeyConfig.isInitialized()
+        });
         // Functions
         self.disableSupportSetting = function(name) {
             return ko.computed(function() {

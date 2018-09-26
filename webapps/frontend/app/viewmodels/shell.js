@@ -16,11 +16,11 @@
 /*global define, window, require */
 define([
     'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
-    'ovs/shared', 'ovs/routing', 'ovs/generic',
+    'ovs/shared', 'ovs/routing', 'ovs/generic','ovs/services/authentication',
     'ovs/plugins/cssloader', 'ovs/plugins/pluginloader',
     'viewmodels/services/misc'
 ], function ($, router, system, activator, bootstrap, i18n,
-             shared, routing, generic,
+             shared, routing, generic, authentication,
              cssLoader, pluginLoader,
              miscService) {
     "use strict";
@@ -86,9 +86,9 @@ define([
                                     backendsActive = true;
                                 }
                             });
-                            self.shared.authentication.metadata = metadata.authentication_metadata;
+                            authentication.metadata = metadata.authentication_metadata;
                             if (metadata.authenticated) {
-                                metadataPromises.push(self.shared.authentication.dispatch(true));
+                                metadataPromises.push(authentication.dispatch(true));
                             }
                             // Wait for all promises to resolve
                             return $.when.apply($, metadataPromises);

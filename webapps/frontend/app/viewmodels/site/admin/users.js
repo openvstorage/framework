@@ -17,14 +17,21 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/services/authentication',
     'viewmodels/containers/user/user', 'viewmodels/containers/user/client', 'viewmodels/containers/user/group', 'viewmodels/containers/user/role',
     'viewmodels/wizards/changepassword/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, User, Client, Group, Role, ChangePasswordWizard) {
+], function($, app, dialog, ko,
+            shared, generic, Refresher, api,
+            authentication,
+            User, Client, Group, Role,
+            ChangePasswordWizard) {
     "use strict";
     return function () {
         var self = this;
 
         // Variables
+        self.loggedInuser  = authentication.user;
+
         self.widgets       = [];
         self.shared        = shared;
         self.guard         = { authenticated: true };
@@ -54,6 +61,12 @@ define([
         self.groupMapping       = ko.observable({});
 
         // Computed
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
+        self.canWrite = ko.pureComputed(function() {
+            return authentication.user.canWrite()
+        });
         self.selectedUserGuid = ko.computed({
             write: function(guid) {
                 self._selectedUserGuid(guid);
