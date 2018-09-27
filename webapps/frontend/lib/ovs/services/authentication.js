@@ -35,7 +35,7 @@ define([
 
         // Computed
         self.canManage = ko.pureComputed(function() {
-            return self.roles().contains('write')
+            return self.roles().contains('manage')
         });
         self.canWrite = ko.pureComputed(function() {
             return self.roles().contains('write')
