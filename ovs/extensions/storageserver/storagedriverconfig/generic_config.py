@@ -32,3 +32,16 @@ class GenericConfig():
             if vars(self) == vars(other):
                 return False
         return True
+
+    def get_difference(self, other):
+        diff_keys = {}
+        if isinstance(other, type(self)) and self != other:
+            diff_keys = other.copy()
+            for key, value in vars(other).iteritems():
+                if value == getattr(self, key):
+                    diff_keys.pop(key)
+
+        return diff_keys
+
+
+

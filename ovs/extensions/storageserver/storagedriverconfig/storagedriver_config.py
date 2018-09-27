@@ -33,12 +33,11 @@ class VRegistryConfig(GenericConfig):
         :param vregistry_arakoon_cluster_id: Arakoon cluster identifier for the volume registry
         :param vregistry_arakoon_cluster_nodes:  an array of arakoon cluster node configurations for the volume registry, each containing node_id, host and port
         :param vregistry_arakoon_timeout_ms: Arakoon client timeout in milliseconds for the volume registry
-        :param args:
-        :param kwargs:
         """
         self.vregistry_arakoon_cluster_id = vregistry_arakoon_cluster_id
         self.vregistry_arakoon_cluster_nodes = vregistry_arakoon_cluster_nodes
         self.vregistry_arakoon_timeout_ms = vregistry_arakoon_timeout_ms
+
 
 class DtlConfig(GenericConfig):
 
@@ -47,10 +46,10 @@ class DtlConfig(GenericConfig):
         Initiate the volumedriverfs config: dtl configuration
         :param dtl_path: path to the directory the DTL writes its data in
         :param dtl_transport: transport to use for the DTL (RDMA|TCP)
-        :param kwargs:
         """
         self.dtl_path = dtl_path
         self.dtl_transport = dtl_transport
+
 
 class DlsConfig(GenericConfig):
     def __init__(self, dls_type=None, dls_arakoon_timeout_ms=None, dls_arakoon_cluster_id=None, dls_arakoon_cluster_nodes=None, *args, **kwargs):
@@ -60,12 +59,12 @@ class DlsConfig(GenericConfig):
         :param dls_arakoon_timeout_ms: Arakoon client timeout in milliseconds for the distributed lock store
         :param dls_arakoon_cluster_id: Arakoon cluster identifier for the distributed lock store
         :param dls_arakoon_cluster_nodes:  an array of arakoon cluster node configurations for the distributed lock store, each containing node_id, host and port
-        :param kwargs:
         """
         self.dls_type = dls_type
         self.dls_arakoon_timeout_ms = dls_arakoon_timeout_ms
         self.dls_arakoon_cluster_id = dls_arakoon_cluster_id
         self.dls_arakoon_cluster_nodes = dls_arakoon_cluster_nodes
+
 
 class S3ConnectionConfig(object):
     def __init__(self, s3_connection_host=None, s3_connection_port=None, s3_connection_use_ssl=None, s3_connection_flavour=None, s3_connection_username=None,
@@ -81,7 +80,6 @@ class S3ConnectionConfig(object):
         :param s3_connection_ssl_cert_file: When backend_type is S3: path to a file holding the SSL certificate
         :param s3_connection_ssl_verify_host: When backend_type is S3: whether to verify the SSL certificate's subject against the host
         :param s3_connection_verbose_logging: When backend_type is S3: whether to do verbose logging
-        :param kwargs:
         """
         self.s3_connection_host = s3_connection_host
         self.s3_connection_port = s3_connection_port
@@ -92,6 +90,7 @@ class S3ConnectionConfig(object):
         self.s3_connection_ssl_cert_file = s3_connection_ssl_cert_file
         self.s3_connection_ssl_verify_host = s3_connection_ssl_verify_host
         self.s3_connection_verbose_logging = s3_connection_verbose_logging
+
 
 class NetworkConfig(GenericConfig):
     def __init__(self, network_uri=None, network_xio_slab_config=None, network_workqueue_max_threads=None, network_snd_rcv_queue_depth=None,
@@ -104,14 +103,14 @@ class NetworkConfig(GenericConfig):
         :param network_snd_rcv_queue_depth: Maximum tx/rx queued messages
         :param network_max_neighbour_distance: Hide nodes that have a distance >= this value from network clients
         :param network_workqueue_ctrl_max_threads: Maximum control path workqueue threads
-        :param kwargs:
         """
         self.network_uri = network_uri
         self.network_xio_slab_config = network_xio_slab_config
         self.network_workqueue_max_threads = network_workqueue_max_threads
         self.network_snd_rcv_queue_depth = network_snd_rcv_queue_depth
-        self.network_max_neighbour_distance =network_max_neighbour_distance
+        self.network_max_neighbour_distance = network_max_neighbour_distance
         self.network_workqueue_ctrl_max_threads = network_workqueue_ctrl_max_threads
+
 
 class MdsConfig(GenericConfig):
     def __init__(self, mds_nodes=None, mds_db_type=None, mds_threads=None, mds_poll_secs=None, mds_cached_pages=None, mds_timeout_secs=None, *args, **kwargs):
@@ -123,7 +122,6 @@ class MdsConfig(GenericConfig):
         :param mds_poll_secs: Poll interval for the backend check in seconds
         :param mds_cached_pages: Capacity of the metadata page cache per volume
         :param mds_timeout_secs: Timeout for network transfers - (0 -> no timeout!)
-        :param kwargs:
         """
         self.mds_nodes = mds_nodes
         self.mds_db_type = mds_db_type
@@ -132,6 +130,7 @@ class MdsConfig(GenericConfig):
         self.mds_cached_pages = mds_cached_pages
         self.mds_timeout_secs = mds_timeout_secs
 
+
 class EventsConfig(GenericConfig):
     def __init__(self, events_amqp_uris=None, events_amqp_exchange=None, events_amqp_routing_key=None, *args, **kwargs):
         """
@@ -139,11 +138,11 @@ class EventsConfig(GenericConfig):
         :param events_amqp_uris: array of URIs, each consisting of an "amqp_uri" entry for a node of the AMQP cluster events shall be sent to
         :param events_amqp_exchange: AMQP exchange events will be sent to
         :param events_amqp_routing_key: AMQP routing key used for sending events
-        :param kwargs:
         """
         self.events_amqp_uris = events_amqp_uris
         self.events_amqp_exchange = events_amqp_exchange
         self.events_amqp_routing_key = events_amqp_routing_key
+
 
 class ScoCacheConfig(GenericConfig):
     def __init__(self, backoff_gap, trigger_gap, scocache_mount_points, *args, **kwargs):
@@ -152,11 +151,11 @@ class ScoCacheConfig(GenericConfig):
         :param backoff_gap: scocache-mountpoint freespace objective for scocache-cleaner
         :param trigger_gap: scocache-mountpoint freespace threshold below which scocache-cleaner is triggered
         :param scocache_mount_point: An array of directories and sizes to be used as scocache mount points
-        :param kwargs:
         """
         self.trigger_gap = trigger_gap
         self.backoff_gap = backoff_gap
         self.scocache_mount_points = scocache_mount_points
+
 
 class FiledriverConfig(GenericConfig):
     def __init__(self, fd_namespace, fd_cache_path, fd_extent_cache_capacity=None, *args, **kwargs):
@@ -170,6 +169,7 @@ class FiledriverConfig(GenericConfig):
         self.fd_cache_path = fd_cache_path
         self.fd_extent_cache_capacity = fd_extent_cache_capacity
 
+
 class ScrubManagerConfig(GenericConfig):
     def __init__(self, scrub_manager_interval=None, scrub_manager_sync_wait_secs=None, scrub_manager_max_parent_scrubs=None, *args, **kwargs):
         """
@@ -181,6 +181,7 @@ class ScrubManagerConfig(GenericConfig):
         self.scrub_manager_interval = scrub_manager_interval
         self.scrub_manager_sync_wait_secs = scrub_manager_sync_wait_secs
         self.scrub_manager_max_parent_scrubs = scrub_manager_max_parent_scrubs
+
 
 class ContentCacheConfig(GenericConfig):
     def __init__(self, read_cache_serialization_path=None, serialize_read_cache=None, clustercache_mount_points=None, *args, **kwargs):
@@ -195,7 +196,7 @@ class ContentCacheConfig(GenericConfig):
         self.clustercache_mount_points = clustercache_mount_points
 
 
-class StorageDriverConfig(object):
+class StorageDriverConfig(GenericConfig):
     """
     Usage:
     Config classes with non-essential parameters may be left out as parameter.
@@ -217,6 +218,8 @@ class StorageDriverConfig(object):
     contentcache_config = ContentCacheConfig(**my_dict)
     scrub_manager_config = ScrubManagerConfig(**my_dict)
 
+    Note that this object 'my_dict' must be a flat dict with all containing parameters. These parameters will then be formatted as needed for the volumedriver
+
     pprint.pprint(StorageDriverConfig(backend_config=backend_config,
                                       vrouter_config=vrouter_config,
                                       volume_manager_config=volume_manager_config,
@@ -234,11 +237,13 @@ class StorageDriverConfig(object):
                                       scrub_manager_config=scrub_manager_config,
                                       **my_dict).get_config())
     """
+
     def __init__(self, vrouter_cluster_id,
                  filedriver_config, vregistry_config, vrouter_config, volume_manager_config, filesystem_config, dtl_config, scocache_config,
                  backend_config=None, mds_config=None, dls_config=None, events_config=None, network_config=None, contentcache_config=None, scrub_manager_config=None,
                  backend_type=None, num_threads=None, shm_region_size=None, stats_collector_destination=None, stats_collector_interval_secs=None,
-                 asio_service_manager_threads=None, asio_service_manager_io_service_per_thread=None, fuse_min_workers=None, fuse_max_workers=None, bgc_threads=None,*args, **kwargs):
+                 asio_service_manager_threads=None, asio_service_manager_io_service_per_thread=None, fuse_min_workers=None, fuse_max_workers=None, bgc_threads=None, *args, **kwargs):
+        # type: (str, FiledriverConfig, VRegistryConfig, VRouterConfig, VolumeManagerConfig, FilesystemConfig, DtlConfig, ScoCacheConfig, Optional[BackendConfig],Optional[MdsConfig], Optional[DlsConfig], EventsConfig[object], NetworkConfig[object], ContentCacheConfig[object], ScrubManagerConfig[object], Optional[str], Optional[int], Optional[int], Optional[str], Optional[int], Optional[int], Optional[int], Optional[int], Optional[int], Optional[int], args, kwargs) -> None
 
         self.vrouter_cluster_id = vrouter_cluster_id
 
@@ -279,9 +284,8 @@ class StorageDriverConfig(object):
         self.scrub_manager_config = scrub_manager_config or ScrubManagerConfig()
         self._config = {}
 
-
-
     def get_config(self):
+        # type: () -> str
         """
         Get the config of the instantiated class
         :return: dict
@@ -310,4 +314,28 @@ class StorageDriverConfig(object):
                         'volume_registry': self.vregistry_config.get_config(),
                         'volume_router': self.vrouter_config.get_config(),
                         'volume_router_cluster': {'vrouter_cluster_id': self.vrouter_cluster_id}}
-        return json.dumps(ExtensionsToolbox.filter_dict_for_none(self._config))
+        return json.dumps(ExtensionsToolbox.filter_dict_for_none(self._config), sort_keys=True)
+
+    def get_difference(self, other):
+        # type: (GenericConfig) -> Dict[str, GenericConfig]
+        """
+        Retrieve the difference between two StoragedriverConfig objects.
+        :param other: other storagedriverconfig object to compare the current object with
+        :type other: GenericConfig
+        :return: dict
+        """
+        if not isinstance(other, GenericConfig):
+            raise RuntimeError('Parameter `other` should be of type `GenericConfig`')
+        self_config = json.loads(self.get_config())
+        differences = self_config.copy() # make deep copy: remove if equal. This way, keys present only in the original dict will still be present,
+                                            # and keys only present in the dict compared with, will result in a difference -> added to differences
+        other_config = json.loads(other.get_config())
+
+        for other_key, other_value in other_config.iteritems():
+            self_value = self_config.get(other_key, None)
+            if self_value == other_value:
+                differences.pop(other_key)
+            else:
+                differences[other_key] = other_value
+        return differences
+

@@ -41,7 +41,6 @@ class BackendConfig(GenericConfig):
         :param backend_interface_partial_read_retry_interval_msecs: delay before retrying a failed partial read in milliseconds
         :param backend_interface_partial_read_retry_interval_max_msecs: max delay before retrying a failed partial read in milliseconds
         :param backend_interface_partial_read_retry_backoff_multiplier: multiplier for the retry interval on each subsequent retry (< 0 -> backend_interface_retry_backoff_multiplier is used)
-
         :param backend_type: Type of backend connection one of ALBA, LOCAL, MULTI or S3, the other parameters in this section are only used when their correct backendtype is set
 
         """
@@ -50,7 +49,6 @@ class BackendConfig(GenericConfig):
             raise RuntimeError('Local_connection_path needs to be provided if backendtype is LOCAL')
 
         self.local_connection_path = local_connection_path
-
         self.backend_connection_pool_capacity = backend_connection_pool_capacity
         self.backend_interface_retries_on_error = backend_interface_retries_on_error
         self.backend_interface_retry_interval_secs = backend_interface_retry_interval_secs
@@ -79,6 +77,7 @@ class BackendConfig(GenericConfig):
         # Assign Alba connection configs per proxy to the backend config
         fixed_config = self.alba_connection_config.get_config()
         fixed_config['local_connection_path'] = self.local_connection_path
+        fixed_config['backend_type'] = self.backend_type
         tmp_dict = dict([(i, fixed_config) for i in xrange(self._nr_of_proxies)])
 
         # Assign other config keys to the backend config
