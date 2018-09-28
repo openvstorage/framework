@@ -199,7 +199,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <li class="active"  data-bind="tooltip: 'ovs:generic.vdisks'">
                 <a href="#vdisks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vdisks"></a>
             </li>
-            <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage')">
+            <li data-bind="tooltip: 'ovs:generic.management', visible: $root.canManage()">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
         </ul>
@@ -246,7 +246,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     </table>
                 </div>
             </div>
-            <div class="tab-pane" id="management" style="padding: 15px;" data-bind="visible: $root.shared.user.roles().contains('manage')">
+            <div class="tab-pane" id="management" style="padding: 15px;" data-bind="visible: $root.canManage()">
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>

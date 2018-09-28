@@ -239,10 +239,10 @@ class VDisk(DataObject):
             # @todo replace RuntimeError with NodeNotReachableException
             except Exception as exception:
                 if is_connection_failure(exception):
-                    self._logger.debug('VDisk {0} status has been set to UNKNOWN'.format(self.name))
+                    self._logger.exception('VDisk {0} status has been set to UNKNOWN'.format(self.name))
                     vdisk_state = VDisk.STATUSES.UNKNOWN
                 else:
-                    self._logger.debug('Uncaught exception occurred when requesting the volume info for vDisk {0}: {1}'.format(self.name, ex))
+                    self._logger.exception('Uncaught exception occurred when requesting the volume info for vDisk {0}'.format(self.name))
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():

@@ -16,10 +16,13 @@
 /*global define */
 define([
     'jquery', 'plugins/dialog', 'knockout',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api', 'ovs/services/authentication',
     'viewmodels/containers/vpool/vpool',
     'viewmodels/wizards/addvpool/index'
-], function($, dialog, ko, shared, generic, Refresher, api, VPool, AddVPoolWizard) {
+], function($, dialog, ko,
+            shared, generic, Refresher, api, authentication,
+            VPool,
+            AddVPoolWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -44,6 +47,9 @@ define([
         // Observables
         self.vPools = ko.observableArray([]);
 
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
         // Functions
         self.loadVPools = function(options) {
             return $.Deferred(function(deferred) {

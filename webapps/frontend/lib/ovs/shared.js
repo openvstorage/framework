@@ -16,9 +16,9 @@
 /*global define */
 define([
     'knockout', 'jquery',
-    'ovs/routing'],
+    'ovs/routing', 'ovs/services/tasks'],
     function(ko, $,
-             routing){
+             routing, tasks){
     "use strict";
     var modes = Object.freeze({
         FULL: 'full'
@@ -27,6 +27,7 @@ define([
     function Shared() {
         var self = this;
 
+        self.tasks          = tasks;
         self.mode           = ko.observable(modes.FULL);
         self.routing        = routing;
         self.footerData     = ko.observable(ko.observable());

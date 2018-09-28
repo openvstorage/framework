@@ -17,12 +17,12 @@
 define([
     'plugins/router', 'jquery', 'knockout',
     'ovs/api',
-    'ovs/services/release', 'ovs/services/messaging', 'ovs/services/translation', 'ovs/services/cookie',
-    'viewmodels/services/user'
+    'ovs/services/release', 'ovs/services/messaging', 'ovs/services/translation', 'ovs/services/cookie', 'ovs/services/notifications',
+    'viewmodels/services/user', "viewmodels/services/misc"
 ], function(router, $, ko,
             api,
-            releaseService, messaging, translation, cookieService,
-            userService){
+            releaseService, messaging, translation, cookieService, notifications,
+            userService, miscService){
     "use strict";
 
     function User(guid, username, roles) {
@@ -54,29 +54,29 @@ define([
 
         // Variables
         self.onLoggedIn = [
-            messaging.start.call(messaging),
-            function () {
-                // Retrieve the current user details
-                return $.when().then(function() {
-                    return miscService.metadata()
-                        .then(function (metadata) {
-                                if (!metadata.authenticated) {
-                                    // This shouldn't be the case, but is checked anyway.
-                                    self.logout();
-                                    throw new Error('User was not logged in. Logging out')
-                                }
-                                self.metadata = metadata.authentication_metadata;
-                                self.user.username(metadata.username);
-                                self.user.guid(metadata.userguid);
-                                self.user.roles(metadata.roles);
-                                releaseService.releaseName = metadata.release.name;
-                                return self.user.guid()
-                            })
+            function() {
+                return messaging.start.call(messaging)
+            },
+            // Retrieve the current user details
+            function() {
+                return miscService.metadata()
+                    .then(function (metadata) {
+                            if (!metadata.authenticated) {
+                                // This shouldn't be the case, but is checked anyway.
+                                self.logout();
+                                throw new Error('User was not logged in. Logging out')
+                            }
+                            self.metadata = metadata.authentication_metadata;
+                            self.user.username(metadata.username);
+                            self.user.guid(metadata.userguid);
+                            self.user.roles(metadata.roles);
+                            releaseService.releaseName = metadata.release.name;
+                            return self.user.guid()
                         })
-                        .then(userService.fetchUser)
-                        .then(function (data) {
-                            translation.setLanguage.call(translation, data.language);
-                        })
+                    .then(userService.fetchUser)
+                    .then(function (data) {
+                        translation.setLanguage.call(translation, data.language);
+                    })
             },
             function () {  // Handle event type messages
                 messaging.subscribe.call(messaging, 'EVENT', notifications.handleEvent);
@@ -190,10 +190,10 @@ define([
             if (!login) {
                 arr = this.onLoggedOut;
             }
-            $.each(arr, function(index, promise) {
-                events.push(promise)
+            $.each(arr, function(index, promise_cb) {
+                events.push(promise_cb())
             });
-            return $.when.apply($, events);
+            return $.when.apply(this, events);
         },
         /**
          * Generate the beared token
