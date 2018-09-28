@@ -1,0 +1,75 @@
+<!--
+Copyright (C) 2017 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <!-- ko foreach: questions -->
+        <!-- ko if: canDisplay -->
+            <div class="form-group" data-bind="css: { 'has-error': $parent.validation().fields.contains(id) }">
+                <label class="col-lg-3 control-label" data-bind="attr: { 'for': id }, translate: translation()"></label>
+                <div class="col-lg-7">
+                    <!-- ko if: input.type === 'widget' -->
+                    <div data-bind="widget: {kind: input.widgetName, item:data}"></div>
+                    <!-- /ko -->
+                    <!-- ko if: !['dropdown', 'widget'].contains(input.type)-->
+                    <input class="autofocus form-control" style="width: 9.375em;display:inline-block;"
+                           data-bind="value: data,
+                                      valueUpdate: 'afterkeydown',
+                                      attr:{'id': id, 'type': input.type}"/>
+                    <!-- /ko -->
+                    <!-- ko if: input.type === 'dropdown' -->
+                    <span data-bind="dropdown: {
+                                         items: input.items, target: data,
+                                         text: input.textFormatFunc
+                                     }">
+
+                    </span>
+                    <!-- /ko -->
+                    <!-- ko if: extendable() === false && field !== id -->
+                    <span style="padding-left: 0.1em;">
+                        <i data-bind="click: function() { $parent.removeFormItem($index); }"
+                            class="hand fa fa-fw" style="padding-top: 0.5em;" data-i18n="[html]ovs:icons.delete"></i>
+                    </span>
+                    <!-- /ko -->
+                    <!-- ko if: hasHelpText -->
+                        <p class="help-block" data-bind="translate: helpTextTranslation()"></p>
+                    <!-- /ko -->
+                </div>
+            </div>
+            <!-- ko if: extendable -->
+            <div class="form-group">
+                <div class="col-lg-3"></div>
+                <div class="col-lg-3">
+                    <span class="hand" data-bind="attr: {id: 'buttonAdd' +field},
+                                                  click: function(question){
+                                                        return $parent.insertGenerateFormItem(question.field)
+                                                  }">
+                        <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+                        <span class="hand" data-bind="translate: extendTranslation()"></span>
+                    </span>
+                </div>
+            </div>
+            <!-- /ko -->
+        <!-- /ko -->
+    <!-- /ko -->
+    <div class="alert alert-danger" data-bind="visible: !validation().value" style="margin-bottom: -0.625em;">
+        <p data-bind="visible: validation().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: validation().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: validation().reasons.length > 0, foreach: validation().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>
