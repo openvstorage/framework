@@ -16,13 +16,13 @@
 /*global define, window, require */
 define([
     'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
-    'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
-    'ovs/authentication', 'ovs/plugins/cssloader', 'ovs/notifications', 'ovs/pluginloader',
-    'viewmodels/services/user', 'viewmodels/services/misc'
+    'ovs/shared', 'ovs/routing', 'ovs/generic','ovs/services/authentication',
+    'ovs/plugins/cssloader', 'ovs/plugins/pluginloader',
+    'viewmodels/services/misc'
 ], function ($, router, system, activator, bootstrap, i18n,
-             shared, routing, Messaging, generic, Tasks,
-             Authentication, cssLoader, notifications, pluginLoader,
-             userService, miscService) {
+             shared, routing, generic, authentication,
+             cssLoader, pluginLoader,
+             miscService) {
     "use strict";
     // Initially load in all routes
     router.map(routing.mainRoutes)
@@ -31,14 +31,6 @@ define([
 
     return function () {
         var self = this;
-
-        self._translate = function () {
-            return $.when().then(function () {
-                i18n.setLng(self.shared.language, function () {
-                    $('html').i18n(); // Force retranslation of complete UI
-                });
-            })
-        };
 
         self.shared = shared;
         self.router = router;
@@ -59,60 +51,6 @@ define([
                 });
         };
         self.activate = function () {
-            self.shared.messaging = new Messaging();
-            self.shared.authentication = new Authentication();
-            self.shared.tasks = new Tasks();
-            self.shared.routing = routing;
-
-            self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
-            self.shared.authentication.onLoggedIn.push(function () {
-                return $.when().then(function() {
-                    return miscService.metadata()
-                        .then(function (metadata) {
-                                if (!metadata.authenticated) {
-                                    // This shouldn't be the case, but is checked anyway.
-                                    self.shared.authentication.logout();
-                                    throw new Error('User was not logged in. Logging out')
-                                }
-                                self.shared.authentication.metadata = metadata.authentication_metadata;
-                                self.shared.user.username(metadata.username);
-                                self.shared.user.guid(metadata.userguid);
-                                self.shared.user.roles(metadata.roles);
-                                self.shared.releaseName = metadata.release.name;
-                                return self.shared.user.guid()
-                            })
-                        })
-                        .then(userService.fetchUser)
-                        .then(function (data) {
-                            self.shared.language = data.language;
-                        })
-                        .then(self._translate)
-            });
-            self.shared.authentication.onLoggedIn.push(function () {
-                self.shared.messaging.subscribe('EVENT', notifications.handleEvent);
-            });
-            self.shared.authentication.onLoggedOut.push(function () {
-                self.shared.language = self.shared.defaultLanguage;
-                return self._translate();
-            });
-            var token = window.localStorage.getItem('accesstoken'), state, expectedState;
-            if (token === null) {
-                token = generic.getCookie('accesstoken');
-                if (token !== null) {
-                    state = generic.getCookie('state');
-                    expectedState = window.localStorage.getItem('state');
-                    if (state === null || state !== expectedState) {
-                        token = null;
-                    } else {
-                        window.localStorage.setItem('accesstoken', token);
-                    }
-                    generic.removeCookie('accesstoken');
-                    generic.removeCookie('state');
-                }
-            }
-            if (token !== null) {
-                self.shared.authentication.accessToken(token);
-            }
             return $.when().then(function() {
                     return miscService.metadata()
                         // @todo handle failures - do a promise retry and swallow error on x'th retry
@@ -148,9 +86,9 @@ define([
                                     backendsActive = true;
                                 }
                             });
-                            self.shared.authentication.metadata = metadata.authentication_metadata;
+                            authentication.metadata = metadata.authentication_metadata;
                             if (metadata.authenticated) {
-                                metadataPromises.push(self.shared.authentication.dispatch(true));
+                                metadataPromises.push(authentication.dispatch(true));
                             }
                             // Wait for all promises to resolve
                             return $.when.apply($, metadataPromises);

@@ -42,6 +42,9 @@ define([
         self.status          = ko.observable();
         self.saving          = ko.observable(false);
 
+        self.isRunning = ko.pureComputed(function() {
+            return self.status() === 'running'
+        });
         // Functions
         self.fillData = function(data) {
             if (self.edit() === true) {

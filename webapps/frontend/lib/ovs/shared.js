@@ -14,34 +14,36 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['knockout'], function(ko){
+define([
+    'knockout', 'jquery',
+    'ovs/routing', 'ovs/services/tasks'],
+    function(ko, $,
+             routing, tasks){
     "use strict";
-    var singleton = function() {
-        var pluginData = {};
-        return {
-            messaging      : undefined,
-            tasks          : undefined,
-            authentication : undefined,
-            defaultLanguage: 'en-US',
-            language       : 'en-US',
-            mode           : ko.observable('full'),
-            routing        : undefined,
-            footerData     : ko.observable(ko.observable()),
-            nodes          : undefined,
-            identification : ko.observable(),
-            releaseName    : '',
-            pluginData     : pluginData,
-            user           : {
-                username: ko.observable(),
-                guid    : ko.observable(),
-                roles   : ko.observableArray([])
-            },
-            hooks          : {
-                dashboards: [],
-                wizards   : {},
-                pages     : {}
-            }
+    var modes = Object.freeze({
+        FULL: 'full'
+    });
+
+    function Shared() {
+        var self = this;
+
+        self.tasks          = tasks;
+        self.mode           = ko.observable(modes.FULL);
+        self.routing        = routing;
+        self.footerData     = ko.observable(ko.observable());
+        self.identification = ko.observable();
+        self.releaseName    = '';
+        self.pluginData     = {};
+        self.hooks          = {
+            dashboards: [],
+            wizards: {},
+            pages: {}
         };
-    };
-    return singleton();
+
+        self.fullMode = ko.pureComputed(function() {
+            return self.mode() === modes.FULL
+        })
+    }
+    Shared.prototype = { };
+    return new Shared();
 });

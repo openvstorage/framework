@@ -16,8 +16,9 @@
 /*global define, window */
 define([
     'jquery', 'knockout', 'plugins/router',
-    'ovs/shared'
-], function($, ko, router, shared) {
+    'ovs/shared', 'ovs/services/authentication'
+], function($, ko, router,
+            shared, authentication) {
     "use strict";
     return function() {
         var self = this;
@@ -35,7 +36,7 @@ define([
         // Functions
         self.login = function() {
             self.failed(false);
-            self.shared.authentication.login(self.username(), self.password())
+            authentication.login(self.username(), self.password())
                 .done(function() {
                     self.loggedIn(true);
                     if (self.referrer) {

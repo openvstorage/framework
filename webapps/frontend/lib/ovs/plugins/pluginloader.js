@@ -16,7 +16,7 @@
 /*global define, window */
 define(['jquery', 'knockout',
     'durandal/system', 'durandal/activator',
-    'ovs/routing', 'ovs/shared', 'ovs/viewcache'
+    'ovs/routing', 'ovs/shared', 'ovs/services/viewcache'
 ], function ($, ko,
              system, activator,
              routing, shared, viewcache) {

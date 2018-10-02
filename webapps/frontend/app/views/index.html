@@ -16,7 +16,7 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <nav class="navbar navbar-default navbar-fixed-top" data-bind="visible: shared.mode() === 'full'">
+    <nav class="navbar navbar-default navbar-fixed-top" data-bind="visible: shared.fullMode()">
         <div class="noise">
             <div class="container">
                 <div class="navbar-header">
@@ -38,7 +38,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         </li>
                     </ul>
                     <!-- below: navbar-right has float: right behavior -->
-                    <ul class="nav navbar-nav navbar-right" data-bind="visible: shared.authentication.loggedIn">
+                    <ul class="nav navbar-nav navbar-right" data-bind="visible: authentication.loggedIn">
                         <li class="dropdown">
                             <a href="#" class="dropdown-toggle" data-toggle="dropdown"><span data-i18n="ovs:generic.administration"></span> <b class="caret"></b></a>
                             <ul class="dropdown-menu">
@@ -50,7 +50,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <li class="divider"></li>
                                 <li><a class="hand" href="/api/"><span data-i18n="ovs:generic.api"></span> <i style="color: lightgrey; padding-left: 5px;" class="fa" data-i18n="[html]ovs:icons.externallink"></i></a></li>
                                 <li class="divider"></li>
-                                <li><a class="hand" data-bind="click: shared.authentication.logout"><span data-i18n="ovs:generic.logout"></span>: <i><span data-bind="text: shared.user.username"></span></i></a></li>
+                                <li><a class="hand" data-bind="click: authentication.logout"><span data-i18n="ovs:generic.logout"></span>: <i><span data-bind="text: authentication.user.username"></span></i></a></li>
                             </ul>
                         </li>
                     </ul>
@@ -62,7 +62,7 @@ but WITHOUT ANY WARRANTY of any kind.
         </div>
     </nav>
     <div class="wrapper">
-        <div class="container page-host" data-bind="css: { 'page-host': shared.mode() === 'full' }, router: { cacheViews: true }"></div>
+        <div class="container page-host" data-bind="css: { 'page-host': shared.fullMode() }, router: { cacheViews: true }"></div>
     </div>
     <div class="footer" data-bind="footer: { data: shared.footerData }"></div>
 </div>

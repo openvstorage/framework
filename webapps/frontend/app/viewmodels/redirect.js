@@ -14,7 +14,7 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['ovs/shared'], function(shared) {
+define([], function() {
     "use strict";
     return {
         canActivate: function() {

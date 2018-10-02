@@ -16,9 +16,12 @@
 /*global define, window */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
-    'ovs/shared', 'ovs/generic',
+    'ovs/shared', 'ovs/generic', 'ovs/api',
+    'ovs/services/authentication',
     'jqp/timeago'
-], function(router, dialog, $, shared, generic) {
+], function(router, dialog, $,
+            shared, generic, api,
+            authentication) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];
@@ -35,11 +38,11 @@ define([
         var state, metadata;
         if (instance !== undefined && instance.hasOwnProperty('guard')) {
             if (instance.guard.authenticated === true) {
-                if (!instance.shared.authentication.validate()) {
+                if (!authentication.loggedIn()) {
                     window.localStorage.setItem('referrer', instruction.fragment);
                     state = window.localStorage.getItem('state');
-                    if (state === null && instance.shared.authentication.metadata.mode === 'remote') {
-                        metadata = instance.shared.authentication.metadata;
+                    if (state === null && authentication.metadata.mode === 'remote') {
+                        metadata = authentication.metadata;
                         state = generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10);
                         window.localStorage.setItem('state', state);
                         return metadata.authorize_uri +
@@ -58,30 +61,26 @@ define([
     };
     childRouter.mapUnknownRoutes('../404');
 
-    return {
-        shared: shared,
-        router: childRouter,
+    function IndexViewModel() {
+        this.shared = shared;
+        this.router = childRouter;
+        this.authentication = authentication;
+    }
+    IndexViewModel.prototype = {
         activate: function(mode) {
-            var self = this;
             // Config
-            self.shared.mode(mode);
-
+            shared.mode(mode);
             // Notifications
             $.pnotify.defaults.history = false;
             $.pnotify.defaults.styling = "bootstrap";
 
             // Fetch main API metadata
-            $.ajax('/api/?timestamp=' + (new Date().getTime()), {
-                    type: 'GET',
-                    contentType: 'application/json',
-                    timeout: 5000,
-                    headers: { Accept: 'application/json' }
-                })
+            api.get('', { timeout: 5000 })
                 .done(function(metadata) {
-                    shared.nodes = metadata.storagerouter_ips;
+                    api.setNodes(metadata.storagerouter_ips);
                     shared.identification(metadata.identification);
-                    window.localStorage.setItem('nodes', JSON.stringify(shared.nodes));
                 });
         }
     };
+    return IndexViewModel
 });

@@ -62,7 +62,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </td>
 
             </tr>
-            <tr data-part="vnew" data-bind="visible: $root.shared.user.roles().contains('manage'), with: $root.newDomain()">
+            <tr data-part="vnew" data-bind="visible: $root.canManage(), with: $root.newDomain()">
                 <td><input title="createDomain" type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
                 <td>
                     <i data-bind="click: function() {

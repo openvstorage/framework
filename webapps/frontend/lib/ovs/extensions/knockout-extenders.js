@@ -137,12 +137,11 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             optional = regex.optional;
             regex = regex.regex;
         }
-
         computed = ko.computed({
             read: target,
             write: function(newValue) {
                 target(newValue);
-                if (newValue !== undefined) {
+                if (newValue) {
                     valid(newValue.match(regex) !== null);
                 } else {
                     valid(optional);

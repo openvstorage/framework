@@ -18,8 +18,12 @@ define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/shared', 'ovs/generic',
     'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/storagerouter/storagerouter',
+    'viewmodels/services/vdisk',
     './data'
-], function($, ko, api, shared, generic, VDisk, StorageRouter, data) {
+], function($, ko, api, shared, generic,
+            VDisk, StorageRouter,
+            vdiskService,
+            data) {
     "use strict";
     return function() {
         var self = this;
@@ -41,16 +45,16 @@ define([
             }
             if (data.amount() === 1) {
                 return $.t('ovs:wizards.create_ft.gather.amount_one', {
-                    devicename: generic.cleanDeviceName(data.name())
+                    devicename: vdiskService.cleanDeviceName(data.name())
                 });
             }
             var start = data.name() + '-' + data.startnr(),
                 end = data.name() + '-' + (data.startnr() + data.amount() - 1);
             return $.t('ovs:wizards.create_ft.gather.amount_multiple', {
                 start: start,
-                devicestart: generic.cleanDeviceName(start),
+                devicestart: vdiskService.cleanDeviceName(start),
                 end: end,
-                deviceend: generic.cleanDeviceName(end)
+                deviceend: vdiskService.cleanDeviceName(end)
             });
         });
         self.canStart = ko.computed(function() {

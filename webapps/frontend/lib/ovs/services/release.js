@@ -1,4 +1,4 @@
-// Copyright (C) 2016 iNuron NV
+// Copyright (C) 2018 iNuron NV
 //
 // This file is part of Open vStorage Open Source Edition (OSE),
 // as available from
@@ -14,18 +14,19 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define(['jquery', 'ovs/generic'], function($, generic) {
+define([],
+    function() {
     "use strict";
-    function handleEvent(data) {
-        //if (data.type === 'foobar') {
-        //    generic.alertInfo(
-        //        $.t('ovs:events.' + data.type),
-        //        $.t('ovs:events.' + data.type + '_content', data.metadata)
-        //    );
-        //}
+
+    /**
+     * Contains the release name
+     * ReleaseName is currently filled in after logging in in the authentication service
+     * @constructor
+     */
+    function ReleaseService(){
+        this.releaseName = ''
     }
 
-    return {
-        handleEvent: handleEvent
-    };
+    ReleaseService.prototype = {};
+    return new ReleaseService()
 });

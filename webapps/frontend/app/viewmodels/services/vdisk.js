@@ -25,12 +25,10 @@ define([
     function VDiskService() {
         var self = this;
 
-        self.shared = shared;
-
         /**
          * Loads the vdisk
          * @param guid: guid of the vdisk
-         * @returns {Deferred}
+         * @returns {Promise<T>}
          */
         self.loadVDisk = function (guid) {
             return api.get('vdisks/' + guid)
@@ -38,39 +36,85 @@ define([
         /**
          * Loads the config params of the vdisk
          * @param guid: Additional query params.
-         * @returns {Deferred}
+         * @returns {Promise<T>}
          */
         self.loadConfig = function (guid) {
             return api.get('vdisks/' + guid + '/get_config_params')
-                .then(self.shared.tasks.wait)
+                .then(shared.tasks.wait)
         };
+        /**
+         * Update the configuration parameters of the VDisk
+         * @param guid: Guid of the VDisk
+         * @param new_config_params: New config params
+         * @returns {Promise<T>}
+         */
         self.setConfig = function (guid, new_config_params) {
                 return api.post('vdisks/' + guid + '/set_config_params', {
                     data: { new_config_params: new_config_params}
                 })
-                .then(self.shared.tasks.wait)
+                .then(shared.tasks.wait)
         };
+        /**
+         * Set the VDisk as template
+         * @param guid: Guid of the VDisk
+         * @returns {Promise<T>}
+         */
         self.setAsTemplate = function (guid){
             return api.post('vdisks/' + guid + '/set_as_template')
-                .then(self.shared.tasks.wait)
+                .then(shared.tasks.wait)
         };
-
+        /**
+         * Scrub the VDisk
+         * @param guid: Guid of the VDisk
+         * @returns {Promise<T>}
+         */
         self.scrub = function (guid){
             return api.post('vdisks/' + guid + '/scrub')
-                .then(self.shared.tasks.wait)
+                .then(shared.tasks.wait)
         };
+        /**
+         * Remove a snapshot from the VDisk
+         * @param guid: Guid of the VDisk
+         * @param snapshotid: ID of the snapshot
+         * @returns {Promise<T>}
+         */
         self.removeSnapshot = function (guid, snapshotid){
             return api.post('vdisks/' + guid + '/remove_snapshot', {
                     data: { snapshot_id: snapshotid }
-                }).then(self.shared.tasks.wait)
+                }).then(shared.tasks.wait)
         };
+        /**
+         * Remove a VDisk
+         * @param guid: Guid of the VDisk
+         * @returns {Promise<T>}
+         */
         self.removeVDisk = function (guid){
             return api.del('vdisks/' + guid)
-                .then(self.shared.tasks.wait)
+                .then(shared.tasks.wait)
         };
+        /**
+         * Restart a VDisk
+         * @param guid: Guid of the VDisk
+         * @returns {Promise<T>}
+         */
         self.restart = function (guid){
-            return api.post('vdisks/' + vd.guid() + '/restart')
-                .then(self.shared.tasks.wait)
+            return api.post('vdisks/' + guid + '/restart')
+                .then(shared.tasks.wait)
+        };
+        /**
+         * Cleans the device name of a VDisk
+         * @param name: Name of the VDisk
+         * @returns {string}
+         */
+        self.cleanDeviceName = function(name) {
+            var cleaned = name.replace(/^(\/)+|(\/)+$/g, '').replace(/ /g,"_").replace(/[^a-zA-Z0-9-_\.\/]+/g, "");
+            while (cleaned.indexOf('//') > -1) {
+                cleaned = cleaned.replace(/\/\//g, '/');
+            }
+            if (cleaned.length > 4 && cleaned.slice(-4) === '.raw') {
+                return cleaned;
+            }
+            return cleaned + '.raw';
         }
     }
     return new VDiskService();

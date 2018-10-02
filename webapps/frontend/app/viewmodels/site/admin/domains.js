@@ -17,8 +17,12 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/services/authentication',
     'viewmodels/containers/domain/domain'
-], function($, app, dialog, ko, shared, generic, Refresher, api, Domain) {
+], function($, app, dialog, ko,
+            shared, generic, Refresher, api,
+            authentication,
+            Domain) {
     "use strict";
     return function () {
         var self = this;
@@ -41,6 +45,9 @@ define([
         self.domainsHandle = {};
 
         // Computed
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
         self.domainNames = ko.computed(function() {
             var names = [];
             $.each(self.domains(), function(i, domain) {

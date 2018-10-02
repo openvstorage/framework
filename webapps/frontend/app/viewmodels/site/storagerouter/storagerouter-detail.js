@@ -17,11 +17,14 @@
 define([
     'jquery', 'durandal/app', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/services/authentication',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/containers/domain/domain', 'viewmodels/containers/vdisk/vdisk',
     'viewmodels/wizards/configurepartition/index'
 ], function(
-    $, app, ko, dialog, shared, generic, Refresher, api,
+    $, app, ko, dialog, shared,
+    generic, Refresher, api,
+    authentication,
     StorageRouter, VPool, StorageDriver, Domain, VDisk,
     ConfigurePartitionWizard
 ) {
@@ -104,6 +107,19 @@ define([
                 }
             });
             return domains;
+        });
+
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
+        self.canEdit = ko.pureComputed(function() {
+            return self.storageRouter().loaded() && self.canManage() && !self.markingOffline() && !self.refreshing()
+        });
+        self.canRefresh = ko.pureComputed(function() {
+            return self.canManage() && !self.markingOffline()
+        });
+        self.canMarkOffline = ko.pureComputed(function() {
+            return self.canManage() && !self.refreshing()
         });
 
         // Functions

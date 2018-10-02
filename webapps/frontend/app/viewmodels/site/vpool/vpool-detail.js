@@ -16,12 +16,12 @@
 /*global define */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api', 'ovs/services/authentication',
     'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vdisk/vdisk',
     'viewmodels/wizards/addvpool/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index'
 ], function($, app, dialog, ko, router,
-            shared, generic, Refresher, api,
+            shared, generic, Refresher, api, authentication,
             VPool, StorageDriver, StorageRouter, VDisk,
             ExtendVPool, CreateHPRMConfigsWizard, ReconfigureVPool) {
     "use strict";
@@ -93,6 +93,10 @@ define([
                 }
             });
             return collapsed;
+        });
+
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
         });
 
         // Functions
@@ -275,7 +279,7 @@ define([
             });
         };
         self.removeStorageRouter = function(sr) {
-            var single = generic.keys(self.srSDMap()).length === 1;
+            var single = Object.keys(self.srSDMap()).length === 1;
             if (self.srSDMap().hasOwnProperty(sr.guid()) && self.srSDMap()[sr.guid()].canBeDeleted() === true && self.refreshList().length === 0) {
                 self.updatingStorageRouters(true);
                 app.showMessage(

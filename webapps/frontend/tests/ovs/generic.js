@@ -64,16 +64,11 @@ define([
             expect(generic.getCookie('generic_unittest_x')).toBe(undefined);
         });
 
-        it('keys should list all object keys', function() {
-            Object.prototype.invalidValue = 0;
-            expect(generic.keys({ abc: 1, def: 2, xyz: 3 })).toEqual(['abc', 'def', 'xyz']);
-        });
-
         it('removeElement should remove the correct item', function() {
             var array = [123, 456, 789];
-            generic.removeElement(array, 456);
+            array.remove(456)
             expect(array).toEqual([123, 789]);
-            generic.removeElement(array, 0);
+            array.remove(array, 0);
         });
 
         it('smooth should smooth a transition', function() {

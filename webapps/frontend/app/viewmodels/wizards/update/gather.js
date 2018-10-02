@@ -68,7 +68,7 @@ define([
                     reasons.push($.t('ovs:wizards.update.component_choose'));
                 }
             }
-            reasons = generic.arrayFilterUnique(reasons);
+            reasons = reasons.getUnqiue();
             return { value: reasons.length === 0, reasons: reasons, fields: [] };
         });
         self.frameworkMessages = ko.computed(function() {
@@ -89,8 +89,8 @@ define([
                     }
                 });
             }
-            downtimes = generic.arrayFilterUnique(downtimes);
-            prerequisites = generic.arrayFilterUnique(prerequisites);
+            downtimes = downtimes.getUnqiue();
+            prerequisites = prerequisites.getUnqiue();
             downtimes.sort(function(downtime1, downtime2) {
                 return downtime1 < downtime2 ? -1 : 1;
             });
@@ -118,8 +118,8 @@ define([
                     }
                 });
             }
-            downtimes = generic.arrayFilterUnique(downtimes);
-            prerequisites = generic.arrayFilterUnique(prerequisites);
+            downtimes = downtimes.getUnqiue();
+            prerequisites = prerequisites.getUnqiue()
             downtimes.sort(function(downtime1, downtime2) {
                 return downtime1 < downtime2 ? -1 : 1;
             });
@@ -147,8 +147,8 @@ define([
                         prerequisites.push($.t(plugin.name + ':wizards.update.prerequisites.' + prereq[0]) + ': ' + prereq[1])
                     }
                 });
-                downtimes = generic.arrayFilterUnique(downtimes);
-                prerequisites = generic.arrayFilterUnique(prerequisites);
+                downtimes = downtimes.getUnqiue();
+                prerequisites = prerequisites.getUnqiue();
                 downtimes.sort(function(downtime1, downtime2) {
                     return downtime1 < downtime2 ? -1 : 1;
                 });

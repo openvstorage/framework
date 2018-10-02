@@ -34,12 +34,12 @@ but WITHOUT ANY WARRANTY of any kind.
                         <span data-bind="text: group() !== undefined ? group().description() : '-'"></span>
                         <i class="hand fa fa-fw edit-button" data-i18n="[html]ovs:icons.edit" style="padding-left: 10px; display: none;"
                            data-bind="click: function() {
-                                          if (!$root.groupsInitialLoad() && guid() !== $root.shared.user.guid()) {
+                                          if (!$root.groupsInitialLoad() && guid() !== $root.loggedInUser.guid()) {
                                               backupValue(groupGuid());
                                               edit(true);
                                           }
                                       },
-                                      style: { color: !$root.groupsInitialLoad() && guid() !== $root.shared.user.guid() ? 'black' : 'lightgrey' }"></i>
+                                      style: { color: !$root.groupsInitialLoad() && guid() !== $root.loggedInUser.guid() ? 'black' : 'lightgrey' }"></i>
                     </span>
                     <span data-bind="visible: edit()">
                         <span data-bind="dropdown: {
@@ -61,15 +61,15 @@ but WITHOUT ANY WARRANTY of any kind.
                     <i data-bind="click: function() { $root.changePassword($data.guid()); }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.password"></i>
                     <i data-bind="click: function() {
-                                      if (guid() !== $root.shared.user.guid()) {
+                                      if (guid() !== $root.loggedInUser.guid()) {
                                           $root.deleteUser($data.guid());
                                       }
                                   },
-                                  style: { color: guid() !== $root.shared.user.guid() ? 'black' : 'lightgrey' }"
+                                  style: { color: guid() !== $root.loggedInUser.guid() ? 'black' : 'lightgrey' }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
                 </td>
             </tr>
-            <tr data-part="vnew" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newUser()">
+            <tr data-part="vnew" data-bind="visible: $root.canManage(), with: $root.newUser()">
                 <td><input type="text" data-bind="value: username, valueUpdate: 'input'" style="width: 200px;"/></td>
                 <td>
                     <span data-bind="dropdown: {
@@ -127,15 +127,15 @@ but WITHOUT ANY WARRANTY of any kind.
                 </td>
                 <td>
                     <i data-bind="click: function() {
-                                      if ($.inArray('write', $root.shared.user.roles()) !== -1) {
+                                      if ($root.canWrite()) {
                                           $root.deleteClient($data.guid());
                                       }
                                   },
-                                  style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' }"
+                                  style: { color: $root.canWrite() ? 'black' : 'lightgrey' }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
                 </td>
             </tr>
-            <tr data-part="vnew" data-bind="visible: $root.selectedUserGuid() !== undefined && $.inArray('write', $root.shared.user.roles()) !== -1, with: $root.newClient()">
+            <tr data-part="vnew" data-bind="visible: $root.selectedUserGuid() && $root.canWrite(), with: $root.newClient()">
                 <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
                 <td><i data-i18n="ovs:generic.generated"></i></td>
                 <td><i data-i18n="ovs:generic.generated"></i></td>

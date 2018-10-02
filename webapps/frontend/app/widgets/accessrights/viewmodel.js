@@ -15,9 +15,12 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic', 'ovs/shared', 'ovs/api',
+    'jquery', 'knockout',
+    'ovs/generic', 'ovs/shared', 'ovs/api', 'ovs/services/authentication',
     'viewmodels/containers/user/user', 'viewmodels/containers/user/client'
-], function($, ko, generic, shared, api, User, Client) {
+], function($, ko,
+            generic, shared, api, authentication,
+            User, Client) {
     "use strict";
     return function() {
         var self = this;
@@ -58,7 +61,9 @@ define([
         self.clientRights = ko.computed(function() {
             return self.rights()['clients'];
         });
-
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
         // Functions
         self.loadUsers = function() {
             return $.Deferred(function(deferred) {

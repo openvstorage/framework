@@ -17,9 +17,13 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/services/authentication',
     'viewmodels/containers/backend/backend', 'viewmodels/containers/backend/backendtype', 'viewmodels/containers/domain/domain',
     'viewmodels/wizards/addbackend/index'
-], function($, dialog, ko, shared, generic, Refresher, api, Backend, BackendType, Domain, AddBackendWizard) {
+], function($, dialog, ko,
+            shared, generic, Refresher, api,
+            authentication,
+            Backend, BackendType, Domain, AddBackendWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -51,6 +55,9 @@ define([
         self.backendsHandle         = {};
         self.domainsHandle          = undefined;
 
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
         // Functions
         self.loadBackends = function(options) {
             return $.Deferred(function(deferred) {

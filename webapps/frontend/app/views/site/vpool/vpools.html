@@ -19,7 +19,7 @@ but WITHOUT ANY WARRANTY of any kind.
     <div>
         <h2 class="pull-left" data-i18n="ovs:vpools.title"></h2>
         <button class="btn btn-default pull-right" id="buttonAddVpool"
-                data-bind="click: addVPool, enable: $root.shared.user.roles().contains('manage')"
+                data-bind="click: addVPool, enable: $root.canManage()"
                 style="margin-top: 20px; margin-bottom: 10px;">
             <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
             <span data-i18n="ovs:vpools.add"></span>

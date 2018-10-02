@@ -16,7 +16,8 @@
 /*global define */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/pluginloader',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/plugins/pluginloader',
+    'ovs/services/authentication',
     'viewmodels/containers/vdisk/vdisk', 'viewmodels/containers/vpool/vpool',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/domain/domain',
     'viewmodels/wizards/clone/index', 'viewmodels/wizards/vdiskmove/index', 'viewmodels/wizards/rollback/index', 'viewmodels/wizards/snapshot/index',
@@ -25,6 +26,7 @@ define([
 ], function(
     $, app, dialog, ko, router,
     shared, generic, Refresher, pluginLoader,
+    authentication,
     VDisk, VPool, StorageRouter, Domain,
     CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard,
     vdiskDetailData,
@@ -186,7 +188,7 @@ define([
             }
         };
         self.setAsTemplate = function() {
-            if (self.canSetAsTemplate() === true) {
+            if (self.canBeTemplated()) {
                 var vd = self.vDisk;
                 self.convertingToTemplate(true);
                 app.showMessage(
@@ -422,7 +424,7 @@ define([
             }
             return !self.convertingToTemplate() && !self.removing() && !self.restarting() && self.vDisk.liveStatus() === 'RUNNING';
         });
-        self.canSetAsTemplate = ko.pureComputed(function() {
+        self.canBeTemplated = ko.pureComputed(function() {
             if (self.vDisk === undefined) {
                 return false;
             }
@@ -475,7 +477,39 @@ define([
                 return features.alba.features !== undefined && features.alba.features.contains('block-cache');
             }
         });
-
+        self.canManage = ko.pureComputed(function() {
+            return authentication.user.canManage()
+        });
+        self.canWriteAndModify = ko.pureComputed(function() {
+             return authentication.user.canWrite() && self.canBeModified()
+        });
+        self.canManageAndModify = ko.pureComputed(function() {
+            return self.canManage() && self.canBeModified()
+        });
+        self.canSnapshot = ko.pureComputed(function() {
+            return self.canWriteAndModify() && !self.data.blocked_actions().contains('snapshot');
+        });
+        self.canRollBack = ko.pureComputed(function() {
+            return self.canWriteAndModify() && !self.data.blocked_actions().contains('rollback');
+        });
+        self.canClone = ko.pureComputed(function() {
+            return self.canWriteAndModify() && !self.data.blocked_actions().contains('clone');
+        });
+        self.canMove = ko.pureComputed(function() {
+            return self.canWriteAndModify() && !self.data.blocked_actions().contains('move');
+        });
+        self.canScrub = ko.pureComputed(function() {
+            return self.canManageAndModify() && !self.data.blocked_actions().contains('scrub');
+        });
+        self.canSetAsTemplate = ko.pureComputed(function() {
+            return self.canWriteAndModify() && !self.data.blocked_actions().contains('set_as_template');
+        });
+        self.canRestart = ko.pureComputed(function() {
+            return self.canManageAndModify() && !self.data.blocked_actions().contains('restart') && self.vDisk.liveStatus() !== 'RUNNING';
+        });
+        self.canRemove = ko.pureComputed(function() {
+            return self.canManageAndModify() && !self.data.blocked_actions().contains('remove') && !self.removing() && !self.convertingToTemplate();
+        });
         // Durandal
         self.activate = function (mode, guid) {
                     self.plugin_pages = pluginLoader.get_plugin_pages(self.vDiskString, guid);

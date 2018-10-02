@@ -222,7 +222,7 @@ class VPoolController(object):
 
     @classmethod
     @ovs_task(name='ovs.vpool.shrink_vpool')
-    def shrink_vpool(cls, storagedriver_guid, offline_storage_router_guids=list()):
+    def shrink_vpool(cls, storagedriver_guid, offline_storage_router_guids=None):
         """
         Removes a StorageDriver (if its the last StorageDriver for a vPool, the vPool is removed as well)
         :param storagedriver_guid: Guid of the StorageDriver to remove
@@ -236,6 +236,8 @@ class VPoolController(object):
         # TODO: Add logging
         # TODO: Unit test individual pieces of code
         # Validations
+        if offline_storage_router_guids is None:
+            offline_storage_router_guids = []
         storagedriver = StorageDriver(storagedriver_guid)
         storagerouter = storagedriver.storagerouter
         cls._logger.info('StorageDriver {0} - Deleting StorageDriver {1}'.format(storagedriver.guid, storagedriver.name))
@@ -295,13 +297,24 @@ class VPoolController(object):
         cls._logger.info('StorageDriver {0} - Removing stale vDisks'.format(storagedriver.guid))
         VDiskController.remove_stale_vdisks(vpool=vp_installer.vpool)
 
-        # Reconfigure the MDSes
+        # Un-configure or reconfigure the MDSes
         cls._logger.info('StorageDriver {0} - Reconfiguring MDSes'.format(storagedriver.guid))
-        for vdisk_guid in storagerouter.vdisks_guids:
-            try:
-                MDSServiceController.ensure_safety(vdisk_guid=vdisk_guid, excluded_storagerouter_guids=[storagerouter.guid] + offline_storage_router_guids)
-            except Exception:
-                cls._logger.exception('StorageDriver {0} - vDisk {1} - Ensuring MDS safety failed'.format(storagedriver.guid, vdisk_guid))
+        vdisks = set()
+        mds_services_to_remove = [mds_service for mds_service in storagedriver.vpool.mds_services if mds_service.service.storagerouter_guid == storagerouter.guid]
+        for mds in mds_services_to_remove:
+            for junction in mds.vdisks:
+                vdisk = junction.vdisk
+                if vdisk in vdisks:
+                    continue
+                vdisks.add(vdisk)
+                vdisk.invalidate_dynamics(['storagedriver_id'])
+                if vdisk.storagedriver_id:
+                    try:
+                        StorageRouterController._logger.debug('StorageDriver {0} - vDisk {1} - Ensuring MDS safety'.format(storagedriver.guid, vdisk.guid))
+                        MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid,
+                                                           excluded_storagerouter_guids=[storagerouter.guid] + offline_storage_router_guids)
+                    except Exception:
+                        cls._logger.exception('StorageDriver {0} - vDisk {1} - Ensuring MDS safety failed'.format(storagedriver.guid, vdisk.guid))
 
         # Validate that all MDSes on current StorageRouter have been moved away
         # Ensure safety does not always throw an error, that's why we perform this check here instead of in the Exception clause of above code
