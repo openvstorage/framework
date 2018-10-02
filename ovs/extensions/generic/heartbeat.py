@@ -77,7 +77,7 @@ class HeartBeat(object):
         :return: None
         :rtype: NoneType
         """
-        current_time = current_time or time.time()
+        current_time = current_time
         try:
             # Check timeout of other nodes and clear arp cache
             if storagerouter.heartbeats and 'process' in storagerouter.heartbeats and current_time - storagerouter.heartbeats['process'] >= cls.ARP_TIMEOUT:
