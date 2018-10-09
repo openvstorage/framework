@@ -265,7 +265,7 @@ define([
         };
         self.isEmpty = generic.isEmpty;
         self.configureRoles = function(partition, disk) {
-            if (self.shared.user.roles().contains('manage')) {
+            if (authentication.user.canManage()) {
                 dialog.show(new ConfigurePartitionWizard({
                     modal: true,
                     partition: partition,
