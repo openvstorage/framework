@@ -30,7 +30,7 @@ define([
         var self = this;
 
         // Variables
-        self.loggedInuser  = authentication.user;
+        self.loggedInUser  = authentication.user;
 
         self.widgets       = [];
         self.shared        = shared;
