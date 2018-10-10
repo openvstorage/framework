@@ -276,7 +276,8 @@ define([
             }
         }
         var start = generic.getTimestamp();
-        var call = '/api/' + relayParams.relay + api + (api === '' ? '?' : '/?') + querystring.join('&');
+        var relay = relayParams.relay || '';
+        var call = '/api/' + relay + api + (api === '' ? '?' : '/?') + querystring.join('&');
         return sendAjax.call(this, call, callData)
             .then(function(data) {
                 var timing = generic.getTimestamp() - start;
