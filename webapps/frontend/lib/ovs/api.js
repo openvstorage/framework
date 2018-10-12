@@ -87,6 +87,10 @@ define([
         this.testMode = false;
         this.testReplies = new MockedReplies();
 
+        this.failing_over = false;
+        this.max_failover_tries = 10;
+        this.failover_try_delay = 5 * 1000; // Miliseconds
+
         this.defaultTimeout = 120 * 1000;  // Milliseconds
         this.defaultRelay = {relay: ''};
         this.defaultContentType = 'application/json';
@@ -125,28 +129,60 @@ define([
         },
         /**
          * Check to failover the GUI. Returns a deferred that will throw the error that was passed
-         * @returns {Promise<T>}
          */
         failover: function() {
-            getResponsiveNodes.call(this).then(function(candidates) {
-                if (! candidates) {
-                    console.error('No API is currently responsive. Reloading in the 5 seconds in hopes of fixing the issue');
-                    window.setTimeout(function() {
-                        location.reload(true);
-                    }, 5000);
-                } else {
-                    if (!candidates.contains(convertToURL(window.location.hostname))) {
-                        // Relay the UI to the first candidate
-                        console.warn('Current API is no longer responsive. Migrating to a different host in 5 seconds');
-                        window.setTimeout(function() {
-                            window.location.href = candidates[0];
-                        }, 5000);
-                    }
-                }
-            });
+            var self = this;
+            if (self.failing_over) {
+                return $.when()
+            }
+            self.failing_over = true;
+            return failover.call(self)
+                .always(function() {
+                    self.failing_over = false;
+                });
     }
     };
 
+    /**
+     * Failover the UI
+     * @param current_try: Current failover try
+     * @param max_tries: Maximum amount of tries
+     * @return {Promise<null>}
+     */
+    function failover(current_try, max_tries) {
+        var self = this;
+        if (typeof current_try === 'undefined') { current_try = 0}
+        if (typeof max_tries === 'undefined') { max_tries = self.max_failover_tries}
+
+        var remaining_tries = max_tries - current_try;
+        if (!remaining_tries) {
+            console.error('No retries left. Reloading the current page');
+            location.reload(true);
+            return $.when().then(function() {
+                return null
+            })
+        }
+
+        return getResponsiveNodes.call(self).then(function(candidates) {
+            console.warn('On try ' + current_try + ' for failing over (Remaining: '+ remaining_tries + ')');
+            if (candidates.length === 0) {
+                console.error('No API is currently responsive. Retrying in the 5 seconds in hopes of fixing the issue');
+                return generic.delay(self.failover_try_delay).then(
+                    function() {
+                        return failover.call(self, current_try + 1, max_tries)
+                    });
+            } else {
+                if (!candidates.contains(convertToURL(window.location.hostname))) {
+                    // Relay the UI to the first candidate
+                    console.warn('Current API is no longer responsive. Migrating to a different host in 5 seconds');
+                    return generic.delay(self.failover_try_delay).then(function() {
+                        window.location.href = candidates[0];
+                        return null // Keep the chain going
+                    })
+                }
+            }
+        })
+    }
     /**
      * Converts an IP to a URL
      * @param ip: IP to convert
@@ -195,11 +231,11 @@ define([
             }, [])
         }
         return generic.whenAll.apply(null, nodes.map(function (node) {
-                    var hostAddress = convertToURL(node);
-                    return validateHost(hostAddress);
-                })).then(
-                    filterAndReturnURL,  // Success
-                    filterAndReturnURL)  // Error. Map all responding nodes to the url
+            var hostAddress = convertToURL(node);
+            return validateHost(hostAddress);
+        })).then(
+            filterAndReturnURL,
+            filterAndReturnURL)
     }
     /**
      * Sends Ajax calls
@@ -228,7 +264,6 @@ define([
      * @return {Promise<T>}
      */
     function sendRequest(api, options, type) {
-        var self = this;
         options = options || {};
         var log = generic.tryGet(options, 'log', true);
         var querystring = [];

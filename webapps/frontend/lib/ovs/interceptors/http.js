@@ -61,19 +61,19 @@ define(['jquery',
             if (jqXhr.readyState === ReadyStates.DONE) {
                 if (jqXhr.status === StatusCodes.BAD_GATEWAY) {
                     // Current API host is not responding
-                    return api.failover();
+                    api.failover();
                 } else if ([StatusCodes.FORBIDDEN, StatusCodes.UNAUTHORIZED].contains(jqXhr.status)) {
                     var responseData = $.parseJSON(jqXhr.responseText);
                     if (responseData.error === 'invalid_token') {
                         authentication.logout();
                     }
-                    throw jqXhr;
                 }
             } else if (jqXhr.readyState === ReadyStates.UNSENT && jqXhr.status === StatusCodes.REQUEST_UNCOMPLETE) {
                 // Default state of an XHR. Could mean a timeout.
                 // Relay might be given. The relay could have timed out because it took too long to fetch
-                return api.failover();
+                api.failover();
             }
+            throw jqXhr;
         });
     }
     addHTTPInterceptors()
