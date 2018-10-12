@@ -284,7 +284,7 @@ define(['jquery', 'knockout',
                         return deferred.reject(value)
                     }
                     return deferred.resolve(value)
-                })
+                }, time)
             }).promise()
         },
         /**
