@@ -36,5 +36,5 @@ class OVSResponse(Response):
         self.timings = timings
 
     def build_timings(self):
-        self['Server-Timing'] = ','.join('{0}={1}; "{2}"'.format(key, timing_info[0] * 1000, timing_info[1])
+        self['Server-Timing'] = ','.join('{0};dur={1};desc={2}'.format(key, timing_info[0] * 1000, timing_info[1])
                                          for key, timing_info in self.timings.iteritems())
