@@ -78,7 +78,7 @@ define(['jquery'],
                     }
                 }
             }
-            return '';
+            return error;
         }
     };
 
