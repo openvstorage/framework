@@ -29,6 +29,7 @@ define([
 
         self.tasks          = tasks;
         self.mode           = ko.observable(modes.FULL);
+        self.modes          = modes;
         self.routing        = routing;
         self.footerData     = ko.observable(ko.observable());
         self.identification = ko.observable();
