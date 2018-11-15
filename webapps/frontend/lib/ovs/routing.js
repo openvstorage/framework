@@ -19,7 +19,9 @@ define(['jquery', 'knockout'], function($, ko) {
     var mainRoutes, siteRoutes, buildSiteRoutes, loadHash, extraRoutes, routePatches;
 
     mainRoutes = [
+       // When accessing the GUI without any mode, redirect to a :mode*details view
        { route: '',              moduleId: 'viewmodels/redirect', nav: false },
+       // Parent route for the whole GUI
        { route: ':mode*details', moduleId: 'viewmodels/index',    nav: false }
     ];
     siteRoutes = [

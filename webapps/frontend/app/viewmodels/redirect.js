@@ -14,13 +14,15 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define([], function() {
+define([
+   'ovs/shared'
+], function(shared) {
     "use strict";
     return {
         canActivate: function() {
-            var redirect = '#full';
+            // Returning an object with 'redirect' indicates that the canActivate will redirect the router to a different path
             return {
-                redirect: redirect
+                redirect: '#' + shared.modes.FULL
             };
         }
     };

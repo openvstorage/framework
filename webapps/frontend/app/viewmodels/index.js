@@ -23,10 +23,16 @@ define([
             shared, generic, api,
             authentication) {
     "use strict";
-    var mode, childRouter;
-    mode = router.activeInstruction().params[0];
+    var modeInstruction = router.activeInstruction().params[0];
+    var mode = modeInstruction|| shared.modes.FULL;
+    // I suspect that there is a bug within the Durandal router. This value is sometimes undefined which gets passed into
+    // route building. All routes are then prefixed with '#undefined'. Adding the failsafe to default to full is the work-around
+    // The actual cause is swept under the mat though (mainly because it has not been reproducable so far).
+    if (!modeInstruction) {
+        console.warn('Router received an invalid mode instruction. It was reverted to full. Instruction was {0}'.format([modeInstruction]))
+    }
     shared.routing.buildSiteRoutes(mode);
-    childRouter = router.createChildRouter()
+    var childRouter = router.createChildRouter()
                         .makeRelative({
                             moduleId: 'viewmodels/site',
                             route: ':mode',
@@ -67,6 +73,9 @@ define([
         this.authentication = authentication;
     }
     IndexViewModel.prototype = {
+        // Activate is called by the router with the params in the route
+        // The parent route in routing.js is { route: ':mode*details', moduleId: 'viewmodels/index',    nav: false }
+        // Which makes the first activate param the mode, the second the details (could be anything)
         activate: function(mode) {
             // Config
             shared.mode(mode);
