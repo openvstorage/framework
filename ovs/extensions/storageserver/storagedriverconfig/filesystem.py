@@ -14,10 +14,10 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from ovs.extensions.storageserver.storagedriverconfig.generic_config import GenericConfig
+from .base import BaseStorageDriverConfig
 
 
-class FilesystemConfig(GenericConfig):
+class FilesystemConfig(BaseStorageDriverConfig):
     """
     Filesystem container of the storagedriver config
     """

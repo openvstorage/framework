@@ -14,10 +14,10 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from ovs.extensions.storageserver.storagedriverconfig.generic_config import GenericConfig
+from .base import BaseStorageDriverConfig
 
 
-class BackendConfig(GenericConfig):
+class BackendConfig(BaseStorageDriverConfig):
     """
     Backendinterface container of the storagedriver config
     """
@@ -72,7 +72,6 @@ class BackendConfig(GenericConfig):
         if nr_of_proxies is isinstance(int, nr_of_proxies) and nr_of_proxies < 0:
             self._nr_of_proxies = nr_of_proxies
 
-
     def get_config(self):
         # Assign Alba connection configs per proxy to the backend config
         fixed_config = self.alba_connection_config.get_config()
@@ -91,7 +90,7 @@ class BackendConfig(GenericConfig):
         return tmp_dict
 
 
-class AlbaConnectionConfig(GenericConfig):
+class AlbaConnectionConfig(BaseStorageDriverConfig):
     def __init__(self, alba_connection_host=None, alba_connection_port=None, alba_connection_preset=None, alba_connection_timeout=None, alba_connection_use_rora=None,
                  alba_connection_transport=None, alba_connection_rora_timeout_msecs=None, alba_connection_rora_manifest_cache_capacity=None, alba_connection_asd_connection_pool_capacity=None,
                  *args, **kwargs):
