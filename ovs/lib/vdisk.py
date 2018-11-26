@@ -1577,18 +1577,32 @@ class VDiskController(object):
         """
         Set metadata page cache size to configured ratio
 
-        Terminology:
-        cache_capacity (the value set to set_metadata_cache_capacity) is the "number of pages to cache"
-        one page can cache "metadata_page_capacity" entries
-        an entry addresses one cluster of a volume
+        Volumedriver caches metadata entries in pages. A page contains 1 << Metadata cache bits entries.
+        Caching these pages in the volumedriver avoids requesting the page from the MDS (which lowers latency)
+        5 bits -> 2 ** 5 -> 32 entries per page
+        Every entry is 8 bytes. 32 * 8 = 256 bytes data per page. There is also some overhead to keep the pages in maps/lists
+        For convenience sake: 320 bytes for every page (64 bytes guestimated as overhead)
+
+        Each metadata entry in a page addresses a cluster of a volume (size of the cluster is the cluster size)
+        (Cluster size calculation within the volumedriver: 512 * cluster_multiplier = cluster_size)
+        (512 is the smallest addressable unit of a volume)
+        Every page can thus hold information for entries per page * cluster size data about the volume
+
+        This method will calculate the number of pages to cache. Caching all metadata pages for a volume is dividing the
+        size of the vdisk by the amount of data a single metadata page can cache.
+
+        The volumedriver will then cache that amount of pages. 320bytes is used for every page. A huge number of pages can
+        cause memory issues!
 
         Example:
-        A volume has a cluster_size of 4k (default) and a metadata_page_capacity of 32. A single page addresses 4k * 32 = 128k of a volume
-        So if a volume's size is 256M, the cache should have a capacity (cache_capacity) of 1024 to be completely in memory
+        A volume has a cluster_size of 4k (default) and a metadata_page_capacity of 32 (5 bits).
+        A single page addresses 4k * 32 = 128k of a volume
+        So if a volume's size is 256M, the number of pages to cache has to be 2048 (256M/128K)
+        This means that the volumedriver would reserve 640KB (2048 * 320byte) memory
 
-        Example 2:
-        A volume has a size of 256M, and a cluster_size of 4k, and a metadata_page_capacity of 32
-        If we want 10% of that volume to be cached, we need 256M / (4k * 32 = 128k) = 2048 => a cache_capacity of 205
+        The pagecache_ratio allows the user to control how much data the volume should be cached in metadata.
+        Say the user only whiches to hold 10% of the data cached in metadata. We'd set the number fo pages to 205 (2048*0.1)
+        This means that the volumedriver would reserve 64KB (205 * 320bytes) memory for this volume
 
         :param vdisk: Object vDisk
         :type vdisk: ovs.dal.hybrids.vdisk.VDisk
@@ -1618,14 +1632,17 @@ class VDiskController(object):
         storagedriver_config = StorageDriverConfiguration(vdisk.vpool_guid, storagedriver_id)
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
-        # noinspection PyTypeChecker
-        metadata_page_size = float(2 ** vdisk.vpool.metadata_store_bits * cluster_size)
-        cache_capacity = int(math.ceil(vdisk.size / metadata_page_size * ratio))
-
-        max_cache_capacity = int(2 * 1024 ** 4 / metadata_page_size)
-        cache_capacity = min(max_cache_capacity, cache_capacity)
-        VDiskController._logger.info('Setting metadata page cache size for vdisk {0} to {1}'.format(vdisk.name, cache_capacity))
-        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity, req_timeout_secs=10)
+        # Calculate the number of metadata entries per page.
+        entries_per_page = float(2 ** vdisk.vpool.metadata_store_bits)
+        # Each entry addresses one cluster. Calculate how much volume data can be covered with a single page.
+        volume_data_per_page = float(entries_per_page * cluster_size)
+        # Calculate the number of pages the volumedriver can cache with the configured ratio.
+        number_of_pages = int(math.ceil(vdisk.size / volume_data_per_page * ratio))
+        # Set a cap. Too many pages to cache can easily lead to OOM. This is not a golden value for all environments!
+        max_number_of_pages = int(2 * 1024 ** 4 / volume_data_per_page)
+        number_of_pages_to_configure = min(max_number_of_pages, number_of_pages)
+        VDiskController._logger.info('Setting metadata page cache capacity for vdisk {0} to {1}'.format(vdisk.name, number_of_pages_to_configure))
+        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), number_of_pages_to_configure, req_timeout_secs=10)
 
     @staticmethod
     def clean_devicename(name):
