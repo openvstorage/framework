@@ -13,6 +13,8 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND
+from ovs.extensions.generic.configuration import Configuration
 
 
 class VPoolShared(object):
@@ -22,7 +24,7 @@ class VPoolShared(object):
     """
 
     @staticmethod
-    def retrieve_alba_arakoon_config(alba_backend_guid, ovs_client):
+    def retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client):
         """
         Retrieve the ALBA Arakoon configuration
         WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
@@ -38,3 +40,35 @@ class VPoolShared(object):
         if successful is False:
             raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))
         return arakoon_config
+
+    @staticmethod
+    def retrieve_local_alba_arakoon_config(alba_backend_guid):
+        """
+        Retrieves the local ALBA Arakoon configuration.
+        WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
+        :param alba_backend_guid: Guid of the ALBA Backend
+        :type alba_backend_guid: str
+        :return: Arakoon configuration information
+        :rtype: dict
+        """
+        return Configuration.get(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), default=None)
+
+    @staticmethod
+    def sync_alba_arakoon_config(alba_backend_guid, ovs_client):
+        """
+        Compares the remote and local config. Updates the local config if needed. Guarantees the latest greatest config
+        WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
+        :param alba_backend_guid: Guid of the ALBA Backend
+        :type alba_backend_guid: str
+        :param ovs_client: OVS client object
+        :type ovs_client: OVSClient
+        :return: Arakoon configuration information
+        :rtype: dict
+        """
+        remote_config = VPoolShared.retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
+        current_config = Configuration.get(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), default=None)
+
+        if current_config != remote_config:
+            Configuration.set(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), remote_config)
+        return remote_config
+

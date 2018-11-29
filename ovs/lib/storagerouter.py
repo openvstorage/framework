@@ -605,23 +605,6 @@ class StorageRouterController(object):
         return mountpoints
 
     @staticmethod
-    def _retrieve_alba_arakoon_config(alba_backend_guid, ovs_client):
-        """
-        Retrieve the ALBA Arakoon configuration
-        :param alba_backend_guid: Guid of the ALBA Backend
-        :type alba_backend_guid: str
-        :param ovs_client: OVS client object
-        :type ovs_client: OVSClient
-        :return: Arakoon configuration information
-        :rtype: dict
-        """
-        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(alba_backend_guid))
-        successful, arakoon_config = ovs_client.wait_for_task(task_id, timeout=300)
-        if successful is False:
-            raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))
-        return arakoon_config
-
-    @staticmethod
     def _revert_vpool_status(vpool, status=VPool.STATUSES.RUNNING, storagedriver=None, client=None, dirs_created=None):
         """
         Remove the vPool being created or revert the vPool being extended

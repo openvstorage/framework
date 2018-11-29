@@ -504,7 +504,7 @@ class VPoolController(object):
                 if connection_info['host']:  # Remote Backend for accelerated Backend
                     alba_backend_guid = parameters[ctype]['backend_info']['alba_backend_guid']
                     ovs_client = OVSClient.get_instance(connection_info=connection_info)
-                    arakoon_config = VPoolShared.retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+                    arakoon_config = VPoolShared.sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
                     arakoons[ctype] = ArakoonClusterConfig.convert_config_to(arakoon_config, return_type='INI')
                 else:  # Local Backend for accelerated Backend
                     alba_backend_name = parameters[ctype]['backend_info']['alba_backend_name']
@@ -552,20 +552,4 @@ class VPoolController(object):
         local_client.dir_delete(directories='/opt/OpenvStorage/config/{0}'.format(identifier))
         return tgz_name
 
-    @staticmethod
-    def retrieve_alba_arakoon_config(alba_backend_guid, ovs_client):
-        """
-        Retrieve the ALBA Arakoon configuration
-        WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
-        :param alba_backend_guid: Guid of the ALBA Backend
-        :type alba_backend_guid: str
-        :param ovs_client: OVS client object
-        :type ovs_client: OVSClient
-        :return: Arakoon configuration information
-        :rtype: dict
-        """
-        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(alba_backend_guid))
-        successful, arakoon_config = ovs_client.wait_for_task(task_id, timeout=300)
-        if successful is False:
-            raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))
-        return arakoon_config
+

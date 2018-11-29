@@ -32,6 +32,7 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
@@ -43,7 +44,7 @@ from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.storagedriver import StorageDriverController
-
+from ovs.lib.helpers.vpool.shared import VPoolShared
 
 class StorageDriverInstaller(object):
     """
@@ -385,8 +386,9 @@ class StorageDriverInstaller(object):
         block_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_BLOCK]
         fragment_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_FRAGMENT]
 
+        #todo is this duplicate too? check on production
         # Obtain all arakoon configurations for each Backend (main, block cache, fragment cache)
-        arakoon_data = {'abm': vpool.metadata['backend']['backend_info']['arakoon_config']}
+        arakoon_data = {'abm': VPoolShared.retrieve_local_alba_arakoon_config(vpool.metadata['backend']['backend_info']['alba_backend_guid'])}
         if block_cache_settings['is_backend'] is True:
             arakoon_data['abm_bc'] = block_cache_settings['backend_info']['arakoon_config']
         if fragment_cache_settings['is_backend'] is True:

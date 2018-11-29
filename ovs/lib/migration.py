@@ -307,7 +307,7 @@ class MigrationController(object):
                                 backend_data = metadata.pop(metadata_key)  # Pop to mutate metadata
                                 new_cache_structure['is_backend'] = True
                                 # Copy over the old data
-                                new_cache_structure['backend_info']['arakoon_config'] = backend_data['arakoon_config']
+                                new_cache_structure['backend_info']['arakoon_config'] = backend_data['arakoon_config'] #todo fix migration code
                                 new_cache_structure['backend_info'].update(backend_data['backend_info'])
                                 new_cache_structure['backend_info']['connection_info'].update(backend_data['connection_info'])
                             else:
