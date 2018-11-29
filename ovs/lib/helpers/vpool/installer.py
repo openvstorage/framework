@@ -21,6 +21,7 @@ VpoolInstaller class responsible for adding/removing vPools
 import re
 import copy
 import json
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient
@@ -256,7 +257,7 @@ class VPoolInstaller(object):
         new_backend_info = copy.deepcopy(backend_info)
         preset_name = backend_info['preset']
         alba_backend_guid = backend_info['alba_backend_guid']
-        arakoon_config = VPoolShared.retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+        VPoolShared.sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
 
         # Requesting the remote stack for re-use in calculate read preference
         backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
@@ -286,7 +287,7 @@ class VPoolInstaller(object):
                                  'backend_guid': backend_dict['backend_guid'],
                                  'alba_backend_guid': alba_backend_guid,
                                  'connection_info': connection_info,
-                                 'arakoon_config': arakoon_config})
+                                 'arakoon_config': REMOTE_CONFIG_BACKEND.format(alba_backend_guid)})
 
         return new_backend_info
 
