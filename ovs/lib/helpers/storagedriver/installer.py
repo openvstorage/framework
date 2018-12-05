@@ -32,7 +32,7 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
@@ -341,12 +341,15 @@ class StorageDriverInstaller(object):
         def _generate_proxy_cache_config(cache_settings, cache_type, proxy_index):
             if cache_settings['read'] is False and cache_settings['write'] is False:
                 return ['none']
-
             if cache_settings['is_backend'] is True:
-                cfg_tree_name = 'abm_bc' if cache_type == StorageDriverConfiguration.CACHE_BLOCK else 'abm_aa'
+                if cache_type == StorageDriverConfiguration.CACHE_BLOCK:
+                    alba_backend_guid = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_BLOCK]['backend_info']['alba_backend_guid']
+                else:
+                    alba_backend_guid = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_FRAGMENT]['backend_info']['alba_backend_guid']
+
                 return ['alba', {'cache_on_read': cache_settings['read'],
                                  'cache_on_write': cache_settings['write'],
-                                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format(cfg_tree_name)),
+                                 'albamgr_cfg_url': Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid)),
                                  'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                 'preset': cache_settings['backend_info']['preset']}],
                                  'manifest_cache_size': manifest_cache_size}]
@@ -368,6 +371,8 @@ class StorageDriverInstaller(object):
             return scrub_cache_info
 
         def _generate_proxy_config(proxy_type, proxy_service):
+            alba_backend_guid = vpool.metadata['backend']['backend_info']['alba_backend_guid']
+
             proxy_config = {'log_level': 'info',
                             'port': proxy_service.service.ports[0] if proxy_type == 'main' else 0,
                             'ips': [self.storagedriver.storage_ip] if proxy_type == 'main' else ['127.0.0.1'],
@@ -375,7 +380,7 @@ class StorageDriverInstaller(object):
                             'fragment_cache': fragment_cache_main_proxy if proxy_type == 'main' else fragment_cache_scrub_proxy,
                             'transport': 'tcp',
                             'read_preference': read_preferences,
-                            'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
+                            'albamgr_cfg_url': Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid))}
             if self.sr_installer.block_cache_supported:
                 proxy_config['block_cache'] = block_cache_main_proxy if proxy_type == 'main' else block_cache_scrub_proxy
             return proxy_config
@@ -386,19 +391,16 @@ class StorageDriverInstaller(object):
         block_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_BLOCK]
         fragment_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_FRAGMENT]
 
-        #todo is this duplicate too? check on production
         # Obtain all arakoon configurations for each Backend (main, block cache, fragment cache)
         arakoon_data = {'abm': VPoolShared.retrieve_local_alba_arakoon_config(vpool.metadata['backend']['backend_info']['alba_backend_guid'])}
         if block_cache_settings['is_backend'] is True:
             arakoon_data['abm_bc'] = block_cache_settings['backend_info']['arakoon_config']
+
         if fragment_cache_settings['is_backend'] is True:
             arakoon_data['abm_aa'] = fragment_cache_settings['backend_info']['arakoon_config']
 
         for proxy_id, alba_proxy in enumerate(self.storagedriver.alba_proxies):
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
-            for arakoon_entry, arakoon_config in arakoon_data.iteritems():
-                arakoon_config = ArakoonClusterConfig.convert_config_to(config=arakoon_config, return_type='INI')
-                Configuration.set(config_tree.format(arakoon_entry), arakoon_config, raw=True)
 
             # Generate cache information for main proxy
             block_cache_main_proxy = _generate_proxy_cache_config(cache_type=StorageDriverConfiguration.CACHE_BLOCK, cache_settings=block_cache_settings, proxy_index=proxy_id)

@@ -13,9 +13,9 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
-from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND, REMOTE_CONFIG_BACKEND_INI
 from ovs.extensions.generic.configuration import Configuration
-
+from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 
 class VPoolShared(object):
     """
@@ -24,7 +24,7 @@ class VPoolShared(object):
     """
 
     @staticmethod
-    def retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client):
+    def _retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client):
         """
         Retrieve the ALBA Arakoon configuration
         WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
@@ -42,7 +42,7 @@ class VPoolShared(object):
         return arakoon_config
 
     @staticmethod
-    def retrieve_local_alba_arakoon_config(alba_backend_guid):
+    def retrieve_local_alba_arakoon_config(alba_backend_guid, as_ini=False):
         """
         Retrieves the local ALBA Arakoon configuration.
         WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
@@ -51,7 +51,10 @@ class VPoolShared(object):
         :return: Arakoon configuration information
         :rtype: dict
         """
-        return Configuration.get(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), default=None)
+        cfg =  Configuration.get(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), default=None)
+        if as_ini:
+            cfg = ArakoonClusterConfig.convert_config_to(cfg, return_type='INI')
+        return cfg
 
     @staticmethod
     def sync_alba_arakoon_config(alba_backend_guid, ovs_client):
@@ -65,10 +68,13 @@ class VPoolShared(object):
         :return: Arakoon configuration information
         :rtype: dict
         """
-        remote_config = VPoolShared.retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
+        remote_config = VPoolShared._retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
         current_config = Configuration.get(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), default=None)
 
         if current_config != remote_config:
             Configuration.set(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), remote_config)
+
+            ini_config = ArakoonClusterConfig.convert_config_to(config=remote_config, return_type='INI')
+            Configuration.set(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid), ini_config, raw=True)
         return remote_config
 
