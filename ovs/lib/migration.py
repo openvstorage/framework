@@ -62,6 +62,7 @@ class MigrationController(object):
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
         from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
+        from ovs.lib.helpers.vpool.shared import VPoolShared
 
         MigrationController._logger.info('Start out of band migrations...')
         service_manager = ServiceFactory.get_manager()
@@ -664,3 +665,18 @@ class MigrationController(object):
                 Configuration.register_usage(System.get_component_identifier(), registration_key)
 
         MigrationController._logger.info('Finished out of band migrations')
+
+        ####################################################
+        # deduplicate configs of proxies: now one config per remote alba-backend
+        for vpool in VPoolList.get_vpools():
+            backendlist = [vpool.metadata['backend']['backend_info']['alba_backend_guid']]
+            caching_info = vpool.metadata['caching_info']
+            for storagerouter_ip, info in caching_info.iteritems():
+                for cache_type, content in info.iteritems():
+                    if content.get('is_backend'):
+                        backendlist.append(content['backend_info']['alba_backend_guid'])
+
+            for alba_backend_guid in backendlist:
+                VPoolShared.sync_alba_arakoon_config(alba_backend_guid)  # Make sure all configs are in place before updating the proxy configs
+
+        # todo update configs of proxies: update

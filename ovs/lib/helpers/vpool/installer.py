@@ -257,7 +257,7 @@ class VPoolInstaller(object):
         new_backend_info = copy.deepcopy(backend_info)
         preset_name = backend_info['preset']
         alba_backend_guid = backend_info['alba_backend_guid']
-        VPoolShared.sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+        arakoon_config = VPoolShared.sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
 
         # Requesting the remote stack for re-use in calculate read preference
         backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
@@ -287,7 +287,7 @@ class VPoolInstaller(object):
                                  'backend_guid': backend_dict['backend_guid'],
                                  'alba_backend_guid': alba_backend_guid,
                                  'connection_info': connection_info,
-                                 'arakoon_config': REMOTE_CONFIG_BACKEND.format(alba_backend_guid)})
+                                 'arakoon_config': arakoon_config})  # It is still preferable to keep this in the metadata, as this way, envs can be rebuilt upon failure
 
         return new_backend_info
 
