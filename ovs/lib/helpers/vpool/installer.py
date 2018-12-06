@@ -21,7 +21,7 @@ VpoolInstaller class responsible for adding/removing vPools
 import re
 import copy
 import json
-from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient

@@ -13,7 +13,7 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
-from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND, REMOTE_CONFIG_BACKEND_INI
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG, REMOTE_CONFIG_BACKEND_INI
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 
@@ -51,7 +51,7 @@ class VPoolShared(object):
         :return: Arakoon configuration information
         :rtype: dict
         """
-        cfg =  Configuration.get(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), default=None)
+        cfg =  Configuration.get(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), default=None)
         if as_ini:
             cfg = ArakoonClusterConfig.convert_config_to(cfg, return_type='INI')
         return cfg
@@ -69,10 +69,10 @@ class VPoolShared(object):
         :rtype: dict
         """
         remote_config = VPoolShared._retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
-        current_config = Configuration.get(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), default=None)
+        current_config = Configuration.get(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), default=None)
 
         if current_config != remote_config:
-            Configuration.set(REMOTE_CONFIG_BACKEND.format(alba_backend_guid), remote_config)
+            Configuration.set(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), remote_config)
 
             ini_config = ArakoonClusterConfig.convert_config_to(config=remote_config, return_type='INI')
             Configuration.set(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid), ini_config, raw=True)

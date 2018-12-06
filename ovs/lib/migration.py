@@ -668,15 +668,34 @@ class MigrationController(object):
 
         ####################################################
         # deduplicate configs of proxies: now one config per remote alba-backend
+        present_remote_configs = list(Configuration.list('/ovs/framework/remote_configs/alba_backends'))
         for vpool in VPoolList.get_vpools():
+
+            connection_info = vpool.metadata['backend']['backend_info']['connection_info']
+            client = OVSClient(ip=connection_info['host'], port=connection_info['port'], credentials=(connection_info['client_id'],
+                                                                                                      connection_info['client_secret']))
             backendlist = [vpool.metadata['backend']['backend_info']['alba_backend_guid']]
             caching_info = vpool.metadata['caching_info']
             for storagerouter_ip, info in caching_info.iteritems():
                 for cache_type, content in info.iteritems():
+                    # Make sure all configs are in place before updating the proxy configs
                     if content.get('is_backend'):
-                        backendlist.append(content['backend_info']['alba_backend_guid'])
+                        alba_backend_guid = content['backend_info']['alba_backend_guid']
+                        if not alba_backend_guid in present_remote_configs:
+                            VPoolShared.sync_alba_arakoon_config(alba_backend_guid, client)
+                            present_remote_configs.append(alba_backend_guid)
+                        for std in vpool.storagedrivers:
+                            for proxy in std.alba_proxies:
+                                # Update all proxy configs to new paths
+                                proxy_config_location = '/ovs/vpools/{0}/proxies/{1}/config/'.format(vpool.guid, proxy.guid)
+                                main_cache_config = proxy_config_location + 'main|{0}'.format(cache_type)
+                                cfg = Configuration.get(str(main_cache_config))
+                                cfg['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid))
+                                Configuration.set(main_cache_config, cfg)
+                                # Now remove old configs of proxies
+                                other_cache_configs = Configuration.list(proxy_config_location)
+                                other_cache_configs.pop('main')
+                                for other_cache_config in other_cache_configs:
+                                    config_to_delete = proxy_config_location + other_cache_config
+                                    Configuration.delete(config_to_delete)
 
-            for alba_backend_guid in backendlist:
-                VPoolShared.sync_alba_arakoon_config(alba_backend_guid)  # Make sure all configs are in place before updating the proxy configs
-
-        # todo update configs of proxies: update
