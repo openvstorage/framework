@@ -18,12 +18,16 @@
 MigrationController module
 """
 
+import os
 import copy
 import json
 from ovs.extensions.generic.logger import Logger
 from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
+from ovs_extensions.api.client import OVSClient
+
 
 
 class MigrationController(object):
@@ -669,33 +673,54 @@ class MigrationController(object):
         ####################################################
         # deduplicate configs of proxies: now one config per remote alba-backend
         present_remote_configs = list(Configuration.list('/ovs/framework/remote_configs/alba_backends'))
-        for vpool in VPoolList.get_vpools():
 
-            connection_info = vpool.metadata['backend']['backend_info']['connection_info']
+        for vpool in VPoolList.get_vpools():
+            metadata = vpool.metadata
+            proxy_config_template = '/ovs/vpools/{0}/proxies/{{0}}/config'.format(vpool.guid)
+            backend_info = metadata['backend']['backend_info']
+            main_backend_guid = backend_info['alba_backend_guid']
+            connection_info = backend_info['connection_info']
             client = OVSClient(ip=connection_info['host'], port=connection_info['port'], credentials=(connection_info['client_id'],
                                                                                                       connection_info['client_secret']))
-            backendlist = [vpool.metadata['backend']['backend_info']['alba_backend_guid']]
-            caching_info = vpool.metadata['caching_info']
-            for storagerouter_ip, info in caching_info.iteritems():
-                for cache_type, content in info.iteritems():
-                    # Make sure all configs are in place before updating the proxy configs
-                    if content.get('is_backend'):
-                        alba_backend_guid = content['backend_info']['alba_backend_guid']
-                        if not alba_backend_guid in present_remote_configs:
-                            VPoolShared.sync_alba_arakoon_config(alba_backend_guid, client)
-                            present_remote_configs.append(alba_backend_guid)
-                        for std in vpool.storagedrivers:
-                            for proxy in std.alba_proxies:
-                                # Update all proxy configs to new paths
-                                proxy_config_location = '/ovs/vpools/{0}/proxies/{1}/config/'.format(vpool.guid, proxy.guid)
-                                main_cache_config = proxy_config_location + 'main|{0}'.format(cache_type)
-                                cfg = Configuration.get(str(main_cache_config))
-                                cfg['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid))
-                                Configuration.set(main_cache_config, cfg)
-                                # Now remove old configs of proxies
-                                other_cache_configs = Configuration.list(proxy_config_location)
-                                other_cache_configs.pop('main')
-                                for other_cache_config in other_cache_configs:
-                                    config_to_delete = proxy_config_location + other_cache_config
-                                    Configuration.delete(config_to_delete)
+            VPoolShared.sync_alba_arakoon_config(main_backend_guid, client)
+            present_remote_configs.append(main_backend_guid)
+
+            for storagedriver in vpool.storagedrivers:
+                storagerouter = storagedriver.storagerouter
+                storagerouter_info = metadata['caching_info'][storagerouter.guid]
+                for proxy in storagedriver.alba_proxies:
+                    main_proxy_config_path = os.path.join(proxy_config_template.format(proxy.guid), 'main')
+                    main_proxy_config = Configuration.get(main_proxy_config_path)
+
+                    # update config of main general backend of the vPool
+                    main_proxy_config['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_CONFIG.format(main_backend_guid))
+
+                    # Update caching info
+                    for cache_type in ['block_cache', 'fragment_cache']:
+                        if storagerouter_info[cache_type]['is_backend']:
+                            backend_info = storagerouter_info[cache_type]['backend_info']
+                            # Make sure replacing config is present
+                            alba_guid = backend_info['alba_backend_guid']
+                            connection_info = backend_info['connection_info']
+                            client = OVSClient(ip=connection_info['host'], port=connection_info['port'], credentials=(connection_info['client_id'], connection_info['client_secret']))
+                            VPoolShared.sync_alba_arakoon_config(alba_guid, client)
+                            main_proxy_config[cache_type][1]['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_guid))
+
+                    # Set updated config
+                    print 'setting config at {0}'.format(main_proxy_config_path)
+                    print main_proxy_config
+                    # Configuration.set(main_proxy_config_path, main_proxy_config)
+
+                    # Now remove old configs of proxies
+                    other_cache_configs = list(Configuration.list(proxy_config_template))
+                    if not other_cache_configs:
+                        # log
+                        print 'No other config files found at path {0}'.format(proxy_config_template)
+                    else:
+                        other_cache_configs.remove('main')
+                        for other_cache_config in other_cache_configs:
+                            config_to_delete = os.path.join(proxy_config_template, other_cache_config)
+                            print 'deleting {0}'.format(config_to_delete)
+                            Configuration.delete(config_to_delete)
+
 
