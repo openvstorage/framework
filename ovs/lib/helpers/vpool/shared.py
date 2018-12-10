@@ -43,21 +43,25 @@ class VPoolShared(object):
 
     @staticmethod
     def retrieve_local_alba_arakoon_config(alba_backend_guid, as_ini=False):
+        # type: (str, Optional[bool]) -> dict
         """
         Retrieves the local ALBA Arakoon configuration.
         WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
         :param alba_backend_guid: Guid of the ALBA Backend
         :type alba_backend_guid: str
+        :param as_ini: Save the config as an INI file for alba
+        :type as_ini: bool
         :return: Arakoon configuration information
         :rtype: dict
         """
-        cfg =  Configuration.get(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), default=None)
+        cfg = Configuration.get(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), default=None)
         if as_ini:
             cfg = ArakoonClusterConfig.convert_config_to(cfg, return_type='INI')
         return cfg
 
-    @staticmethod
-    def sync_alba_arakoon_config(alba_backend_guid, ovs_client):
+    @classmethod
+    def retrieve_sync_alba_arakoon_config(cls, alba_backend_guid, ovs_client):
+        # type: (str, OVSClient) -> dict
         """
         Compares the remote and local config. Updates the local config if needed. Guarantees the latest greatest config
         WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
@@ -68,13 +72,15 @@ class VPoolShared(object):
         :return: Arakoon configuration information
         :rtype: dict
         """
-        remote_config = VPoolShared._retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
+        remote_config = cls._retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
         current_config = Configuration.get(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), default=None)
 
         if current_config != remote_config:
-            Configuration.set(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), remote_config)
+            transaction_id = Configuration.begin_transaction()
+            Configuration.set(key=REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), value=remote_config, transaction=transaction_id)
 
             ini_config = ArakoonClusterConfig.convert_config_to(config=remote_config, return_type='INI')
-            Configuration.set(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid), ini_config, raw=True)
+            Configuration.set(key=REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid), value=ini_config, raw=True, transaction=transaction_id)
+            Configuration.apply_transaction(transaction_id)
         return remote_config
 

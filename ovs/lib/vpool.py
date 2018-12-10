@@ -504,7 +504,7 @@ class VPoolController(object):
                 if connection_info['host']:  # Remote Backend for accelerated Backend
                     alba_backend_guid = parameters[ctype]['backend_info']['alba_backend_guid']
                     ovs_client = OVSClient.get_instance(connection_info=connection_info)
-                    arakoon_config = VPoolShared.sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+                    arakoon_config = VPoolShared.retrieve_sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
                     arakoons[ctype] = ArakoonClusterConfig.convert_config_to(arakoon_config, return_type='INI')
                 else:  # Local Backend for accelerated Backend
                     alba_backend_name = parameters[ctype]['backend_info']['alba_backend_name']

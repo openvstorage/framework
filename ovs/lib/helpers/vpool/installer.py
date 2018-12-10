@@ -257,7 +257,7 @@ class VPoolInstaller(object):
         new_backend_info = copy.deepcopy(backend_info)
         preset_name = backend_info['preset']
         alba_backend_guid = backend_info['alba_backend_guid']
-        arakoon_config = VPoolShared.sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+        arakoon_config = VPoolShared.retrieve_sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
 
         # Requesting the remote stack for re-use in calculate read preference
         backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
