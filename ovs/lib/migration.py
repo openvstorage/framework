@@ -707,9 +707,8 @@ class MigrationController(object):
                             main_proxy_config[cache_type][1]['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_guid))
 
                     # Set updated config
-                    print 'setting config at {0}'.format(main_proxy_config_path)
-                    print main_proxy_config
-                    # Configuration.set(main_proxy_config_path, main_proxy_config)
+                    print 'Setting config at {0}'.format(main_proxy_config_path)
+                    Configuration.set(main_proxy_config_path, main_proxy_config)
 
                     # Now remove old configs of proxies
                     other_cache_configs = list(Configuration.list(proxy_config_template))
