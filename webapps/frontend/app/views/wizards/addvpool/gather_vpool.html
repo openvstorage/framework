@@ -67,19 +67,19 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="form-group">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></label>
         <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }" style="margin-bottom: -5px;">
-            <!-- ko if: data.loadingBackends() === true -->
+            <!-- ko if: data.loadingBackends()-->
                 <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
             <!-- /ko -->
-            <!-- ko if: data.loadingBackends() === false && (vpoolBackends() === undefined || vpoolBackends().length === 0) -->
+            <!-- ko if: !data.loadingBackends() && (backends().length === 0) -->
                 <i data-i18n="[html]ovs:wizards.add_vpool.gather_vpool.no_backends"
                    style="display: inline-block; margin-top: 7px;"></i>
             <!-- /ko -->
-            <!-- ko if: data.loadingBackends() === false && (vpoolBackends() !== undefined && vpoolBackends().length > 0) -->
-                <span data-bind="visible: (data.vPool() === undefined || vpoolBackend() !== undefined),
+            <!-- ko if: !data.loadingBackends() && (backends().length > 0) -->
+                <span data-bind="visible: (data.vPool() === undefined || backend() !== undefined),
                                  dropdown: {
                                      disabled: data.isExtend,
                                      key: 'guid', keyisfunction: false,
-                                     items: vpoolBackends, target: vpoolBackend,
+                                     items: backends, target: backend,
                                      text: function(item) {
                                          if (item !== undefined) {
                                              return item.name;
@@ -90,7 +90,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <!-- /ko -->
             <button type='button' class="btn btn-default"  style="margin-left: 10px;"
                     data-bind="click: loadBackends,
-                               style: {'margin-top': (vpoolBackends() !== undefined && vpoolBackends().length > 0 ? '-26px' : '')},
+                               style: {'margin-top': (backends() !== undefined && backends().length > 0 ? '-26px' : '')},
                                enable: !data.loadingBackends(),
                                visible: !data.backendData.backend_info.isLocalBackend()">
                 <span class="fa fa-" data-bind="css: { 'fa-spin': data.loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
@@ -98,7 +98,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </button>
         </div>
     </div>
-    <div class="form-group" data-bind="visible: vpoolBackend() !== undefined">
+    <div class="form-group" data-bind="visible: backend() !== undefined">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
         <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('preset') }" style="margin-bottom: -5px;">
             <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && preset() === undefined)"></span>

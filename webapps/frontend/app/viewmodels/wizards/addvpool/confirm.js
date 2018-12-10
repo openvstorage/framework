@@ -25,7 +25,6 @@ define([
         // Variables
         self.activated = false;
         self.data   = options.data;
-        self.shared = shared;
 
         // Observables
         self.loadingUpdateImpact = ko.observable(false);
@@ -110,7 +109,7 @@ define([
                     $.t('ovs:wizards.extend_vpool.confirm.started_message', {what: vpool.name()}));
             }
             return api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', {data: postData})
-                .then(self.shared.tasks.wait)
+                .then(shared.tasks.wait)
                 // Using then instead of deferred to chain the returned promise
                 .then(function (data) {
                     // Success

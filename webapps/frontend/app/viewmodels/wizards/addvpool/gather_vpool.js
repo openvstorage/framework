@@ -17,16 +17,15 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/storagedriver/storagedriver',
-    'viewmodels/services/backend'
-], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, backendService) {
+    'viewmodels/wizards/addvpool/gather_base'
+], function ($, ko,
+             shared, api, generic,
+             BaseStep) {
     "use strict";
     return function (options) {
         var self = this;
 
-        // Variables
-        self.data   = options.data;
-        self.shared = shared;
+        BaseStep.call(self, options);
 
         // Observables
         self._storageRouterIpAddresses  = ko.observableArray([]);
@@ -124,40 +123,6 @@ define([
             self._storageRouterIpAddresses(ipAddresses);
             return ipAddresses;
         });
-        self.vpoolBackend = ko.computed({
-            deferEvaluation: true,  // Wait with computing for an actual subscription
-            read: function() {
-                var backendInfo = self.data.backendData.backend_info;
-                var backend = self.data.getBackend(backendInfo.backend_guid());
-                if (backend === undefined) {
-                    // Return the first of the list
-                    var backends = self.getVPoolBackends();
-                    if (backends !== undefined && backends.length > 0) {
-                        backend = backends[0];
-                        self.vpoolBackend(backend)
-                    }
-                }
-                return backend;
-            },
-            write: function(backend) {
-                // Mutate the backend info
-                var backendInfo = self.data.backendData.backend_info;
-                backendInfo.name(backend.name);
-                backendInfo.backend_guid(backend.backend_guid);
-                backendInfo.alba_backend_guid(backend.guid);
-            }
-        });
-        self.vpoolBackends = ko.computed({
-            deferEvaluation: true,  // Wait with computing for an actual subscription
-            read: function () {
-                var backends = self.getVPoolBackends();
-                // Reset the current Model
-                if (backends.length === 0 && self.data.isExtend() === false) {
-                    self.resetBackend();
-                }
-                return backends;
-            }
-        });
         self.storageRouterIpAddress = ko.computed({
             deferEvaluation: true,  // Wait with computing for an actual subscription
             read: function() {
@@ -180,73 +145,15 @@ define([
                self.data.storageDriverParams.storageIP(ip);
             }
         });
-        self.enhancedPreset = ko.pureComputed(function() {
-            /**
-             * Compute a preset to look like presetName: (1,1,1,1),(2,1,2,1)
-             */
-            var vpool = self.data.vPool();
-            if (vpool === undefined || (vpool.backendPolicies().length === 0 && vpool.backendPreset === undefined)) {
-               return undefined
-            }
-            return backendService.enhancePreset(vpool.backendPreset(), vpool.backendPolicies());
-        });
-        self.enhancedPresets = ko.pureComputed(function() {
-            var presets = self.vpoolBackend() === undefined ? [] : self.vpoolBackend().presets;
-            return backendService.parsePresets(presets)
-        });
-        self.preset = ko.computed({
-            deferEvaluation: true,  // Wait with computing for an actual subscription
-            read: function() {
-                var parsedPreset = undefined;
-                if (self.vpoolBackend() === undefined) {
-                    return parsedPreset
-                }
-                var backendInfo = self.data.backendData.backend_info;
-                var preset = self.data.getPreset(backendInfo.alba_backend_guid(), backendInfo.preset());
-                if (preset === undefined) {
-                    // No preset could be found for our current setting. Attempt to reconfigure it
-                    var enhancedPresets = self.enhancedPresets();
-                    if (enhancedPresets.length > 0) {
-                        parsedPreset = enhancedPresets[0];
-                        self.preset(parsedPreset);  // This will trigger this compute to trigger again but also correct the mistake
-                    }
-                    return parsedPreset
-                }
-                return backendService.parsePreset(preset);
-            },
-            write: function(preset) {
-                var backendInfo = self.data.backendData.backend_info;
-                backendInfo.preset(preset.name);
-            }
-        });
 
         // Functions
-        self.loadBackends = function() {
-            var connectionInfo = self.data.backendData.backend_info.connection_info;
-            return self.data.loadBackends(connectionInfo)
-        };
-        self.getVPoolBackends = function() {
-            // Wrapped function for the computable
-            // Issue was when the computed would update the Model when no backends were found, the computed would not
-            // return its value and the backend computed would fetch the old values, causing a mismatch
-            var connectionInfo = self.data.backendData.backend_info.connection_info;
-            return self.data.filterBackendsByLocationKey(self.data.buildLocationKey(connectionInfo));
-        };
-        self.resetBackend = function() {
-            // Will force to recompute everything
-            self.vpoolBackend({'name': undefined, 'backend_guid': undefined, 'alba_backend_guid': undefined});
-            self.resetPreset();
-        };
-        self.resetPreset = function() {
-            self.preset({'name': undefined});
-        };
         self.preValidate = function () {
             var validationResult = {valid: true, reasons: [], fields: []};
             var vpoolName = self.data.vPool().name();
             self.loadingPrevalidations(true);
             generic.xhrAbort(self.checkMtptHandle);
             return self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', {data: {name: vpoolName}})
-                .then(self.shared.tasks.wait)
+                .then(shared.tasks.wait)
                 .then(function (data) {
                     if (data === true) {
                         validationResult.valid = false;
@@ -258,6 +165,14 @@ define([
                     self.preValidateResult(validationResult);
                     self.loadingPrevalidations(false);
                 })
+        };
+
+        // Abstract implementations
+        self.getBackendInfo = function() {
+            return self.data.backendData.backend_info;
+        };
+        self.getConnectionInfo = function() {
+            return self.getBackendInfo().connection_info;
         };
 
     };

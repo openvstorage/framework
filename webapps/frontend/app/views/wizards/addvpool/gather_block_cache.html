@@ -126,18 +126,18 @@ but WITHOUT ANY WARRANTY of any kind.
                     <!-- ko if: $root.data.loadingBackends() === true -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
                     <!-- /ko -->
-                    <!-- ko if: $root.data.loadingBackends() === false && ($root.blockCacheBackends() === undefined || $root.blockCacheBackends().length === 0) -->
+                    <!-- ko if: $root.data.loadingBackends() === false && ($root.backends().length === 0) -->
                         <div>
                             <label class="col-lg-5 control-label" style="text-align: left; padding-left: 0">
                                 <i data-i18n="[html]ovs:wizards.add_vpool.gather_block_cache.no_backends"></i>
                             </label>
                         </div>
                     <!-- /ko -->
-                    <!-- ko if: $root.data.loadingBackends() === false && ($root.blockCacheBackends() !== undefined && $root.blockCacheBackends().length > 0) -->
-                        <span data-bind="visible: ($root.data.vPool() === undefined || $root.blockCacheBackend() !== undefined),
+                    <!-- ko if: $root.data.loadingBackends() === false && ($root.backends().length > 0) -->
+                        <span data-bind="visible: ($root.data.vPool() === undefined || $root.backend() !== undefined),
                                          dropdown: {
                                              key: 'guid', keyisfunction: false,
-                                             items: $root.blockCacheBackends, target: $root.blockCacheBackend,
+                                             items: $root.backends, target: $root.backend,
                                              text: function(item) {
                                                  if (item !== undefined) {
                                                      return item.name;
@@ -148,7 +148,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <!-- /ko -->
                     <button type ='button' class="btn btn-default"  style="margin-left: 10px;"
                             data-bind="click: $root.loadBackends,
-                                       style: {'margin-top': ($root.blockCacheBackends() !== undefined && $root.blockCacheBackends().length > 0 ? '-26px' : '')},
+                                       style: {'margin-top': ($root.backends().length > 0 ? '-26px' : '')},
                                        enable: !$root.data.loadingBackends() && hasRemoteInfo(),
                                        visible: !isLocalBackend()">
                         <span class="fa fa-" data-bind="css: { 'fa-spin': $root.data.loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>
@@ -156,7 +156,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     </button>
                 </div>
             </div>
-            <div class="form-group" data-bind="visible: $root.blockCacheBackend() !== undefined">
+            <div class="form-group" data-bind="visible: $root.backend() !== undefined">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_preset"></label>
                 <div class="col-lg-7" data-bind="css: { 'has-error': $root.canContinue().fields.contains('preset') }">
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: ($root.preset() === undefined)"></span>
