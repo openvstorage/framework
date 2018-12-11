@@ -21,11 +21,7 @@ MigrationController module
 import os
 import copy
 import json
-from ovs_extensions.api.client import OVSClient
-from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
-from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG
 from ovs.extensions.generic.logger import Logger
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 
@@ -55,6 +51,9 @@ class MigrationController(object):
         from ovs.dal.lists.storagedriverlist import StorageDriverList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.dal.lists.vpoollist import VPoolList
+        from ovs_extensions.api.client import OVSClient
+        from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
+        from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG, REMOTE_CONFIG_BACKEND_INI
         from ovs.extensions.db.arakooninstaller import ArakoonInstaller
         from ovs.extensions.generic.configuration import Configuration
         from ovs.extensions.generic.sshclient import SSHClient
@@ -65,6 +64,7 @@ class MigrationController(object):
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+        from ovs.extensions.storage.volatilefactory import VolatileFactory
         from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
         from ovs.lib.helpers.vpool.shared import VPoolShared
 
@@ -674,6 +674,7 @@ class MigrationController(object):
         # deduplicate configs of proxies: now one config per remote alba-backend
         present_remote_configs = list(Configuration.list('/ovs/framework/remote_configs/alba_backends'))
         errors = []
+        #todo add check if needs to migrate
         try:
             for vpool in VPoolList.get_vpools():
                 vpool_errors = []
@@ -686,7 +687,7 @@ class MigrationController(object):
                 try:
                     client = OVSClient(ip=connection_info['host'], port=connection_info['port'], credentials=(connection_info['client_id'],
                                                                                                               connection_info['client_secret']))
-                    VPoolShared.retrieve_sync_alba_arakoon_config(main_backend_guid, client)
+                    VPoolShared.sync_alba_arakoon_config(main_backend_guid, client)
                     present_remote_configs.append(main_backend_guid)
                 except Exception:
                     vpool_errors.append('Failed to sync up remote config of remote backend {0} of vPool {1}'.format(main_backend_guid, vpool.guid))
@@ -704,10 +705,10 @@ class MigrationController(object):
                             main_proxy_config = Configuration.get(main_proxy_config_path)
 
                             # update config of main general backend of the vPool
-                            main_proxy_config['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_CONFIG.format(main_backend_guid))
+                            main_proxy_config['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(main_backend_guid))
 
                             # Update caching info
-                            for cache_type in ['block_cache', 'fragment_cache']:
+                            for cache_type in [StorageDriverConfiguration.CACHE_FRAGMENT, StorageDriverConfiguration.CACHE_BLOCK]:
                                 if storagerouter_info[cache_type]['is_backend']:
                                     backend_info = storagerouter_info[cache_type]['backend_info']
                                     # Make sure replacing config is present
@@ -715,8 +716,8 @@ class MigrationController(object):
                                     connection_info = backend_info['connection_info']
                                     try:
                                         client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
-                                        VPoolShared.retrieve_sync_alba_arakoon_config(alba_guid, client)
-                                        main_proxy_config[cache_type][1]['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_guid))
+                                        VPoolShared.sync_alba_arakoon_config(alba_guid, client)
+                                        main_proxy_config[cache_type][1]['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(alba_guid))
                                     except Exception as ex:
                                         proxy_errors = True
                                         errors.append('Failed to update proxy {0} of vPool {1}: {2}'.format(proxy.guid, vpool.guid, ex))
