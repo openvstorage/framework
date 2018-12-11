@@ -328,7 +328,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <td>
                                                         <span data-bind="text: $root.vPool().volumePotentials()[$parent.guid()]"></span>
                                                     </td>
-                                                    <td style="height:37px;">
+                                                    <td colspan="2" style="height:37px;">
                                                         <button type="button"
                                                                 class="btn btn-mini btn-default hand"
                                                                 data-bind="click: function() {$root.reconfigureStorageRouter($parent, $data)},
@@ -366,7 +366,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                 <!-- Empty to fill in for the expand button -->
                                                 <td></td>
                                                 <th colspan="3" data-i18n="ovs:vpools.configuration"></th>
-                                                <th colspan="2" data-i18n="ovs:vpools.ports"></th>
+                                                <th colspan="4" data-i18n="ovs:vpools.ports"></th>
                                             </tr>
                                             <tr>
                                                 <!-- Empty to fill in for the expand button -->
@@ -385,6 +385,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                 <td colspan="1">
                                                     <span data-bind="text: ports().management"></span>
                                                 </td>
+                                                <td colspan="2"></td>
                                             </tr>
                                             <tr>
                                                 <!-- Empty to fill in for the expand button -->
@@ -425,6 +426,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                 <td colspan="1">
                                                     <span data-bind="text: ports().xmlrpc"></span>
                                                 </td>
+                                                <td colspan="2"></td>
                                             </tr>
                                             <tr>
                                                 <!-- Empty to fill in for the expand button -->
@@ -470,6 +472,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                 <td colspan="1">
                                                     <span data-bind="text: ports().dtl"></span>
                                                 </td>
+                                                <td colspan="2"></td>
                                             </tr>
                                         <!-- /ko -->
                                         <!-- /ko -->

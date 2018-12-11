@@ -27,6 +27,7 @@ define([
 
         BaseStep.call(self, options);
 
+        self.canChangePreset = !self.data.isExtend();
         // Observables
         self._storageRouterIpAddresses  = ko.observableArray([]);
         self.loadingPrevalidations      = ko.observable();
@@ -81,24 +82,27 @@ define([
             if (self.data.scrubAvailable() === false) {
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: 'SCRUB'}));
             }
-            try {
-                var partitions = self.data.getStorageRouterMetadata(self.data.storageRouter().guid()).metadata.partitions;
-                if (partitions !== undefined) {
-                $.each(partitions, function (role, partitions) {
-                    if (requiredRoles.contains(role) && partitions.length > 0) {
-                        requiredRoles.remove(role)
-                    }
-                });
-                $.each(requiredRoles, function (index, role) {
-                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: role}));
-                });
-            }
-            }
-            catch (error) {
+            if (self.data.loadingStorageRouterInfo()) {
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
+            } else{
+                try {
+                    var partitions = self.data.getStorageRouterMetadata(self.data.storageRouter().guid()).metadata.partitions;
+                    if (partitions) {
+                        $.each(partitions, function (role, partitions) {
+                            if (requiredRoles.contains(role) && partitions.length > 0) {
+                                requiredRoles.remove(role)
+                            }
+                        });
+                        $.each(requiredRoles, function (index, role) {
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: role}));
+                        });
+                    }
+                }
+                catch (error) {
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
+                }
             }
-
-            if (self.data.storageDriverParams.storageIP() === undefined) {
+            if (!self.data.storageDriverParams.storageIP()) {
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_storage_ip'));
                 fields.push('storageip');
             }

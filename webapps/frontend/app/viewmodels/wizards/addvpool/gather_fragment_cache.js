@@ -29,5 +29,8 @@ define([
         self.getCacheType = function() {
             return 'fragment_cache'
         };
+        self.getOtherConnectionInfo = function() {
+            return  self.data.cachingData.block_cache.backend_info.connection_info;
+        };
     }
 });

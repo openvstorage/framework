@@ -46,15 +46,15 @@ define([
                     reasons.push($.t(baseTranslation + '.backends_loading'));
                 } else {
                     var connectionInfo = self.getConnectionInfo();
-                    if (fragmentCache.is_backend() === true ){
-                        if (self.backend() === undefined) {
+                    if (fragmentCache.is_backend()){
+                        if (!self.backend()) {
                             reasons.push($.t(baseTranslation + '.choose_backend'));
                             fields.push('backend');
-                        } else if (self.preset() === undefined) {
+                        } else if (!self.preset()) {
                             reasons.push($.t(baseTranslation + '.choose_preset'));
                             fields.push('preset');
                         }
-                        if (connectionInfo.isLocalBackend() === false && connectionInfo.hasRemoteInfo() === false || self.data.invalidBackendInfo() === true) {
+                        if (!connectionInfo.isLocalBackend() && !connectionInfo.hasRemoteInfo() || self.data.invalidBackendInfo()) {
                             reasons.push($.t(baseTranslation + '.invalid_alba_info'));
                             fields.push('invalid_alba_info');
                         }
@@ -72,7 +72,7 @@ define([
             write: function(data) {
                 self._reUsedStorageRouter(data);
                 // Set connection info
-                if (data !== undefined) {
+                if (data) {
                     var cacheConnectionInfoMapping = self.data.vPool().getCacheConnectionInfoMapping();
                     var storagerouterConnectionInfo = cacheConnectionInfoMapping[self.getCacheType()][data.guid()];
                     self.getConnectionInfo().update(storagerouterConnectionInfo)
@@ -92,8 +92,21 @@ define([
         });
 
 
+        // Functions
+        /**
+         * Copy the connection info from a previous step
+         */
+        self.copyConnectionInfo = function(){
+            var currectConnectionInfo = self.getConnectionInfo();
+            var otherConnectionInfo = self.getOtherConnectionInfo();
+            currectConnectionInfo.update(otherConnectionInfo.toJS())
+        };
+
         // Abstract. Requires implementations
         self.getCacheType = function() {
+            throw new Error("Method must be implemented.");
+        };
+        self.getOtherConnectionInfo = function() {
             throw new Error("Method must be implemented.");
         };
 
@@ -105,7 +118,7 @@ define([
         self.activate = function() {
             if (self.actived === false) {
                 var connectionInfo = self.getConnectionInfo();
-                if (!!ko.utils.unwrapObservable(connectionInfo.isLocalBackend) === false && !['', undefined, null].contains(connectionInfo.host())) {
+                if (!ko.utils.unwrapObservable(connectionInfo.isLocalBackend) && !connectionInfo.host()) {
                     self.data.loadBackends(connectionInfo);
                 }
                 self.actived = true;

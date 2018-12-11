@@ -23,7 +23,6 @@ but WITHOUT ANY WARRANTY of any kind.
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.block_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
             <span data-bind="dropdown: {
-                                 enabled: $root.data.supportsBlockCache,
                                  items: cacheSettings, target: cacheSetting,
                                  text: function(item) {
                                      return $.t('ovs:generic.blockCaches.' + item);
@@ -77,22 +76,34 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <div data-bind="visible: !isLocalBackend()">
                 <div class="form-group">
-                    <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.re_use_connection_info"></label>
+                    <label class="col-lg-3 control-label" for="copyConnectionInfo" data-i18n="ovs:wizards.add_vpool.gather_block_cache.copy_connection_info"></label>
                     <div class="col-lg-7">
-                        <span data-bind="dropdown: {
-                                             key: 'guid',
-                                             keyisfunction: true,
-                                             items: $root.reUsableStorageRouters,
-                                             target: $root.reUsedStorageRouter,
-                                             text: function(item) {
-                                                 if (item !== undefined) {
-                                                     return item.name();
-                                                 } else {
-                                                     return '-';
+                        <button type="button" class="btn btn-mini btn-default hand"
+                        id="copyConnectionInfo" style="color: #428bca;"
+                        data-bind="click: $root.copyConnectionInfo">
+                            <span class="fa hand" data-i18n="[html]ovs:icons.copy"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div data-bind="visible: $root.reUsableStorageRouters().length > 1">
+                        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.re_use_connection_info"></label>
+                        <div class="col-lg-7">
+                            <span data-bind="dropdown: {
+                                                 key: 'guid',
+                                                 keyisfunction: true,
+                                                 items: $root.reUsableStorageRouters,
+                                                 target: $root.reUsedStorageRouter,
+                                                 text: function(item) {
+                                                     if (item) {
+                                                         return item.name();
+                                                     } else {
+                                                         return '-';
+                                                     }
                                                  }
-                                             }
-                                         }">
-                        </span>
+                                             }">
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div data-bind="css: { 'has-error': $root.canContinue().fields.contains('invalid_alba_info') }">
@@ -123,17 +134,17 @@ but WITHOUT ANY WARRANTY of any kind.
             <div class="form-group" data-bind="css: { 'has-error': $root.canContinue().fields.contains('backend') }">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_block_cache.alba_backend"></label>
                 <div class="col-lg-7">
-                    <!-- ko if: $root.data.loadingBackends() === true -->
+                    <!-- ko if: $root.data.loadingBackends() -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
                     <!-- /ko -->
-                    <!-- ko if: $root.data.loadingBackends() === false && ($root.backends().length === 0) -->
+                    <!-- ko if: !$root.data.loadingBackends() && ($root.backends().length === 0) -->
                         <div>
                             <label class="col-lg-5 control-label" style="text-align: left; padding-left: 0">
                                 <i data-i18n="[html]ovs:wizards.add_vpool.gather_block_cache.no_backends"></i>
                             </label>
                         </div>
                     <!-- /ko -->
-                    <!-- ko if: $root.data.loadingBackends() === false && ($root.backends().length > 0) -->
+                    <!-- ko if: !$root.data.loadingBackends()&& ($root.backends().length > 0) -->
                         <span data-bind="visible: ($root.data.vPool() === undefined || $root.backend() !== undefined),
                                          dropdown: {
                                              key: 'guid', keyisfunction: false,

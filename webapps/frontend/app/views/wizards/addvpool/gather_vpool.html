@@ -75,7 +75,7 @@ but WITHOUT ANY WARRANTY of any kind.
                    style="display: inline-block; margin-top: 7px;"></i>
             <!-- /ko -->
             <!-- ko if: !data.loadingBackends() && (backends().length > 0) -->
-                <span data-bind="visible: (data.vPool() === undefined || backend() !== undefined),
+                <span data-bind="visible: (!data.vPool() || backend()),
                                  dropdown: {
                                      disabled: data.isExtend,
                                      key: 'guid', keyisfunction: false,
@@ -101,21 +101,13 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="form-group" data-bind="visible: backend() !== undefined">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
         <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('preset') }" style="margin-bottom: -5px;">
-            <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && preset() === undefined)"></span>
-            <span data-bind="visible: (data.vPool() === undefined || preset() !== undefined),
+            <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() && !preset())"></span>
+            <span data-bind="visible: (!data.vPool() || preset()),
                              dropdown: {
                                  disabled: data.isExtend,
                                  key: 'name', keyisfunction: false,
                                  items: enhancedPresets, target: preset,
-                                 text: function(item) {
-                                     var policies = [];
-                                     if (item !== undefined) {
-                                         $.each(item.policies, function(index, policy) {
-                                             policies.push(policy.text);
-                                         });
-                                         return item.name + ': ' + policies.join(', ');
-                                     }
-                                 }
+                                 text: getDisplayAblePreset
                              }"></span>
         </div>
     </div>
@@ -137,7 +129,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                  items: data.storageRoutersAvailable,
                                  target: data.storageRouter,
                                  text: function(item) {
-                                     if (item !== undefined) {
+                                     if (item) {
                                          return item.name()
                                      }
                                  }
@@ -148,8 +140,8 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageip') }">
         <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.ip_address"></label>
         <div class="col-lg-7" style="margin-bottom: -5px;">
-            <div data-bind="visible: data.loadingStorageRouters() || data.loadingMetadata()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
-            <span data-bind="visible: !data.loadingStorageRouters() && !data.loadingMetadata(),
+            <div data-bind="visible: data.loadingStorageRouterInfo()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
+            <span data-bind="visible: !data.loadingStorageRouterInfo(),
                              dropdown: {
                                  items: storageRouterIpAddresses,
                                  target: storageRouterIpAddress,

@@ -62,6 +62,9 @@ define(['jquery', 'knockout',
         self.vPools                             = ko.observableArray([]);
 
         // Computed
+        self.loadingStorageRouterInfo = ko.pureComputed(function() {
+            return self.loadingStorageRouters() || self.loadingMetadata()
+        });
         self.hasCacheQuota = ko.pureComputed(function() {
             var storageRouter = undefined;
             // These observables should only change once during the lifetime of the wizard and will cause less recomputing
@@ -326,7 +329,7 @@ define(['jquery', 'knockout',
         self.loadStorageRouters = function(){
             self.loadingStorageRouters(true);
             var promise;
-            if (self.isExtend() === true) {
+            if (self.isExtend()) {
                 promise = self.vPool().loadStorageRouters();
             } else {
                 promise = $.Deferred(function (deferred) {

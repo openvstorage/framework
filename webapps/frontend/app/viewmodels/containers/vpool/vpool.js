@@ -250,7 +250,7 @@ define([
         self.getBackendInfo = function(returnViewModel) {
             returnViewModel = (returnViewModel === undefined) ? false : returnViewModel;
             var backendInfo = self.metadata() === undefined? {} : self.metadata().backend;
-            if (returnViewModel === true) {
+            if (returnViewModel) {
                 return new BackendInfo(backendInfo)
             }
             return backendInfo

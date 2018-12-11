@@ -61,7 +61,7 @@ define([
             /**
              * Compute a preset to look like presetName: (1,1,1,1),(2,1,2,1)
              */
-            if (self.policies() === undefined || self.preset() === undefined) {
+            if (!self.policies() || self.preset()) {
                 return null;
             }
             var policies = [];
@@ -116,14 +116,9 @@ define([
         });
         self.hasRemoteInfo = ko.pureComputed(function (){
             var requiredProps = [self.client_id, self.client_secret, self.host, self.port];
-            var hasRemoteInfo = true;
-            $.each(requiredProps, function(index, prop) {
-                if (ko.utils.unwrapObservable(prop) === undefined){
-                    hasRemoteInfo = false;
-                    return false  // Break
-                }
-            });
-            return hasRemoteInfo;
+            return requiredProps.every(function(prop){
+                return !!ko.utils.unwrapObservable(prop)
+            })
         });
     }
     ConnectionInfoViewModel.prototype = $.extend({}, BaseContainer.prototype);

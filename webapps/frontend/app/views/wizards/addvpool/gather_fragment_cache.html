@@ -75,9 +75,19 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
             <div data-bind="visible: !isLocalBackend()">
-                <div data-bind="visible: $root.reUsableStorageRouters().length > 1">
-                    <div class="form-group">
-                        <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.re_use_connection_info"></label>
+                <div class="form-group">
+                    <label class="col-lg-3 control-label" for="copyConnectionInfo" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.copy_connection_info"></label>
+                    <div class="col-lg-7">
+                        <button type="button" class="btn btn-mini btn-default hand"
+                        id="copyConnectionInfo" style="color: #428bca;"
+                        data-bind="click: $root.copyConnectionInfo">
+                            <span class="fa hand" data-i18n="[html]ovs:icons.copy"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div data-bind="visible: $root.reUsableStorageRouters().length > 1">
+                        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_fragment_cache.re_use_connection_info"></label>
                         <div class="col-lg-7">
                             <span data-bind="dropdown: {
                                                  key: 'guid',
@@ -85,7 +95,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                  items: $root.reUsableStorageRouters,
                                                  target: $root.reUsedStorageRouter,
                                                  text: function(item) {
-                                                     if (item !== undefined) {
+                                                     if (item) {
                                                          return item.name();
                                                      } else {
                                                          return '-';
