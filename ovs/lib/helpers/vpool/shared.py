@@ -14,7 +14,7 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI, REMOTE_CONFIG_BACKEND_CONFIG, REMOTE_CONFIG_BACKENDS_BASE
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI, REMOTE_CONFIG_BACKEND_CONFIG, REMOTE_CONFIG_BACKEND_BASE
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
@@ -94,7 +94,7 @@ class VPoolShared(object):
         Iterate over all vPools in the cluster and check which local or remote backend configs are still in use.
         :return:
         """
-        present_remote_configs = dict([(key, REMOTE_CONFIG_BACKEND_CONFIG.format(key)) for key in list(Configuration.list(REMOTE_CONFIG_BACKENDS_BASE))])
+        present_remote_configs = dict([(key, REMOTE_CONFIG_BACKEND_CONFIG.format(key)) for key in list(Configuration.list(REMOTE_CONFIG_BACKEND_BASE))])
         in_use = set()
         cache_types = [StorageDriverConfiguration.CACHE_FRAGMENT, StorageDriverConfiguration.CACHE_BLOCK]
 
