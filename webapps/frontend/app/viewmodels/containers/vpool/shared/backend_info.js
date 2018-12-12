@@ -61,7 +61,7 @@ define([
             /**
              * Compute a preset to look like presetName: (1,1,1,1),(2,1,2,1)
              */
-            if (!self.policies() || self.preset()) {
+            if (!(self.policies() || self.preset())) {
                 return null;
             }
             var policies = [];
