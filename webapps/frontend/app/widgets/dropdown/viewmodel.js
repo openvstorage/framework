@@ -204,11 +204,7 @@ define([
                     var key = self.key();
                     var ret = item;
                     if (key && item) {
-                        var valueOfKey = item[key];
-                        if (self.keyIsFunction()) {
-                            valueOfKey = valueOfKey() // Unpack
-                        }
-                        ret = valueOfKey
+                        ret = ko.utils.unwrapObservable(item[key]);
                     }
                     return ret;
                 };
