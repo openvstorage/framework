@@ -75,25 +75,17 @@ class VPoolShared(object):
         :return: Arakoon configuration information
         :rtype: dict
         """
-        in_use = cls.calculate_abm_configs_in_use()
+        #todo: Fix leak of backends not bein removed
 
-        if alba_backend_guid not in in_use: # todo not good: if vpool is created, no proxies yet -> 'not in use'
-            # Remove this config if it is not in use anymore
+        remote_config = cls._retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
+        current_config = Configuration.get(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), default=None)
+        if current_config != remote_config:
             transaction_id = Configuration.begin_transaction()
-            Configuration.delete(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), transaction=transaction_id)
-            Configuration.delete(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid), transaction=transaction_id)
+            Configuration.set(key=REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), value=remote_config, transaction=transaction_id)
+
+            ini_config = ArakoonClusterConfig.convert_config_to(config=remote_config, return_type='INI')
+            Configuration.set(key=REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid), value=ini_config, raw=True, transaction=transaction_id)
             Configuration.apply_transaction(transaction_id)
-
-        else:
-            remote_config = cls._retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
-            current_config = Configuration.get(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), default=None)
-            if current_config != remote_config:
-                transaction_id = Configuration.begin_transaction()
-                Configuration.set(key=REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), value=remote_config, transaction=transaction_id)
-
-                ini_config = ArakoonClusterConfig.convert_config_to(config=remote_config, return_type='INI')
-                Configuration.set(key=REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid), value=ini_config, raw=True, transaction=transaction_id)
-                Configuration.apply_transaction(transaction_id)
 
 
     @classmethod

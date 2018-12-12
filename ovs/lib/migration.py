@@ -685,8 +685,7 @@ class MigrationController(object):
                 main_backend_guid = backend_info['alba_backend_guid']
                 connection_info = backend_info['connection_info']
                 try:
-                    client = OVSClient(ip=connection_info['host'], port=connection_info['port'], credentials=(connection_info['client_id'],
-                                                                                                              connection_info['client_secret']))
+                    client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
                     VPoolShared.sync_alba_arakoon_config(main_backend_guid, client)
                     present_remote_configs.append(main_backend_guid)
                 except Exception:
