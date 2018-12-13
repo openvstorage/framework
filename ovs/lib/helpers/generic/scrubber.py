@@ -35,6 +35,7 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.constants.vpools import GENERIC_SCRUB, SCRUB_BASE_PATH
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.logger import Logger
@@ -502,9 +503,9 @@ class StackWorker(ScrubShared):
             proxy_amount = 1
         self.alba_proxy_services = ['ovs-albaproxy_{0}_{1}_{2}_scrub_{3}'.format(self.vpool.name, self.storagerouter.name, self.partition_guid, i)
                                     for i in xrange(0, proxy_amount)]
-        self.scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}_{{0}}'.format(vpool.guid, self.partition_guid)  # Formatted with the number of the proxy
+        self.scrub_config_key = '{0}/scrub_config_{1}_{{0}}'.format(SCRUB_BASE_PATH.format(vpool.guid), self.partition_guid)  # Formatted with the number of the proxy
         self.scrub_directory = '{0}/scrub_work_{1}_{2}_{3}'.format(scrub_info['scrub_path'], vpool.name, self.storagerouter.name, self.partition_guid)
-        self.backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, self.partition_guid)
+        self.backend_config_key = '{0}/backend_config_{1}'.format(SCRUB_BASE_PATH.format(vpool.guid), self.partition_guid)
         self.lock_time = 5 * 60
         self.registered_proxy = False
         self.registering_data = {'job_id': self.job_id, 'stack_id': self.stack_id}  # Data to register within Arakoon about this StackWorker
@@ -797,7 +798,7 @@ class StackWorker(ScrubShared):
                     machine_id = System.get_my_machine_id(client)
                     port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
                     ports = System.get_free_ports(selected_range=port_range, amount=len(self.alba_proxy_services), client=client)
-                    scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(self.vpool.guid)).copy()
+                    scrub_config = Configuration.get(GENERIC_SCRUB.format(self.vpool.guid)).copy()
                     for alba_proxy_index, alba_proxy_service in enumerate(self.alba_proxy_services):
                         port = ports[alba_proxy_index]
                         scrub_proxy_config_key = self.scrub_config_key.format(alba_proxy_index)

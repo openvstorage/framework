@@ -53,7 +53,8 @@ class MigrationController(object):
         from ovs.dal.lists.vpoollist import VPoolList
         from ovs_extensions.api.client import OVSClient
         from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
-        from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG, REMOTE_CONFIG_BACKEND_INI, REMOTE_CONFIG_BACKEND_BASE
+        from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI, REMOTE_CONFIG_BACKEND_BASE
+        from ovs_extensions.constants.vpools import PROXY_CONFIG_MAIN, PROXY_CONFIG_PATH, GENERIC_SCRUB
         from ovs.extensions.db.arakooninstaller import ArakoonInstaller
         from ovs.extensions.generic.configuration import Configuration
         from ovs.extensions.generic.sshclient import SSHClient
@@ -164,14 +165,14 @@ class MigrationController(object):
                                             target_name='ovs-{0}'.format(new_service_name))
 
                 # Update scrub proxy config
-                proxy_config_key = '/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)
+                proxy_config_key = PROXY_CONFIG_MAIN.format(vpool.guid, alba_proxy.guid)
                 proxy_config = None if Configuration.exists(key=proxy_config_key) is False else Configuration.get(proxy_config_key)
                 if proxy_config is not None:
                     fragment_cache = proxy_config.get(StorageDriverConfiguration.CACHE_FRAGMENT, ['none', {}])
                     if fragment_cache[0] == 'alba' and fragment_cache[1].get('cache_on_write') is True:  # Accelerated ALBA configured
                         fragment_cache_scrub_info = copy.deepcopy(fragment_cache)
                         fragment_cache_scrub_info[1]['cache_on_read'] = False
-                        proxy_scrub_config_key = '/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid)
+                        proxy_scrub_config_key = GENERIC_SCRUB.format(vpool.guid)
                         proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
                         if proxy_scrub_config is not None and proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] == ['none']:
                             proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] = fragment_cache_scrub_info
@@ -375,9 +376,9 @@ class MigrationController(object):
             try:
                 vpool = storagedriver.vpool
                 root_client = sr_client_map[storagedriver.storagerouter_guid]
-                _update_manifest_cache_size('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))  # Generic scrub proxy is deployed every time scrubbing kicks in, so no need to restart these services
+                _update_manifest_cache_size(GENERIC_SCRUB.format(vpool.guid))  # Generic scrub proxy is deployed every time scrubbing kicks in, so no need to restart these services
                 for alba_proxy in storagedriver.alba_proxies:
-                    if _update_manifest_cache_size('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)) is True:
+                    if _update_manifest_cache_size(PROXY_CONFIG_MAIN.format(vpool.guid, alba_proxy.guid)) is True:
                         # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
                         ExtensionsToolbox.edit_version_file(client=root_client,
                                                             package_name='alba',
@@ -671,15 +672,13 @@ class MigrationController(object):
         MigrationController._logger.info('Finished out of band migrations')
 
         ####################################################
-        # deduplicate configs of proxies: now one config per remote alba-backend
+        # Deduplicate configs of proxies: now one config per remote alba-backend
         present_remote_configs = list(Configuration.list(REMOTE_CONFIG_BACKEND_BASE))
         errors = []
-        #todo add check if needs to migrate
         try:
             for vpool in VPoolList.get_vpools():
                 vpool_errors = []
                 metadata = vpool.metadata
-                proxy_config_template = '/ovs/vpools/{0}/proxies/{{0}}/config'.format(vpool.guid)
                 backend_info = metadata['backend']['backend_info']
                 main_backend_guid = backend_info['alba_backend_guid']
                 connection_info = backend_info['connection_info']
@@ -701,7 +700,7 @@ class MigrationController(object):
                     for proxy in storagedriver.alba_proxies:
                         proxy_errors = False
                         try:
-                            main_proxy_config_path = os.path.join(proxy_config_template.format(proxy.guid), 'main')
+                            main_proxy_config_path = PROXY_CONFIG_MAIN.format(vpool.guid, proxy.guid)
                             main_proxy_config = Configuration.get(main_proxy_config_path)
 
                             # update config of main general backend of the vPool
@@ -731,15 +730,17 @@ class MigrationController(object):
                             Configuration.set(main_proxy_config_path, main_proxy_config)
 
                             # Now remove old configs of proxies
-                            other_cache_configs = list(Configuration.list(proxy_config_template))
-                            if not other_cache_configs or proxy_errors:
-                                # No other configs should be deleted in the config mgmt or if errors occurred: don't remove the old configs just yet, as they might be of use for manual intervention.
-                                pass
-                            else:
+                            config_path = PROXY_CONFIG_PATH.format(vpool.guid, proxy.guid)
+                            other_cache_configs = list(Configuration.list(config_path))
+                            if other_cache_configs and not proxy_errors:
                                 other_cache_configs.remove('main')
                                 for other_cache_config in other_cache_configs:
-                                    config_to_delete = os.path.join(proxy_config_template, other_cache_config)
+                                    config_to_delete = os.path.join(config_path, other_cache_config)
                                     Configuration.delete(config_to_delete)
+
+                            else:
+                                # No other configs should be deleted in the config mgmt or if errors occurred: don't remove the old configs just yet, as they might be of use for manual intervention.
+                                pass
                         except Exception as ex:
                             errors.append('Failed to update config for proxy {0} of vPool {1}: {2}'.format(proxy.guid, vpool.guid, ex))
                             continue

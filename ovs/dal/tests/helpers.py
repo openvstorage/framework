@@ -37,6 +37,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, GENERIC_SCRUB, HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs_extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
@@ -175,10 +176,10 @@ class DalHelper(object):
             else:
                 vpool = vpools[vpool_id]
             srclients[vpool_id] = StorageRouterClient(vpool.guid, None)
-            Configuration.set('/ovs/vpools/{0}/mds_config|mds_tlogs'.format(vpool.guid), 100)
-            Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 2)
-            Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 75)
-            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
+            Configuration.set('{0}|mds_tlogs'.format(MDS_CONFIG_PATH.format(vpool.guid)), 100)
+            Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 2)
+            Configuration.set('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)), 75)
+            Configuration.set(GENERIC_SCRUB.format(vpool.guid), json.dumps({}, indent=4), raw=True)
         for sr_id in structure.get('storagerouters', []):
             if sr_id not in storagerouters:
                 storagerouter = StorageRouter()
@@ -444,7 +445,7 @@ class DalHelper(object):
             sds = [storagedriver]
         for sd in sds:
             new_config = copy.deepcopy(default_config)
-            key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
+            key = HOSTS_CONFIG_PATH.format(vpool.guid, sd.storagedriver_id)
             new_config['volume_router']['vrouter_id'] = sd.storagedriver_id
             LocalStorageRouterClient.configurations[key] = new_config
             Configuration.set(key, json.dumps(new_config), raw=True)

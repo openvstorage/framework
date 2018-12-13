@@ -22,6 +22,7 @@ import re
 import copy
 import json
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, VPOOL_BASE_PATH
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient
@@ -128,7 +129,7 @@ class VPoolInstaller(object):
         self.mds_tlogs = config.get('mds_tlogs')
         self.mds_safety = config.get('mds_safety')
         self.mds_maxload = config.get('mds_maxload')
-        Configuration.set(key='/ovs/vpools/{0}/mds_config'.format(self.vpool.guid),
+        Configuration.set(key=MDS_CONFIG_PATH.format(self.vpool.guid),
                           value={'mds_tlogs': self.mds_tlogs or 100,
                                  'mds_safety': self.mds_safety or 3,
                                  'mds_maxload': self.mds_maxload or 75})
@@ -213,8 +214,8 @@ class VPoolInstaller(object):
                 self.sd_installer.storagedriver.delete()
             if len(self.vpool.storagedrivers) == 0:
                 self.vpool.delete()
-                if Configuration.dir_exists(key='/ovs/vpools/{0}'.format(self.vpool.guid)):
-                    Configuration.delete(key='/ovs/vpools/{0}'.format(self.vpool.guid))
+                if Configuration.dir_exists(key=VPOOL_BASE_PATH.format(self.vpool.guid)):
+                    Configuration.delete(key=VPOOL_BASE_PATH.format(self.vpool.guid))
         elif status == VPool.STATUSES.FAILURE:
             # In case of failure status the cluster registry settings have already been adapted, so revert
             self.configure_cluster_registry(exclude=[self.sd_installer.storagedriver])

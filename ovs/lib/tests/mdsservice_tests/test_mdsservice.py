@@ -25,6 +25,7 @@ from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.service import Service
 from ovs.dal.tests.helpers import DalHelper
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.log.logger import Logger
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration
@@ -171,7 +172,7 @@ class MDSServices(unittest.TestCase):
         vdisks = {}
 
         for vpool in vpools.itervalues():
-            Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+            Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 3)
 
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=10, start_id=len(vdisks) + 1, mds_service=mds_service))
@@ -428,7 +429,7 @@ class MDSServices(unittest.TestCase):
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+        Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 3)
 
         vdisks = {}
         for mds_service in mds_services.itervalues():
@@ -625,7 +626,7 @@ class MDSServices(unittest.TestCase):
         storagerouters = structure['storagerouters']
         storagerouter_domains = structure['storagerouter_domains']
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+        Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 3)
 
         vdisks = {}
         for mds_service in mds_services.itervalues():
@@ -831,7 +832,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 11: Add some more vDisks and increase safety
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 5)
+        Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 5)
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
@@ -866,7 +867,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 12: Reduce safety
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
+        Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 3)
         # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY |
         # |    1   |       1       |   1   |     1      |      -       |    10    |
         # |    2   |       2       |   1   |     3      |      2       |    10    |
@@ -965,7 +966,7 @@ class MDSServices(unittest.TestCase):
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 55)
+        Configuration.set('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)), 55)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
@@ -1155,7 +1156,7 @@ class MDSServices(unittest.TestCase):
         storagerouters = structure['storagerouters']
         storagerouter_domains = structure['storagerouter_domains']
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 35)
+        Configuration.set('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)), 35)
 
         vdisks = {}
         for mds_service in mds_services.itervalues():
@@ -1327,8 +1328,8 @@ class MDSServices(unittest.TestCase):
         mds_services = structure['mds_services']
         storagedrivers = structure['storagedrivers']
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 3)
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 10)
+        Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 3)
+        Configuration.set('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)), 10)
 
         vdisks = DalHelper.create_vdisks_for_mds_service(amount=1, start_id=1, mds_service=mds_services[1])
         vdisk = vdisks[1]
@@ -1385,7 +1386,7 @@ class MDSServices(unittest.TestCase):
         self.assertEqual(mds_client.get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
         self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid), 2)
+        Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 2)
         MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
 
         configs = [[{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}]]
@@ -1411,7 +1412,7 @@ class MDSServices(unittest.TestCase):
         vpool = structure['vpools'][1]
         mds_service = structure['mds_services'][1]
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 70)
+        Configuration.set('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)), 70)
 
         mds_service.capacity = 10
         mds_service.save()
@@ -1519,7 +1520,7 @@ class MDSServices(unittest.TestCase):
         mds_services = structure['mds_services']
         storagerouters = structure['storagerouters']
 
-        Configuration.set('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid), 35)
+        Configuration.set('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)), 35)
 
         vdisks = {}
         for mds_service in mds_services.itervalues():

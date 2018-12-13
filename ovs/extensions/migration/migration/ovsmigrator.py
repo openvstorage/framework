@@ -18,6 +18,7 @@
 OVS migration module
 """
 
+from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.packages.packagefactory import PackageFactory
 
@@ -74,7 +75,7 @@ class ExtensionMigrator(object):
                 if Configuration.exists(key=mds_safety_key):
                     current_mds_settings = Configuration.get(key=mds_safety_key)
                     for vpool in VPoolList.get_vpools():
-                        vpool_key = '/ovs/vpools/{0}'.format(vpool.guid)
+                        vpool_key = VPOOL_BASE_PATH.format(vpool.guid)
                         if Configuration.dir_exists(key=vpool_key):
                             Configuration.set(key='{0}/mds_config'.format(vpool_key),
                                               value=current_mds_settings)

@@ -13,11 +13,13 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
+import os
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI, REMOTE_CONFIG_BACKEND_CONFIG, REMOTE_CONFIG_BACKEND_BASE
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs_extensions.constants.vpools import PROXY_CONFIG_PATH
 
 
 class VPoolShared(object):
@@ -75,7 +77,7 @@ class VPoolShared(object):
         :return: Arakoon configuration information
         :rtype: dict
         """
-        #todo: Fix leak of backends not bein removed
+        # Todo: Fix leak of backends not being removed
 
         remote_config = cls._retrieve_remote_alba_arakoon_config(alba_backend_guid, ovs_client)
         current_config = Configuration.get(REMOTE_CONFIG_BACKEND_CONFIG.format(alba_backend_guid), default=None)
@@ -90,6 +92,7 @@ class VPoolShared(object):
 
     @classmethod
     def calculate_abm_configs_in_use(cls):
+        # type: (None) -> List[str]
         """
         Iterate over all vPools in the cluster and check which local or remote backend configs are still in use.
         :return:
@@ -99,15 +102,13 @@ class VPoolShared(object):
         cache_types = [StorageDriverConfiguration.CACHE_FRAGMENT, StorageDriverConfiguration.CACHE_BLOCK]
 
         for vpool in VPoolList.get_vpools():
-            print vpool.name
-            proxy_config_template = '/ovs/vpools/{0}/proxies/{{0}}/config/main'.format(vpool.guid)
+            proxy_config_template = os.path.join(PROXY_CONFIG_PATH, 'main').format(vpool.guid)
             for std in vpool.storagedrivers:
                 for proxy in std.alba_proxies:
                     cfg = Configuration.get(proxy_config_template.format(proxy.guid), default=None)
                     cfg_mgr_url = cfg['albamgr_cfg_url']  # type:str
 
                     if cfg_mgr_url not in present_remote_configs.values():
-                        print cfg_mgr_url
                         in_use.add(Configuration.extract_key_from_path(cfg_mgr_url))
                     # Extract all albamgr_cfg_urls
                     for cache_type in cache_types:
