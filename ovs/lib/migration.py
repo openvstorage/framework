@@ -313,7 +313,7 @@ class MigrationController(object):
                                 backend_data = metadata.pop(metadata_key)  # Pop to mutate metadata
                                 new_cache_structure['is_backend'] = True
                                 # Copy over the old data
-                                new_cache_structure['backend_info']['arakoon_config'] = backend_data['arakoon_config'] #todo fix migration code
+                                new_cache_structure['backend_info']['arakoon_config'] = backend_data['arakoon_config']
                                 new_cache_structure['backend_info'].update(backend_data['backend_info'])
                                 new_cache_structure['backend_info']['connection_info'].update(backend_data['connection_info'])
                             else:
@@ -727,7 +727,8 @@ class MigrationController(object):
                                         errors.append('Failed to update proxy {0} of vPool {1}: {2}'.format(proxy.guid, vpool.guid, ex))
                                         continue
                             # Set updated config.
-                            Configuration.set(main_proxy_config_path, main_proxy_config)
+                            transaction_id = Configuration.begin_transaction()
+                            Configuration.set(main_proxy_config_path, main_proxy_config, transaction=transaction_id)
 
                             # Now remove old configs of proxies
                             config_path = PROXY_CONFIG_PATH.format(vpool.guid, proxy.guid)
@@ -736,11 +737,12 @@ class MigrationController(object):
                                 other_cache_configs.remove('main')
                                 for other_cache_config in other_cache_configs:
                                     config_to_delete = os.path.join(config_path, other_cache_config)
-                                    Configuration.delete(config_to_delete)
-
+                                    Configuration.delete(config_to_delete, transaction=transaction_id)
                             else:
                                 # No other configs should be deleted in the config mgmt or if errors occurred: don't remove the old configs just yet, as they might be of use for manual intervention.
                                 pass
+                            Configuration.apply_transaction(transaction=transaction_id)
+
                         except Exception as ex:
                             errors.append('Failed to update config for proxy {0} of vPool {1}: {2}'.format(proxy.guid, vpool.guid, ex))
                             continue

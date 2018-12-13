@@ -112,7 +112,7 @@ class VPoolShared(object):
                         in_use.add(Configuration.extract_key_from_path(cfg_mgr_url))
                     # Extract all albamgr_cfg_urls
                     for cache_type in cache_types:
-                        cache_cfg = cfg.get(cache_type)
+                        cache_cfg = cfg[cache_type]
                         if len(cache_cfg) == 1:  # No backend caching for this type
                             continue
                         else:

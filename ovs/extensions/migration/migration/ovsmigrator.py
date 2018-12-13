@@ -18,7 +18,6 @@
 OVS migration module
 """
 
-from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.packages.packagefactory import PackageFactory
 
@@ -58,6 +57,7 @@ class ExtensionMigrator(object):
             try:
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.dal.lists.vpoollist import VPoolList
+                from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
                 from ovs.extensions.generic.configuration import Configuration
                 from ovs.extensions.services.servicefactory import ServiceFactory
                 from ovs.extensions.generic.sshclient import SSHClient
