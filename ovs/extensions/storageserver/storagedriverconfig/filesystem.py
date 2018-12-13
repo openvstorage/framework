@@ -17,10 +17,13 @@
 from .base import BaseStorageDriverConfig
 
 
-class FilesystemConfig(BaseStorageDriverConfig):
+class FileSystemConfig(BaseStorageDriverConfig):
     """
     Filesystem container of the storagedriver config
     """
+
+    component_identifier = 'filesystem'
+
     def __init__(self, fs_virtual_disk_format, fs_dtl_host=None, fs_dtl_port=None, fs_dtl_mode=None, fs_ignore_sync=None, fs_max_open_files=None, fs_cache_dentries=None, fs_raw_disk_suffix=None,
                  fs_dtl_config_mode=None, fs_file_event_rules=None, fs_enable_shm_interface=None, fs_metadata_backend_type=None,
                  fs_enable_network_interface=None, fs_metadata_backend_mds_nodes=None, fs_metadata_backend_mds_timeout_secs=None, fs_metadata_backend_arakoon_cluster_id=None,

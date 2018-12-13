@@ -14,13 +14,16 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from ovs.extensions.storageserver.storagedriverconfig.generic_config import GenericConfig
+from .base import BaseStorageDriverConfig
 
 
-class VolumeManagerConfig(GenericConfig):
+class VolumeManagerConfig(BaseStorageDriverConfig):
     """
     Volumemanager config container of the storagedriver config
     """
+
+    component_identifier = 'volume_manager'
+
     def __init__(self, clean_interval, metadata_path, tlog_path, default_cluster_size=None, dtl_throttle_usecs=None, non_disposable_scos_factor=None,
                  number_of_scos_in_tlog=None, read_cache_default_behaviour=None, read_cache_default_mode=None, sap_persist_interval=None,
                  sco_written_to_backend_action=None, required_tlog_freespace=None, required_meta_freespace=None, freespace_check_interval=None,

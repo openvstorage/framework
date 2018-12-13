@@ -14,13 +14,16 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from ovs.extensions.storageserver.storagedriverconfig.generic_config import GenericConfig
+from .base import BaseStorageDriverConfig
 
 
-class VRouterConfig(GenericConfig):
+class VolumeRouterConfig(BaseStorageDriverConfig):
     """
-    VRouterconfig container of the storagedriver config
+    VolumeRouterConfig container of the storagedriver config
     """
+
+    component_identifier = 'volume_router'
+
     def __init__(self,vrouter_id, vrouter_max_workers=None, vrouter_min_workers=None, vrouter_use_fencing=None,
                  vrouter_sco_multiplier=None, vrouter_routing_retries=None, vrouter_redirect_retries=None, vrouter_local_io_retries=None, vrouter_keepalive_retries=None,
                  vrouter_send_sync_response=None, vrouter_migrate_timeout_ms=None, vrouter_keepalive_time_secs=None, vrouter_file_read_threshold=None,

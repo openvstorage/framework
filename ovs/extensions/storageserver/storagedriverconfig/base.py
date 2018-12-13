@@ -17,14 +17,27 @@
 Base storagedriver config
 Exposes methods for all sections of a complete storagedriver config
 """
+from functools import wraps
 from subprocess import check_output
+
+
+def ensure_options(f):
+    """
+    Ensure that config has its possible options cached
+    """
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if not VolumeDriverConfigOption._options:
+            VolumeDriverConfigOption._cache_options()
+        return f(*args, **kwargs)
+    return wrap
 
 
 class VolumeDriverConfigOption(object):
     """
     Config option read out by 'volumedriver_fs', '--config-help-markdown'
     """
-    _options_by_component_and_key = {}
+    _options = []
 
     def __init__(self, component, key, default_value, dynamically_reconfigurable, remarks):
         #  type: (str, str, any, bool, str) -> None
@@ -46,6 +59,7 @@ class VolumeDriverConfigOption(object):
         self.remarks = remarks
 
     @classmethod
+    @ensure_options
     def get_all_options(cls):
         # type: () -> List[VolumeDriverConfigOption]
         """
@@ -53,17 +67,12 @@ class VolumeDriverConfigOption(object):
         :return: A list with all options
         :rtype: List[VolumeDriverConfigOption]
         """
-        if not cls._options_by_component_and_key:
-            cls._cache_options()
-        options = []
-        for component, component_keys_options in cls._options_by_component_and_key.iteritems():
-            for component_key, option in component_keys_options.iteritems():
-                options.append(option)
-        return options
+        return cls._options
 
     @classmethod
+    @ensure_options
     def get_option_by_component_and_key(cls, component, key):
-        # type: (str, str) -> VolumeDriverConfigOption
+        # type: (str, str) -> Union[VolumeDriverConfigOption, None]
         """
         Retrieve an option by component and key
         Returns None when no option was found
@@ -74,11 +83,13 @@ class VolumeDriverConfigOption(object):
         :return: Option if found else none
         :rtype: VolumeDriverConfigOption
         """
-        if not cls._options_by_component_and_key:
-            cls._cache_options()
-        return cls._options_by_component_and_key.get(component, {}).get(key)
+        try:
+            return filter(lambda option: option.key == key and option.component == component, cls._options)[0]
+        except IndexError:
+            return None
 
     @classmethod
+    @ensure_options
     def get_options_by_component(cls, component):
         # type: (str) -> List[VolumeDriverConfigOption]
         """
@@ -88,13 +99,7 @@ class VolumeDriverConfigOption(object):
         :return: All options associated with the component
         :rtype: List[VolumeDriverConfigOption]
         """
-        if not cls._options_by_component_and_key:
-            cls._cache_options()
-        options = []
-        component_keys_options = cls._options_by_component_and_key.get(component)
-        for component_key, option in component_keys_options.iteritems():
-            options.append(option)
-        return options
+        return filter(lambda option: option.component == component, cls._options)
 
     @classmethod
     def _cache_options(cls):
@@ -107,13 +112,7 @@ class VolumeDriverConfigOption(object):
         markdown = check_output(['volumedriver_fs', '--config-help-markdown'])
         for line in markdown.split('\n|')[2:]:
             options.append(cls.from_option_line('|' + line))
-        options_by_component_and_key = {}
-        for option in options:
-            if option.component not in options_by_component_and_key:
-                options_by_component_and_key[option.component] = {}
-            if option.key not in options_by_component_and_key:
-                options_by_component_and_key[option.component][option.key] = option
-        cls._options_by_component_and_key = options_by_component_and_key
+        cls._options = options
 
     @classmethod
     def from_option_line(cls, line):
@@ -126,19 +125,18 @@ class VolumeDriverConfigOption(object):
         :rtype: VolumeDriverConfigOption
         """
         stripped = [s.strip() for s in line.split('|')[1:-1]]
-        print line
         if len(stripped) > 5:
             # A remark with a '|' in it
             remark_pieces = stripped[4:]
             stripped[4] = '|'.join(remark_pieces)
-            print 1, stripped
             stripped = stripped[:5]
-            print 2, stripped
         component, key, default_value, dynamically_reconfigurable_string, remarks = stripped
         return cls(component, key, default_value, dynamically_reconfigurable_string == 'yes', remarks)
 
 
 class BaseStorageDriverConfig(object):
+
+    component_identifier = 'base'
 
     def to_dict(self):
         # type: () -> Dict[str, any]
@@ -200,4 +198,16 @@ class BaseStorageDriverConfig(object):
         :rtype: bool
         """
         option = VolumeDriverConfigOption.get_option_by_component_and_key(component, key)
-        return option and option.dynamically_reconfigurable
+        return bool(option) and option.dynamically_reconfigurable
+
+    @classmethod
+    def is_dynamically_reloadable(cls, key):
+        """
+        :param key: Config key to look for
+        :type key: str
+        :return: True if the option is dynamically reloadable
+        :rtype: bool
+        """
+        if cls.component_identifier == BaseStorageDriverConfig.component_identifier:
+            raise NotImplementedError('Component identifier has not been implemented by the current class')
+        return cls._is_dynamically_reloadable(cls.component_identifier, key)
