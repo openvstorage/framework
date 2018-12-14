@@ -704,7 +704,7 @@ class MigrationController(object):
                             main_proxy_config = Configuration.get(main_proxy_config_path)
 
                             # update config of main general backend of the vPool
-                            if not main_proxy_config['albamgr_cfg_url'].contains(REMOTE_CONFIG_BACKEND_BASE):
+                            if not REMOTE_CONFIG_BACKEND_BASE in main_proxy_config['albamgr_cfg_url']:
                                 main_proxy_config['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(main_backend_guid))
 
                             # Update caching info
@@ -715,7 +715,7 @@ class MigrationController(object):
                                     alba_guid = backend_info['alba_backend_guid']
                                     connection_info = backend_info['connection_info']
                                     try:
-                                        if main_proxy_config[cache_type][1]['albamgr_cfg_url'].contains(REMOTE_CONFIG_BACKEND_BASE):
+                                        if REMOTE_CONFIG_BACKEND_BASE in main_proxy_config[cache_type][1]['albamgr_cfg_url']:
                                             client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
                                             if alba_guid not in present_remote_configs:
                                                 # If the proxy is already in this list, we can safely assume that it has been recently added and does not need resyncing.
