@@ -26,73 +26,23 @@ function show_help {
     echo "Open vStorage CLI launcher"
     echo "--------------------------"
     show_generic_help
-    echo "  * Setup options:"
-    echo "    - ovs setup [--rollback-on-failure]          Launch Open vStorage setup and autodetect required node role (master/extra) and optionally rollback if setup would fail"
-    echo "    - ovs setup master [--rollback-on-failure]   Launch Open vStorage setup and install master node and optionally rollback if setup would fail"
-    echo "    - ovs setup extra [--rollback-on-failure]    Launch Open vStorage setup and install extra node and optionally rollback if setup would fail"
-    echo "    - ovs setup promote [--rollback-on-failure]  Promote this node (extra -> master) and optionally rollback if promote would fail"
-    echo "    - ovs setup demote [--rollback-on-failure]   Demote this node (master -> extra) and optionally rollback if demote would fail"
     echo ""
-    echo "  * Rollback options:"
-    echo "    - ovs rollback                               Roll back a failed setup on this node"
+
     echo ""
-    echo "  * Update options:"
-    echo "    - ovs update <components>                    Update specified components on all nodes in cluster (comma-separated list)"
-    echo ""
-    echo "  * Remove options:"
-    echo "    - ovs remove node <ip>                       Remove node from cluster"
-    echo ""
-    echo "  * Monitor options:"
-    echo "    - ovs monitor mds                            Watch Open vStorage MDS clusters for all vPools per StorageRouter"
-    echo "    - ovs monitor services                       Watch Open vStorage services"
-    echo "    - ovs monitor heartbeat                      Send an internal heartbeat"
+
     echo ""
     echo "  * Services options:"
     echo "    - ovs stop framework [ip|all]                Stop Open vStorage Framework services on this node, on all nodes, or on the given ip"
     echo "    - ovs start framework [ip|all]               Start Open vStorage Framework services on this node, on all nodes, or on the given ip"
     echo ""
-    echo "  * Configuration editing:"
-    echo "    - ovs config edit some/key                   Opens the contents of 'some/key' in your EDITOR, and updates it after editing"
-    echo "    - ovs config list [some]                     Lists all keys [under 'some']"
-    echo "    - ovs config list-recursive [some]           Lists all keys recursively [under 'some']"
-    echo "    - ovs config get some/key                    Prints the contents of 'some/key'"
     echo ""
     echo "  * Custom Open vStorage modules:"
     echo "    - ovs <modulename> <arguments>               Execute a custom Open vStorage module in /opt/OpenvStorage/scripts/"
     echo ""
 }
 
-if [ "$1" = "help" ] ; then
-    show_help
-elif [ "$1" = "setup" ] ; then
-    if [ "$#" -lt 2 ] ; then
-        python -c "from ovs.lib.nodeinstallation import NodeInstallationController; NodeInstallationController.setup_node()"
-    elif [ "$2" = "--rollback-on-failure" ] ; then
-        python -c "from ovs.lib.nodeinstallation import NodeInstallationController; NodeInstallationController.setup_node(execute_rollback=True)"
-    elif [ "$2" = "master" ] || [ "$2" = "extra" ] ; then
-        if [ "$3" = "--rollback-on-failure" ] ; then
-            python -c "from ovs.lib.nodeinstallation import NodeInstallationController; NodeInstallationController.setup_node(node_type='$2', execute_rollback=True)"
-        else
-            python -c "from ovs.lib.nodeinstallation import NodeInstallationController; NodeInstallationController.setup_node(node_type='$2')"
-        fi
-    elif [ "$2" = "promote" ] ; then
-        if [ "$3" = "--rollback-on-failure" ] ; then
-            python -c "from ovs.lib.nodetype import NodeTypeController; NodeTypeController.promote_or_demote_node('promote', execute_rollback=True)"
-        else
-            python -c "from ovs.lib.nodetype import NodeTypeController; NodeTypeController.promote_or_demote_node('promote')"
-        fi
-    elif [ "$2" = "demote" ] ; then
-        if [ "$3" = "--rollback-on-failure" ] ; then
-            python -c "from ovs.lib.nodetype import NodeTypeController; NodeTypeController.promote_or_demote_node('demote', execute_rollback=True)"
-        elif [ "$#" -eq 3 ] ; then
-            python -c "from ovs.lib.nodetype import NodeTypeController; NodeTypeController.promote_or_demote_node('demote', '$3')"
-        else
-            python -c "from ovs.lib.nodetype import NodeTypeController; NodeTypeController.promote_or_demote_node('demote')"
-        fi
-    else
-        show_help
-    fi
-elif [ "$1" = "rollback" ] ; then
+
+if [ "$1" = "rollback" ] ; then
     if [ "$#" -eq 1 ]; then
         python -c "from ovs.lib.nodeinstallation import NodeInstallationController; NodeInstallationController.rollback_setup()"
     else
