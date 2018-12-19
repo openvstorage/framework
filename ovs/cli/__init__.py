@@ -1,10 +1,11 @@
 import click
 from .setup import setup_group
 from .config import config_group
-from .misc.misc import rollback, update, unittest
+from .misc.misc import rollback, update, collect_logs
 from .remove import remove_group
 from .monitor import monitor_group
-from .collect import collect_group
+from .services import start_group, stop_group
+from ovs_extensions.cli.cli import unittest
 
 import subprocess
 
@@ -18,6 +19,6 @@ def ovs(ctx):
         # Do nothing: invoke subcommand
 
 
-groups = [setup_group, config_group, rollback, update, remove_group, monitor_group, unittest, collect_group]
+groups = [setup_group, config_group, rollback, update, remove_group, monitor_group, unittest, start_group, stop_group, collect_logs]
 for group in groups:
     ovs.add_command(group)

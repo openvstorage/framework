@@ -2,10 +2,10 @@ import os
 import uuid
 import click
 import subprocess
-
 from ovs.extensions.generic.configuration import Configuration
-#todo debug config managemtn
-@click.command('edit', help='Use NANO te edit a config value manually')
+
+
+@click.command('edit', help='Use NANO te edit a config or value manually')
 @click.argument('path')
 def edit(path):
     path = str(path)
@@ -20,17 +20,25 @@ def edit(path):
         Configuration.set(path, f.read(), raw=True)
     os.remove(tmp_path)
 
+
 @click.command('list', help='List values of the configmanagement from path')
-@click.argument('path') #todo fix empty path
+@click.argument('path', required=False, default=None)
 def list(path):
-    path = str(path)
+    if path:
+        path = str(path)
+    else:
+        path = '/'
     for entry in Configuration.list(path):
         print entry
 
+
 @click.command('list-recursive', help='Recursively list values of the configmanagement from path')
-@click.argument('path')
+@click.argument('path', required=False, default=None)
 def list_recursive(path):
-    path = str(path)
+    if path:
+        path = str(path)
+    else:
+        path = '/'
     for entry in Configuration.list(path, recursive=True):
         print entry
 
