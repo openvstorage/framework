@@ -70,6 +70,9 @@ class DalHelper(object):
         """
         if kwargs.get('fake_sleep', False) is True:
             fakesleep.monkey_patch()
+        import os
+        ut = os.environ.get('RUNNING_UNITTESTS')
+        print '===========', ut, type(ut)
         volatile, persistent = DalHelper._clean()
         Configuration.initialize()
         return volatile, persistent
@@ -88,7 +91,8 @@ class DalHelper(object):
     def _clean():
         volatile = VolatileFactory.get_client()
         persistent = PersistentFactory.get_client()
-
+        ut = os.environ.get('RUNNING_UNITTESTS')
+        print '===========', ut, type(ut), os.environ.get('RUNNING_UNITTESTS') == 'True'
         # noinspection PyProtectedMember
         volatile._clean()
         # noinspection PyProtectedMember

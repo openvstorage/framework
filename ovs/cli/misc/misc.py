@@ -50,3 +50,5 @@ def collect_logs(logs):
         subprocess.check_call('journalctl -u ovs-* -u asd-* -u alba-* --no-pager', stderr=fh, stdout=fh, shell=True)
     subprocess.check_call('tar czfP {0} {1} /var/log/*log --exclude=syslog'.format(tmp_path, parsed_string), shell=True)
     print 'Files stored in {0}'.format(tmp_path)
+
+
