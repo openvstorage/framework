@@ -3,7 +3,6 @@ from .setup import master
 from .setup import extra
 from .setup import promote
 from .setup import demote
-from ovs.lib.nodeinstallation import NodeInstallationController
 
 # This group will be exported to the main CLI interface
 
@@ -13,6 +12,7 @@ from ovs.lib.nodeinstallation import NodeInstallationController
 @click.pass_context
 def setup_group(ctx, rollback_on_failure):
     if ctx.invoked_subcommand is None:
+        from ovs.lib.nodeinstallation import NodeInstallationController
         NodeInstallationController.setup_node(execute_rollback=rollback_on_failure)
     # else:
         # Do nothing: invoke subcommand

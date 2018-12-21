@@ -1,10 +1,11 @@
 import click
-from ovs.lib.noderemoval import NodeRemovalController
 
 
 @click.command('node')
 @click.argument('IP')
-@click.argument('silent', required=False, default=False, type=click.BOOL)
+@click.option('--force-yes', required=False, default=False, is_flag=True)
 def remove_node(ip, silent):
-    silent = '--force-yes' if silent else None  #todo change in code van controller
+    from ovs.lib.noderemoval import NodeRemovalController
+
     NodeRemovalController.remove_node(node_ip=ip, silent=silent)
+

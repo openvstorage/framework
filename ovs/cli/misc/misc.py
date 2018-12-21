@@ -1,23 +1,21 @@
 import os
 import click
-import tarfile
-import time
 import datetime
 import subprocess
-from ovs.extensions.generic.system import System
-from ovs_extensions.generic.unittests import UnitTest
 
-from ovs.lib.nodeinstallation import NodeInstallationController
-from ovs.lib.update import UpdateController
 
 @click.command('rollback', help='Roll back a failed OVS install')
 def rollback():
+    from ovs.lib.nodeinstallation import NodeInstallationController
+
     NodeInstallationController.rollback_setup()
 
 
 @click.command('update', help='Update specified components on all nodes in cluster ')
 @click.argument('components', nargs=-1)
 def update(components):
+    from ovs.lib.update import UpdateController
+
     if len(components) == 1:
         components = components[0].split(',')  # for backwards compatiblity: comma-separated list
 
@@ -28,6 +26,8 @@ def update(components):
 @click.command('collect', help='Collect different logfiles from the environment and dump them in .gz')
 @click.argument('logs')
 def collect_logs(logs):
+    from ovs.extensions.generic.system import System
+
     sr = System.get_my_storagerouter()
     time_string = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     tmp_path = '/tmp/ovs-{0}-{1}-logs.tar'.format(sr.name, time_string)
@@ -39,7 +39,7 @@ def collect_logs(logs):
         os.remove(gz_path)
     open(tmp_path, 'a')
 
-    #Make sure all folders exist (tar might make trouble otherwise)
+    # Make sure all folders exist (tar might make trouble otherwise)
     log_list = ['/var/log/arakoon', '/var/log/nginx', '/var/log/ovs', '/var/log/rabbitmq', '/var/log/upstart', '/var/log/dmesg']
     parsed_string = ''
     for path in log_list:

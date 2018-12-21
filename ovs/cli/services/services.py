@@ -1,14 +1,13 @@
-import click
 import re
-from ovs.extensions.generic.system import System
-from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.lib.helpers.toolbox import Toolbox
+import click
+
 
 @click.command('framework')
 @click.argument('host', required=False, default=None, type=click.STRING)
 def framework_stop(host):
+    from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+    from ovs.extensions.services.servicefactory import ServiceFactory
+
     storagerouter_list = _get_storagerouter_list(host)
     print 'Stopping...'
     for storagerouter in storagerouter_list:
@@ -20,9 +19,13 @@ def framework_stop(host):
             continue
     print 'Done'
 
+
 @click.command('framework')
 @click.argument('host', required=False, default=None, type=click.STRING)
 def framework_start(host):
+    from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+    from ovs.extensions.services.servicefactory import ServiceFactory
+
     storagerouter_list = _get_storagerouter_list(host)
     print 'Starting...'
     for storagerouter in storagerouter_list:
@@ -36,6 +39,10 @@ def framework_start(host):
     print 'Done'
 
 def _get_storagerouter_list(host):
+    from ovs.dal.lists.storagerouterlist import StorageRouterList
+    from ovs.lib.helpers.toolbox import Toolbox
+    from ovs.extensions.generic.system import System
+
     storagerouter_list = []
     if not host:
         storagerouter_list = [System.get_my_storagerouter()]

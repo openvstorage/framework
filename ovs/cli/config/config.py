@@ -2,12 +2,13 @@ import os
 import uuid
 import click
 import subprocess
-from ovs.extensions.generic.configuration import Configuration
 
 
 @click.command('edit', help='Use NANO te edit a config or value manually')
 @click.argument('path')
 def edit(path):
+    from ovs.extensions.generic.configuration import Configuration
+
     path = str(path)
     tmp_path = '/tmp/{0}'.format(uuid.uuid4())
     with open(tmp_path, 'w') as f:
@@ -24,6 +25,8 @@ def edit(path):
 @click.command('list', help='List values of the configmanagement from path')
 @click.argument('path', required=False, default=None)
 def list(path):
+    from ovs.extensions.generic.configuration import Configuration
+
     if path:
         path = str(path)
     else:
@@ -35,6 +38,8 @@ def list(path):
 @click.command('list-recursive', help='Recursively list values of the configmanagement from path')
 @click.argument('path', required=False, default=None)
 def list_recursive(path):
+    from ovs.extensions.generic.configuration import Configuration
+
     if path:
         path = str(path)
     else:
@@ -45,6 +50,8 @@ def list_recursive(path):
 @click.command('get', help='Fetch value of the configmanagement from path')
 @click.argument('path')
 def get(path):
+    from ovs.extensions.generic.configuration import Configuration
+
     path = str(path)
     if Configuration.exists(path, raw=True):
         print Configuration.get(path, raw=True)
