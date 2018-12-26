@@ -242,7 +242,7 @@ class VDisk(DataObject):
                     self._logger.debug('VDisk {0} status has been set to UNKNOWN'.format(self.name))
                     vdisk_state = VDisk.STATUSES.UNKNOWN
                 else:
-                    self._logger.debug('Uncaught exception occurred when requesting the volume info for vDisk {0}: {1}'.format(self.name, ex))
+                    self._logger.debug('Uncaught exception occurred when requesting the volume info for vDisk {0}'.format(self.name))
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
