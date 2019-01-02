@@ -14,12 +14,8 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from .services import framework_start, framework_stop
+from .rollback import rollback
 from ovs_extensions.cli import OVSGroup
 
-services_group = OVSGroup('services', help='Restart services')
-start_group = OVSGroup('start', help='(Re)Start framework services')
-start_group.add_command(framework_start)
-
-stop_group = OVSGroup('stop', help='Stop framework services')
-stop_group.add_command(framework_stop)
+rollback_group = OVSGroup('rollback', help='Rollback options')
+rollback_group.add_command(rollback)

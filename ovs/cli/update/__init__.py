@@ -14,12 +14,18 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from .services import framework_start, framework_stop
-from ovs_extensions.cli import OVSGroup
+import click
+from ovs_extensions.cli import OVSCommand
 
-services_group = OVSGroup('services', help='Restart services')
-start_group = OVSGroup('start', help='(Re)Start framework services')
-start_group.add_command(framework_start)
 
-stop_group = OVSGroup('stop', help='Stop framework services')
-stop_group.add_command(framework_stop)
+@click.command('update', help='Update specified components on all nodes in cluster',
+               command_parameter_help='<components>', cls=OVSCommand)
+@click.argument('components', nargs=-1)
+def update_command(components):
+    from ovs.lib.update import UpdateController
+
+    if len(components) == 1:
+        components = components[0].split(',')  # for backwards compatiblity: comma-separated list
+
+    components = [str(i) for i in components]
+    UpdateController.execute_update(components)

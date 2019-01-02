@@ -1,31 +1,27 @@
+# Copyright (C) 2019 iNuron NV
+#
+# This file is part of Open vStorage Open Source Edition (OSE),
+# as available from
+#
+#      http://www.openvstorage.org and
+#      http://www.openvstorage.com.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+# as published by the Free Software Foundation, in version 3 as it comes
+# in the LICENSE.txt file of the Open vStorage OSE distribution.
+#
+# Open vStorage is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY of any kind.
+
 import os
 import click
 import datetime
 import subprocess
 
 
-@click.command('rollback', help='Roll back a failed OVS install')
-def rollback():
-    from ovs.lib.nodeinstallation import NodeInstallationController
-
-    NodeInstallationController.rollback_setup()
-
-
-@click.command('update', help='Update specified components on all nodes in cluster ')
-@click.argument('components', nargs=-1)
-def update(components):
-    from ovs.lib.update import UpdateController
-
-    if len(components) == 1:
-        components = components[0].split(',')  # for backwards compatiblity: comma-separated list
-
-    components = [str(i) for i in components]
-    UpdateController.execute_update(components)
-
-
-@click.command('collect', help='Collect different logfiles from the environment and dump them in .gz')
-@click.argument('logs')
-def collect_logs(logs):
+@click.command('collect', help='Collect all ovs logs to a tarball (for support purposes)')
+def collect_logs():
     from ovs.extensions.generic.system import System
 
     sr = System.get_my_storagerouter()

@@ -2,7 +2,7 @@ import re
 import click
 
 
-@click.command('framework')
+@click.command('framework', help='Stop Open vStorage Framework services on this node, on all nodes, or on the given ip')
 @click.argument('host', required=False, default=None, type=click.STRING)
 def framework_stop(host):
     from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -20,7 +20,7 @@ def framework_stop(host):
     print 'Done'
 
 
-@click.command('framework')
+@click.command('framework', help='Start Open vStorage Framework services on this node, on all nodes, or on the given ip')
 @click.argument('host', required=False, default=None, type=click.STRING)
 def framework_start(host):
     from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -37,6 +37,7 @@ def framework_start(host):
             continue
 
     print 'Done'
+
 
 def _get_storagerouter_list(host):
     from ovs.dal.lists.storagerouterlist import StorageRouterList

@@ -1,13 +1,32 @@
+# Copyright (C) 2019 iNuron NV
+#
+# This file is part of Open vStorage Open Source Edition (OSE),
+# as available from
+#
+#      http://www.openvstorage.org and
+#      http://www.openvstorage.com.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+# as published by the Free Software Foundation, in version 3 as it comes
+# in the LICENSE.txt file of the Open vStorage OSE distribution.
+#
+# Open vStorage is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY of any kind.
+
 import click
 from .setup import master
 from .setup import extra
 from .setup import promote
 from .setup import demote
+from ovs_extensions.cli import OVSGroup
 
 # This group will be exported to the main CLI interface
 
 
-@click.group('setup', help='all setup related functionality', invoke_without_command=True)
+@click.group('setup',
+             help='Launch Open vStorage setup and autodetect required node role (master/extra) and optionally rollback if setup would fail',
+             invoke_without_command=True, short_help='ovs setup [--rollback-on-failure]', cls=OVSGroup)
 @click.option('--rollback-on-failure', help='Rollback on failure', flag_value=True, default=False)
 @click.pass_context
 def setup_group(ctx, rollback_on_failure):
