@@ -19,7 +19,7 @@ from ovs_extensions.cli import OVSCommand
 
 
 @click.command('update', help='Update specified components on all nodes in cluster',
-               command_parameter_help='<components>', cls=OVSCommand)
+               section_header='Update', command_parameter_help='<components>', cls=OVSCommand)
 @click.argument('components', nargs=-1)
 def update_command(components):
     from ovs.lib.update import UpdateController

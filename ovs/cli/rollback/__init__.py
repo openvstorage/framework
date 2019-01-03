@@ -14,8 +14,12 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from .rollback import rollback
-from ovs_extensions.cli import OVSGroup
+import click
+from ovs_extensions.cli import OVSCommand
 
-rollback_group = OVSGroup('rollback', help='Rollback options')
-rollback_group.add_command(rollback)
+
+@click.command('rollback', help='Roll back a failed setup on this node', section_header='Rollback', cls=OVSCommand)
+def rollback_command():
+    from ovs.lib.nodeinstallation import NodeInstallationController
+
+    NodeInstallationController.rollback_setup()

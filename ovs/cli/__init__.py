@@ -32,9 +32,9 @@ from .config import config_group
 from .misc import misc_group
 from .remove import remove_group
 from .monitor import monitor_group
-# from .services import services_group
+from .services import services_group
 from .update import update_command
-from .rollback import rollback_group
+from .rollback import rollback_command
 from ovs_extensions.cli import OVSCLI, unittest_command
 from IPython import embed
 
@@ -49,7 +49,8 @@ def ovs(ctx):
     # Do nothing: invoke subcommand
 
 
-# groups = [setup_group, config_group, rollback_group, update, remove_group, monitor_group, unittest_command, services_group, misc_group]
-groups = [setup_group, config_group, rollback_group, update_command, remove_group, monitor_group, unittest_command, misc_group]
+# groups = [setup_group, config_group, rollback_command, update_command, remove_group, monitor_group, unittest_command, services_group, misc_group]
+groups = [setup_group, config_group, rollback_command, update_command, remove_group, monitor_group, unittest_command, misc_group]
 for group in groups:
+    print group.name
     ovs.add_command(group)
