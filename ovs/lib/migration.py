@@ -346,8 +346,8 @@ class MigrationController(object):
                         _config = Configuration.get(new_path)
                         Configuration.set(new_path, _config)
                     except:
-                        _config = Configuration.get(new_path, raw=True)
-                        Configuration.set(new_path, _config, raw=True)
+                        _config = Configuration.get('{0}.raw'.format(new_path))
+                        Configuration.set('{0}.raw'.format(new_path), _config)
         if ExtensionMigrator.THIS_VERSION <= 13:  # There is no way of checking whether this new indentation logic has been applied, so we only perform this for version 13 and lower
             MigrationController._logger.info('Re-saving every configuration setting with new indentation rules')
             _resave_all_config_entries()

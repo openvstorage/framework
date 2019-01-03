@@ -28,7 +28,8 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, PROXY_CONFIG_PATH, HOSTS_CONFIG_PATH, VPOOL_BASE_PATH
+from ovs_extensions.constants.arakoon import ARAKOON_ABM_CONFIG
+from ovs_extensions.constants.vpools import PROXY_CONFIG_ABM, MDS_CONFIG_PATH, PROXY_CONFIG_PATH, HOSTS_CONFIG_PATH, VPOOL_BASE_PATH
 from ovs_extensions.api.client import OVSClient
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
@@ -510,11 +511,9 @@ class VPoolController(object):
                     arakoons[ctype] = ArakoonClusterConfig.convert_config_to(arakoon_config, return_type='INI')
                 else:  # Local Backend for accelerated Backend
                     alba_backend_name = parameters[ctype]['backend_info']['alba_backend_name']
-                    if Configuration.exists(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name),
-                                            raw=True) is False:
+                    if Configuration.exists(key=ARAKOON_ABM_CONFIG.format(alba_backend_name)) is False:
                         raise ValueError('Arakoon cluster for ALBA Backend {0} could not be retrieved'.format(alba_backend_name))
-                    arakoons[ctype] = Configuration.get(key='/ovs/arakoon/{0}-abm/config'.format(alba_backend_name),
-                                                        raw=True)
+                    arakoons[ctype] = Configuration.get(key=ARAKOON_ABM_CONFIG.format(alba_backend_name))
                 cache_info[ctype] = ['alba', {'albamgr_cfg_url': '/etc/hprm/{0}/{1}_cache_arakoon.ini'.format(identifier, ctype),
                                               'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                              'preset': parameters[ctype]['backend_info']['preset']}],
@@ -541,7 +540,7 @@ class VPoolController(object):
             if ctype in arakoons:
                 file_contents_map['/opt/OpenvStorage/config/{0}/{1}_cache_arakoon.ini'.format(identifier, ctype)] = arakoons[ctype]
         file_contents_map.update({'/opt/OpenvStorage/config/{0}/config.json'.format(identifier): json.dumps(config, indent=4),
-                                  '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(identifier): Configuration.get(key=config_path.format('abm'), raw=True)})
+                                  '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(identifier): Configuration.get(PROXY_CONFIG_ABM)})
 
         local_client = SSHClient(endpoint=local_storagerouter)
         local_client.dir_create(directories='/opt/OpenvStorage/config/{0}'.format(identifier))

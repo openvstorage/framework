@@ -806,7 +806,7 @@ class StackWorker(ScrubShared):
                         scrub_proxy_config['port'] = port
                         scrub_proxy_config['transport'] = 'tcp'
                         scrub_proxy_configs.append(scrub_proxy_config)
-                        Configuration.set(scrub_proxy_config_key, json.dumps(scrub_proxy_config, indent=4), raw=True)
+                        Configuration.set('{0}.raw'.format(scrub_proxy_config_key), json.dumps(scrub_proxy_config, indent=4))
                         params = {'VPOOL_NAME': self.vpool.name,
                                   'LOG_SINK': Logger.get_sink_path(alba_proxy_service),
                                   'CONFIG_PATH': Configuration.get_configuration_path(scrub_proxy_config_key),
@@ -843,7 +843,7 @@ class StackWorker(ScrubShared):
                                              'alba_connection_port': scrub_proxy_config['port']})
                         backend_config[str(index)] = proxy_config
                 # Copy backend connection manager information in separate key
-                Configuration.set(self.backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
+                Configuration.set('{0}.raw'.format(self.backend_config_key), json.dumps({"backend_connection_manager": backend_config}, indent=4))
                 self._logger.info(self._format_message('Backend config was set up'))
 
                 if 'post_proxy_deployment' in self._test_hooks:
@@ -1192,7 +1192,7 @@ class Scrubber(ScrubShared):
                     'time_start': self.time_start,
                     'time_end': self.time_end,
                     'worker_contexts': self._covert_data_objects(self.worker_contexts)}
-        Configuration.set(job_key, json.dumps(job_info, indent=4), raw=True)
+        Configuration.set('{0}.raw'.format(job_key), json.dumps(job_info, indent=4))
 
     @classmethod
     def generate_vpool_vdisk_map(cls, vpool_guids=None, vdisk_guids=None, manual=False):

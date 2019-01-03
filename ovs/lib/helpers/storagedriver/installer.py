@@ -411,8 +411,8 @@ class StorageDriverInstaller(object):
             scrub_proxy_config = _generate_proxy_config(proxy_type='scrub', proxy_service=alba_proxy)
 
             # Add configurations to configuration management
-            Configuration.set(PROXY_CONFIG_MAIN.format(vpool.guid, alba_proxy.guid), json.dumps(main_proxy_config, indent=4), raw=True)
-            Configuration.set(GENERIC_SCRUB.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4), raw=True)
+            Configuration.set(PROXY_CONFIG_MAIN.format(vpool.guid, alba_proxy.guid), json.dumps(main_proxy_config, indent=4))
+            Configuration.set(GENERIC_SCRUB.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4))
 
     def configure_storagedriver_service(self):
         """

@@ -179,7 +179,7 @@ class DalHelper(object):
             Configuration.set('{0}|mds_tlogs'.format(MDS_CONFIG_PATH.format(vpool.guid)), 100)
             Configuration.set('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)), 2)
             Configuration.set('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)), 75)
-            Configuration.set(GENERIC_SCRUB.format(vpool.guid), json.dumps({}, indent=4), raw=True)
+            Configuration.set(GENERIC_SCRUB.format(vpool.guid), json.dumps({}, indent=4))
         for sr_id in structure.get('storagerouters', []):
             if sr_id not in storagerouters:
                 storagerouter = StorageRouter()
@@ -448,4 +448,4 @@ class DalHelper(object):
             key = HOSTS_CONFIG_PATH.format(vpool.guid, sd.storagedriver_id)
             new_config['volume_router']['vrouter_id'] = sd.storagedriver_id
             LocalStorageRouterClient.configurations[key] = new_config
-            Configuration.set(key, json.dumps(new_config), raw=True)
+            Configuration.set(key, json.dumps(new_config))
