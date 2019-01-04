@@ -33,9 +33,7 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
-from ovs_extensions.constants.vpools import PROXY_PATH, GENERIC_SCRUB, HOSTS_PATH, HOSTS_CONFIG_PATH, PROXY_CONFIG_MAIN
-from ovs_extensions.constants.vpools import PROXY_CONFIG_ABM
-from ovs_extensions.constants.vpools import GENERIC_SCRUB, PROXY_CONFIG_MAIN
+from ovs_extensions.constants.vpools import GENERIC_SCRUB, PROXY_CONFIG_MAIN, HOSTS_CONFIG_PATH, PROXY_CONFIG_ABM, HOSTS_PATH, PROXY_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger

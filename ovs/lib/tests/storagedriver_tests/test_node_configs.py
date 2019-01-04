@@ -21,6 +21,8 @@ import unittest
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.tests.helpers import DalHelper
+from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
+from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
@@ -309,7 +311,7 @@ class NodeConfigTest(unittest.TestCase):
         junction = structure['storagerouters'][1].domains[0]
         junction.domain = domain
         junction.save()
-        vpool_config_path = 'file://opt/OpenvStorage/config/framework.json?key=/ovs/vpools/{0}/hosts/1/config'.format(vpool.guid)
+        vpool_config_path = 'file://{0}?key={1}'.format(CONFIG_STORE_LOCATION, HOSTS_CONFIG_PATH.format(vpool.guid, 1))
         StorageRouterClient.exceptions['server_revision'] = {vpool_config_path: Exception('ClusterNotReachableException')}
         StorageRouterClient.node_config_recordings = []
         result = StorageDriverController.cluster_registry_checkup()

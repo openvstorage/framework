@@ -24,6 +24,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger as OVSLogger
 from ovs_extensions.generic.remote import remote
 from volumedriver.storagerouter import storagerouterclient
+from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH  #review is this ok?
 
 # Import below classes so the rest of the framework can always import from this module:
 # * We can inject mocks easier without having to make changes everywhere
@@ -328,7 +329,7 @@ class StorageDriverConfiguration(object):
         # noinspection PyArgumentList
         storagerouterclient.Logger.enableLogging()
 
-        self._key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool_guid, storagedriver_id)
+        self._key = HOSTS_CONFIG_PATH.format(vpool_guid, storagedriver_id)
         self._logger = OVSLogger('extensions')
         self._dirty_entries = []
 
