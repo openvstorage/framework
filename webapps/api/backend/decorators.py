@@ -241,6 +241,7 @@ def return_list(object_type, default_sort=None):
     """
     List decorator
     """
+    logger = Logger('API')
 
     def wrap(f):
         """
@@ -279,7 +280,7 @@ def return_list(object_type, default_sort=None):
             start = time.time()
             sort = request.QUERY_PARAMS.get('sort')
             query = request.QUERY_PARAMS.get('query')
-            if query is not None:
+            if query:
                 try:
                     query = json.loads(query)
                     DataList.validate_query(query)
@@ -305,30 +306,58 @@ def return_list(object_type, default_sort=None):
 
             # 3. Fetch data
             start = time.time()
-            data_list = f(*args, **kwargs)
-            guid_list = isinstance(data_list, list) and len(data_list) > 0 and isinstance(data_list[0], basestring)
+            function_result = f(*args, **kwargs)
+            if isinstance(function_result, DataList):
+                # The result of the function is the data subset to perform further iterations on
+                # Slicing is thus not an option as it will copy the queried data and not changing the item subset
+                # So instead of query on the 3 returned StorageRouter items,
+                # it will select all StorageRouter items again to query on.
+                # Set guids would clear the DataList and is not an option either
+                data_list = DataList(object_type, guids=function_result.guids)  # Copy for unit test!
+                # Set the current items to avoid doing the query again. This will save query work when no query
+                # is specified by the api callee
+                data_list._guids = function_result.guids
+                data_list._executed = True
+                # Deep copying the structure isn't required as the data will get serialized at the end of this function
+                # No mutation is possible
+                data_list._data = dict((key, value) for key, value in function_result._data.iteritems() if key in function_result.guids)
+                data_list._objects = dict((key, value) for key, value in function_result._objects.iteritems() if key in function_result.guids)
+            else:
+                # Has to be a normal list!
+                if not isinstance(function_result, list):
+                    raise ValueError('API decorated list function does not yield a list!')
+                # Determine if we have guids or objects
+                if len(function_result) > 0:
+                    if isinstance(function_result[0], basestring):
+                        # GUIDS
+                        data_list = DataList(object_type, guids=function_result)
+                    elif isinstance(function_result[0], object_type):
+                        # Hybrids, reuse the data already given
+                        data_list = DataList(object_type)
+                        hybrids_mapped_by_guid = dict((hybrid.guid, hybrid) for hybrid in function_result)
+                        data_list._executed = True
+                        data_list._guids = hybrids_mapped_by_guid.keys()
+                        data_list._objects = hybrids_mapped_by_guid
+                        data_list._data = dict([(hybrid.guid, {'guid': hybrid.guid, 'data': hybrid._data}) for hybrid in hybrids_mapped_by_guid.values()])
+                    else:
+                        raise ValueError('API decorated list function does not yield the correct item type!')
+                else:
+                    data_list = DataList(object_type, guids=[])
+
             timings['fetch'] = [time.time() - start, 'Fetching data']
 
             # 4. Filtering data
-            if query is not None:
+            if query:
                 start = time.time()
-                if guid_list is True:
-                    guids = data_list
-                    guid_list = False  # The list will be converted to a datalist
-                else:
-                    guids = data_list.guids
                 # Use the guids from the result list as a base to query inside the functions results and apply the query
-                data_list = DataList(object_type, query=query, guids=guids)
+                data_list.set_query(query)
                 # Trigger the query
                 _ = data_list.guids
                 timings['querying'] = [time.time() - start, 'Querying data']
 
             # 5. Sorting
-            if sort is not None:
+            if sort:
                 start = time.time()
-                if guid_list is True:
-                    data_list = DataList(object_type, guids=data_list)
-                    guid_list = False  # The list is converted to objects
                 for sort_item in sort:
                     desc = sort_item[0] == '-'
                     field = sort_item[1 if desc else 0:]
@@ -365,14 +394,11 @@ def return_list(object_type, default_sort=None):
 
             # 7. Serializing
             start = time.time()
-            if contents is not None:
-                if guid_list is True:
-                    data_list = DataList(object_type, guids=data_list)
+            if contents:
                 data = FullSerializer(object_type, contents=contents, instance=data_list, many=True).data
             else:
-                if guid_list is False:
-                    data_list = data_list.guids  # 'data_list' is a ovs.dal.datalist.DataList which has the guids stored
-                data = data_list
+                # No serializing requested. Return the guids
+                data = data_list.guids
             timings['serializing'] = [time.time() - start, 'Serializing']
 
             # Add timings about dynamics

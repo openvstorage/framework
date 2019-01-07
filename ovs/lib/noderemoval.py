@@ -45,8 +45,8 @@ class NodeRemovalController(object):
         Remove the node with specified IP from the cluster
         :param node_ip: IP of the node to remove
         :type node_ip: str
-        :param silent: If silent == '--force-yes' no question will be asked to confirm the removal
-        :type silent: str
+        :param silent: no question will be asked to confirm the removal
+        :type silent: bool
         :return: None
         """
         from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -154,8 +154,14 @@ class NodeRemovalController(object):
         #################
         # CONFIRMATIONS #
         #################
+
+        # silent used to be a string parameter, and is now a boolean for obvious reasons. Backwards compatibility is key though
+        interactive = True
+        if silent:
+            if silent == '--force-yes' or True:
+                interactive = False
+
         try:
-            interactive = silent != '--force-yes'
             remove_asd_manager = not interactive  # Remove ASD manager if non-interactive else ask
             if interactive is True:
                 if len(storage_routers_offline) > 0:

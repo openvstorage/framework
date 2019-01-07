@@ -26,6 +26,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs_extensions.constants.vpools import VPOOL_BASE_PATH, PROXY_CONFIG_MAIN
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.logger import Logger
@@ -262,7 +263,7 @@ class StorageRouterController(object):
             if sd.storagerouter_guid == storagerouter.guid:
                 if len(sd.alba_proxies) == 0:
                     raise ValueError('No ALBA proxies configured for vPool {0} on StorageRouter {1}'.format(vpool.name, storagerouter.name))
-                return Configuration.get('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, sd.alba_proxies[0].guid))
+                return Configuration.get(PROXY_CONFIG_MAIN.format(vpool.guid, sd.alba_proxies[0].guid))
         raise ValueError('vPool {0} has not been extended to StorageRouter {1}'.format(vpool.name, storagerouter.name))
 
     @staticmethod
@@ -605,23 +606,6 @@ class StorageRouterController(object):
         return mountpoints
 
     @staticmethod
-    def _retrieve_alba_arakoon_config(alba_backend_guid, ovs_client):
-        """
-        Retrieve the ALBA Arakoon configuration
-        :param alba_backend_guid: Guid of the ALBA Backend
-        :type alba_backend_guid: str
-        :param ovs_client: OVS client object
-        :type ovs_client: OVSClient
-        :return: Arakoon configuration information
-        :rtype: dict
-        """
-        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(alba_backend_guid))
-        successful, arakoon_config = ovs_client.wait_for_task(task_id, timeout=300)
-        if successful is False:
-            raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))
-        return arakoon_config
-
-    @staticmethod
     def _revert_vpool_status(vpool, status=VPool.STATUSES.RUNNING, storagedriver=None, client=None, dirs_created=None):
         """
         Remove the vPool being created or revert the vPool being extended
@@ -646,8 +630,8 @@ class StorageRouterController(object):
                 storagedriver.delete()
             if len(vpool.storagedrivers) == 0:
                 vpool.delete()
-                if Configuration.dir_exists(key='/ovs/vpools/{0}'.format(vpool.guid)):
-                    Configuration.delete(key='/ovs/vpools/{0}'.format(vpool.guid))
+                if Configuration.dir_exists(key=VPOOL_BASE_PATH.format(vpool.guid)):
+                    Configuration.delete(key=VPOOL_BASE_PATH.format(vpool.guid))
 
     @staticmethod
     def _get_roles_on_storagerouter(ip):

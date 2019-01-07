@@ -32,6 +32,8 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
+from ovs_extensions.constants.vpools import PROXY_PATH, GENERIC_SCRUB, HOSTS_PATH, HOSTS_CONFIG_PATH, PROXY_CONFIG_MAIN
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
@@ -43,11 +45,13 @@ from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.lib.helpers.vpool.shared import VPoolShared
 
 # Mypy
 # noinspection PyUnreachableCode
 if False:
     from ovs.lib.helpers.vpool.installer import VPoolInstaller
+
 
 
 class StorageDriverInstaller(object):
@@ -346,12 +350,12 @@ class StorageDriverInstaller(object):
         def _generate_proxy_cache_config(cache_settings, cache_type, proxy_index):
             if cache_settings['read'] is False and cache_settings['write'] is False:
                 return ['none']
-
             if cache_settings['is_backend'] is True:
-                cfg_tree_name = 'abm_bc' if cache_type == StorageDriverConfiguration.CACHE_BLOCK else 'abm_aa'
+                alba_backend_guid = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][cache_type]['backend_info']['alba_backend_guid']
+
                 return ['alba', {'cache_on_read': cache_settings['read'],
                                  'cache_on_write': cache_settings['write'],
-                                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format(cfg_tree_name)),
+                                 'albamgr_cfg_url': Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid)),
                                  'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                 'preset': cache_settings['backend_info']['preset']}],
                                  'manifest_cache_size': manifest_cache_size}]
@@ -373,6 +377,8 @@ class StorageDriverInstaller(object):
             return scrub_cache_info
 
         def _generate_proxy_config(proxy_type, proxy_service):
+            alba_backend_guid = vpool.metadata['backend']['backend_info']['alba_backend_guid']
+
             proxy_config = {'log_level': 'info',
                             'port': proxy_service.service.ports[0] if proxy_type == 'main' else 0,
                             'ips': [self.storagedriver.storage_ip] if proxy_type == 'main' else ['127.0.0.1'],
@@ -380,7 +386,7 @@ class StorageDriverInstaller(object):
                             'fragment_cache': fragment_cache_main_proxy if proxy_type == 'main' else fragment_cache_scrub_proxy,
                             'transport': 'tcp',
                             'read_preference': read_preferences,
-                            'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))}
+                            'albamgr_cfg_url': Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid))}
             if self.sr_installer.block_cache_supported:
                 proxy_config['block_cache'] = block_cache_main_proxy if proxy_type == 'main' else block_cache_scrub_proxy
             return proxy_config
@@ -392,18 +398,14 @@ class StorageDriverInstaller(object):
         fragment_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_FRAGMENT]
 
         # Obtain all arakoon configurations for each Backend (main, block cache, fragment cache)
-        arakoon_data = {'abm': vpool.metadata['backend']['backend_info']['arakoon_config']}
+        arakoon_data = {'abm': VPoolShared.retrieve_local_alba_arakoon_config(vpool.metadata['backend']['backend_info']['alba_backend_guid'])}
         if block_cache_settings['is_backend'] is True:
             arakoon_data['abm_bc'] = block_cache_settings['backend_info']['arakoon_config']
+
         if fragment_cache_settings['is_backend'] is True:
             arakoon_data['abm_aa'] = fragment_cache_settings['backend_info']['arakoon_config']
 
         for proxy_id, alba_proxy in enumerate(self.storagedriver.alba_proxies):
-            config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
-            for arakoon_entry, arakoon_config in arakoon_data.iteritems():
-                arakoon_config = ArakoonClusterConfig.convert_config_to(config=arakoon_config, return_type='INI')
-                Configuration.set(config_tree.format(arakoon_entry), arakoon_config, raw=True)
-
             # Generate cache information for main proxy
             block_cache_main_proxy = _generate_proxy_cache_config(cache_type=StorageDriverConfiguration.CACHE_BLOCK, cache_settings=block_cache_settings, proxy_index=proxy_id)
             fragment_cache_main_proxy = _generate_proxy_cache_config(cache_type=StorageDriverConfiguration.CACHE_FRAGMENT, cache_settings=fragment_cache_settings, proxy_index=proxy_id)
@@ -417,8 +419,8 @@ class StorageDriverInstaller(object):
             scrub_proxy_config = _generate_proxy_config(proxy_type='scrub', proxy_service=alba_proxy)
 
             # Add configurations to configuration management
-            Configuration.set(config_tree.format('main'), json.dumps(main_proxy_config, indent=4), raw=True)
-            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4), raw=True)
+            Configuration.set(PROXY_CONFIG_MAIN.format(vpool.guid, alba_proxy.guid), json.dumps(main_proxy_config, indent=4), raw=True)
+            Configuration.set(GENERIC_SCRUB.format(vpool.guid), json.dumps(scrub_proxy_config, indent=4), raw=True)
 
     def configure_storagedriver_service(self):
         """
@@ -485,13 +487,13 @@ class StorageDriverInstaller(object):
                                                 trigger_gap=ExtensionsToolbox.convert_byte_size_to_human_readable(size=gap_configuration['trigger']),
                                                 backoff_gap=ExtensionsToolbox.convert_byte_size_to_human_readable(size=gap_configuration['backoff']))
         storagedriver_config.configure_file_driver(fd_cache_path=self.storagedriver_partition_file_driver.path,
-                                                   fd_extent_cache_capacity='1024',
+                                                   fd_extent_cache_capacity=1024,
                                                    fd_namespace='fd-{0}-{1}'.format(vpool.name, vpool.guid))
         storagedriver_config.configure_volume_router(vrouter_id=self.storagedriver.storagedriver_id,
-                                                     vrouter_redirect_timeout_ms='120000',
-                                                     vrouter_keepalive_time_secs='15',
-                                                     vrouter_keepalive_interval_secs='5',
-                                                     vrouter_keepalive_retries='2',
+                                                     vrouter_redirect_timeout_ms=120000,
+                                                     vrouter_keepalive_time_secs=15,
+                                                     vrouter_keepalive_interval_secs=5,
+                                                     vrouter_keepalive_retries=2,
                                                      vrouter_routing_retries=10,
                                                      vrouter_volume_read_threshold=0,
                                                      vrouter_volume_write_threshold=0,
@@ -569,7 +571,7 @@ class StorageDriverInstaller(object):
             self.service_manager.add_service(name=self.SERVICE_TEMPLATE_PROXY,
                                              params={'VPOOL_NAME': vpool.name,
                                                      'LOG_SINK': Logger.get_sink_path(proxy.service.name),
-                                                     'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid)),
+                                                     'CONFIG_PATH': Configuration.get_configuration_path(PROXY_CONFIG_MAIN.format(vpool.guid, proxy.guid)),
                                                      'ALBA_PKG_NAME': alba_pkg_name,
                                                      'ALBA_VERSION_CMD': alba_version_cmd},
                                              client=root_client,
@@ -629,7 +631,7 @@ class StorageDriverInstaller(object):
                 self._logger.exception('StorageDriver {0} - Disabling/stopping service {1} failed'.format(self.storagedriver.guid, service))
                 errors_found = True
 
-        sd_config_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(self.vp_installer.vpool.guid, self.storagedriver.storagedriver_id)
+        sd_config_key = HOSTS_CONFIG_PATH.format(self.vp_installer.vpool.guid, self.storagedriver.storagedriver_id)
         if self.vp_installer.storagedriver_amount <= 1 and Configuration.exists(sd_config_key):
             try:
                 for proxy in self.storagedriver.alba_proxies:
@@ -690,9 +692,8 @@ class StorageDriverInstaller(object):
         """
         try:
             for proxy in self.storagedriver.alba_proxies:
-                config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(self.vp_installer.vpool.guid, proxy.guid)
-                Configuration.delete(config_tree)
-            Configuration.delete('/ovs/vpools/{0}/hosts/{1}'.format(self.vp_installer.vpool.guid, self.storagedriver.storagedriver_id))
+                Configuration.delete(PROXY_PATH.format(self.vp_installer.vpool.guid), proxy.guid)
+            Configuration.delete(HOSTS_PATH.format(self.vp_installer.vpool.guid, self.storagedriver.storagedriver_id))
             return False
         except Exception:
             self._logger.exception('Cleaning configuration management failed')

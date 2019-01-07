@@ -794,7 +794,7 @@ class NodeTypeController(object):
 
         if Configuration.dir_exists('/ovs/vpools'):
             for vpool_guid in Configuration.list('/ovs/vpools'):
-                for storagedriver_id in Configuration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
+                for storagedriver_id in Configuration.list(HOSTS_BASE_PATH.format(vpool_guid)):
                     storagedriver_config = StorageDriverConfiguration(vpool_guid, storagedriver_id)
                     storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                                    events_amqp_uris=uris)

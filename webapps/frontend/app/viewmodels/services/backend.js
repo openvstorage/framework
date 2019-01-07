@@ -22,6 +22,8 @@ define([
     'ovs/api', 'ovs/generic'
 ], function ($, ko, api, generic) {
 
+    var policyColours = ['grey', 'black', 'green'];
+
     function BackendService() {
         var self = this;
         // Properties
@@ -87,6 +89,35 @@ define([
             return api.get('alba/backends/' + guid + '/', { queryparams: queryParams, relayParams: relayParams });
         };
         /**
+         * Parse a policy
+         * @param policy: Array representing the policy
+         * eg: [5, 4, 8, 3]
+         * @param policyMetadata: Metadata about the policy (as returned by the API [Optional]
+         * eg {'in_use': False,
+              'is_active': False,
+              'is_available': False}}
+         */
+        self.parsePolicy = function(policy, policyMetadata){
+            var stringified = '(' + policy.join(', ') +')';
+            policyMetadata = policyMetadata || {'is_available': false, 'is_active': false, 'in_use': false};
+            var newPolicy = {
+                text: stringified,
+                color: policyColours[0],
+                isActive: policyMetadata.is_active,
+                k: policy[0],
+                m: policy[1],
+                c: policy[2],
+                x: policy[3]
+            };
+            if (policyMetadata.is_available) {
+                newPolicy.color = policyColours[1];
+            }
+            if (policyMetadata.in_use) {
+                newPolicy.color = policyColours[2];
+            }
+            return newPolicy
+        };
+        /**
          * Parse a preset
          * @param preset: Preset as returned by the api
          * (eg. {'compression': 'snappy',
@@ -113,35 +144,13 @@ define([
          */
         self.parsePreset = function(preset) {
             var worstPolicy = 0;
-            var policies = [];
             var replication = undefined;
             var policyObject = undefined;
-            var policyMapping = ['grey', 'black', 'green'];
-            $.each(preset.policies, function (jndex, policy) {
+            var policies = preset.policies.map(function(policy){
                 policyObject = JSON.parse(policy.replace('(', '[').replace(')', ']'));
-                var isAvailable = preset.policy_metadata[policy].is_available;
-                var isActive = preset.policy_metadata[policy].is_active;
-                var inUse = preset.policy_metadata[policy].in_use;
-                var newPolicy = {
-                    text: policy,
-                    color: 'grey',
-                    isActive: false,
-                    k: policyObject[0],
-                    m: policyObject[1],
-                    c: policyObject[2],
-                    x: policyObject[3]
-                };
-                if (isAvailable) {
-                    newPolicy.color = 'black';
-                }
-                if (isActive) {
-                    newPolicy.isActive = true;
-                }
-                if (inUse) {
-                    newPolicy.color = 'green';
-                }
-                worstPolicy = Math.max(policyMapping.indexOf(newPolicy.color), worstPolicy);
-                policies.push(newPolicy);
+                var newPolicy = self.parsePolicy(policyObject, preset.policy_metadata[policy]);
+                worstPolicy = Math.max(policyColours.indexOf(newPolicy.color), worstPolicy);
+                return newPolicy
             });
             if (preset.policies.length === 1) {
                 policyObject = JSON.parse(preset.policies[0].replace('(', '[').replace(')', ']'));
@@ -155,7 +164,7 @@ define([
                 compression: preset.compression,
                 fragSize: preset.fragment_size,
                 encryption: preset.fragment_encryption,
-                color: policyMapping[worstPolicy],
+                color: policyColours[worstPolicy],
                 inUse: preset.in_use,
                 isDefault: preset.is_default,
                 replication: replication
