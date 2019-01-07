@@ -308,7 +308,7 @@ def return_list(object_type, default_sort=None):
             start = time.time()
             function_result = f(*args, **kwargs)
             if isinstance(function_result, DataList):
-                data_list = DataList(object_type, guids=function_result.guids)  # Copy for unit test!
+                data_list = function_result[:]  # Copy for unit test!
             else:
                 # Has to be a normal list!
                 if not isinstance(function_result, list):
