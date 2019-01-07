@@ -479,13 +479,13 @@ class StorageDriverInstaller(object):
                                                 trigger_gap=ExtensionsToolbox.convert_byte_size_to_human_readable(size=gap_configuration['trigger']),
                                                 backoff_gap=ExtensionsToolbox.convert_byte_size_to_human_readable(size=gap_configuration['backoff']))
         storagedriver_config.configure_file_driver(fd_cache_path=self.storagedriver_partition_file_driver.path,
-                                                   fd_extent_cache_capacity='1024',
+                                                   fd_extent_cache_capacity=1024,
                                                    fd_namespace='fd-{0}-{1}'.format(vpool.name, vpool.guid))
         storagedriver_config.configure_volume_router(vrouter_id=self.storagedriver.storagedriver_id,
-                                                     vrouter_redirect_timeout_ms='120000',
-                                                     vrouter_keepalive_time_secs='15',
-                                                     vrouter_keepalive_interval_secs='5',
-                                                     vrouter_keepalive_retries='2',
+                                                     vrouter_redirect_timeout_ms=120000,
+                                                     vrouter_keepalive_time_secs=15,
+                                                     vrouter_keepalive_interval_secs=5,
+                                                     vrouter_keepalive_retries=2,
                                                      vrouter_routing_retries=10,
                                                      vrouter_volume_read_threshold=0,
                                                      vrouter_volume_write_threshold=0,
