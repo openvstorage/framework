@@ -369,6 +369,7 @@ class StorageDriverConfiguration(object):
             if client is None:
                 changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
             else:
+                print self.remote_path
                 with remote(client.ip, [LocalStorageRouterClient]) as rem:
                     changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
             reloaded = True

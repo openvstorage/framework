@@ -539,7 +539,7 @@ class VPoolController(object):
                 config['{0}_cache'.format(ctype)] = cache_info[ctype]
             if ctype in arakoons:
                 file_contents_map['/opt/OpenvStorage/config/{0}/{1}_cache_arakoon.ini'.format(identifier, ctype)] = arakoons[ctype]
-        file_contents_map.update({'/opt/OpenvStorage/config/{0}/config.json'.format(identifier): json.dumps(config, indent=4),
+        file_contents_map.update({'/opt/OpenvStorage/config/{0}/config.json'.format(identifier): config,
                                   '/opt/OpenvStorage/config/{0}/arakoon.ini'.format(identifier): Configuration.get(PROXY_CONFIG_ABM)})
 
         local_client = SSHClient(endpoint=local_storagerouter)

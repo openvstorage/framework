@@ -38,7 +38,6 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.constants.vpools import PROXY_CONFIG_ABM
 from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.constants.vpools import PROXY_CONFIG_ABM
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
