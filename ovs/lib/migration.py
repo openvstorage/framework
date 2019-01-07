@@ -673,9 +673,10 @@ class MigrationController(object):
 
         ####################################################
         # Deduplicate configs of proxies: now one config per remote alba-backend
-        present_remote_configs = list(Configuration.list(REMOTE_CONFIG_BACKEND_BASE))
         errors = []
         try:
+            present_remote_configs = list(Configuration.list(REMOTE_CONFIG_BACKEND_BASE))
+
             for vpool in VPoolList.get_vpools():
                 vpool_errors = []
                 metadata = vpool.metadata
@@ -702,7 +703,7 @@ class MigrationController(object):
                         try:
                             main_proxy_config_path = PROXY_CONFIG_MAIN.format(vpool.guid, proxy.guid)
                             main_proxy_config = Configuration.get(main_proxy_config_path)
-
+                            # No other configs should be deleted in the config mgmt or if errors occurred: don't remove the old configs just yet, as they might be of use for manual intervention.
                             # update config of main general backend of the vPool
                             if not REMOTE_CONFIG_BACKEND_BASE in main_proxy_config['albamgr_cfg_url']:
                                 main_proxy_config['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(main_backend_guid))
@@ -738,9 +739,6 @@ class MigrationController(object):
                                 for other_cache_config in other_cache_configs:
                                     config_to_delete = os.path.join(config_path, other_cache_config)
                                     Configuration.delete(config_to_delete, transaction=transaction_id)
-                            else:
-                                # No other configs should be deleted in the config mgmt or if errors occurred: don't remove the old configs just yet, as they might be of use for manual intervention.
-                                pass
                             Configuration.apply_transaction(transaction=transaction_id)
 
                         except Exception as ex:
