@@ -89,7 +89,6 @@ class DalHelper(object):
     def _clean():
         volatile = VolatileFactory.get_client()
         persistent = PersistentFactory.get_client()
-
         # noinspection PyProtectedMember
         volatile._clean()
         # noinspection PyProtectedMember
