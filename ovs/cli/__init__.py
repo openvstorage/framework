@@ -29,7 +29,7 @@ os.environ['OVS_LOGTYPE_OVERRIDE'] = 'file'
 import click
 from .setup import setup_group
 from .config import config_group
-from .misc import misc_group
+from .misc import collect_group
 from .remove import remove_group
 from .monitor import monitor_group
 from .services import services_group
@@ -49,8 +49,14 @@ def ovs(ctx):
     # Do nothing: invoke subcommand
 
 
-# groups = [setup_group, config_group, rollback_command, update_command, remove_group, monitor_group, unittest_command, services_group, misc_group]
-groups = [setup_group, config_group, rollback_command, update_command, remove_group, monitor_group, unittest_command, misc_group]
+groups = [setup_group,
+          config_group,
+          rollback_command,
+          update_command,
+          remove_group,
+          monitor_group,
+          unittest_command,
+          services_group,
+          collect_group]
 for group in groups:
-    print group.name
     ovs.add_command(group)

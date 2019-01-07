@@ -1,8 +1,29 @@
+# Copyright (C) 2019 iNuron NV
+#
+# This file is part of Open vStorage Open Source Edition (OSE),
+# as available from
+#
+#      http://www.openvstorage.org and
+#      http://www.openvstorage.com.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+# as published by the Free Software Foundation, in version 3 as it comes
+# in the LICENSE.txt file of the Open vStorage OSE distribution.
+#
+# Open vStorage is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY of any kind.
+
 import re
 import click
+from ovs_extensions.cli.commands import OVSCommand
+
+extra_options = {'command_parameter_help': '[ip|all]',
+                 'cls': OVSCommand}
 
 
-@click.command('framework', help='Stop Open vStorage Framework services on this node, on all nodes, or on the given ip')
+@click.command('framework', help='Stop Open vStorage Framework services on this node, on all nodes, or on the given ip',
+               **extra_options)
 @click.argument('host', required=False, default=None, type=click.STRING)
 def framework_stop(host):
     from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -20,7 +41,8 @@ def framework_stop(host):
     print 'Done'
 
 
-@click.command('framework', help='Start Open vStorage Framework services on this node, on all nodes, or on the given ip')
+@click.command('framework', help='Start Open vStorage Framework services on this node, on all nodes, or on the given ip',
+               **extra_options)
 @click.argument('host', required=False, default=None, type=click.STRING)
 def framework_start(host):
     from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException

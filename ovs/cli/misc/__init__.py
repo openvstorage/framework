@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 from .misc import collect_logs
-from ovs_extensions.cli import OVSGroup
+from ovs_extensions.cli.commands import OVSGroup
 
-misc_group = OVSGroup('miscellaneous', help='Miscellaneous options')
-misc_group.add_command(collect_logs)
+collect_group = OVSGroup('collect', help='Collect resources from the cluster')
+collect_group.add_command(collect_logs)

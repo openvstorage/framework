@@ -18,9 +18,11 @@ import os
 import click
 import datetime
 import subprocess
+from ovs_extensions.cli.commands import OVSCommand
 
 
-@click.command('collect', help='Collect all ovs logs to a tarball (for support purposes)')
+@click.command('logs', help='Collect all ovs logs to a tarball (for support purposes)',
+               section_header='Miscellaneous', cls=OVSCommand)
 def collect_logs():
     from ovs.extensions.generic.system import System
 
@@ -46,5 +48,3 @@ def collect_logs():
         subprocess.check_call('journalctl -u ovs-* -u asd-* -u alba-* --no-pager', stderr=fh, stdout=fh, shell=True)
     subprocess.check_call('tar czfP {0} {1} /var/log/*log --exclude=syslog'.format(tmp_path, parsed_string), shell=True)
     print 'Files stored in {0}'.format(tmp_path)
-
-
