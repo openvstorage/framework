@@ -24,6 +24,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -52,8 +53,8 @@ class SafetyEnsurer(MDSShared):
         self.vdisk = VDisk(vdisk_guid)
         self.excluded_storagerouters = [StorageRouter(sr_guid) for sr_guid in excluded_storagerouter_guids]
 
-        self.sr_client_timeout = Configuration.get('ovs/vpools/{0}/mds_config|sr_client_connection_timeout'.format(self.vdisk.vpool_guid), default=300)
-        self.mds_client_timeout = Configuration.get('ovs/vpools/{0}/mds_config|mds_client_connection_timeout'.format(self.vdisk.vpool_guid), default=120)
+        self.sr_client_timeout = Configuration.get('{0}|sr_client_connection_timeout'.format(MDS_CONFIG_PATH.format(self.vdisk.vpool_guid)), default=300)
+        self.mds_client_timeout = Configuration.get('{0}|mds_client_connection_timeout'.format(MDS_CONFIG_PATH.format(self.vdisk.vpool_guid)), default=120)
         self.tlogs, self.safety, self.max_load = self.get_mds_config()
         # Filled in by functions
         self.metadata_backend_config_start = {}
@@ -163,7 +164,7 @@ class SafetyEnsurer(MDSShared):
         :return: tlogs, safety and maxload
         :rtype: int, int, int
         """
-        mds_config = Configuration.get('/ovs/vpools/{0}/mds_config'.format(self.vdisk.vpool_guid))
+        mds_config = Configuration.get(MDS_CONFIG_PATH.format(self.vdisk.vpool_guid))
         return mds_config['mds_tlogs'], mds_config['mds_safety'], mds_config['mds_maxload']
 
     def get_reconfiguration_reasons(self):

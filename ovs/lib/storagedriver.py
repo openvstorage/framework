@@ -28,6 +28,7 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH, HOSTS_BASE_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
@@ -126,7 +127,7 @@ class StorageDriverController(object):
                             continue
 
                         with remote(storagerouter.ip, [LocalStorageRouterClient]) as rem:
-                            sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
+                            sd_key = HOSTS_CONFIG_PATH.format(vpool.guid, sd.storagedriver_id)
                             if Configuration.exists(sd_key) is True:
                                 path = Configuration.get_configuration_path(sd_key)
                                 try:
@@ -389,7 +390,7 @@ class StorageDriverController(object):
                                   'node_id': node.name})
         if Configuration.dir_exists('/ovs/vpools'):
             for vpool_guid in Configuration.list('/ovs/vpools'):
-                for storagedriver_id in Configuration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
+                for storagedriver_id in Configuration.list(HOSTS_BASE_PATH.format(vpool_guid)):
                     storagedriver_config = StorageDriverConfiguration(vpool_guid, storagedriver_id)
                     storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=cluster_name,
                                                                    vregistry_arakoon_cluster_nodes=arakoon_nodes)

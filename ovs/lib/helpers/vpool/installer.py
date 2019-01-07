@@ -21,6 +21,8 @@ VpoolInstaller class responsible for adding/removing vPools
 import re
 import copy
 import json
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, VPOOL_BASE_PATH
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient
@@ -127,7 +129,7 @@ class VPoolInstaller(object):
         self.mds_tlogs = config.get('mds_tlogs')
         self.mds_safety = config.get('mds_safety')
         self.mds_maxload = config.get('mds_maxload')
-        Configuration.set(key='/ovs/vpools/{0}/mds_config'.format(self.vpool.guid),
+        Configuration.set(key=MDS_CONFIG_PATH.format(self.vpool.guid),
                           value={'mds_tlogs': self.mds_tlogs or 100,
                                  'mds_safety': self.mds_safety or 3,
                                  'mds_maxload': self.mds_maxload or 75})
@@ -212,8 +214,8 @@ class VPoolInstaller(object):
                 self.sd_installer.storagedriver.delete()
             if len(self.vpool.storagedrivers) == 0:
                 self.vpool.delete()
-                if Configuration.dir_exists(key='/ovs/vpools/{0}'.format(self.vpool.guid)):
-                    Configuration.delete(key='/ovs/vpools/{0}'.format(self.vpool.guid))
+                if Configuration.dir_exists(key=VPOOL_BASE_PATH.format(self.vpool.guid)):
+                    Configuration.delete(key=VPOOL_BASE_PATH.format(self.vpool.guid))
         elif status == VPool.STATUSES.FAILURE:
             # In case of failure status the cluster registry settings have already been adapted, so revert
             self.configure_cluster_registry(exclude=[self.sd_installer.storagedriver])
@@ -256,7 +258,8 @@ class VPoolInstaller(object):
         new_backend_info = copy.deepcopy(backend_info)
         preset_name = backend_info['preset']
         alba_backend_guid = backend_info['alba_backend_guid']
-        arakoon_config = VPoolShared.retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+        VPoolShared.sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+        arakoon_config = VPoolShared.retrieve_local_alba_arakoon_config(alba_backend_guid=alba_backend_guid)
 
         # Requesting the remote stack for re-use in calculate read preference
         backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
@@ -286,7 +289,7 @@ class VPoolInstaller(object):
                                  'backend_guid': backend_dict['backend_guid'],
                                  'alba_backend_guid': alba_backend_guid,
                                  'connection_info': connection_info,
-                                 'arakoon_config': arakoon_config})
+                                 'arakoon_config': arakoon_config})  # It is still preferable to keep this in the metadata, as this way, envs can be rebuilt upon failure
 
         return new_backend_info
 

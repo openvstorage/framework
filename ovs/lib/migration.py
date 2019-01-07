@@ -18,10 +18,10 @@
 MigrationController module
 """
 
+import os
 import copy
 import json
 from ovs.extensions.generic.logger import Logger
-from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 
@@ -51,6 +51,10 @@ class MigrationController(object):
         from ovs.dal.lists.storagedriverlist import StorageDriverList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.dal.lists.vpoollist import VPoolList
+        from ovs_extensions.api.client import OVSClient
+        from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
+        from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI, REMOTE_CONFIG_BACKEND_BASE
+        from ovs_extensions.constants.vpools import PROXY_CONFIG_MAIN, PROXY_CONFIG_PATH, GENERIC_SCRUB
         from ovs.extensions.db.arakooninstaller import ArakoonInstaller
         from ovs.extensions.generic.configuration import Configuration
         from ovs.extensions.generic.sshclient import SSHClient
@@ -61,7 +65,9 @@ class MigrationController(object):
         from ovs_extensions.services.interfaces.systemd import Systemd
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+        from ovs.extensions.storage.volatilefactory import VolatileFactory
         from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
+        from ovs.lib.helpers.vpool.shared import VPoolShared
 
         MigrationController._logger.info('Start out of band migrations...')
         service_manager = ServiceFactory.get_manager()
@@ -159,14 +165,14 @@ class MigrationController(object):
                                             target_name='ovs-{0}'.format(new_service_name))
 
                 # Update scrub proxy config
-                proxy_config_key = '/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)
+                proxy_config_key = PROXY_CONFIG_MAIN.format(vpool.guid, alba_proxy.guid)
                 proxy_config = None if Configuration.exists(key=proxy_config_key) is False else Configuration.get(proxy_config_key)
                 if proxy_config is not None:
                     fragment_cache = proxy_config.get(StorageDriverConfiguration.CACHE_FRAGMENT, ['none', {}])
                     if fragment_cache[0] == 'alba' and fragment_cache[1].get('cache_on_write') is True:  # Accelerated ALBA configured
                         fragment_cache_scrub_info = copy.deepcopy(fragment_cache)
                         fragment_cache_scrub_info[1]['cache_on_read'] = False
-                        proxy_scrub_config_key = '/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid)
+                        proxy_scrub_config_key = GENERIC_SCRUB.format(vpool.guid)
                         proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
                         if proxy_scrub_config is not None and proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] == ['none']:
                             proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] = fragment_cache_scrub_info
@@ -370,9 +376,9 @@ class MigrationController(object):
             try:
                 vpool = storagedriver.vpool
                 root_client = sr_client_map[storagedriver.storagerouter_guid]
-                _update_manifest_cache_size('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))  # Generic scrub proxy is deployed every time scrubbing kicks in, so no need to restart these services
+                _update_manifest_cache_size(GENERIC_SCRUB.format(vpool.guid))  # Generic scrub proxy is deployed every time scrubbing kicks in, so no need to restart these services
                 for alba_proxy in storagedriver.alba_proxies:
-                    if _update_manifest_cache_size('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)) is True:
+                    if _update_manifest_cache_size(PROXY_CONFIG_MAIN.format(vpool.guid, alba_proxy.guid)) is True:
                         # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
                         ExtensionsToolbox.edit_version_file(client=root_client,
                                                             package_name='alba',
@@ -664,3 +670,90 @@ class MigrationController(object):
                 Configuration.register_usage(System.get_component_identifier(), registration_key)
 
         MigrationController._logger.info('Finished out of band migrations')
+
+        ####################################################
+        # Deduplicate configs of proxies: now one config per remote alba-backend
+        errors = []
+        try:
+            present_remote_configs = list(Configuration.list(REMOTE_CONFIG_BACKEND_BASE))
+
+            for vpool in VPoolList.get_vpools():
+                vpool_errors = []
+                metadata = vpool.metadata
+                backend_info = metadata['backend']['backend_info']
+                main_backend_guid = backend_info['alba_backend_guid']
+                connection_info = backend_info['connection_info']
+
+                if main_backend_guid not in present_remote_configs:
+                    try:
+                        client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
+                        VPoolShared.sync_alba_arakoon_config(main_backend_guid, client)
+                        present_remote_configs.append(main_backend_guid)
+                    except Exception:
+                        vpool_errors.append('Failed to sync up remote config of remote backend {0} of vPool {1}'.format(main_backend_guid, vpool.guid))
+                        if main_backend_guid not in present_remote_configs:
+                            # skip this update of proxies, cause no change of configs can happen
+                            continue
+
+                for storagedriver in vpool.storagedrivers:
+                    storagerouter = storagedriver.storagerouter
+                    storagerouter_info = metadata['caching_info'][storagerouter.guid]
+                    for proxy in storagedriver.alba_proxies:
+                        proxy_errors = False
+                        try:
+                            main_proxy_config_path = PROXY_CONFIG_MAIN.format(vpool.guid, proxy.guid)
+                            main_proxy_config = Configuration.get(main_proxy_config_path)
+                            # No other configs should be deleted in the config mgmt or if errors occurred: don't remove the old configs just yet, as they might be of use for manual intervention.
+                            # update config of main general backend of the vPool
+                            if not REMOTE_CONFIG_BACKEND_BASE in main_proxy_config['albamgr_cfg_url']:
+                                main_proxy_config['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(main_backend_guid))
+
+                            # Update caching info
+                            for cache_type in [StorageDriverConfiguration.CACHE_FRAGMENT, StorageDriverConfiguration.CACHE_BLOCK]:
+                                if storagerouter_info[cache_type]['is_backend']:
+                                    backend_info = storagerouter_info[cache_type]['backend_info']
+                                    # Make sure replacing config is present
+                                    alba_guid = backend_info['alba_backend_guid']
+                                    connection_info = backend_info['connection_info']
+                                    try:
+                                        if REMOTE_CONFIG_BACKEND_BASE in main_proxy_config[cache_type][1]['albamgr_cfg_url']:
+                                            client = OVSClient.get_instance(connection_info=connection_info, cache_store=VolatileFactory.get_client())
+                                            if alba_guid not in present_remote_configs:
+                                                # If the proxy is already in this list, we can safely assume that it has been recently added and does not need resyncing.
+                                                # Only if it is absent, connect to the backend and fetch it.
+                                                VPoolShared.sync_alba_arakoon_config(alba_guid, client)
+                                            main_proxy_config[cache_type][1]['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(alba_guid))
+                                    except Exception as ex:
+                                        proxy_errors = True
+                                        errors.append('Failed to update proxy {0} of vPool {1}: {2}'.format(proxy.guid, vpool.guid, ex))
+                                        continue
+                            # Set updated config.
+                            transaction_id = Configuration.begin_transaction()
+                            Configuration.set(main_proxy_config_path, main_proxy_config, transaction=transaction_id)
+
+                            # Now remove old configs of proxies
+                            config_path = PROXY_CONFIG_PATH.format(vpool.guid, proxy.guid)
+                            other_cache_configs = list(Configuration.list(config_path))
+                            if other_cache_configs and not proxy_errors:
+                                other_cache_configs.remove('main')
+                                for other_cache_config in other_cache_configs:
+                                    config_to_delete = os.path.join(config_path, other_cache_config)
+                                    Configuration.delete(config_to_delete, transaction=transaction_id)
+                            Configuration.apply_transaction(transaction=transaction_id)
+
+                        except Exception as ex:
+                            errors.append('Failed to update config for proxy {0} of vPool {1}: {2}'.format(proxy.guid, vpool.guid, ex))
+                            continue
+                if vpool_errors:
+                    MigrationController._logger.info('Failed to update vPool info: {0}'.format(vpool_errors))
+        except Exception as ex:
+            errors.append('Unexpected exception occured while migrating proxies: {0}'.format(ex))
+        finally:
+            if errors:
+                MigrationController._logger.info('Failed to update migration of proxies: {0}'.format('\n'.join(errors)))
+
+            else:
+                MigrationController._logger.info('Finished migration of all proxies on environment')
+
+
+

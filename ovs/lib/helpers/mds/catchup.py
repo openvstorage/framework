@@ -27,6 +27,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
@@ -72,7 +73,7 @@ class MDSCatchUp(MDSShared):
         self.mds_key = self._CATCH_UP_VDISK_KEY.format(self.vdisk.guid)
         self.tlog_threshold = Configuration.get('ovs/volumedriver/mds|tlogs_behind', default=100)
         self.volumedriver_service_name = 'ovs-volumedriver_{0}'.format(self.vdisk.vpool.name)
-        self.mds_client_timeout = Configuration.get('ovs/vpools/{0}/mds_config|mds_client_connection_timeout'.format(self.vdisk.vpool_guid), default=120)
+        self.mds_client_timeout = Configuration.get('{0}|mds_client_connection_timeout'.format(MDS_CONFIG_PATH.format(self.vdisk.vpool_guid)), default=120)
         self.mds_clients = {}
         self.dry_run = False
         self.catch_up_threads = []

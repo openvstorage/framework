@@ -28,6 +28,7 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, PROXY_CONFIG_PATH, HOSTS_CONFIG_PATH, VPOOL_BASE_PATH
 from ovs_extensions.api.client import OVSClient
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
@@ -176,7 +177,7 @@ class VPoolController(object):
             # Update the MDS safety if changed via API (vpool.configuration will be available at this point also for the newly added StorageDriver)
             vp_installer.vpool.invalidate_dynamics('configuration')
             if vp_installer.mds_safety is not None and vp_installer.vpool.configuration['mds_config']['mds_safety'] != vp_installer.mds_safety:
-                Configuration.set(key='/ovs/vpools/{0}/mds_config|mds_safety'.format(vp_installer.vpool.guid), value=vp_installer.mds_safety)
+                Configuration.set(key='{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vp_installer.vpool.guid)), value=vp_installer.mds_safety)
 
             sd_installer.start_services()  # Create and start watcher volumedriver, DTL, proxies and StorageDriver services
 
@@ -271,7 +272,7 @@ class VPoolController(object):
                 # StorageRouter is offline
                 continue
 
-            sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vp_installer.vpool.guid, sd.storagedriver_id)
+            sd_key = HOSTS_CONFIG_PATH.format(vp_installer.vpool.guid, sd.storagedriver_id)
             if Configuration.exists(sd_key) is True:
                 path = Configuration.get_configuration_path(sd_key)
                 with remote(sd.storagerouter.ip, [LocalStorageRouterClient]) as rem:
@@ -368,7 +369,7 @@ class VPoolController(object):
             except Exception:
                 errors_found = True
                 cls._logger.exception('StorageDriver {0} - Cleaning up vPool from the model failed'.format(storagedriver.guid))
-            Configuration.delete('/ovs/vpools/{0}'.format(vp_installer.vpool.guid))
+            Configuration.delete(VPOOL_BASE_PATH.format(vp_installer.vpool.guid))
 
         cls._logger.info('StorageDriver {0} - Running MDS checkup'.format(storagedriver.guid))
         try:
@@ -454,7 +455,7 @@ class VPoolController(object):
             if len(sd.alba_proxies) == 0:
                 raise ValueError('No ALBA proxies configured for vPool {0} on StorageRouter {1}'.format(vpool.name,
                                                                                                         sd.storagerouter.name))
-            config_path = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, sd.alba_proxies[0].guid)
+            config_path = '{0}/{{0}}'.format(PROXY_CONFIG_PATH.format(vpool.guid, sd.alba_proxies[0].guid))
 
         if config_path is None:
             raise ValueError('vPool {0} has not been extended any StorageRouter'.format(vpool.name))
@@ -504,7 +505,8 @@ class VPoolController(object):
                 if connection_info['host']:  # Remote Backend for accelerated Backend
                     alba_backend_guid = parameters[ctype]['backend_info']['alba_backend_guid']
                     ovs_client = OVSClient.get_instance(connection_info=connection_info)
-                    arakoon_config = VPoolShared.retrieve_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+                    VPoolShared.sync_alba_arakoon_config(alba_backend_guid=alba_backend_guid, ovs_client=ovs_client)
+                    arakoon_config = VPoolShared.retrieve_local_alba_arakoon_config(alba_backend_guid=alba_backend_guid)
                     arakoons[ctype] = ArakoonClusterConfig.convert_config_to(arakoon_config, return_type='INI')
                 else:  # Local Backend for accelerated Backend
                     alba_backend_name = parameters[ctype]['backend_info']['alba_backend_name']
@@ -552,20 +554,4 @@ class VPoolController(object):
         local_client.dir_delete(directories='/opt/OpenvStorage/config/{0}'.format(identifier))
         return tgz_name
 
-    @staticmethod
-    def retrieve_alba_arakoon_config(alba_backend_guid, ovs_client):
-        """
-        Retrieve the ALBA Arakoon configuration
-        WARNING: YOU DO NOT BELONG HERE, PLEASE MOVE TO YOUR OWN PLUGIN
-        :param alba_backend_guid: Guid of the ALBA Backend
-        :type alba_backend_guid: str
-        :param ovs_client: OVS client object
-        :type ovs_client: OVSClient
-        :return: Arakoon configuration information
-        :rtype: dict
-        """
-        task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(alba_backend_guid))
-        successful, arakoon_config = ovs_client.wait_for_task(task_id, timeout=300)
-        if successful is False:
-            raise RuntimeError('Could not load metadata from environment {0}'.format(ovs_client.ip))
-        return arakoon_config
+

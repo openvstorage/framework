@@ -31,6 +31,7 @@ from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -205,7 +206,7 @@ class MDSServiceController(MDSShared):
         for vpool, storagerouter_info in mds_dict.iteritems():
             # Make sure there's at least 1 MDS on every StorageRouter that's not overloaded
             # Remove all MDS Services which have been manually marked for removal (by setting its capacity to 0)
-            max_load = Configuration.get('/ovs/vpools/{0}/mds_config|mds_maxload'.format(vpool.guid))
+            max_load = Configuration.get('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)))
             for storagerouter in sorted(storagerouter_info, key=lambda k: k.ip):
                 total_load = 0.0
                 root_client = mds_dict[vpool][storagerouter]['client']
@@ -387,7 +388,7 @@ class MDSServiceController(MDSShared):
                 mds_per_load[load] = []
             mds_per_load[load].append(storagerouter)
 
-        safety = Configuration.get('/ovs/vpools/{0}/mds_config|mds_safety'.format(vpool.guid))
+        safety = Configuration.get('{0}|mds_safety'.format(MDS_CONFIG_PATH.format(vpool.guid)))
         config_set = {}
         for storagerouter, ip_info in mds_per_storagerouter.iteritems():
             config_set[storagerouter.guid] = [ip_info]

@@ -21,6 +21,7 @@ VPool module
 import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration,\
@@ -140,7 +141,7 @@ class VPool(DataObject):
         dtl_enabled = not (dtl_config_mode == StorageDriverClient.VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
 
         try:
-            mds_config = Configuration.get('/ovs/vpools/{0}/mds_config'.format(self.guid))
+            mds_config = Configuration.get(MDS_CONFIG_PATH.format(self.guid))
         except NotFoundException:
             mds_config = {}
 
