@@ -308,7 +308,20 @@ def return_list(object_type, default_sort=None):
             start = time.time()
             function_result = f(*args, **kwargs)
             if isinstance(function_result, DataList):
-                data_list = function_result[:]  # Copy for unit test!
+                # The result of the function is the data subset to perform further iterations on
+                # Slicing is thus not an option as it will copy the queried data and not changing the item subset
+                # So instead of query on the 3 returned StorageRouter items,
+                # it will select all StorageRouter items again to query on.
+                # Set guids would clear the DataList and is not an option either
+                data_list = DataList(object_type, guids=function_result.guids)  # Copy for unit test!
+                # Set the current items to avoid doing the query again. This will save query work when no query
+                # is specified by the api callee
+                data_list._guids = function_result.guids
+                data_list._executed = True
+                # Deep copying the structure isn't required as the data will get serialized at the end of this function
+                # No mutation is possible
+                data_list._data = dict((key, value) for key, value in function_result._data.iteritems() if key in function_result.guids)
+                data_list._objects = dict((key, value) for key, value in function_result._objects.iteritems() if key in function_result.guids)
             else:
                 # Has to be a normal list!
                 if not isinstance(function_result, list):
