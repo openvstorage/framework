@@ -28,7 +28,7 @@ def ensure_options(f):
     @wraps(f)
     def wrap(*args, **kwargs):
         if not VolumeDriverConfigOption._options:
-            VolumeDriverConfigOption._cache_options()
+            VolumeDriverConfigOption._read_cache_volumedriver_options()
         return f(*args, **kwargs)
     return wrap
 
@@ -83,10 +83,7 @@ class VolumeDriverConfigOption(object):
         :return: Option if found else none
         :rtype: VolumeDriverConfigOption
         """
-        try:
-            return filter(lambda option: option.key == key and option.component == component, cls._options)[0]
-        except IndexError:
-            return None
+        return next((option for option in cls._options if option.key == key and option.component == component), None)
 
     @classmethod
     @ensure_options
@@ -99,10 +96,10 @@ class VolumeDriverConfigOption(object):
         :return: All options associated with the component
         :rtype: List[VolumeDriverConfigOption]
         """
-        return filter(lambda option: option.component == component, cls._options)
+        return [option for option in cls._options if option.component == component]
 
     @classmethod
-    def _cache_options(cls):
+    def _read_cache_volumedriver_options(cls):
         """
         Cache all possible options
         :return: None
@@ -111,11 +108,11 @@ class VolumeDriverConfigOption(object):
         options = []
         markdown = check_output(['volumedriver_fs', '--config-help-markdown'])
         for line in markdown.split('\n|')[2:]:
-            options.append(cls.from_option_line('|' + line))
+            options.append(cls.parse_markdown_line('|' + line))
         cls._options = options
 
     @classmethod
-    def from_option_line(cls, line):
+    def parse_markdown_line(cls, line):
         # type: (str) -> VolumeDriverConfigOption
         """
         Convert an option line string to an VolumeDriverConfigOption instance
@@ -170,20 +167,22 @@ class BaseStorageDriverConfig(object):
         return not other == self
 
     def get_difference(self, other):
-        # type: (BaseStorageDriverConfig) -> Dict[str, any]
+        # type: (BaseStorageDriverConfig) -> Dict[str, Tuple[any, any]]
         """
         Get all keys that differ from the other value
         :param other: Other instance
         :type other: BaseStorageDriverConfig
-        :return:
+        :return: A Dict with all keys that different mapped with the value of the current item and the compared item
+        :rtype: Dict[str, Tuple[any, any]]
         """
-        diff_keys = []
+        diff = {}
         if not isinstance(other, type(self)):
             raise ValueError('Other is not of type {0}'.format(BaseStorageDriverConfig))
         for key, value in other.to_dict().iteritems():
-            if value != getattr(self, key):
-                diff_keys.append(key)
-        return diff_keys
+            self_value = getattr(self, key)
+            if value != self_value:
+                diff[key] = (value, self_value)
+        return diff
 
     @staticmethod
     def _is_dynamically_reloadable(component, key):
