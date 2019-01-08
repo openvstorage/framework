@@ -14,13 +14,16 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from ovs.extensions.storageserver.storagedriverconfig.generic_config import GenericConfig
+from .base import BaseStorageDriverConfig
 
 
-class BackendConfig(GenericConfig):
+class BackendConnectionManager(BaseStorageDriverConfig):
     """
     Backendinterface container of the storagedriver config
     """
+
+    component_identifier = 'backend_connection_manager'
+
     def __init__(self, local_connection_path=None, backend_connection_pool_capacity=None, backend_interface_retries_on_error=None, backend_interface_retry_interval_secs=None, backend_interface_retry_interval_max_secs=None,
                  backend_connection_pool_blacklist_secs=None, backend_interface_retry_backoff_multiplier=None, backend_interface_partial_read_retries_on_error=None,
                  backend_interface_partial_read_timeout_msecs=None, backend_interface_partial_read_timeout_max_msecs=None, backend_interface_partial_read_timeout_multiplier=None, backend_interface_partial_read_retry_interval_msecs=None,
@@ -69,13 +72,26 @@ class BackendConfig(GenericConfig):
         self._nr_of_proxies = 1
 
     def set_nr_of_proxies(self, nr_of_proxies):
-        if nr_of_proxies is isinstance(int, nr_of_proxies) and nr_of_proxies < 0:
+        # type: (int) -> int
+        """
+        Set the number of proxies to be used
+        :param nr_of_proxies: Amount of proxies to configure
+        :return: Amount of proxies configured
+        :rtype: int
+        """
+        if nr_of_proxies:
             self._nr_of_proxies = nr_of_proxies
+        return self._nr_of_proxies
 
-
-    def get_config(self):
+    def to_dict(self):
+        # type: () -> Dict[str, any]
+        """
+        Convert the current config set to a dictionary
+        :return: Dict
+        :rtype: Dict[str, any]
+        """
         # Assign Alba connection configs per proxy to the backend config
-        fixed_config = self.alba_connection_config.get_config()
+        fixed_config = self.alba_connection_config.to_dict()
         fixed_config['local_connection_path'] = self.local_connection_path
         fixed_config['backend_type'] = self.backend_type
         tmp_dict = dict([(i, fixed_config) for i in xrange(self._nr_of_proxies)])
@@ -91,7 +107,10 @@ class BackendConfig(GenericConfig):
         return tmp_dict
 
 
-class AlbaConnectionConfig(GenericConfig):
+class AlbaConnectionConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'backend_connection_manager'
+
     def __init__(self, alba_connection_host=None, alba_connection_port=None, alba_connection_preset=None, alba_connection_timeout=None, alba_connection_use_rora=None,
                  alba_connection_transport=None, alba_connection_rora_timeout_msecs=None, alba_connection_rora_manifest_cache_capacity=None, alba_connection_asd_connection_pool_capacity=None,
                  *args, **kwargs):
@@ -115,3 +134,32 @@ class AlbaConnectionConfig(GenericConfig):
         self.alba_connection_rora_timeout_msecs = alba_connection_rora_timeout_msecs
         self.alba_connection_rora_manifest_cache_capacity = alba_connection_rora_manifest_cache_capacity
         self.alba_connection_asd_connection_pool_capacity = alba_connection_asd_connection_pool_capacity
+
+
+class S3ConnectionConfig(object):
+
+    component_identifier = 'backend_connection_manager'
+
+    def __init__(self, s3_connection_host=None, s3_connection_port=None, s3_connection_use_ssl=None, s3_connection_flavour=None, s3_connection_username=None,
+                 s3_connection_password=None, s3_connection_ssl_cert_file=None, s3_connection_ssl_verify_host=None, s3_connection_verbose_logging=None, *args, **kwargs):
+        """
+        Initiate the volumedriverfs config: s3 manager
+        :param s3_connection_host: When backend_type is S3: the S3 host to connect to, otherwise ignored
+        :param s3_connection_port: When backend_type is S3: the S3 port to connect to, otherwise ignored
+        :param s3_connection_use_ssl: When backend_type is S3: whether to use SSL to encrypt the connection
+        :param s3_connection_flavour: S3 backend flavour: S3 (default), GCS, WALRUS or SWIFT
+        :param s3_connection_username: When backend_type is S3: the S3 username, otherwise ignored
+        :param s3_connection_password: When backend_type is S3: the S3 password
+        :param s3_connection_ssl_cert_file: When backend_type is S3: path to a file holding the SSL certificate
+        :param s3_connection_ssl_verify_host: When backend_type is S3: whether to verify the SSL certificate's subject against the host
+        :param s3_connection_verbose_logging: When backend_type is S3: whether to do verbose logging
+        """
+        self.s3_connection_host = s3_connection_host
+        self.s3_connection_port = s3_connection_port
+        self.s3_connection_use_ssl = s3_connection_use_ssl
+        self.s3_connection_flavour = s3_connection_flavour
+        self.s3_connection_username = s3_connection_username
+        self.s3_connection_password = s3_connection_password
+        self.s3_connection_ssl_cert_file = s3_connection_ssl_cert_file
+        self.s3_connection_ssl_verify_host = s3_connection_ssl_verify_host
+        self.s3_connection_verbose_logging = s3_connection_verbose_logging

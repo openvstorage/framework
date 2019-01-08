@@ -17,16 +17,18 @@
 """
 StorageDriverConfig
 """
-import json
+from .base import BaseStorageDriverConfig
+from .connection_manager import BackendConnectionManager
+from .filesystem import FileSystemConfig
+from .volume_router import VolumeRouterConfig
+from .volume_manager import VolumeManagerConfig
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
-from ovs.extensions.storageserver.storagedriverconfig.backend_config import BackendConfig
-from ovs.extensions.storageserver.storagedriverconfig.filesystem_config import FilesystemConfig
-from ovs.extensions.storageserver.storagedriverconfig.generic_config import GenericConfig
-from ovs.extensions.storageserver.storagedriverconfig.vrouter_config import VRouterConfig
-from ovs.extensions.storageserver.storagedriverconfig.volume_manager_config import VolumeManagerConfig
 
 
-class VRegistryConfig(GenericConfig):
+class VolumeRegistryConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'volume_registry'
+
     def __init__(self, vregistry_arakoon_cluster_id, vregistry_arakoon_cluster_nodes, vregistry_arakoon_timeout_ms=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: vregistry configuration
@@ -39,7 +41,9 @@ class VRegistryConfig(GenericConfig):
         self.vregistry_arakoon_timeout_ms = vregistry_arakoon_timeout_ms
 
 
-class DtlConfig(GenericConfig):
+class DistributedTransactionLogConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'distributed_transaction_log'
 
     def __init__(self, dtl_path, dtl_transport=None, *args, **kwargs):
         """
@@ -51,7 +55,10 @@ class DtlConfig(GenericConfig):
         self.dtl_transport = dtl_transport
 
 
-class DlsConfig(GenericConfig):
+class DistributedLockStoreConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'distributed_lock_store'
+
     def __init__(self, dls_type=None, dls_arakoon_timeout_ms=None, dls_arakoon_cluster_id=None, dls_arakoon_cluster_nodes=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: dls configuration
@@ -66,33 +73,10 @@ class DlsConfig(GenericConfig):
         self.dls_arakoon_cluster_nodes = dls_arakoon_cluster_nodes
 
 
-class S3ConnectionConfig(object):
-    def __init__(self, s3_connection_host=None, s3_connection_port=None, s3_connection_use_ssl=None, s3_connection_flavour=None, s3_connection_username=None,
-                 s3_connection_password=None, s3_connection_ssl_cert_file=None, s3_connection_ssl_verify_host=None, s3_connection_verbose_logging=None, *args, **kwargs):
-        """
-        Initiate the volumedriverfs config: s3 manager
-        :param s3_connection_host: When backend_type is S3: the S3 host to connect to, otherwise ignored
-        :param s3_connection_port: When backend_type is S3: the S3 port to connect to, otherwise ignored
-        :param s3_connection_use_ssl: When backend_type is S3: whether to use SSL to encrypt the connection
-        :param s3_connection_flavour: S3 backend flavour: S3 (default), GCS, WALRUS or SWIFT
-        :param s3_connection_username: When backend_type is S3: the S3 username, otherwise ignored
-        :param s3_connection_password: When backend_type is S3: the S3 password
-        :param s3_connection_ssl_cert_file: When backend_type is S3: path to a file holding the SSL certificate
-        :param s3_connection_ssl_verify_host: When backend_type is S3: whether to verify the SSL certificate's subject against the host
-        :param s3_connection_verbose_logging: When backend_type is S3: whether to do verbose logging
-        """
-        self.s3_connection_host = s3_connection_host
-        self.s3_connection_port = s3_connection_port
-        self.s3_connection_use_ssl = s3_connection_use_ssl
-        self.s3_connection_flavour = s3_connection_flavour
-        self.s3_connection_username = s3_connection_username
-        self.s3_connection_password = s3_connection_password
-        self.s3_connection_ssl_cert_file = s3_connection_ssl_cert_file
-        self.s3_connection_ssl_verify_host = s3_connection_ssl_verify_host
-        self.s3_connection_verbose_logging = s3_connection_verbose_logging
+class NetworkInterfaceConfig(BaseStorageDriverConfig):
 
+    component_identifier = 'network_interface'
 
-class NetworkConfig(GenericConfig):
     def __init__(self, network_uri=None, network_xio_slab_config=None, network_workqueue_max_threads=None, network_snd_rcv_queue_depth=None,
                  network_max_neighbour_distance=None, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
         """
@@ -112,7 +96,10 @@ class NetworkConfig(GenericConfig):
         self.network_workqueue_ctrl_max_threads = network_workqueue_ctrl_max_threads
 
 
-class MdsConfig(GenericConfig):
+class MetadataServerConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'metadata_server'
+
     def __init__(self, mds_nodes=None, mds_db_type=None, mds_threads=None, mds_poll_secs=None, mds_cached_pages=None, mds_timeout_secs=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: MDS config manager
@@ -131,7 +118,10 @@ class MdsConfig(GenericConfig):
         self.mds_timeout_secs = mds_timeout_secs
 
 
-class EventsConfig(GenericConfig):
+class EventPublisherConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'event_publisher'
+
     def __init__(self, events_amqp_uris=None, events_amqp_exchange=None, events_amqp_routing_key=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: events config manager
@@ -144,7 +134,10 @@ class EventsConfig(GenericConfig):
         self.events_amqp_routing_key = events_amqp_routing_key
 
 
-class ScoCacheConfig(GenericConfig):
+class ScoCacheConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'scocache'
+
     def __init__(self, backoff_gap, trigger_gap, scocache_mount_points, *args, **kwargs):
         """
         Initiate the volumedriverfs config: events config manager
@@ -157,7 +150,10 @@ class ScoCacheConfig(GenericConfig):
         self.scocache_mount_points = scocache_mount_points
 
 
-class FiledriverConfig(GenericConfig):
+class FileDriverConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'file_driver'
+
     def __init__(self, fd_namespace, fd_cache_path, fd_extent_cache_capacity=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config:  filedriver config
@@ -170,7 +166,10 @@ class FiledriverConfig(GenericConfig):
         self.fd_extent_cache_capacity = fd_extent_cache_capacity
 
 
-class ScrubManagerConfig(GenericConfig):
+class ScrubManagerConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'scrub_manager'
+
     def __init__(self, scrub_manager_interval=None, scrub_manager_sync_wait_secs=None, scrub_manager_max_parent_scrubs=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config:  filedriver config
@@ -183,10 +182,13 @@ class ScrubManagerConfig(GenericConfig):
         self.scrub_manager_max_parent_scrubs = scrub_manager_max_parent_scrubs
 
 
-class ContentCacheConfig(GenericConfig):
+class ContentAddressedCacheConfig(BaseStorageDriverConfig):
+
+    component_identifier = 'content_addressed_cache'
+
     def __init__(self, read_cache_serialization_path=None, serialize_read_cache=None, clustercache_mount_points=None, *args, **kwargs):
         """
-        Initiate the volumedriverfs config:  filedriver config
+        Initiate the content_addressed_cache config
         :param read_cache_serialization_path: Directory to store the serialization of the Read Cache
         :param serialize_read_cache: Whether to serialize the readcache on exit or not
         :param clustercache_mount_points: An array of directories and sizes to be used as Read Cache mount points
@@ -196,7 +198,7 @@ class ContentCacheConfig(GenericConfig):
         self.clustercache_mount_points = clustercache_mount_points
 
 
-class StorageDriverConfig(GenericConfig):
+class StorageDriverConfig(BaseStorageDriverConfig):
     """
     Usage:
     Config classes with non-essential parameters may be left out as parameter.
@@ -205,17 +207,17 @@ class StorageDriverConfig(GenericConfig):
     --------------------------------------------------------------------------
     vrouter_config = VRouterConfig(**my_dict)
     volume_manager_config = VolumeManagerConfig(**my_dict)
-    filesystem_config = FilesystemConfig(**my_dict)
-    dtl_config = DtlConfig(**my_dict)
-    mds_config = MdsConfig(**my_dict)
+    filesystem_config = FileSystemConfig(**my_dict)
+    dtl_config = DistributedTransactionLogConfig(**my_dict)
+    mds_config = MetadataServerConfig(**my_dict)
     backend_config = BackendConfig(**my_dict)
-    dls_config = DlsConfig(**my_dict)
-    events_config = EventsConfig(**my_dict)
-    network_config = NetworkConfig(**my_dict)
-    vregistry_config = VRegistryConfig(**my_dict)
+    dls_config = DistributedLockStoreConfig(**my_dict)
+    events_config = EventPublisherConfig(**my_dict)
+    network_config = NetworkInterfaceConfig(**my_dict)
+    vregistry_config = VolumeRegistryConfig(**my_dict)
     scocache_config= ScoCacheConfig(*my_dict)
-    filedriver_config = FiledriverConfig(**my_dict)
-    contentcache_config = ContentCacheConfig(**my_dict)
+    filedriver_config = FileDriverConfig(**my_dict)
+    contentcache_config = ContentAddressedCacheConfig(**my_dict)
     scrub_manager_config = ScrubManagerConfig(**my_dict)
 
     Note that this object 'my_dict' must be a flat dict with all containing parameters. These parameters will then be formatted as needed for the volumedriver
@@ -238,17 +240,40 @@ class StorageDriverConfig(GenericConfig):
                                       **my_dict).get_config())
     """
 
-    def __init__(self, vrouter_cluster_id,
-                 filedriver_config, vregistry_config, vrouter_config, volume_manager_config, filesystem_config, dtl_config, scocache_config,
-                 backend_config=None, mds_config=None, dls_config=None, events_config=None, network_config=None, contentcache_config=None, scrub_manager_config=None,
-                 backend_type=None, num_threads=None, shm_region_size=None, stats_collector_destination=None, stats_collector_interval_secs=None,
-                 asio_service_manager_threads=None, asio_service_manager_io_service_per_thread=None, fuse_min_workers=None, fuse_max_workers=None, bgc_threads=None, *args, **kwargs):
-        # type: (str, FiledriverConfig, VRegistryConfig, VRouterConfig, VolumeManagerConfig, FilesystemConfig, DtlConfig, ScoCacheConfig, Optional[BackendConfig],Optional[MdsConfig], Optional[DlsConfig], EventsConfig[object], NetworkConfig[object], ContentCacheConfig[object], ScrubManagerConfig[object], Optional[str], Optional[int], Optional[int], Optional[str], Optional[int], Optional[int], Optional[int], Optional[int], Optional[int], Optional[int], args, kwargs) -> None
+    # Compilation of all other objects
+    component_identifier = 'complete_storagedriver_config'
 
+    def __init__(self,
+                 vrouter_cluster_id,  # type: str
+                 filedriver_config,  # type: FileDriverConfig
+                 vregistry_config,  # type: VolumeRegistryConfig
+                 vrouter_config,  # type: VolumeRouterConfig
+                 volume_manager_config,  # type: VolumeManagerConfig
+                 filesystem_config,  # type: FileSystemConfig
+                 dtl_config,  # type: DistributedTransactionLogConfig
+                 scocache_config,  # type: ScoCacheConfig
+                 backend_config=None,  # type: Optional[BackendConnectionManager]
+                 mds_config=None,  # type: Optional[MetadataServerConfig]
+                 dls_config=None,  # type: Optional[DistributedLockStoreConfig]
+                 events_config=None,  # type: Optional[EventPublisherConfig]
+                 network_config=None,  # type: Optional[NetworkInterfaceConfig]
+                 contentcache_config=None,  # type: Optional[ContentAddressedCacheConfig]
+                 scrub_manager_config=None,  # type: Optional[ScrubManagerConfig]
+                 backend_type=None,  # type: Optional[str]
+                 num_threads=None,  # type: Optional[int]
+                 shm_region_size=None,  # type: Optional[int]
+                 stats_collector_destination=None,  # type: Optional[str]
+                 stats_collector_interval_secs=None,  # type: Optional[str]
+                 asio_service_manager_threads=None,  # type: Optional[int]
+                 asio_service_manager_io_service_per_thread=None,  # type: Optional[int]
+                 fuse_min_workers=None,  # type: Optional[int]
+                 fuse_max_workers=None,  # type: Optional[int]
+                 bgc_threads=None,  # type: Optional[int]
+                 *args, **kwargs):
+        # type: (...) -> None
         self.vrouter_cluster_id = vrouter_cluster_id
 
         # Optional params
-
         self.backend_type = backend_type
         self.num_threads = num_threads
         self.shm_region_size = shm_region_size
@@ -264,7 +289,7 @@ class StorageDriverConfig(GenericConfig):
 
         self.bgc_threads = bgc_threads
 
-        # Seperate configs
+        # Separate configs
         # Configs which require at least one mandatory param
         self.vrouter_config = vrouter_config
         self.vregistry_config = vregistry_config
@@ -275,67 +300,44 @@ class StorageDriverConfig(GenericConfig):
         self.scocache_config = scocache_config
 
         # Configs that can be None
-        self.backend_config = backend_config or BackendConfig()
-        self.mds_config = mds_config or MdsConfig()
-        self.dls_config = dls_config or DlsConfig()
-        self.events_config = events_config or EventsConfig()
-        self.network_config = network_config or NetworkConfig()
-        self.contentcache_config = contentcache_config or ContentCacheConfig()
-        self.scrub_manager_config = scrub_manager_config or ScrubManagerConfig()
+        self.backend_config = backend_config or BackendConnectionManager()  # type: BackendConnectionManager
+        self.mds_config = mds_config or MetadataServerConfig()  # type: MetadataServerConfig
+        self.dls_config = dls_config or DistributedLockStoreConfig()  # type: DistributedLockStoreConfig
+        self.events_config = events_config or EventPublisherConfig()  # type: NetworkInterfaceConfig
+        self.network_config = network_config or NetworkInterfaceConfig()  # type: NetworkInterfaceConfig
+        self.contentcache_config = contentcache_config or ContentAddressedCacheConfig()  # type: ContentAddressedCacheConfig
+        self.scrub_manager_config = scrub_manager_config or ScrubManagerConfig()  # type: ScrubManagerConfig
         self._config = {}
 
-    def get_config(self):
-        # type: () -> str
+    def to_dict(self):
+        # type: () -> Dict[str, any]
         """
-        Get the config of the instantiated class
-        :return: dict
+        Get the complete overview as a dict
+        :return: The complete overview as dict
+        :rtype: Dict[str, any]
         """
         self._config = {'asio_service_manager': {'asio_service_manager_io_service_per_thread': self.asio_service_manager_io_service_per_thread,
                                                  'asio_service_manager_threads': self.asio_service_manager_threads},
-                        'backend_connection_manager': self.backend_config.get_config(),
+                        'backend_connection_manager': self.backend_config.to_dict(),
                         'backend_garbage_collector': {'bgc_threads': self.bgc_threads},
-                        'content_addressed_cache': self.contentcache_config.get_config(),
-                        'distributed_lock_store': self.dls_config.get_config(),
-                        'distributed_transaction_log': self.dtl_config.get_config(),
-                        'event_publisher': self.events_config.get_config(),
-                        'file_driver': self.filedriver_config.get_config(),
-                        'filesystem': self.filesystem_config.get_config(),
+                        'content_addressed_cache': self.contentcache_config.to_dict(),
+                        'distributed_lock_store': self.dls_config.to_dict(),
+                        'distributed_transaction_log': self.dtl_config.to_dict(),
+                        'event_publisher': self.events_config.to_dict(),
+                        'file_driver': self.filedriver_config.to_dict(),
+                        'filesystem': self.filesystem_config.to_dict(),
                         'fuse': {'fuse_min_workers': self.fuse_min_workers,
                                  'fuse_max_workers': self.fuse_max_workers},
-                        'metadata_server': self.mds_config.get_config(),
-                        'network_interface': self.network_config.get_config(),
+                        'metadata_server': self.mds_config.to_dict(),
+                        'network_interface': self.network_config.to_dict(),
                         'threadpool_component': {'num_threads': self.num_threads},
-                        'scocache': self.scocache_config.get_config(),
-                        'scrub_manager': self.scrub_manager_config.get_config(),
+                        'scocache': self.scocache_config.to_dict(),
+                        'scrub_manager': self.scrub_manager_config.to_dict(),
                         'shm_interface': {'shm_region_size': self.shm_region_size},
                         'stats_collector': {'stats_collector_destination': self.stats_collector_destination,
                                             'stats_collector_interval_secs': self.stats_collector_interval_secs},
-                        'volume_manager': self.volume_manager_config.get_config(),
-                        'volume_registry': self.vregistry_config.get_config(),
-                        'volume_router': self.vrouter_config.get_config(),
+                        'volume_manager': self.volume_manager_config.to_dict(),
+                        'volume_registry': self.vregistry_config.to_dict(),
+                        'volume_router': self.vrouter_config.to_dict(),
                         'volume_router_cluster': {'vrouter_cluster_id': self.vrouter_cluster_id}}
-        return json.dumps(ExtensionsToolbox.filter_dict_for_none(self._config), sort_keys=True)
-
-    def get_difference(self, other):
-        # type: (GenericConfig) -> Dict[str, GenericConfig]
-        """
-        Retrieve the difference between two StoragedriverConfig objects.
-        :param other: other storagedriverconfig object to compare the current object with
-        :type other: GenericConfig
-        :return: dict
-        """
-        if not isinstance(other, GenericConfig):
-            raise RuntimeError('Parameter `other` should be of type `GenericConfig`')
-        self_config = json.loads(self.get_config())
-        differences = self_config.copy() # make deep copy: remove if equal. This way, keys present only in the original dict will still be present,
-                                            # and keys only present in the dict compared with, will result in a difference -> added to differences
-        other_config = json.loads(other.get_config())
-
-        for other_key, other_value in other_config.iteritems():
-            self_value = self_config.get(other_key, None)
-            if self_value == other_value:
-                differences.pop(other_key)
-            else:
-                differences[other_key] = other_value
-        return differences
-
+        return ExtensionsToolbox.filter_dict_for_none(self._config)

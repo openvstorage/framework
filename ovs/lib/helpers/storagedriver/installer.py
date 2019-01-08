@@ -47,6 +47,13 @@ from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient,
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.helpers.vpool.shared import VPoolShared
 
+# Mypy
+# noinspection PyUnreachableCode
+if False:
+    from ovs.lib.helpers.vpool.installer import VPoolInstaller
+
+
+
 class StorageDriverInstaller(object):
     """
     Class used to create/remove a StorageDriver to/from a StorageRouter
@@ -66,6 +73,7 @@ class StorageDriverInstaller(object):
     _logger = Logger('lib')
 
     def __init__(self, vp_installer, configurations=None, storagedriver=None):
+        # type: (VPoolInstaller, Optional[Dict[any,any]], Optional[StorageDriver]) -> None
         """
         Initialize a StorageDriverInstaller class instance containing information about:
             - vPool information on which a new StorageDriver is going to be deployed, eg: global vPool configurations, vPool name, ...
