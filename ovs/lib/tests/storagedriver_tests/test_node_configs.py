@@ -311,7 +311,7 @@ class NodeConfigTest(unittest.TestCase):
         junction = structure['storagerouters'][1].domains[0]
         junction.domain = domain
         junction.save()
-        vpool_config_path = 'file://{0}?key={1}'.format(CONFIG_STORE_LOCATION, HOSTS_CONFIG_PATH.format(vpool.guid, 1))
+        vpool_config_path = Configuration.get_configuration_path(HOSTS_CONFIG_PATH.format(vpool.guid, 1))
         StorageRouterClient.exceptions['server_revision'] = {vpool_config_path: Exception('ClusterNotReachableException')}
         StorageRouterClient.node_config_recordings = []
         result = StorageDriverController.cluster_registry_checkup()

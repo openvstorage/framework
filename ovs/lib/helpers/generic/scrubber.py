@@ -807,7 +807,7 @@ class StackWorker(ScrubShared):
                         scrub_proxy_config['port'] = port
                         scrub_proxy_config['transport'] = 'tcp'
                         scrub_proxy_configs.append(scrub_proxy_config)
-                        Configuration.set('{0}.raw'.format(scrub_proxy_config_key), scrub_proxy_config)
+                        Configuration.set(scrub_proxy_config_key, scrub_proxy_config)
                         params = {'VPOOL_NAME': self.vpool.name,
                                   'LOG_SINK': Logger.get_sink_path(alba_proxy_service),
                                   'CONFIG_PATH': Configuration.get_configuration_path(scrub_proxy_config_key),
@@ -844,7 +844,7 @@ class StackWorker(ScrubShared):
                                              'alba_connection_port': scrub_proxy_config['port']})
                         backend_config[str(index)] = proxy_config
                 # Copy backend connection manager information in separate key
-                Configuration.set('{0}.raw'.format(self.backend_config_key), {"backend_connection_manager": backend_config})
+                Configuration.set(self.backend_config_key, {"backend_connection_manager": backend_config})
                 self._logger.info(self._format_message('Backend config was set up'))
 
                 if 'post_proxy_deployment' in self._test_hooks:
@@ -1193,7 +1193,7 @@ class Scrubber(ScrubShared):
                     'time_start': self.time_start,
                     'time_end': self.time_end,
                     'worker_contexts': self._covert_data_objects(self.worker_contexts)}
-        Configuration.set('{0}.raw'.format(job_key), job_info)
+        Configuration.set(job_key, job_info)
 
     @classmethod
     def generate_vpool_vdisk_map(cls, vpool_guids=None, vdisk_guids=None, manual=False):
@@ -1273,14 +1273,16 @@ class Scrubber(ScrubShared):
         removed_keys = []
         try:
             with volatile_mutex('scrubber_clean_entries', wait=30):
+                transaction_id = Configuration.begin_transaction()
                 for key in Configuration.list(self._SCRUB_KEY):
                     full_key = SCRUB_JOB.format(key)
                     job_info = Configuration.get(full_key)
                     time_start = job_info.get('time_start')
                     time_end = job_info.get('time_end')
                     if time_start is None or (time_end is not None and time_end - time_start >= self._KEY_LIFETIME):
-                        Configuration.delete(full_key)
+                        Configuration.delete(full_key, transaction=transaction_id)
                         removed_keys.append(full_key)
+                Configuration.apply_transaction(transaction_id)
                 if len(removed_keys) > 0:
                     self._logger.info(self._format_message('Cleaned up the following outdated scrub keys: {0}'.format('\n - '.join(removed_keys))))
         except NoLockAvailableException:

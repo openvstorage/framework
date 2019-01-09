@@ -36,7 +36,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs_extensions.constants.vpools import PROXY_CONFIG_ABM
+from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -141,8 +141,8 @@ class VDiskController(object):
             storagedriver = vpool.storagedrivers[0]
             storagerouter = storagedriver.storagerouter
             if StorageRouter.ALBA_FEATURES.CACHE_QUOTA in storagerouter.features['alba']['features']:
-                proxy = storagedriver.alba_proxies[0]
-                configuration = Configuration.get_configuration_path(PROXY_CONFIG_ABM.format(vpool.guid, proxy.guid))
+                alba_backend_guid = vpool.metadata['backend']['backend_info']['alba_backend_guid']
+                configuration = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(alba_backend_guid))
                 client = SSHClient(storagerouter)
                 if vdisk.cache_quota is not None:
                     fcq = vdisk.cache_quota.get(VPool.CACHES.FRAGMENT)
