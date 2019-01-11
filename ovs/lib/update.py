@@ -655,8 +655,10 @@ class UpdateController(object):
                         key = '/ovs/framework/hosts/{0}/versions'.format(System.get_my_machine_id(client=client))
                         old_versions = Configuration.get(key) if Configuration.exists(key) else {}
                         try:
+                            UpdateController._logger.info('voor migrate')
                             with remote(client.ip, [Migrator]) as rem:
-                                rem.Migrator.migrate(master_ips, extra_ips)
+                                rem.Migrator.migrate(master_ips, extra_ips, UpdateController._logger)  #todo remove me logger
+                                UpdateController._logger.info('na migrate')
                         except EOFError as eof:
                             UpdateController._logger.warning('{0}: EOFError during code migration, retrying {1}'.format(client.ip, eof))
                             with remote(client.ip, [Migrator]) as rem:
