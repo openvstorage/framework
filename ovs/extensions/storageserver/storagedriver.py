@@ -19,7 +19,7 @@ Wrapper class for the storagedriver client of the voldrv team
 """
 import os
 import copy
-from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH  #review is this ok?
+from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger as OVSLogger

@@ -18,7 +18,6 @@
 OVS migration module
 """
 
-import os
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.packages.packagefactory import PackageFactory
 
@@ -28,9 +27,9 @@ class ExtensionMigrator(object):
     Handles all model related migrations
     """
     identifier = PackageFactory.COMP_MIGRATION_FWK
-    THIS_VERSION = 14
+    THIS_VERSION = 15
 
-    _logger = Logger('extensions')
+    _logger = Logger('update')
 
     def __init__(self):
         """ Init method """
@@ -38,18 +37,27 @@ class ExtensionMigrator(object):
 
     @staticmethod
     def migrate_critical():
+        """
+        This migrate reflects the ovs core related changes in the config management, where raw is removed as parameter of get and set methods.
+        Instead, files that are to be interpreted as raw need a suffix of either .ini or .raw. Everything else will be default read and
+        interpreted as a JSON file.
+        ASD config locations and ovs/arakoon/xxx/config locations are to be read as .raw and .ini, so we migrate these. This change is critical
+        because it will totally render the config mgmt useless if not run first, due to changing the ovsdb path.
+        :return:
+        """
         try:
             from ovs.constants.albanode import ASD_CONFIG, ASD_CONFIG_DIR
             from ovs_extensions.constants.arakoon import ARAKOON_BASE, ARAKOON_CONFIG
             from ovs.extensions.generic.configuration import Configuration
             ExtensionMigrator._logger.info('First migrate to the new config management, where raw files have `.raw` or `.ini` extensions')
-            # todo add more checks? eg will now rename .ini to .ini files -> unneccesary
             for name in Configuration.list(ARAKOON_BASE):
-                whole_path = os.path.join(ARAKOON_BASE, name, 'config')
-                ExtensionMigrator._logger.info('renaming {0}'.format(whole_path))
-                Configuration.rename(whole_path, ARAKOON_CONFIG.format(name))
+                old_path = ARAKOON_CONFIG.format(name).rstrip('ini', 1)
+                if Configuration.exists(old_path):
+                    Configuration.rename(old_path, ARAKOON_CONFIG.format(name))
             for asd in Configuration.list(ASD_CONFIG_DIR):
-                Configuration.rename(ASD_CONFIG.format(asd).strip('.raw'), ASD_CONFIG.format(asd))
+                old_path = ASD_CONFIG.format(asd).rstrip('.raw', 1)
+                if Configuration.exists(old_path):
+                    Configuration.rename(old_path, ASD_CONFIG.format(asd))
                 ExtensionMigrator._logger.info('Succesfully finished migrating config management')
         except ImportError:
             ExtensionMigrator._logger.info('Arakoon constants file not found, not migrating to new config management')

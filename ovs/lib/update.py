@@ -18,7 +18,6 @@
 Module for UpdateController
 """
 
-import os
 import copy
 import time
 import inspect
@@ -683,11 +682,11 @@ class UpdateController(object):
             if PackageFactory.COMP_FWK in components:
                 UpdateController._logger.info('Starting DAL code migration')
                 try:
-                    persistent_client = PersistentFactory.get_client()
-                    old_versions = persistent_client.get('ovs_model_version') if persistent_client.exists('ovs_model_version') else {}
                     from ovs.dal.helpers import Migration
                     with remote(ssh_clients[0].ip, [Migration]) as rem:
                         rem.Migration.migrate()
+                    persistent_client = PersistentFactory.get_client()
+                    old_versions = persistent_client.get('ovs_model_version') if persistent_client.exists('ovs_model_version') else {}
 
                     new_versions = persistent_client.get('ovs_model_version') if persistent_client.exists('ovs_model_version') else {}
                     if old_versions != new_versions:
