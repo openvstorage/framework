@@ -17,9 +17,9 @@
 """
 Overrides persistent factory.
 """
+from ovs_extensions.constants.arakoon import ARAKOON_CONFIG
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.storage.persistentfactory import PersistentFactory as _PersistentFactory
-from ovs_extensions.constants.arakoon import ARAKOON_CONFIG
 
 class PersistentFactory(_PersistentFactory):
     """

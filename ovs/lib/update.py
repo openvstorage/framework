@@ -393,29 +393,6 @@ class UpdateController(object):
 
         cls._logger.info('{0}: Executed hook {1}'.format(client.ip, method_name))
 
-    @classmethod
-    @add_hooks('update', 'pre_update')
-    def _pre_update_hooks(cls):
-        try:
-            from ovs.constants.albanode import ASD_CONFIG, ASD_CONFIG_DIR
-            from ovs_extensions.constants.arakoon import ARAKOON_BASE, ARAKOON_CONFIG
-            cls._logger.info('First migrate to the new config management, where raw files have `.raw` or `.ini` extensions')
-            #todo add more checks? eg will now rename .ini to .ini files -> unneccesary
-            for name in Configuration.list(ARAKOON_BASE):
-                whole_path = os.path.join(ARAKOON_BASE, name, 'config')
-                cls._logger.info('renaming {0}'.format(whole_path))
-                Configuration.rename(whole_path, ARAKOON_CONFIG.format(name))
-            for asd in Configuration.list(ASD_CONFIG_DIR):
-                Configuration.rename(ASD_CONFIG.format(asd).strip('.raw'), ASD_CONFIG.format(asd))
-            cls._logger.info('Succesfully finished migrating config management')
-        except ImportError:
-            cls._logger.info('Arakoon constants file not found, not migrating to new config management')
-            pass
-        except Exception as ex:
-            cls._logger.info('Unexpected error encountered during migrating config management: {0}'.format(ex))
-
-
-
     ################
     # CELERY TASKS #
     ################
@@ -669,16 +646,6 @@ class UpdateController(object):
             # Remove update file
             for client in ssh_clients:
                 client.file_delete(UpdateController._update_file)
-
-            # Pre update actions
-            for client in ssh_clients:
-                UpdateController._logger.info('{0}: Executing pre-update actions'.format(client.ip))
-                with remote(client.ip, [Toolbox]) as rem:
-                    for fct in rem.Toolbox.fetch_hooks(component='update', sub_component='pre_update'):
-                        try:
-                            fct()
-                        except Exception:
-                            UpdateController._logger.exception('{0}: Pre update hook {1} failed'.format(client.ip, fct.__name__))
 
             # Migrate extensions
             if PackageFactory.COMP_FWK in components:

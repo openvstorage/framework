@@ -18,6 +18,7 @@
 OVS migration module
 """
 
+import os
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.packages.packagefactory import PackageFactory
 
@@ -34,6 +35,27 @@ class ExtensionMigrator(object):
     def __init__(self):
         """ Init method """
         pass
+
+    @staticmethod
+    def migrate_critical():
+        try:
+            from ovs.constants.albanode import ASD_CONFIG, ASD_CONFIG_DIR
+            from ovs_extensions.constants.arakoon import ARAKOON_BASE, ARAKOON_CONFIG
+            from ovs.extensions.generic.configuration import Configuration
+            ExtensionMigrator._logger.info('First migrate to the new config management, where raw files have `.raw` or `.ini` extensions')
+            # todo add more checks? eg will now rename .ini to .ini files -> unneccesary
+            for name in Configuration.list(ARAKOON_BASE):
+                whole_path = os.path.join(ARAKOON_BASE, name, 'config')
+                ExtensionMigrator._logger.info('renaming {0}'.format(whole_path))
+                Configuration.rename(whole_path, ARAKOON_CONFIG.format(name))
+            for asd in Configuration.list(ASD_CONFIG_DIR):
+                Configuration.rename(ASD_CONFIG.format(asd).strip('.raw'), ASD_CONFIG.format(asd))
+                ExtensionMigrator._logger.info('Succesfully finished migrating config management')
+        except ImportError:
+            ExtensionMigrator._logger.info('Arakoon constants file not found, not migrating to new config management')
+            pass
+        except Exception as ex:
+            ExtensionMigrator._logger.info('Unexpected error encountered during migrating config management: {0}'.format(ex))
 
     @staticmethod
     def migrate(previous_version, master_ips=None, extra_ips=None):
@@ -54,6 +76,7 @@ class ExtensionMigrator(object):
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         if working_version < ExtensionMigrator.THIS_VERSION:
+            ExtensionMigrator.migrate_critical()
             try:
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.dal.lists.vpoollist import VPoolList

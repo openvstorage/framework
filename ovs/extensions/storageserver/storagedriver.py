@@ -19,12 +19,12 @@ Wrapper class for the storagedriver client of the voldrv team
 """
 import os
 import copy
+from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH  #review is this ok?
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger as OVSLogger
 from ovs_extensions.generic.remote import remote
 from volumedriver.storagerouter import storagerouterclient
-from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH  #review is this ok?
 
 # Import below classes so the rest of the framework can always import from this module:
 # * We can inject mocks easier without having to make changes everywhere
@@ -369,7 +369,6 @@ class StorageDriverConfiguration(object):
             if client is None:
                 changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
             else:
-                print self.remote_path
                 with remote(client.ip, [LocalStorageRouterClient]) as rem:
                     changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
             reloaded = True
