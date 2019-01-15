@@ -46,19 +46,24 @@ class ExtensionMigrator(object):
         :return:
         """
         try:
-            from ovs.constants.albanode import ASD_CONFIG, ASD_CONFIG_DIR
+            from ovs.constants.albanode import ASD_CONFIG, ASD_BASE_PATH
             from ovs_extensions.constants.arakoon import ARAKOON_BASE, ARAKOON_CONFIG
             from ovs.extensions.generic.configuration import Configuration
-            ExtensionMigrator._logger.info('First migrate to the new config management, where raw files have `.raw` or `.ini` extensions')
+
+            def _easy_rename(old_name, new_name):
+                try:
+                    if not Configuration.exists(new_name):
+                        Configuration.rename(old_name, new_name)
+                except:
+                    ExtensionMigrator._logger.info('Something went wrong during renaming of {0} to {1}'.format(old_name, new_name))
+
+            ExtensionMigrator._logger.info('Critical migrate to the new config management, where raw files have `.raw` or `.ini` extensions')
             for name in Configuration.list(ARAKOON_BASE):
-                old_path = ARAKOON_CONFIG.format(name).rstrip('ini', 1)
-                if Configuration.exists(old_path):
-                    Configuration.rename(old_path, ARAKOON_CONFIG.format(name))
-            for asd in Configuration.list(ASD_CONFIG_DIR):
-                old_path = ASD_CONFIG.format(asd).rstrip('.raw', 1)
-                if Configuration.exists(old_path):
-                    Configuration.rename(old_path, ASD_CONFIG.format(asd))
-                ExtensionMigrator._logger.info('Succesfully finished migrating config management')
+                _easy_rename(ARAKOON_CONFIG.format(name).rstrip('.ini'), ARAKOON_CONFIG.format(name))
+            for asd in Configuration.list(ASD_BASE_PATH):
+                _easy_rename(ASD_CONFIG.format(asd).rstrip('.raw'), ASD_CONFIG.format(asd))
+            ExtensionMigrator._logger.info('Succesfully finished migrating config management')
+
         except ImportError:
             ExtensionMigrator._logger.info('Arakoon constants file not found, not migrating to new config management')
             pass
