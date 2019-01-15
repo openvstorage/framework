@@ -27,13 +27,48 @@ class ExtensionMigrator(object):
     Handles all model related migrations
     """
     identifier = PackageFactory.COMP_MIGRATION_FWK
-    THIS_VERSION = 14
+    THIS_VERSION = 15
 
-    _logger = Logger('extensions')
+    _logger = Logger('update')
 
     def __init__(self):
         """ Init method """
         pass
+
+    @staticmethod
+    def migrate_critical():
+        """
+        This migrate reflects the ovs core related changes in the config management, where raw is removed as parameter of get and set methods.
+        Instead, files that are to be interpreted as raw need a suffix of either .ini or .raw. Everything else will be default read and
+        interpreted as a JSON file.
+        ASD config locations and ovs/arakoon/xxx/config locations are to be read as .raw and .ini, so we migrate these. This change is critical
+        because it will totally render the config mgmt useless if not run first, due to changing the ovsdb path.
+        :return:
+        """
+        try:
+            from ovs.constants.albanode import ASD_CONFIG, ASD_BASE_PATH
+            from ovs_extensions.constants.arakoon import ARAKOON_BASE, ARAKOON_CONFIG
+            from ovs.extensions.generic.configuration import Configuration
+
+            def _easy_rename(old_name, new_name):
+                try:
+                    if not Configuration.exists(new_name):
+                        Configuration.rename(old_name, new_name)
+                except:
+                    ExtensionMigrator._logger.info('Something went wrong during renaming of {0} to {1}'.format(old_name, new_name))
+
+            ExtensionMigrator._logger.info('Critical migrate to the new config management, where raw files have `.raw` or `.ini` extensions')
+            for name in Configuration.list(ARAKOON_BASE):
+                _easy_rename(ARAKOON_CONFIG.format(name).rstrip('.ini'), ARAKOON_CONFIG.format(name))
+            for asd in Configuration.list(ASD_BASE_PATH):
+                _easy_rename(ASD_CONFIG.format(asd).rstrip('.raw'), ASD_CONFIG.format(asd))
+            ExtensionMigrator._logger.info('Succesfully finished migrating config management')
+
+        except ImportError:
+            ExtensionMigrator._logger.info('Arakoon constants file not found, not migrating to new config management')
+            pass
+        except Exception as ex:
+            ExtensionMigrator._logger.info('Unexpected error encountered during migrating config management: {0}'.format(ex))
 
     @staticmethod
     def migrate(previous_version, master_ips=None, extra_ips=None):
@@ -54,6 +89,7 @@ class ExtensionMigrator(object):
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         if working_version < ExtensionMigrator.THIS_VERSION:
+            ExtensionMigrator.migrate_critical()
             try:
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.dal.lists.vpoollist import VPoolList

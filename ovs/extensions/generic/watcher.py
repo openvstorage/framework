@@ -25,6 +25,7 @@ import time
 import pika
 import uuid
 import argparse
+from ovs_extensions.constants.arakoon import ARAKOON_CONFIG
 from ovs_extensions.constants.config import ARAKOON_NAME, CACC_LOCATION
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
 from ovs.extensions.db.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
@@ -95,7 +96,7 @@ class Watcher(object):
             if store_type == 'arakoon_voldrv':
                 try:
                     cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-                    configuration = Configuration.get('/ovs/arakoon/{0}/config'.format(cluster_name), raw=True)
+                    configuration = Configuration.get(ARAKOON_CONFIG.format(cluster_name))
                     client = PyrakoonStore(cluster=cluster_name, configuration=configuration)
                     client.nop()
                     break

@@ -19,6 +19,7 @@ Wrapper class for the storagedriver client of the voldrv team
 """
 import os
 import copy
+from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger as OVSLogger
@@ -328,7 +329,7 @@ class StorageDriverConfiguration(object):
         # noinspection PyArgumentList
         storagerouterclient.Logger.enableLogging()
 
-        self._key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool_guid, storagedriver_id)
+        self._key = HOSTS_CONFIG_PATH.format(vpool_guid, storagedriver_id)
         self._logger = OVSLogger('extensions')
         self._dirty_entries = []
 

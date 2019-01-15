@@ -771,6 +771,7 @@ class ScrubTestCase(unittest.TestCase):
             proxy_amount = 1
             if stack_worker.storagerouter == sr1:
                 proxy_amount = sr1_proxy_amount
+
             self.assertEquals(len(running_proxy_services), proxy_amount, 'Not the right amount of proxies were deployed')
             proxy_config_keys = sorted([int(key) for key in deployed_scrubber_configs[stack_worker]['backend_connection_manager'].iterkeys() if key.isdigit()])
             self.assertListEqual(proxy_config_keys, sorted(xrange(0, proxy_amount)))

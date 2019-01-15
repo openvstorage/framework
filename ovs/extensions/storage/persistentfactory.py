@@ -17,9 +17,9 @@
 """
 Overrides persistent factory.
 """
+from ovs_extensions.constants.arakoon import ARAKOON_CONFIG
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.storage.persistentfactory import PersistentFactory as _PersistentFactory
-
 
 class PersistentFactory(_PersistentFactory):
     """
@@ -32,7 +32,7 @@ class PersistentFactory(_PersistentFactory):
         if client_type not in ['pyrakoon', 'arakoon']:
             raise RuntimeError('Configured client type {0} is not implemented'.format(client_type))
         cluster = Configuration.get('/ovs/framework/arakoon_clusters|ovsdb')
-        contents = Configuration.get('/ovs/arakoon/{0}/config'.format(cluster), raw=True)
+        contents = Configuration.get(ARAKOON_CONFIG.format(cluster))
         return {'cluster': cluster,
                 'configuration': contents}
 
