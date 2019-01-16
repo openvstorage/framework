@@ -14,15 +14,25 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from .services import framework_start, framework_stop
-from ovs_extensions.cli import OVSGroup
+import click
+from .services import framework_start as _framework_start, framework_stop as _framework_stop
+from ovs_extensions.cli import OVSCommand
 
-start_group = OVSGroup('start', help='(Re)Start framework services')
-start_group.add_command(framework_start)
+extra_options = {'command_parameter_help': 'framework [ip|all]',
+                 'cls': OVSCommand}
 
-stop_group = OVSGroup('stop', help='Stop framework services')
-stop_group.add_command(framework_stop)
 
-services_group = OVSGroup('services', help='Restart services')
-services_group.add_command(start_group)
-services_group.add_command(stop_group)
+@click.command('stop', help='(Re)start Open vStorage Framework services on this node, on all nodes, or on the given ip',
+               section_header='Services', **extra_options)
+@click.argument('framework', required=True, type=click.STRING)
+@click.argument('host', required=False, default=None, type=click.STRING)
+def framework_stop(framework, host):
+    _framework_stop(host)
+
+
+@click.command('start', help='Stop Open vStorage Framework services on this node, on all nodes, or on the given ip',
+               section_header='Services', **extra_options)
+@click.argument('framework', required=True, type=click.STRING)
+@click.argument('host', required=False, default=None, type=click.STRING)
+def framework_start(framework, host):
+    _framework_start(host)

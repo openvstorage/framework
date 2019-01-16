@@ -15,14 +15,10 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import os
-import click
 import datetime
 import subprocess
-from ovs_extensions.cli.commands import OVSCommand
 
 
-@click.command('logs', help='Collect all ovs logs to a tarball (for support purposes)',
-               section_header='Miscellaneous', cls=OVSCommand)
 def collect_logs():
     from ovs.extensions.generic.system import System
 

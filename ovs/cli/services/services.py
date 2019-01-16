@@ -18,14 +18,13 @@ import re
 import click
 from ovs_extensions.cli.commands import OVSCommand
 
-extra_options = {'command_parameter_help': '[ip|all]',
-                 'cls': OVSCommand}
 
-
-@click.command('framework', help='Stop Open vStorage Framework services on this node, on all nodes, or on the given ip',
-               **extra_options)
-@click.argument('host', required=False, default=None, type=click.STRING)
-def framework_stop(host):
+def framework_stop(host=None):
+    """
+    Stops all framework services on this node, all nodes or on specified host
+    :param host: None, 'all' or ip
+    :return:
+    """
     from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
     from ovs.extensions.services.servicefactory import ServiceFactory
 
@@ -41,10 +40,12 @@ def framework_stop(host):
     print 'Done'
 
 
-@click.command('framework', help='Start Open vStorage Framework services on this node, on all nodes, or on the given ip',
-               **extra_options)
-@click.argument('host', required=False, default=None, type=click.STRING)
-def framework_start(host):
+def framework_start(host=None):
+    """
+    Starts all framework services on this node, all nodes or on specified host
+    :param host: None, all or ip
+    :return:
+    """
     from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
     from ovs.extensions.services.servicefactory import ServiceFactory
 
