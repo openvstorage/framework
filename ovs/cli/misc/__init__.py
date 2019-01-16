@@ -14,8 +14,26 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from .misc import collect_logs
-from ovs_extensions.cli.commands import OVSGroup
+import click
+from .misc import collect_logs as _collect_logs
+from ovs_extensions.cli.commands import OVSGroup, OVSCommand
 
-collect_group = OVSGroup('collect', help='Collect resources from the cluster')
-collect_group.add_command(collect_logs)
+
+extra_options = {'section_header':'Miscellaneous',
+                 'cls': OVSCommand}
+
+
+@click.command('collect', help='Collect all ovs logs to a tarball (for support purposes)',
+               command_parameter_help= 'logs', **extra_options)
+@click.argument('logs', required=True, type=click.STRING)
+def collect_logs(logs):
+    _collect_logs()
+
+
+@click.command('version', help='List all ovs packages and their respective versions',
+               **extra_options)
+def version_command():
+    from ovs.extensions.packages.packagefactory import PackageFactory
+    mgr = PackageFactory.get_manager()
+    for package, version in mgr.get_installed_versions().iteritems():
+        print '{0: <30} {1}'.format(package,version)

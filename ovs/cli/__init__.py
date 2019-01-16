@@ -29,10 +29,10 @@ os.environ['OVS_LOGTYPE_OVERRIDE'] = 'file'
 import click
 from .setup import setup_group
 from .config import config_group
-from .misc import collect_group
+from .misc import collect_logs, version_command
 from .remove import remove_group
 from .monitor import monitor_group
-from .services import services_group
+from .services import framework_start, framework_stop
 from .update import update_command
 from .rollback import rollback_command
 from ovs_extensions.cli import OVSCLI, unittest_command
@@ -56,7 +56,7 @@ groups = [setup_group,
           remove_group,
           monitor_group,
           unittest_command,
-          services_group,
-          collect_group]
+          framework_start, framework_stop,
+          collect_logs, version_command]
 for group in groups:
     ovs.add_command(group)
