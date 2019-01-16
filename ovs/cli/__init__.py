@@ -59,5 +59,6 @@ groups = [setup_group,
           services_group,
           collect_group,
           version_command]
+
 for group in groups:
     ovs.add_command(group)
