@@ -19,8 +19,9 @@
  */
 define([
     'jquery', 'knockout',
-    'ovs/api'
-], function ($, ko, api) {
+    'ovs/api', 'ovs/shared'
+], function ($, ko,
+             api, shared) {
 
     function VPoolService() {
         var self = this;
@@ -41,6 +42,12 @@ define([
         self.loadVPool = function(vPoolGuid, queryParams, relayParams) {
             return api.get('vpools/{0}'.format([vPoolGuid]), { queryparams: queryParams, relayParams: relayParams })
         };
+
+        self.shrinkVPool = function(vPoolGuid, storagerouter_guid) {
+            return api.post('vpools/{0}/shrink_vpool'.format([vPoolGuid]), { data: { storagerouter_guid: storagerouter_guid } })
+                                            .then(shared.tasks.wait)
+        };
+
     }
     return new VPoolService();
 });

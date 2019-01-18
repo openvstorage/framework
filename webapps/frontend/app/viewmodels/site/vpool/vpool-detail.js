@@ -18,10 +18,12 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api', 'ovs/services/authentication',
     'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
+    'viewmodels/services/vdisk', 'viewmodels/services/vpool', 'viewmodels/services/storagerouter','viewmodels/services/storagedriver',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vdisk/vdisk',
     'viewmodels/wizards/addvpool/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index'
 ], function($, app, dialog, ko, router,
             shared, generic, Refresher, api, authentication,
+            VDiskService, VPoolService, StoragerouterService,
             VPool, StorageDriver, StorageRouter, VDisk,
             ExtendVPool, CreateHPRMConfigsWizard, ReconfigureVPool) {
     "use strict";
@@ -117,40 +119,39 @@ define([
             }).promise();
         };
         self.loadStorageRouters = function() {
-            return $.Deferred(function(deferred) {
+            return $.when().then(function () {
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     var options = {
                         sort: 'name',
                         contents: 'storagedrivers,features'
                     };
-                    self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
-                        .done(function(data) {
+                    self.loadStorageRoutersHandle = StoragerouterService.loadStorageRouterHandle(options)
+                        .done(function (data) {
                             var guids = [], sadata = {};
-                            $.each(data.data, function(index, item) {
+                            $.each(data.data, function (index, item) {
                                 guids.push(item.guid);
                                 sadata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.storageRouters,
-                                function(guid) {
+                                function (guid) {
                                     return new StorageRouter(guid);
                                 }, 'guid'
                             );
-                            $.each(self.storageRouters(), function(index, storageRouter) {
+                            $.each(self.storageRouters(), function (index, storageRouter) {
                                 if (sadata.hasOwnProperty(storageRouter.guid())) {
                                     storageRouter.fillData(sadata[storageRouter.guid()]);
                                 }
                             });
                             deferred.resolve();
                         })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.resolve();
                 }
-            }).promise();
+
+                return false;
+            })
         };
         self.loadStorageDrivers = function() {
-            return $.Deferred(function(deferred) {
+            return $.when().then(function () {
                 if (generic.xhrCompleted(self.loadStorageDriversHandle)) {
                     self.loadStorageDriversHandle = api.get('storagedrivers', {
                         queryparams: {
@@ -158,60 +159,49 @@ define([
                             contents: 'storagerouter,vpool_backend_info,vdisks_guids,alba_proxies,proxy_summary'
                         }
                     })
-                    .done(function(data) {
+                    .done(function (data) {
                         var guids = [], sddata = {}, map = {};
-                        $.each(data.data, function(index, item) {
+                        $.each(data.data, function (index, item) {
                             guids.push(item.guid);
                             sddata[item.guid] = item;
                         });
                         generic.crossFiller(
                             guids, self.storageDrivers,
-                            function(guid) {
+                            function (guid) {
                                 return new StorageDriver(guid);
                             }, 'guid'
                         );
-                        $.each(self.storageDrivers(), function(index, storageDriver) {
+                        $.each(self.storageDrivers(), function (index, storageDriver) {
                             if (sddata.hasOwnProperty(storageDriver.guid())) {
                                 storageDriver.fillData(sddata[storageDriver.guid()]);
                             }
                             map[storageDriver.storageRouterGuid()] = storageDriver;
                         });
                         self.srSDMap(map);
-                        deferred.resolve();
-                    })
-                    .fail(function() {
-                        deferred.reject();
                     });
-                } else {
-                    deferred.resolve();
                 }
-            }).promise();
+                return false
+            })
         };
         self.loadVDisks = function(options) {
-            return $.Deferred(function(deferred) {
+            return $.when().then(function() {
                 if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
                     options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
                     options.vpoolguid = self.vPool().guid();
                     options.query = self.vDiskQuery;
-                    self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
+                    self.vDisksHandle[options.page] = VDiskService.loadVDisksHandle(options)
                         .done(function(data) {
-                            deferred.resolve({
-                                data: data,
-                                loader: function(guid) {
-                                    if (!self.vDiskCache.hasOwnProperty(guid)) {
+                                if (!self.vDiskCache.hasOwnProperty(guid)) {
                                         self.vDiskCache[guid] = new VDisk(guid);
                                     }
-                                    return self.vDiskCache[guid];
-                                }
-                            });
-                        })
-                        .fail(function() { deferred.reject(); });
-                } else {
-                    deferred.resolve();
+                                return self.vDiskCache[guid];
+                    })
                 }
-            }).promise();
+                return false
+            })
         };
+
         self.formatBytes = function(value) {
             return generic.formatBytes(value);
         };
@@ -302,8 +292,7 @@ define([
                                     $.t('ovs:wizards.shrink_vpool.confirm.inprogress_multi')
                                 );
                             }
-                            api.post('vpools/' + self.vPool().guid() + '/shrink_vpool', { data: { storagerouter_guid: sr.guid() } })
-                                .then(self.shared.tasks.wait)
+                            VPoolService.shrinkVPool(self.vPool().guid(), sr.guid())
                                 .done(function() {
                                     if (single === true) {
                                         generic.alertSuccess(
@@ -344,9 +333,9 @@ define([
                     $.t('ovs:vpools.detail.refresh.started'),
                     $.t('ovs:vpools.detail.refresh.started_msg', { sr: sr.name(), vpool: self.vPool().name() })
                 );
-                api.post('storagedrivers/' + self.srSDMap()[sr.guid()].guid()+ '/refresh_configuration')
-                    .then(self.shared.tasks.wait)
+                StorageDriverService.refreshConfiguration(self.srSDMap()[sr.guid()].guid())
                     .done(function(data) {
+
                         if (data === 0) {
                             generic.alertWarning(
                                 $.t('ovs:vpools.detail.refresh.warning'),

@@ -33,6 +33,19 @@ define([
         self.loadVDisk = function (guid) {
             return api.get('vdisks/' + guid)
         };
+
+
+        /**
+         * Get the vdisk handle
+         * @param options: options of the vdisk
+         * @returns {Promise<T>}
+         */
+        self.loadVDisksHandle = function (options) {
+            return api.get('vdisks', { queryparams: options })
+                .then(shared.tasks.wait)
+        };
+
+
         /**
          * Loads the config params of the vdisk
          * @param guid: Additional query params.
