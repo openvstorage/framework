@@ -242,7 +242,7 @@ define([
             if (self.srSDMap().hasOwnProperty(sr.guid())) {
                 var wizard = new ReconfigureVPool({
                         modal: true,
-                        completed: deferred,
+                        completed: false,
                         vPool: self.vPool(),
                         storageRouter: sr,
                         storageDriver: sd
