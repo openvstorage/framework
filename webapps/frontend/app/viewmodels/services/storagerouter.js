@@ -74,15 +74,6 @@ define([
             return api.post('storagerouters/' + storageRouterGuid + '/configure_support', { data: Data })
                 .then(shared.tasks.wait)
         };
-
-        /**
-         * Fetch a StorageRouter handle
-         * @param options: options to query
-         * @return {Promise<T>}
-         */
-        self.loadStorageRouterHandle = function(options) {
-            return api.get('storagerouters', { queryparams: options })
-        };
     }
     return new StorageRouterService();
 });

@@ -80,6 +80,16 @@ define(['ovs/api'
             return api.post('storagedrivers/' + storagedriverguid+ '/refresh_configuration')
                     .then(self.shared.tasks.wait)
         };
+
+        /**
+         * Fetch storagedrivers with given query params
+         * @param queryParams: provide queryparams for the api call
+         * @returns {*|void}
+         */
+        self.loadStorageDrivers = function(queryParams) {
+            queryParams = (typeof queryParams !== 'undefined') ? queryParams : {};
+            return api.get('storagedrivers', {queryparams: queryParams})
+        };
     }
     return new StorageDriverService()
 });
