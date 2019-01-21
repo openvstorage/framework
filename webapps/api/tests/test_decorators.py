@@ -22,10 +22,11 @@ import time
 import uuid
 import hashlib
 import unittest
+from functools import wraps
 from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory
-from api.backend.decorators import limit, required_roles, return_list, return_object, return_task
+from api.backend.decorators import limit, required_roles, return_list, return_object, return_task, RateLimiter
 # noinspection PyUnresolvedReferences
 from api.backend.toolbox import ApiToolbox  # Required for the tests
 from api.oauth2.toolbox import OAuth2Toolbox
@@ -45,30 +46,125 @@ from ovs_extensions.api.exceptions import \
     HttpTooManyRequestsException, HttpUnauthorizedException, HttpUpgradeNeededException
 
 
+def data_holder_return_list(default_sort=None):
+    """
+    Wraps around the return_list decorator to access the DataHolder props
+    """
+    def wrap(f):
+        """
+        Returns a wrapped function
+        """
+        @wraps(f)
+        def new_function(self, *args, **kw):
+            # type: (DataHolder, *any, **any) -> any
+            """
+            Executes the decorated function in a locked context
+            Kwargs get mutated. The hinting metadata is added!
+            """
+            return return_list(self.data_type, default_sort=default_sort)(f)(self, *args, **kw)
+        return new_function
+    return wrap
+
+
+class DataHolder(object):
+    """
+    Simple data holder class
+    Exposes methods to retrieve the data as the API would
+    """
+    def __init__(self, base_list, ordered_set=None):
+        # type: (DataList, Optional[List[any]]) -> None
+        """
+        Instantiate a data holder. It requires the data_type and a list to base the data returns off
+        :param base_list: The DataList to base returns off
+        :type base_list: DataList
+        :param ordered_set: Intended ordered set. Used for returning a set amount of items in a particular order
+        Defaults to the base_list
+        :type ordered_set: Optional[List[any]]
+        """
+        self.base_list = base_list
+        self.base_list_guids = base_list.guids[:]
+        self.data_type = base_list._object_type
+        self.ordered_set = ordered_set or base_list
+
+        self.rate_limit_output = None
+        self.output_values = {}
+
+    @data_holder_return_list()
+    def get_base_list(self, *args, **kwargs):
+        """
+        Returns a list of all Machines.
+        """
+        self.output_values['args'] = args
+        self.output_values['kwargs'] = kwargs
+        return self.base_list
+
+    @data_holder_return_list()
+    def get_base_list_guids(self, *args, **kwargs):
+        """
+        Returns a list of all Machines.
+        """
+        self.output_values['args'] = args
+        self.output_values['kwargs'] = kwargs
+        return self.base_list_guids
+
+    @data_holder_return_list(default_sort='name,description')
+    def get_base_list_guids_default_sorted(self, *args, **kwargs):
+        """
+        Returns a guid list of all Machines.
+        """
+        self.output_values['args'] = args
+        self.output_values['kwargs'] = kwargs
+        return self.base_list_guids
+
+    @data_holder_return_list()
+    def get_base_list_first_two(self, *args, **kwargs):
+        """
+        Returns only the first two Machines of the list of all Machines
+        """
+        self.output_values['args'] = args
+        self.output_values['kwargs'] = kwargs
+        return DataList(TestMachine, guids=[item.guid for item in self.ordered_set[:2]])
+
+    @data_holder_return_list()
+    def get_base_list_guids_first_two(self, *args, **kwargs):
+        """
+        Returns only the first two guids of Machines of the list of all Machines
+        """
+        self.output_values['args'] = args
+        self.output_values['kwargs'] = kwargs
+        return [item.guid for item in self.ordered_set[:2]]
+
+    @limit(amount=2, per=2, timeout=2)
+    def rate_limited_function(self, input_value, *args, **kwargs):
+        """
+        Decorated function
+        """
+        _ = args, kwargs
+        self.rate_limit_output = input_value
+        return HttpResponse(json.dumps(input_value))
+
+
 class Decorators(unittest.TestCase):
     """
     The decorators test suite will validate all backend decorators
     """
-    original_versions = None
 
-    @classmethod
-    def setUpClass(cls):
+    @staticmethod
+    def set_up_api():
         """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
+        Setup for API mocking
+        - Create group
+        - Create users
+        - Add OAuth clients
+        - Add roles
+        Requires the DAL to be setup!
         """
-        DalHelper.setup(fake_sleep=True)
-
+        # Admin user/group
         admin_group = Group()
         admin_group.name = 'administrators'
         admin_group.description = 'Administrators'
         admin_group.save()
-        viewers_group = Group()
-        viewers_group.name = 'viewers'
-        viewers_group.description = 'Viewers'
-        viewers_group.save()
 
-        # Create users
         admin = User()
         admin.username = 'admin'
         admin.password = hashlib.sha256('admin').hexdigest()
@@ -87,20 +183,7 @@ class Decorators(unittest.TestCase):
         admin_na.is_active = False
         admin_na.group = admin_group
         admin_na.save()
-        user = User()
-        user.username = 'user'
-        user.password = hashlib.sha256('user').hexdigest()
-        user.is_active = True
-        user.group = viewers_group
-        user.save()
-        sort_combinations = [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]  # No logical ordering
-        for name, description in sort_combinations:
-            machine = TestMachine()
-            machine.name = name
-            machine.description = description
-            machine.save()
 
-        # Create internal OAuth 2 clients
         admin_client = Client()
         admin_client.ovs_type = 'INTERNAL'
         admin_client.grant_type = 'PASSWORD'
@@ -111,6 +194,20 @@ class Decorators(unittest.TestCase):
         admin_na_client.grant_type = 'PASSWORD'
         admin_na_client.user = admin_na
         admin_na_client.save()
+
+        # Viewer user/group
+        viewers_group = Group()
+        viewers_group.name = 'viewers'
+        viewers_group.description = 'Viewers'
+        viewers_group.save()
+
+        user = User()
+        user.username = 'user'
+        user.password = hashlib.sha256('user').hexdigest()
+        user.is_active = True
+        user.group = viewers_group
+        user.save()
+
         user_client = Client()
         user_client.ovs_type = 'INTERNAL'
         user_client.grant_type = 'PASSWORD'
@@ -135,74 +232,104 @@ class Decorators(unittest.TestCase):
         manage_role.save()
 
         # Attach groups to roles
-        mapping = [
-            (admin_group, [read_role, write_role, manage_role]),
-            (viewers_group, [read_role])
-        ]
-        for setting in mapping:
-            for role in setting[1]:
+        mapping = [(admin_group, [read_role, write_role, manage_role]), (viewers_group, [read_role])]
+        for group, roles in mapping:
+            for role in roles:
                 rolegroup = RoleGroup()
-                rolegroup.group = setting[0]
+                rolegroup.group = group
                 rolegroup.role = role
                 rolegroup.save()
-            for user in setting[0].users:
-                for role in setting[1]:
+            for user in group.users:
+                for role in roles:
                     for client in user.clients:
                         roleclient = RoleClient()
                         roleclient.client = client
                         roleclient.role = role
                         roleclient.save()
 
-        cls.original_versions = settings.VERSION
-        settings.VERSION = (1, 2, 3)
-        cls.factory = RequestFactory()
+    def setUp(self):
+        """
+        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
+        This makes sure the unittests can be executed without those libraries installed
+        """
+        DalHelper.setup(fake_sleep=True)
 
-    @classmethod
-    def tearDownClass(cls):
+        self.set_up_api()
+
+        # No logical ordering for testing purposes
+        machine_description_combinations = [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
+        self.machines_by_name_description = {}
+        self.machines_random_order = []
+        for name, description in machine_description_combinations:
+            machine = TestMachine()
+            machine.name = name
+            machine.description = description
+            machine.save()
+            self.machines_random_order.append(machine)
+            if name not in self.machines_by_name_description:
+                self.machines_by_name_description[name] = {}
+            self.machines_by_name_description[name][description] = machine
+
+        self.data_list_machines = DataList(TestMachine, {'type': DataList.where_operator.OR,
+                                                         'items': [('name', DataList.operator.EQUALS, 'aa'),
+                                                                   ('name', DataList.operator.EQUALS, 'bb')]})
+        self.assertEqual(len(self.data_list_machines), 4)
+        self.data_holder = DataHolder(self.data_list_machines, self.machines_random_order)
+
+        self.original_versions = settings.VERSION
+        settings.VERSION = (1, 2, 3)
+        self.factory = RequestFactory()
+
+    def tearDown(self):
         """
         Clean up the unittest
         """
         DalHelper.teardown(fake_sleep=True)
-        settings.VERSION = cls.original_versions
+        settings.VERSION = self.original_versions
 
     def test_ratelimit(self):
         """
         Validates whether the rate limiter behaves correctly
         """
-        @limit(amount=2, per=2, timeout=2)
-        def the_function(input_value, *args, **kwargs):
-            """
-            Decorated function
-            """
-            _ = args, kwargs
-            output['value'] = input_value
-            return HttpResponse(json.dumps(input_value))
-
-        output = {'value': None}
         request = self.factory.post('/users/')
+
         with self.assertRaises(KeyError):
             # Should raise a KeyError complaining about the HTTP_X_REAL_IP
-            the_function(1, request)
+            self.data_holder.rate_limited_function(1, request)
+
         request.META['HTTP_X_REAL_IP'] = '127.0.0.1'
-        response = the_function(2, request)
-        self.assertEqual(output['value'], 2)
+        response = self.data_holder.rate_limited_function(2, request)
+        self.assertEqual(self.data_holder.rate_limit_output, 2)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, '2')
-        response = the_function(3, request)
-        self.assertEqual(output['value'], 3)
+
+        response = self.data_holder.rate_limited_function(3, request)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, '3')
+
+        for _ in xrange(0, 2):
+            with self.assertRaises(HttpTooManyRequestsException) as context:
+                self.data_holder.rate_limited_function(4, request)
+            self.assertEqual(context.exception.status_code, 429)
+            self.assertEqual(self.data_holder.rate_limit_output, 3,
+                             'Decorated function shouldn\'t be called as the cooldown is still happening')
+
+        # Simulate a wait period by clearing all calls
+        rate_limit_info = RateLimiter.get_rate_limit_info(request, self.data_holder.rate_limited_function)
+        rate_limit_info.calls = rate_limit_info.get_calls(time.time() + 5)  # Warp to the future (for calls, not cooldown)!
+        rate_limit_info.save()
         with self.assertRaises(HttpTooManyRequestsException) as context:
-            the_function(4, request)
+            self.data_holder.rate_limited_function(5, request)
         self.assertEqual(context.exception.status_code, 429)
-        self.assertEqual(output['value'], 3)
-        with self.assertRaises(HttpTooManyRequestsException) as context:
-            the_function(4, request)
-        self.assertEqual(context.exception.status_code, 429)
-        self.assertEqual(output['value'], 3)
-        time.sleep(5)
-        response = the_function(6, request)
-        self.assertEqual(output['value'], 6)
+        self.assertEqual(self.data_holder.rate_limit_output, 3,
+                         'Decorated function shouldn\'t be called as the cooldown is still happening because the timeout is still active')
+
+        # Clearing the timeout
+        rate_limit_info.clear_timeout()  # Clear the cooldown
+        rate_limit_info.save()
+
+        response = self.data_holder.rate_limited_function(6, request)
+        self.assertEqual(self.data_holder.rate_limit_output, 6)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, '6')
 
@@ -219,14 +346,12 @@ class Decorators(unittest.TestCase):
             output['value'] = input_value
             return HttpResponse(json.dumps(input_value))
 
-        time.sleep(180)
         output = {'value': None}
         request = self.factory.get('/')
         with self.assertRaises(HttpUnauthorizedException) as context:
             the_function_rr(1, request)
         self.assertEqual(context.exception.status_code, 401)
 
-        time.sleep(180)
         request.client = type('Client', (), {})
         request.user = type('User', (), {})
         request.user.username = 'foobar'
@@ -234,7 +359,6 @@ class Decorators(unittest.TestCase):
             the_function_rr(2, request)
         self.assertEqual(context.exception.status_code, 401)
 
-        time.sleep(180)
         user = UserList.get_user_by_username('user')
         access_token, _ = OAuth2Toolbox.generate_tokens(user.clients[0], generate_access=True, scopes=RoleList.get_roles_by_codes(['read']))
         access_token.expiration = int(time.time() + 86400)
@@ -247,7 +371,6 @@ class Decorators(unittest.TestCase):
         self.assertEqual(context.exception.error, 'invalid_roles')
         self.assertEqual(context.exception.error_description, 'This call requires roles: read, write, manage')
 
-        time.sleep(180)
         user = UserList.get_user_by_username('admin')
         access_token, _ = OAuth2Toolbox.generate_tokens(user.clients[0], generate_access=True, scopes=RoleList.get_roles_by_codes(['read', 'write', 'manage']))
         access_token.expiration = int(time.time() + 86400)
@@ -289,7 +412,6 @@ class Decorators(unittest.TestCase):
                                'version': version}
             return HttpResponse(json.dumps(input_value))
 
-        time.sleep(180)
         output = {'value': None}
         user = UserList.get_user_by_username('user')
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
@@ -299,12 +421,10 @@ class Decorators(unittest.TestCase):
         self.assertEqual(context.exception.error, 'invalid_version')
         self.assertEqual(context.exception.error_description, 'API version requirements: {0} <= <version> <= {1}. Got {2}'.format(2, 2, 1))
 
-        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         with self.assertRaises(HttpNotFoundException):
             the_function_tl_1(2, request, pk=str(uuid.uuid4()))
 
-        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {}
@@ -314,7 +434,6 @@ class Decorators(unittest.TestCase):
         self.assertEqual(context.exception.error, 'invalid_data')
         self.assertEqual(context.exception.error_description, 'Invalid data passed: mandatory is missing')
 
-        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {'mandatory': 'mandatory'}
         request.QUERY_PARAMS = {}
@@ -326,7 +445,6 @@ class Decorators(unittest.TestCase):
         self.assertIn('request', output['value'].keys())
         self.assertEqual(json.loads(response.content), 4)
 
-        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {'mandatory': 'mandatory',
@@ -340,7 +458,6 @@ class Decorators(unittest.TestCase):
         self.assertIn('request', output['value'].keys())
         self.assertEqual(json.loads(response.content), 5)
 
-        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {'mandatory': 'mandatory',
@@ -399,139 +516,150 @@ class Decorators(unittest.TestCase):
         self.assertEqual(response.data['instance'].username, 'b')
         self.assertEqual(response.data['contents'], ['foo', 'bar'])
 
+    # @todo test relation listing which sparked the keyerror in the first place
     def test_return_list(self):
         """
         Validates whether the return_list decorator works correctly:
         * Parsing:
-          * Parses the 'sort' parameter, optionally falling back to value specified by decorator
-          * Parses the 'page' parameter
           * Parses the 'contents' parameter
         * Passes the 'full' hint to the decorated function, indicating whether full objects are useful
-        * If sorting is requested:
-          * Loads a possibly returned list of guids
-          * Sorts the returned list
         * Contents:
           * If contents are specified: Runs the list trough the serializer
           * Else, return the guid list
         """
-        @return_list(TestMachine)
-        def the_function_rl_1(*args, **kwargs):
-            """
-            Returns a list of all Machines.
-            """
-            output_values['args'] = args
-            output_values['kwargs'] = kwargs
-            return data_list_machines
+        data_holder = self.data_holder
+        data_list_machines = self.data_list_machines
+        output_values = data_holder.output_values
 
-        @return_list(TestMachine, default_sort='name,description')
-        def the_function_rl_2(*args, **kwargs):
-            """
-            Returns a guid list of all Machines.
-            """
-            output_values['args'] = args
-            output_values['kwargs'] = kwargs
-            return data_list_machineguids
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
+        for fct, has_hinting, returns_guids in [(data_holder.get_base_list, False, False),
+                                                (data_holder.get_base_list_guids, False, True)]:
+            request.QUERY_PARAMS = {}
+            response = fct(0, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], has_hinting)
+            guid_data = response.data['data']
+            self.assertEqual(len(guid_data), len(data_list_machines))
+            # No contents mean no serialization. Only guids will be returned
+            self.assertIsInstance(guid_data, list)
+            self.assertIsInstance(guid_data[0], str)
 
-        @return_list(TestMachine)
-        def the_function_rl_3(*args, **kwargs):
-            """
-            Returns only the first two Machines of the list of all Machines
-            """
-            output_values['args'] = args
-            output_values['kwargs'] = kwargs
-            return DataList(TestMachine, guids=[guid_table['bb']['aa'], guid_table['aa']['cc']])
+            request.QUERY_PARAMS['contents'] = ''
+            response = fct(1, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], True, 'Full objects are required as contents is passed')
+            self.assertEqual(len(response.data['data']), len(data_list_machines))
+            # Contents requested so data is fully serialized
+            # Change with everything being offloaded to DataList makes sure that the instance that is serialized is always a DataList
+            # The serializer data property is returned by Django (which is a dict)
+            serialized_data = response.data['data']
+            serialized_data_instance = serialized_data['instance']
+            self.assertIsInstance(serialized_data, dict)
+            self.assertIsInstance(serialized_data_instance, DataList)
+            self.assertIsInstance(serialized_data_instance[0], TestMachine)
+            # The guids should be identical as no filtering was done. Added sort as the ordering does not matter here
+            self.assertEqual(data_list_machines.guids.sort(), serialized_data_instance.guids.sort())
 
-        @return_list(TestMachine)
-        def the_function_rl_4(*args, **kwargs):
-            """
-            Returns only the first two guids of Machines of the list of all Machines
-            """
-            output_values['args'] = args
-            output_values['kwargs'] = kwargs
-            return [guid_table['bb']['aa'], guid_table['aa']['cc']]
-
-        # Name/description combinations: [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
-        output_values = {}
-        data_list_machines = DataList(TestMachine, {'type': DataList.where_operator.OR,
-                                                    'items': [('name', DataList.operator.EQUALS, 'aa'),
-                                                              ('name', DataList.operator.EQUALS, 'bb')]})
-        self.assertEqual(len(data_list_machines), 4)
-        guid_table = {}
-        for machine in data_list_machines:
-            if machine.name not in guid_table:
-                guid_table[machine.name] = {}
-            guid_table[machine.name][machine.description] = machine.guid
-        data_list_machineguids = [machine.guid for machine in data_list_machines]
-
-        time.sleep(180)
+    def test_return_list_sorting(self):
+        """
+        Validates whether the return_list decorator works correctly:
+        * Parsing:
+          * Parses the 'sort' parameter, optionally falling back to value specified by decorator
+        * Passes the 'full' hint to the decorated function, indicating whether full objects are useful
+        * If sorting is requested:
+          * Loads a possibly returned list of guids
+          * Sorts the returned list
+        """
+        data_list_machines = self.data_list_machines
+        data_holder = self.data_holder
+        output_values = data_holder.output_values
 
         # Test sorting
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
-        for fct in [the_function_rl_1, the_function_rl_2]:
+        # Hinting is applied when requesting/applying sort
+        for fct, has_hinting, returns_guids in [(data_holder.get_base_list, False, False),
+                                                (data_holder.get_base_list_guids_default_sorted, True, True)]:
+
             request.QUERY_PARAMS = {}
             response = fct(1, request)
             self.assertEqual(response.status_code, 200)
-            # Hinting is applied when requesting/applying sort
-            self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
+            # No changes were requested. There are the default requests
+            self.assertEqual(output_values['kwargs']['hints']['full'], has_hinting)
             self.assertEqual(len(response.data), len(data_list_machines))
-            if fct.__name__ == 'the_function_rl_2':
-                self.assertListEqual(response.data['data'], [guid_table['aa']['bb'],
-                                                             guid_table['aa']['cc'],
-                                                             guid_table['bb']['aa'],
-                                                             guid_table['bb']['dd']])
+            if fct == data_holder.get_base_list:
+                # No sorting was applied. The guids of gets returned (no contents asked for)
+                output = data_list_machines.guids
+            else:
+                # data_holder.get_base_list_guids_default_sorted with default_sort='name,description'
+                output = [self.machines_by_name_description['aa']['bb'].guid,
+                          self.machines_by_name_description['aa']['cc'].guid,
+                          self.machines_by_name_description['bb']['aa'].guid,
+                          self.machines_by_name_description['bb']['dd'].guid]
+            self.assertListEqual(response.data['data'], output)
 
+            # Reverse sort on description.
             request.QUERY_PARAMS['sort'] = 'name,-description'
             response = fct(2, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_machines))
-            self.assertListEqual(response.data['data'], [guid_table['aa']['cc'],
-                                                         guid_table['aa']['bb'],
-                                                         guid_table['bb']['dd'],
-                                                         guid_table['bb']['aa']])
+            self.assertListEqual(response.data['data'], [self.machines_by_name_description['aa']['cc'].guid,
+                                                         self.machines_by_name_description['aa']['bb'].guid,
+                                                         self.machines_by_name_description['bb']['dd'].guid,
+                                                         self.machines_by_name_description['bb']['aa'].guid])
 
+            # Reverse sort on both name and description
             request.QUERY_PARAMS['sort'] = '-name,-description'
             response = fct(3, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_machines))
-            self.assertListEqual(response.data['data'], [guid_table['bb']['dd'],
-                                                         guid_table['bb']['aa'],
-                                                         guid_table['aa']['cc'],
-                                                         guid_table['aa']['bb']])
+            self.assertListEqual(response.data['data'], [self.machines_by_name_description['bb']['dd'].guid,
+                                                         self.machines_by_name_description['bb']['aa'].guid,
+                                                         self.machines_by_name_description['aa']['cc'].guid,
+                                                         self.machines_by_name_description['aa']['bb'].guid])
 
+            # First sort on description
             request.QUERY_PARAMS['sort'] = 'description,name'
             response = fct(4, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_machines))
-            self.assertListEqual(response.data['data'], [guid_table['bb']['aa'],
-                                                         guid_table['aa']['bb'],
-                                                         guid_table['aa']['cc'],
-                                                         guid_table['bb']['dd']])
+            self.assertListEqual(response.data['data'], [self.machines_by_name_description['bb']['aa'].guid,
+                                                         self.machines_by_name_description['aa']['bb'].guid,
+                                                         self.machines_by_name_description['aa']['cc'].guid,
+                                                         self.machines_by_name_description['bb']['dd'].guid])
 
-            request.QUERY_PARAMS['contents'] = ''
-            response = fct(5, request)
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data['data']), len(data_list_machines))
-            # Contents requested so data is fully serialized
-            # Change with everything being offloaded to DataList makes sure that the instance that is serialized is always a DataList
-            self.assertIsInstance(response.data['data']['instance'], DataList)
-            self.assertIsInstance(response.data['data']['instance'][0], TestMachine)
-            self.assertIn(response.data['data']['instance'][0].name, ['aa', 'bb'])
+    def test_return_list_filtering(self):
+        """
+        Validates whether the return_list decorator works correctly:
+        * Parsing:
+          * Parses the 'query' parameter
+        * Passes the 'full' hint to the decorated function, indicating whether full objects are useful
+        """
+        data_list_machines = DataList(TestMachine, {'type': DataList.where_operator.OR,
+                                                    'items': [('name', DataList.operator.EQUALS, 'aa'),
+                                                              ('name', DataList.operator.EQUALS, 'bb')]})
+        self.assertEqual(len(data_list_machines), 4)
+
+        data_holder = DataHolder(data_list_machines, self.machines_random_order)
+        output_values = data_holder.output_values
 
         # Test filtering
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
-        for fct in [the_function_rl_1, the_function_rl_2, the_function_rl_3, the_function_rl_4]:
-            request.QUERY_PARAMS = {}
+
+        for fct, has_hinting, returns_guids in [(data_holder.get_base_list, False, False),
+                                                (data_holder.get_base_list_guids_default_sorted, True, True),
+                                                (data_holder.get_base_list_first_two, False, False),
+                                                (data_holder.get_base_list_guids_first_two, False, True)]:
+
+            request.QUERY_PARAMS = {'query': json.dumps({'type': 'AND',
+                                                        'items': [['description', 'EQUALS', 'aa']]})}
             # Test querying, not to be tested thoroughly (test_basic handles DataList queries)
-            request.QUERY_PARAMS['query'] = json.dumps({'type': 'AND',
-                                                        'items': [['description', 'EQUALS', 'aa']]})
             response = fct(1, request)
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
-            expected_items = [guid_table['bb']['aa']]
+            self.assertEqual(output_values['kwargs']['hints']['full'], has_hinting)
+            expected_items = [self.machines_by_name_description['bb']['aa'].guid]
             self.assertEqual(len(response.data['data']), len(expected_items))
             self.assertListEqual(response.data['data'], expected_items)
 
@@ -539,9 +667,10 @@ class Decorators(unittest.TestCase):
                                                         'items': [['description', 'EQUALS', 'dd']]})
             response = fct(2, request)
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
-            if fct.__name__ in ['the_function_rl_1', 'the_function_rl_2']:
-                expected_items = [guid_table['bb']['dd']]
+            self.assertEqual(output_values['kwargs']['hints']['full'], has_hinting)
+            if fct in [data_holder.get_base_list,
+                       data_holder.get_base_list_guids_default_sorted]:
+                expected_items = [self.machines_by_name_description['bb']['dd'].guid]
             else:
                 expected_items = []  # Not found in the first two items
             self.assertEqual(len(response.data['data']), len(expected_items))
@@ -550,40 +679,77 @@ class Decorators(unittest.TestCase):
             request.QUERY_PARAMS['query'] = json.dumps('rawr')
             with self.assertRaises(ValueError):
                 # Can't capture the response as the exception will be raised in the same context
-                response = fct(1, request)
+                fct(1, request)
+
+    def test_return_list_pagination(self):
+        """
+        Validates whether the return_list decorator works correctly:
+        * Parsing:
+          * Parses the 'page' parameter
+        * Passes the 'full' hint to the decorated function, indicating whether full objects are useful
+        """
+        data_holder = self.data_holder
+        data_list_machines = self.data_list_machines
+        output_values = data_holder.output_values
+
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
 
         # Test pagination
+
+        # Arguments
+        fct, has_hinting, returns_guids = (data_holder.get_base_list, False, False)
+        for arg_type in [int, str]:
+            request.QUERY_PARAMS = {'page': 1 if arg_type == int else '1',
+                                    'page_size': 2 if arg_type == int else '2'}
+            response = fct(1, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], has_hinting)
+            expected_items = [machine.guid for machine in data_list_machines][0:2]
+            self.assertEqual(len(response.data['data']), len(expected_items))
+            self.assertListEqual(response.data['data'], expected_items)
+
+        # Pagination
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
-        for fct in [the_function_rl_1, the_function_rl_2, the_function_rl_3, the_function_rl_4]:
-            request.QUERY_PARAMS = {}
-            for arg_type in [int, str]:
-                request.QUERY_PARAMS['page'] = 1 if arg_type == int else '1'
-                request.QUERY_PARAMS['page_size'] = 2 if arg_type == int else '2'
-                response = fct(3, request)
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
-                if fct.__name__ == 'the_function_rl_2':
-                    expected_items = [guid_table['aa']['bb'], guid_table['aa']['cc']]
-                elif fct.__name__ in ['the_function_rl_3', 'the_function_rl_4']:
-                    expected_items = [guid_table['bb']['aa'], guid_table['aa']['cc']]
+        for fct, has_hinting, returns_guids in [(data_holder.get_base_list, False, False),
+                                                (data_holder.get_base_list_guids_default_sorted, True, True),
+                                                (data_holder.get_base_list_first_two, False, False),
+                                                (data_holder.get_base_list_guids_first_two, False, True)]:
+            print fct
+            request.QUERY_PARAMS = {'page': 1,
+                                    'page_size': 2}
+            response = fct(2, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], has_hinting)
+            if fct == data_holder.get_base_list_guids_default_sorted:
+                expected_items = [self.machines_by_name_description['aa']['bb'].guid,
+                                  self.machines_by_name_description['aa']['cc'].guid]
+            elif fct in [data_holder.get_base_list_first_two,
+                         data_holder.get_base_list_guids_first_two]:
+                expected_items = [machine.guid for machine in self.data_holder.ordered_set[0:2]]
 
-                else:
-                    expected_items = [machine.guid for machine in data_list_machines][0:2]
-                self.assertEqual(len(response.data['data']), len(expected_items))
-                self.assertListEqual(response.data['data'], expected_items)
+            else:
+                # Baselist
+                expected_items = [machine.guid for machine in data_list_machines][0:2]
+            self.assertEqual(len(response.data['data']), len(expected_items))
+            print 'page1', response.data['data'], expected_items
+            self.assertListEqual(response.data['data'], expected_items)
 
-                request.QUERY_PARAMS['page'] = 2
-                request.QUERY_PARAMS['page_size'] = 2
-                response = fct(4, request)
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(output_values['kwargs']['hints']['full'], fct.__name__ == 'the_function_rl_2')
-                if fct.__name__ == 'the_function_rl_2':
-                    expected_items = [guid_table['bb']['aa'], guid_table['bb']['dd']]
-                elif fct.__name__ in ['the_function_rl_3', 'the_function_rl_4']:
-                    # Same items as page 1 because only 2 items in total and when calling a page higher than max,
-                    #  it will go back to the result for the max page
-                    expected_items = [guid_table['bb']['aa'], guid_table['aa']['cc']]
-                else:
-                    expected_items = [machine.guid for machine in data_list_machines][2:4]
-                self.assertEqual(len(response.data['data']), len(expected_items))
-                self.assertListEqual(response.data['data'], expected_items)
+            request.QUERY_PARAMS = {'page': 2,
+                                    'page_size': 2}
+            response = fct(3, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], has_hinting)
+            if fct == data_holder.get_base_list_guids_default_sorted:
+                expected_items = [self.machines_by_name_description['bb']['aa'].guid,
+                                  self.machines_by_name_description['bb']['dd'].guid]
+            elif fct in [data_holder.get_base_list_first_two,
+                         data_holder.get_base_list_guids_first_two]:
+                # Same items as page 1 because only 2 items in total and when calling a page higher than max,
+                #  it will go back to the result for the max page
+                expected_items = [machine.guid for machine in self.machines_random_order[0:2]]
+            else:
+                # Baselist
+                expected_items = [machine.guid for machine in data_list_machines][2:4]
+            self.assertEqual(len(response.data['data']), len(expected_items))
+            print 'page2', response.data['data'], expected_items
+            self.assertListEqual(response.data['data'], expected_items)
