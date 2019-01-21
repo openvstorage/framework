@@ -17,16 +17,67 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api', 'ovs/services/authentication',
+    'viewmodels/containers/shared/base_container',
+    'viewmodels/services/vdisk', 'viewmodels/services/vpool', 'viewmodels/services/storagerouter','viewmodels/services/storagedriver',
     'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vdisk/vdisk',
     'viewmodels/wizards/addvpool/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index'
 ], function($, app, dialog, ko, router,
             shared, generic, Refresher, api, authentication,
+            BaseContainer,
+            VDiskService, VPoolService, StoragerouterService, StoragedriverService,
             VPool, StorageDriver, StorageRouter, VDisk,
             ExtendVPool, CreateHPRMConfigsWizard, ReconfigureVPool) {
     "use strict";
-    return function() {
+    var viewMapping = Object.freeze({
+        'storageRouters': {
+            key: function (data) {  // For relation updates: check if the GUID has changed before discarding a model
+                return ko.utils.unwrapObservable(data.guid)
+            },
+            create: function (options) {  // This object has not yet been converted to work with ko.mapping thus manually overriden the create
+                var storagerouter;
+                if (options.data === null) {
+                    storagerouter = new StorageRouter(null);
+                    storagerouter.loaded(true);
+                    return storagerouter
+                }
+                storagerouter = new StorageRouter(ko.utils.unwrapObservable(options.data.guid));
+                storagerouter.fillData((ko.utils.unwrapObservable(options.data)));
+                storagerouter.loaded(true);
+                return storagerouter
+            },
+            update: function (options) {
+                options.target.fillData(options.data);
+                return options.target
+            }
+        },
+        'storageDrivers': {
+            key: function (data) {  // For relation updates: check if the GUID has changed before discarding a model
+                return ko.utils.unwrapObservable(data.guid)
+            },
+            create: function (options) {  // This object has not yet been converted to work with ko.mapping thus manually overriden the create
+                var storagedriver;
+                if (options.data === null) {
+                    storagedriver = new StorageDriver(null);
+                    storagedriver.loaded(true);
+                    return storagedriver
+                }
+                storagedriver = new StorageDriver(ko.utils.unwrapObservable(options.data.guid));
+                storagedriver.fillData((ko.utils.unwrapObservable(options.data)));
+                storagedriver.loaded(true);
+                return storagedriver
+            },
+            update: function (options) {
+                options.target.fillData(options.data);
+                return options.target
+            }
+
+        }
+    });
+    function VPoolDetail(data) {
         var self = this;
+
+        BaseContainer.call(this);
 
         // Variables
         self.shared             = shared;
@@ -59,7 +110,6 @@ define([
         // Observables
         self.generatingConfigs      = ko.observable(false);
         self.refreshList            = ko.observableArray([]);
-        self.srSDMap                = ko.observable({});
         self.storageDrivers         = ko.observableArray([]);
         self.storageRouters         = ko.observableArray([]);
         self.updatingStorageRouters = ko.observable(false);
@@ -95,8 +145,24 @@ define([
             return collapsed;
         });
 
+
+        var vmData = $.extend({
+            'storageRouters': [],
+            'storageDrivers ': []
+        }, data || {});
+
+        ko.mapping.fromJS(vmData, viewMapping, self);  // Bind the data into this
+
+
         self.canManage = ko.pureComputed(function() {
             return authentication.user.canManage()
+        });
+
+        self.srSDMap = ko.pureComputed(function() {
+            return self.storageDrivers().reduce(function(acc, storagedriver) {
+                acc[storagedriver.storageRouterGuid()] = storagedriver;
+                return acc
+            }, {});
         });
 
         // Functions
@@ -117,86 +183,44 @@ define([
             }).promise();
         };
         self.loadStorageRouters = function() {
-            return $.Deferred(function(deferred) {
+            return $.when().then(function () {
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     var options = {
                         sort: 'name',
                         contents: 'storagedrivers,features'
                     };
-                    self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], sadata = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                sadata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.storageRouters,
-                                function(guid) {
-                                    return new StorageRouter(guid);
-                                }, 'guid'
-                            );
-                            $.each(self.storageRouters(), function(index, storageRouter) {
-                                if (sadata.hasOwnProperty(storageRouter.guid())) {
-                                    storageRouter.fillData(sadata[storageRouter.guid()]);
-                                }
-                            });
-                            deferred.resolve();
+                    return self.loadStorageRoutersHandle = StoragerouterService.loadStorageRouters(options)
+                        .then(function (data) {
+                            self.update({storageRouters: data.data});
+                            return data
                         })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.resolve();
                 }
-            }).promise();
+            })
         };
         self.loadStorageDrivers = function() {
-            return $.Deferred(function(deferred) {
+            return $.when().then(function () {
                 if (generic.xhrCompleted(self.loadStorageDriversHandle)) {
-                    self.loadStorageDriversHandle = api.get('storagedrivers', {
-                        queryparams: {
+                    return self.loadStorageDriversHandle = StoragedriverService.loadStorageDrivers({
                             vpool_guid: self.vPool().guid(),
                             contents: 'storagerouter,vpool_backend_info,vdisks_guids,alba_proxies,proxy_summary'
-                        }
-                    })
-                    .done(function(data) {
-                        var guids = [], sddata = {}, map = {};
-                        $.each(data.data, function(index, item) {
-                            guids.push(item.guid);
-                            sddata[item.guid] = item;
+                        })
+                        .then(function(data) {
+                            self.update({storageDrivers: data.data});
+                            return data;
                         });
-                        generic.crossFiller(
-                            guids, self.storageDrivers,
-                            function(guid) {
-                                return new StorageDriver(guid);
-                            }, 'guid'
-                        );
-                        $.each(self.storageDrivers(), function(index, storageDriver) {
-                            if (sddata.hasOwnProperty(storageDriver.guid())) {
-                                storageDriver.fillData(sddata[storageDriver.guid()]);
-                            }
-                            map[storageDriver.storageRouterGuid()] = storageDriver;
-                        });
-                        self.srSDMap(map);
-                        deferred.resolve();
-                    })
-                    .fail(function() {
-                        deferred.reject();
-                    });
-                } else {
-                    deferred.resolve();
                 }
-            }).promise();
+            })
         };
         self.loadVDisks = function(options) {
-            return $.Deferred(function(deferred) {
+            return $.when().then(function() {
                 if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
                     options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
                     options.vpoolguid = self.vPool().guid();
                     options.query = self.vDiskQuery;
-                    self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
-                        .done(function(data) {
-                            deferred.resolve({
+                    return self.vDisksHandle[options.page] = VDiskService.loadVDisks(options)
+                        .then(function(data) {
+                            return {
                                 data: data,
                                 loader: function(guid) {
                                     if (!self.vDiskCache.hasOwnProperty(guid)) {
@@ -204,14 +228,12 @@ define([
                                     }
                                     return self.vDiskCache[guid];
                                 }
-                            });
-                        })
-                        .fail(function() { deferred.reject(); });
-                } else {
-                    deferred.resolve();
+                            }
+                    })
                 }
-            }).promise();
+            })
         };
+
         self.formatBytes = function(value) {
             return generic.formatBytes(value);
         };
@@ -252,7 +274,6 @@ define([
             if (self.srSDMap().hasOwnProperty(sr.guid())) {
                 var wizard = new ReconfigureVPool({
                         modal: true,
-                        completed: deferred,
                         vPool: self.vPool(),
                         storageRouter: sr,
                         storageDriver: sd
@@ -302,8 +323,7 @@ define([
                                     $.t('ovs:wizards.shrink_vpool.confirm.inprogress_multi')
                                 );
                             }
-                            api.post('vpools/' + self.vPool().guid() + '/shrink_vpool', { data: { storagerouter_guid: sr.guid() } })
-                                .then(self.shared.tasks.wait)
+                            VPoolService.shrinkVPool(self.vPool().guid(), sr.guid())
                                 .done(function() {
                                     if (single === true) {
                                         generic.alertSuccess(
@@ -344,9 +364,9 @@ define([
                     $.t('ovs:vpools.detail.refresh.started'),
                     $.t('ovs:vpools.detail.refresh.started_msg', { sr: sr.name(), vpool: self.vPool().name() })
                 );
-                api.post('storagedrivers/' + self.srSDMap()[sr.guid()].guid()+ '/refresh_configuration')
-                    .then(self.shared.tasks.wait)
+                StorageDriverService.refreshConfiguration(self.srSDMap()[sr.guid()].guid())
                     .done(function(data) {
+
                         if (data === 0) {
                             generic.alertWarning(
                                 $.t('ovs:vpools.detail.refresh.warning'),
@@ -387,5 +407,8 @@ define([
             });
             self.refresher.stop();
         };
-    };
+    }
+
+    VPoolDetail.prototype = $.extend({}, BaseContainer.prototype);
+    return VPoolDetail
 });
