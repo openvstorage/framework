@@ -38,6 +38,7 @@ from ovs.dal.hybrids.j_rolegroup import RoleGroup
 from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.user import User
+from ovs.dal.lists.grouplist import GroupList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.tests.helpers import DalHelper
@@ -72,7 +73,7 @@ class DataHolder(object):
     Exposes methods to retrieve the data as the API would
     """
     def __init__(self, base_list, ordered_set=None):
-        # type: (DataList, Optional[List[any]]) -> None
+        # type: (DataList, DataObject, Optional[List[any]]) -> None
         """
         Instantiate a data holder. It requires the data_type and a list to base the data returns off
         :param base_list: The DataList to base returns off
@@ -142,6 +143,19 @@ class DataHolder(object):
         _ = args, kwargs
         self.rate_limit_output = input_value
         return HttpResponse(json.dumps(input_value))
+
+    @staticmethod
+    def get_admin_group():
+        return next(group for group in GroupList.get_groups() if group.name == 'administrators')
+
+    @staticmethod
+    @return_list(User)
+    def get_users_of_admin_group(*args, **kwargs):
+        """
+        Get the users of the admin group
+        """
+        admin_group = DataHolder.get_admin_group()
+        return admin_group.users
 
 
 class Decorators(unittest.TestCase):
@@ -548,7 +562,6 @@ class Decorators(unittest.TestCase):
             response = fct(1, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True, 'Full objects are required as contents is passed')
-            self.assertEqual(len(response.data['data']), len(data_list_machines))
             # Contents requested so data is fully serialized
             # Change with everything being offloaded to DataList makes sure that the instance that is serialized is always a DataList
             # The serializer data property is returned by Django (which is a dict)
@@ -559,6 +572,37 @@ class Decorators(unittest.TestCase):
             self.assertIsInstance(serialized_data_instance[0], TestMachine)
             # The guids should be identical as no filtering was done. Added sort as the ordering does not matter here
             self.assertEqual(data_list_machines.guids.sort(), serialized_data_instance.guids.sort())
+
+    def test_return_list_relation(self):
+        """
+        DataObject relations are DataList which are created with keys based of the relational object instead of a query
+        """
+        # Special case. Relational lists are created with keys instead of queries.
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
+        admin_group = DataHolder.get_admin_group()
+        admin_group_users = admin_group.users
+
+        request.QUERY_PARAMS = {}
+        response = self.data_holder.get_users_of_admin_group(request)
+        self.assertEqual(response.status_code, 200)
+        guid_data = response.data['data']
+        self.assertEqual(len(guid_data), len(admin_group_users))
+        self.assertIsInstance(guid_data, list)
+        self.assertIsInstance(guid_data[0], str)
+
+        request.QUERY_PARAMS = {'contents': ''}
+        response = self.data_holder.get_users_of_admin_group(request)
+        self.assertEqual(response.status_code, 200)
+        # Contents requested so data is fully serialized
+        # Change with everything being offloaded to DataList makes sure that the instance that is serialized is always a DataList
+        # The serializer data property is returned by Django (which is a dict)
+        serialized_data = response.data['data']
+        serialized_data_instance = serialized_data['instance']
+        self.assertIsInstance(serialized_data, dict)
+        self.assertIsInstance(serialized_data_instance, DataList)
+        self.assertIsInstance(serialized_data_instance[0], User)
+        # The guids should be identical as no filtering was done. Added sort as the ordering does not matter here
+        self.assertEqual(admin_group_users.guids.sort(), serialized_data_instance.guids.sort())
 
     def test_return_list_sorting(self):
         """
@@ -629,6 +673,26 @@ class Decorators(unittest.TestCase):
                                                          self.machines_by_name_description['aa']['bb'].guid,
                                                          self.machines_by_name_description['aa']['cc'].guid,
                                                          self.machines_by_name_description['bb']['dd'].guid])
+
+    def test_return_list_sorting_relation(self):
+        """
+        DataObject relations are DataList which are created with keys based of the relational object instead of a query
+        See: https://github.com/openvstorage/framework/issues/2244
+        """
+        # Special case. Relational lists are created with keys instead of queries.
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
+        admin_group = DataHolder.get_admin_group()
+        admin_group_users = admin_group.users
+
+        request.QUERY_PARAMS = {'sort': 'username'}
+        response = self.data_holder.get_users_of_admin_group(request)
+        self.assertEqual(response.status_code, 200)
+        guid_data = response.data['data']
+        self.assertEqual(len(guid_data), len(admin_group_users))
+        self.assertIsInstance(guid_data, list)
+        self.assertIsInstance(guid_data[0], str)
+        self.assertEqual([user.guid for user in sorted(admin_group_users, key=lambda u: u.username)],
+                         guid_data)
 
     def test_return_list_filtering(self):
         """
