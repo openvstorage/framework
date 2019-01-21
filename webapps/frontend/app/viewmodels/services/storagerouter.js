@@ -76,7 +76,7 @@ define([
         };
 
         /**
-         * Sets support info of a StorageRouter
+         * Fetch a StorageRouter handle
          * @param options: options to query
          * @return {Promise<T>}
          */

@@ -39,12 +39,27 @@ define([
         self.loadVPools = function(queryParams, relayParams) {
             return api.get('vpools', { queryparams: queryParams, relayParams: relayParams })
         };
+
+            /**
+         * Load a vPool
+         * @param vPoolGuid: guid of the vpool to shrink
+         * @param queryParams: Additional query params. Defaults to no params
+         * @param relayParams: Relay to use (Optional, defaults to no relay)
+         * @return {Promise<T>}
+         */
         self.loadVPool = function(vPoolGuid, queryParams, relayParams) {
             return api.get('vpools/{0}'.format([vPoolGuid]), { queryparams: queryParams, relayParams: relayParams })
         };
 
-        self.shrinkVPool = function(vPoolGuid, storagerouter_guid) {
-            return api.post('vpools/{0}/shrink_vpool'.format([vPoolGuid]), { data: { storagerouter_guid: storagerouter_guid } })
+
+        /**
+         * Shrink given vPool
+         * @param vPoolGuid: guid of the vpool to shrink
+         * @param storagerouterGuid: guid of the storagerouter to shrink from
+         * @return {Promise<T>}
+         */
+        self.shrinkVPool = function(vPoolGuid, storagerouterGuid) {
+            return api.post('vpools/{0}/shrink_vpool'.format([vPoolGuid]), { data: { storagerouter_guid: storagerouterGuid } })
                                             .then(shared.tasks.wait)
         };
 

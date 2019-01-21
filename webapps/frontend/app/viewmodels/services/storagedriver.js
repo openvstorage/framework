@@ -70,19 +70,16 @@ define(['ovs/api'
         self.calculateUpdateImpact = function(storagedriverguid, postData) {
             return api.post('storagedrivers/{0}/calculate_update_impact'.format([storagedriverguid]), {data: postData})
         };
-                /**
-         * Calculate the impact of the update of the storagedriver
-         * @param storagedriverguid Guid of the storagedriver that will be updated
+
+        /**
+         * Refresh the configuration of the storagedriver
+         * @param storagedriverguid Guid of the storagedriver that will refresh his configuration
          * @returns {*|void}
          */
         self.refreshConfiguration = function(storagedriverguid) {
             return api.post('storagedrivers/' + storagedriverguid+ '/refresh_configuration')
                     .then(self.shared.tasks.wait)
         };
-
-
-
-
     }
     return new StorageDriverService()
 });

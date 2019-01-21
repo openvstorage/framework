@@ -40,9 +40,8 @@ define([
          * @param options: options of the vdisk
          * @returns {Promise<T>}
          */
-        self.loadVDisksHandle = function (options) {
+        self.loadVDisks = function (options) {
             return api.get('vdisks', { queryparams: options })
-                .then(shared.tasks.wait)
         };
 
 

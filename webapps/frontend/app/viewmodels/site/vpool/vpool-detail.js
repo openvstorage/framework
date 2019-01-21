@@ -17,13 +17,13 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api', 'ovs/services/authentication',
-    'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/services/vdisk', 'viewmodels/services/vpool', 'viewmodels/services/storagerouter','viewmodels/services/storagedriver',
+    'viewmodels/containers/vpool/vpool', 'viewmodels/containers/storagedriver/storagedriver',
     'viewmodels/containers/storagerouter/storagerouter', 'viewmodels/containers/vdisk/vdisk',
     'viewmodels/wizards/addvpool/index', 'viewmodels/wizards/createhprmconfigs/index', 'viewmodels/wizards/reconfigurevpool/index'
 ], function($, app, dialog, ko, router,
             shared, generic, Refresher, api, authentication,
-            VDiskService, VPoolService, StoragerouterService,
+            VDiskService, VPoolService, StoragerouterService, StoragedriverService,
             VPool, StorageDriver, StorageRouter, VDisk,
             ExtendVPool, CreateHPRMConfigsWizard, ReconfigureVPool) {
     "use strict";
@@ -143,11 +143,8 @@ define([
                                     storageRouter.fillData(sadata[storageRouter.guid()]);
                                 }
                             });
-                            deferred.resolve();
                         })
                 }
-
-                return false;
             })
         };
         self.loadStorageDrivers = function() {
@@ -180,7 +177,6 @@ define([
                         self.srSDMap(map);
                     });
                 }
-                return false
             })
         };
         self.loadVDisks = function(options) {
@@ -190,15 +186,19 @@ define([
                     options.contents = '_dynamics,_relations,-snapshots';
                     options.vpoolguid = self.vPool().guid();
                     options.query = self.vDiskQuery;
-                    self.vDisksHandle[options.page] = VDiskService.loadVDisksHandle(options)
-                        .done(function(data) {
-                                if (!self.vDiskCache.hasOwnProperty(guid)) {
+                    return self.vDisksHandle[options.page] = VDiskService.loadVDisks(options)
+                        .then(function(data) {
+                            return {
+                                data: data,
+                                loader: function(guid) {
+                                    if (!self.vDiskCache.hasOwnProperty(guid)) {
                                         self.vDiskCache[guid] = new VDisk(guid);
                                     }
-                                return self.vDiskCache[guid];
+                                    return self.vDiskCache[guid];
+                                }
+                            }
                     })
                 }
-                return false
             })
         };
 
