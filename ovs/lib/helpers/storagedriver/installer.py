@@ -20,7 +20,6 @@ StorageDriverInstaller class responsible for adding and removing StorageDrivers
 
 import re
 import copy
-import json
 import time
 from subprocess import CalledProcessError
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -50,7 +49,7 @@ from ovs.lib.helpers.vpool.shared import VPoolShared
 # Mypy
 # noinspection PyUnreachableCode
 if False:
-    from ovs.lib.helpers.vpool.installer import VPoolInstaller
+    from ovs.lib.helpers.vpool.installers.installer import VPoolInstaller
 
 
 

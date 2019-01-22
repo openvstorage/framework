@@ -18,7 +18,6 @@
 VPoolController class responsible for making changes to existing vPools
 """
 
-import json
 import time
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
@@ -44,7 +43,9 @@ from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient,
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.vpool.shared import VPoolShared
-from ovs.lib.helpers.vpool.installer import VPoolInstaller
+from ovs.lib.helpers.vpool.installers.extend_installer import ExtendInstaller
+from ovs.lib.helpers.vpool.installers.create_installer import CreateInstaller
+from ovs.lib.helpers.vpool.installers.shrink_installer import ShrinkInstaller
 from ovs.lib.helpers.storagerouter.installer import StorageRouterInstaller
 from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
 from ovs.lib.mdsservice import MDSServiceController
@@ -82,7 +83,12 @@ class VPoolController(object):
             raise RuntimeError('Could not find StorageRouter')
 
         # Validate requested vPool configurations
-        vp_installer = VPoolInstaller(name=parameters.get('vpool_name'))
+        vpool_name = parameters.get('vpool_name')
+        extending = True if VPoolList.get_vpool_by_name(vpool_name=vpool_name) else False
+        if extending:
+            vp_installer = ExtendInstaller(name=vpool_name)
+        else:
+            vp_installer = CreateInstaller(name=vpool_name)
         vp_installer.validate(storagerouter=storagerouter)
 
         # Validate requested StorageDriver configurations
@@ -245,7 +251,7 @@ class VPoolController(object):
         storagerouter = storagedriver.storagerouter
         cls._logger.info('StorageDriver {0} - Deleting StorageDriver {1}'.format(storagedriver.guid, storagedriver.name))
 
-        vp_installer = VPoolInstaller(name=storagedriver.vpool.name)
+        vp_installer = ShrinkInstaller(name=storagedriver.vpool.name)
         vp_installer.validate(storagedriver=storagedriver)
 
         sd_installer = StorageDriverInstaller(vp_installer=vp_installer,
