@@ -1,17 +1,42 @@
-from ovs.lib.helpers.vpool.installers.installer import VPoolInstaller
-from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
-from ovs_extensions.generic.toolbox import ExtensionsToolbox
+# Copyright (C) 2019 iNuron NV
+#
+# This file is part of Open vStorage Open Source Edition (OSE),
+# as available from
+#
+#      http://www.openvstorage.org and
+#      http://www.openvstorage.com.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+# as published by the Free Software Foundation, in version 3 as it comes
+# in the LICENSE.txt file of the Open vStorage OSE distribution.
+#
+# Open vStorage is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY of any kind.
+
+
 from ovs.dal.hybrids.vpool import VPool
+from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
+from ovs.extensions.generic.configuration import Configuration
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
+from ovs.lib.helpers.vpool.installers.installer import VPoolInstaller
 
 
 class CreateInstaller(VPoolInstaller):
+    """"
+    VPool create specific installer instance
+    """
 
     def __init__(self, name):
         super(CreateInstaller, self).__init__(name)
         self.is_new = True
 
     def ensure_exists(self, mds_config_params, *args, **kwargs):
+        """
+        Ensure that the VPool DAL object exists.
+        :param mds_config_params: MDS config params provided by the API call
+        :return: None
+        """
         self.create(rdma_enabled=self.sd_installer.rdma_enabled)
         self.configure_mds(mds_config_params)
 
