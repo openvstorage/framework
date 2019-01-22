@@ -66,7 +66,7 @@ class MigrationController(object):
         from ovs.extensions.services.servicefactory import ServiceFactory
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
         from ovs.extensions.storage.volatilefactory import VolatileFactory
-        from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
+        from ovs.lib.helpers.storagedriver.installers.installer import StorageDriverInstaller
         from ovs.lib.helpers.vpool.shared import VPoolShared
 
         MigrationController._logger.info('Start out of band migrations...')

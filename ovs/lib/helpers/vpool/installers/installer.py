@@ -20,7 +20,7 @@ VpoolInstaller class responsible for adding/removing vPools
 
 import copy
 import json
-from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, VPOOL_BASE_PATH
+from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
 from ovs.dal.hybrids.vpool import VPool
 from ovs_extensions.api.client import OVSClient
 from ovs.extensions.generic.configuration import Configuration
@@ -31,7 +31,7 @@ from ovs.lib.helpers.vpool.shared import VPoolShared
 from ovs.lib.helpers.vpool.container import Container
 
 
-class VPoolInstaller(object, Container):
+class VPoolInstaller(Container):
     """
     Class used to create/remove a vPool
     This class will be responsible for
@@ -84,35 +84,6 @@ class VPoolInstaller(object, Container):
         self.vpool.rdma_enabled = kwargs.get('rdma_enabled', False)
         self.vpool.metadata_store_bits = 5
         self.vpool.save()
-
-    def configure_mds(self, config):
-        """
-        Configure the global MDS settings for this vPool
-        :param config: MDS configuration settings (Can contain amount of tlogs to wait for during MDS checkup, MDS safety and the maximum load for an MDS)
-        :type config: dict
-        :raises RuntimeError: If specified safety not between 1 and 5
-                              If specified amount of tlogs is less than 1
-                              If specified maximum load is less than 10%
-        :return: None
-        :rtype: NoneType
-        """
-        if self.vpool is None:
-            raise RuntimeError('Cannot configure MDS settings when no vPool has been created yet')
-
-        ExtensionsToolbox.verify_required_params(verify_keys=True,
-                                                 actual_params=config,
-                                                 required_params={'mds_tlogs': (int, {'min': 1}, False),
-                                                                  'mds_safety': (int, {'min': 1, 'max': 5}, False),
-                                                                  'mds_maxload': (int, {'min': 10}, False)})
-
-        # Don't set a default value here, because we need to know whether these values have been specifically set or were set at None
-        self.mds_tlogs = config.get('mds_tlogs')
-        self.mds_safety = config.get('mds_safety')
-        self.mds_maxload = config.get('mds_maxload')
-        Configuration.set(key=MDS_CONFIG_PATH.format(self.vpool.guid),
-                          value={'mds_tlogs': self.mds_tlogs or 100,
-                                 'mds_safety': self.mds_safety or 3,
-                                 'mds_maxload': self.mds_maxload or 75})
 
     def revert_vpool(self, status):
         """
@@ -352,3 +323,9 @@ class VPoolInstaller(object, Container):
                     read_preferences.append(node_id)
         return read_preferences
 
+    def ensure_exists(self, *args, **kwargs):
+        """
+        This abstract implementation should be implemented in its two inheriting classes: createInstaller and extendInstaller.
+        :return:
+        """
+        raise NotImplementedError('Should be implemented in Extend or Create VPool installer')

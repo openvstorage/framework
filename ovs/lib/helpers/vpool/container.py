@@ -7,8 +7,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig
 
 
-
-class Container():
+class Container(object):
     """
     This container class provides some basic information that is shared across vpool installers for create and extend, but also shrinking of vpools
     """
@@ -33,7 +32,6 @@ class Container():
         self.sd_installer = None
         self.sr_installer = None
         self.storagedriver_amount = 0 if self.vpool is None else len(self.vpool.storagedrivers)
-
 
     def validate(self, storagerouter=None, storagedriver=None):
         """

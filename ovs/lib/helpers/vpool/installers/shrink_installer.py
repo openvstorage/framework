@@ -3,7 +3,7 @@ from ovs.lib.vdisk import VDiskController
 from ovs.lib.mdsservice import MDSServiceController
 
 
-class ShrinkInstaller(object, Container):
+class ShrinkInstaller(Container):
 
     def __init__(self, name):
         super(ShrinkInstaller, self).__init__(name)
