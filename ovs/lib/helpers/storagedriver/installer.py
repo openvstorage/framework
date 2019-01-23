@@ -30,7 +30,6 @@ from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
-from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs_extensions.constants.vpools import GENERIC_SCRUB, PROXY_CONFIG_MAIN, HOSTS_CONFIG_PATH, HOSTS_PATH, PROXY_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
@@ -45,12 +44,15 @@ from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.helpers.vpool.shared import VPoolShared
+from ovs.extensions.storageserver.storagedriverconfig import ScoCacheConfig, VolumeRouterConfig, VolumeManagerConfig, FileSystemConfig, FileDriverConfig, VolumeRegistryConfig, DistributedLockStoreConfig, \
+    ContentAddressedCacheConfig, DistributedTransactionLogConfig, BackendConnectionManager
+from ovs.extensions.storageserver.storagedriverconfig.storagedriver import StorageDriverConfig
 
 # Mypy
 # noinspection PyUnreachableCode
 if False:
     from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
-
+    from ovs.extensions.storageserver.storagedriverconfig.connection_manager import AlbaConnectionConfig
 
 
 class StorageDriverInstaller(object):
@@ -346,6 +348,7 @@ class StorageDriverInstaller(object):
         :return: None
         :rtype: NoneType
         """
+
         def _generate_proxy_cache_config(cache_settings, cache_type, proxy_index):
             if cache_settings['read'] is False and cache_settings['write'] is False:
                 return ['none']
@@ -427,48 +430,6 @@ class StorageDriverInstaller(object):
         :return: None
         :rtype: NoneType
         """
-        def _generate_queue_urls():
-            mq_user = Configuration.get('/ovs/framework/messagequeue|user')
-            mq_protocol = Configuration.get('/ovs/framework/messagequeue|protocol')
-            mq_password = Configuration.get('/ovs/framework/messagequeue|password')
-            return [{'amqp_uri': '{0}://{1}:{2}@{3}:5672'.format(mq_protocol, mq_user, mq_password, sr.ip)} for sr in StorageRouterList.get_masters()]
-
-        def _generate_config_file_system():
-            config = {'fs_dtl_host': '',
-                      'fs_enable_shm_interface': 0,
-                      'fs_enable_network_interface': 1,
-                      'fs_metadata_backend_arakoon_cluster_nodes': [],
-                      'fs_metadata_backend_mds_nodes': [],
-                      'fs_metadata_backend_type': 'MDS',
-                      'fs_virtual_disk_format': 'raw',
-                      'fs_raw_disk_suffix': '.raw',
-                      'fs_file_event_rules': [{'fs_file_event_rule_calls': ['Rename'],
-                                               'fs_file_event_rule_path_regex': '.*'}]}
-            if self.dtl_mode == StorageDriverClient.FRAMEWORK_DTL_NO_SYNC:
-                config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
-            else:
-                config['fs_dtl_mode'] = StorageDriverClient.VPOOL_DTL_MODE_MAP[self.dtl_mode]
-                config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
-            return config
-
-        def _generate_config_backend_connection_manager():
-            config = {'backend_type': 'MULTI',
-                      'backend_interface_retries_on_error': 5,
-                      'backend_interface_retry_interval_secs': 1,
-                      'backend_interface_retry_backoff_multiplier': 2.0}
-            for index, proxy in enumerate(sorted(self.storagedriver.alba_proxies, key=lambda k: k.service.ports[0])):
-                config[str(index)] = {'alba_connection_host': self.storagedriver.storage_ip,
-                                      'alba_connection_port': proxy.service.ports[0],
-                                      'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
-                                      'alba_connection_timeout': 30,
-                                      'alba_connection_use_rora': True,
-                                      'alba_connection_transport': 'TCP',
-                                      'alba_connection_rora_manifest_cache_capacity': 25000,
-                                      'alba_connection_asd_connection_pool_capacity': 10,
-                                      'alba_connection_rora_timeout_msecs': 50,
-                                      'backend_type': 'ALBA'}
-            return config
-
         if self.sr_installer is None:
             raise RuntimeError('No StorageRouterInstaller instance found')
         if len(self.write_caches) == 0:
@@ -480,54 +441,44 @@ class StorageDriverInstaller(object):
         arakoon_nodes = [{'host': node.ip,
                           'port': node.client_port,
                           'node_id': node.name} for node in ArakoonClusterConfig(cluster_id=arakoon_cluster_name).nodes]
+        vregistry_config = VolumeRegistryConfig(vregistry_arakoon_cluster_id=arakoon_cluster_name,
+                                                vregistry_arakoon_cluster_nodes=arakoon_nodes)
 
-        storagedriver_config = StorageDriverConfiguration(vpool.guid, self.storagedriver.storagedriver_id)
-        storagedriver_config.configure_scocache(scocache_mount_points=self.write_caches,
-                                                trigger_gap=ExtensionsToolbox.convert_byte_size_to_human_readable(size=gap_configuration['trigger']),
-                                                backoff_gap=ExtensionsToolbox.convert_byte_size_to_human_readable(size=gap_configuration['backoff']))
-        storagedriver_config.configure_file_driver(fd_cache_path=self.storagedriver_partition_file_driver.path,
-                                                   fd_extent_cache_capacity=1024,
-                                                   fd_namespace='fd-{0}-{1}'.format(vpool.name, vpool.guid))
-        storagedriver_config.configure_volume_router(vrouter_id=self.storagedriver.storagedriver_id,
-                                                     vrouter_redirect_timeout_ms=120000,
-                                                     vrouter_keepalive_time_secs=15,
-                                                     vrouter_keepalive_interval_secs=5,
-                                                     vrouter_keepalive_retries=2,
-                                                     vrouter_routing_retries=10,
-                                                     vrouter_volume_read_threshold=0,
-                                                     vrouter_volume_write_threshold=0,
-                                                     vrouter_file_read_threshold=0,
-                                                     vrouter_file_write_threshold=0,
-                                                     vrouter_min_workers=4,
-                                                     vrouter_max_workers=16,
-                                                     vrouter_sco_multiplier=self.sco_size * 1024 / self.cluster_size,
-                                                     vrouter_backend_sync_timeout_ms=60000,
-                                                     vrouter_migrate_timeout_ms=60000,
-                                                     vrouter_use_fencing=True)
-        storagedriver_config.configure_volume_manager(tlog_path=self.storagedriver_partition_tlogs.path,
-                                                      metadata_path=self.storagedriver_partition_metadata.path,
-                                                      clean_interval=1,
-                                                      dtl_throttle_usecs=4000,
-                                                      default_cluster_size=self.cluster_size * 1024,
-                                                      number_of_scos_in_tlog=self.tlog_multiplier,
-                                                      non_disposable_scos_factor=float(self.write_buffer) / self.tlog_multiplier / self.sco_size)
-        storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'),
-                                                       events_amqp_uris=_generate_queue_urls())
-        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=arakoon_cluster_name,
-                                                       vregistry_arakoon_cluster_nodes=arakoon_nodes)
-        storagedriver_config.configure_network_interface(network_max_neighbour_distance=StorageDriver.DISTANCES.FAR - 1)
-        storagedriver_config.configure_threadpool_component(num_threads=16)
-        storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
-        storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
-                                                              dls_arakoon_cluster_id=arakoon_cluster_name,
-                                                              dls_arakoon_cluster_nodes=arakoon_nodes)
-        storagedriver_config.configure_content_addressed_cache(serialize_read_cache=False,
-                                                               read_cache_serialization_path=[])
-        storagedriver_config.configure_distributed_transaction_log(dtl_path=self.storagedriver_partition_dtl.path,  # Not used, but required
-                                                                   dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[self.dtl_transport])
+        scocache_config = ScoCacheConfig(scocache_mount_points=self.write_caches,
+                                         trigger_gap=ExtensionsToolbox.convert_byte_size_to_human_readable(size=gap_configuration['trigger']),
+                                         backoff_gap=ExtensionsToolbox.convert_byte_size_to_human_readable(size=gap_configuration['backoff']))
+        fd_config = FileDriverConfig(fd_cache_path=self.storagedriver_partition_file_driver.path,
+                                     fd_namespace='fd-{0}-{1}'.format(vpool.name, vpool.guid))
+        vrouter_config = VolumeRouterConfig(vrouter_id=self.storagedriver.storagedriver_id,
+                                            vrouter_sco_multiplier=self.sco_size * 1024 / self.cluster_size)
+        volume_mgr_config = VolumeManagerConfig(tlog_path=self.storagedriver_partition_tlogs.path,
+                                                metadata_path=self.storagedriver_partition_metadata.path,
+                                                default_cluster_size=self.cluster_size * 1024,
+                                                number_of_scos_in_tlog=self.tlog_multiplier,
+                                                non_disposable_scos_factor=float(self.write_buffer) / self.tlog_multiplier / self.sco_size)
+        dist_store_config = DistributedLockStoreConfig(dls_arakoon_cluster_id=arakoon_cluster_name,
+                                                       dls_arakoon_cluster_nodes=arakoon_nodes)
+        content_adressed_cache_config = ContentAddressedCacheConfig()
 
-        storagedriver_config.configure_filesystem(**_generate_config_file_system())
-        storagedriver_config.configure_backend_connection_manager(**_generate_config_backend_connection_manager())
+        dtl_config = DistributedTransactionLogConfig(dtl_path=self.storagedriver_partition_dtl.path,  # Not used, but required
+                                                     dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[self.dtl_transport])
+
+        fs_config = FileSystemConfig(dtl_mode=self.dtl_mode)
+
+        backend_connection_config = BackendConnectionManager(self.storagedriver.alba_proxies, vpool, self.storagedriver.storagedriver_ip).to_dict()
+
+        storagedriver_config = StorageDriverConfig(vrouter_cluster_id=vpool.guid,
+                                                   dtl_config=dtl_config,
+                                                   filedriver_config=fd_config,
+                                                   filesystem_config=fs_config,
+                                                   vrouter_config=vrouter_config,
+                                                   scocache_config=scocache_config,
+                                                   vregistry_config=vregistry_config,
+                                                   dist_store_config=dist_store_config,
+                                                   volume_manager_config=volume_mgr_config,
+                                                   backend_config=backend_connection_config,
+                                                   content_adressed_cache_config=content_adressed_cache_config)
+
 
         storagedriver_config.save(client=self.sr_installer.root_client)
 

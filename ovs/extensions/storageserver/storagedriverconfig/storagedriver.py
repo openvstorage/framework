@@ -22,8 +22,10 @@ from .connection_manager import BackendConnectionManager
 from .filesystem import FileSystemConfig
 from .volume_router import VolumeRouterConfig
 from .volume_manager import VolumeManagerConfig
+from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
-
 
 class VolumeRegistryConfig(BaseStorageDriverConfig):
 
@@ -59,7 +61,7 @@ class DistributedLockStoreConfig(BaseStorageDriverConfig):
 
     component_identifier = 'distributed_lock_store'
 
-    def __init__(self, dls_type=None, dls_arakoon_timeout_ms=None, dls_arakoon_cluster_id=None, dls_arakoon_cluster_nodes=None, *args, **kwargs):
+    def __init__(self, dls_type='Arakoon', dls_arakoon_timeout_ms=None, dls_arakoon_cluster_id=None, dls_arakoon_cluster_nodes=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: dls configuration
         :param dls_type: Type of distributed lock store to use (default / currently only supported value: "Backend")
@@ -78,7 +80,7 @@ class NetworkInterfaceConfig(BaseStorageDriverConfig):
     component_identifier = 'network_interface'
 
     def __init__(self, network_uri=None, network_xio_slab_config=None, network_workqueue_max_threads=None, network_snd_rcv_queue_depth=None,
-                 network_max_neighbour_distance=None, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
+                 network_max_neighbour_distance=StorageDriver.DISTANCES.FAR - 1, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: network config manager
         :param network_uri: When backend_type is S3: whether to do verbose logging
@@ -129,9 +131,17 @@ class EventPublisherConfig(BaseStorageDriverConfig):
         :param events_amqp_exchange: AMQP exchange events will be sent to
         :param events_amqp_routing_key: AMQP routing key used for sending events
         """
-        self.events_amqp_uris = events_amqp_uris
+
+        if events_amqp_uris:
+            self.events_amqp_uris = events_amqp_uris
+        else:
+            mq_user = Configuration.get('/ovs/framework/messagequeue|user')
+            mq_protocol = Configuration.get('/ovs/framework/messagequeue|protocol')
+            mq_password = Configuration.get('/ovs/framework/messagequeue|password')
+            self.events_amqp_uris = [{'amqp_uri': '{0}://{1}:{2}@{3}:5672'.format(mq_protocol, mq_user, mq_password, sr.ip)} for sr in StorageRouterList.get_masters()]
+
         self.events_amqp_exchange = events_amqp_exchange
-        self.events_amqp_routing_key = events_amqp_routing_key
+        self.events_amqp_routing_key = events_amqp_routing_key or Configuration.get('/ovs/framework/messagequeue|queues.storagedriver', default=None)
 
 
 class ScoCacheConfig(BaseStorageDriverConfig):
@@ -154,7 +164,7 @@ class FileDriverConfig(BaseStorageDriverConfig):
 
     component_identifier = 'file_driver'
 
-    def __init__(self, fd_namespace, fd_cache_path, fd_extent_cache_capacity=None, *args, **kwargs):
+    def __init__(self, fd_namespace, fd_cache_path, fd_extent_cache_capacity=1024, *args, **kwargs):
         """
         Initiate the volumedriverfs config:  filedriver config
         :param fd_namespace:  backend namespace to use for filedriver objects
@@ -186,13 +196,16 @@ class ContentAddressedCacheConfig(BaseStorageDriverConfig):
 
     component_identifier = 'content_addressed_cache'
 
-    def __init__(self, read_cache_serialization_path=None, serialize_read_cache=None, clustercache_mount_points=None, *args, **kwargs):
+    def __init__(self, read_cache_serialization_path=None, serialize_read_cache=False, clustercache_mount_points=None, *args, **kwargs):
         """
         Initiate the content_addressed_cache config
         :param read_cache_serialization_path: Directory to store the serialization of the Read Cache
         :param serialize_read_cache: Whether to serialize the readcache on exit or not
         :param clustercache_mount_points: An array of directories and sizes to be used as Read Cache mount points
         """
+        if read_cache_serialization_path is None:
+            read_cache_serialization_path = []
+
         self.read_cache_serialization_path = read_cache_serialization_path
         self.serialize_read_cache = serialize_read_cache
         self.clustercache_mount_points = clustercache_mount_points
@@ -260,7 +273,7 @@ class StorageDriverConfig(BaseStorageDriverConfig):
                  contentcache_config=None,  # type: Optional[ContentAddressedCacheConfig]
                  scrub_manager_config=None,  # type: Optional[ScrubManagerConfig]
                  backend_type=None,  # type: Optional[str]
-                 num_threads=None,  # type: Optional[int]
+                 num_threads=16,  # type: Optional[int]
                  shm_region_size=None,  # type: Optional[int]
                  stats_collector_destination=None,  # type: Optional[str]
                  stats_collector_interval_secs=None,  # type: Optional[str]

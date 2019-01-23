@@ -24,34 +24,34 @@ class VolumeRouterConfig(BaseStorageDriverConfig):
 
     component_identifier = 'volume_router'
 
-    def __init__(self,vrouter_id, vrouter_max_workers=None, vrouter_min_workers=None, vrouter_use_fencing=None,
-                 vrouter_sco_multiplier=None, vrouter_routing_retries=None, vrouter_redirect_retries=None, vrouter_local_io_retries=None, vrouter_keepalive_retries=None,
-                 vrouter_send_sync_response=None, vrouter_migrate_timeout_ms=None, vrouter_keepalive_time_secs=None, vrouter_file_read_threshold=None,
-                 vrouter_redirect_timeout_ms=None, vrouter_file_write_threshold=None, vrouter_volume_read_threshold=None, vrouter_volume_write_threshold=None,
-                 vrouter_backend_sync_timeout_ms=None, vrouter_registry_cache_capacity=None, vrouter_keepalive_interval_secs=None,
+    def __init__(self,vrouter_id, vrouter_max_workers=16, vrouter_min_workers=4, vrouter_use_fencing=True,
+                 vrouter_sco_multiplier=None, vrouter_routing_retries=10, vrouter_redirect_retries=None, vrouter_local_io_retries=None, vrouter_keepalive_retries=2,
+                 vrouter_send_sync_response=None, vrouter_migrate_timeout_ms=60000, vrouter_keepalive_time_secs=15, vrouter_file_read_threshold=0,
+                 vrouter_redirect_timeout_ms=120000, vrouter_file_write_threshold=0, vrouter_volume_read_threshold=0, vrouter_volume_write_threshold=0,
+                 vrouter_backend_sync_timeout_ms=60000, vrouter_registry_cache_capacity=None, vrouter_keepalive_interval_secs=5,
                  vrouter_local_io_sleep_before_retry_usecs=None, vrouter_check_local_volume_potential_period=None, *args, **kwargs):
         """
 
         :param vrouter_id: the vrouter_id of this node of the cluster. Must be one of the vrouter_id's s specified in the vrouter_cluster_nodes section
-        :param vrouter_max_workers: maximum number of worker threads to handle redirected requests
-        :param vrouter_min_workers: minimal number of worker threads to handle redirected requests
-        :param vrouter_use_fencing: whether to use fencing support if it is available
+        :param vrouter_max_workers: maximum number of worker threads to handle redirected requests. Defaults to 16
+        :param vrouter_min_workers: minimal number of worker threads to handle redirected requests. Defaults to 4
+        :param vrouter_use_fencing: whether to use fencing support if it is available. Defaults to True
         :param vrouter_sco_multiplier: number of clusters in a sco
-        :param vrouter_routing_retries: number of times the routing shall be retried in case the volume is not found (exponential backoff inbetween retries!)
+        :param vrouter_routing_retries: number of times the routing shall be retried in case the volume is not found (exponential backoff inbetween retries!). Defaults to 10
         :param vrouter_redirect_retries: number of retries to after a redirect timed out
         :param vrouter_local_io_retries: number of retry attempts for requests that failed with a retryable error
-        :param vrouter_keepalive_retries: number of unacknowledged probes before considering the other side dead
+        :param vrouter_keepalive_retries: number of unacknowledged probes before considering the other side dead. Defaults to 2
         :param vrouter_send_sync_response: whether to send extended response data on sync requests
         :param vrouter_migrate_timeout_ms: timeout for migration requests in milliseconds (in addition to remote backend sync timeout!)
         :param vrouter_keepalive_time_secs: time between two keepalive probe cycles in seconds (0 switches keepalive off)
         :param vrouter_file_read_threshold: number of remote read requests before auto-migrating a file - 0 turns it off
-        :param vrouter_redirect_timeout_ms: timeout for redirected requests in milliseconds - 0 turns it off
-        :param vrouter_file_write_threshold: number of remote write requests before auto-migrating a file - 0 turns it off
-        :param vrouter_volume_read_threshold: number of remote read requests before auto-migrating a volume - 0 turns it off
-        :param vrouter_volume_write_threshold: number of remote write requests before auto-migrating a volume - 0 turns it off
-        :param vrouter_backend_sync_timeout_ms: timeout for remote backend syncs (during migration) - 0 turns it off
+        :param vrouter_redirect_timeout_ms: timeout for redirected requests in milliseconds - 0 turns it off. Defaults to 120000
+        :param vrouter_file_write_threshold: number of remote write requests before auto-migrating a file - 0 turns it off. Defaults to 0
+        :param vrouter_volume_read_threshold: number of remote read requests before auto-migrating a volume - 0 turns it off. Defaults to 0
+        :param vrouter_volume_write_threshold: number of remote write requests before auto-migrating a volume - 0 turns it off. Defaults to 0
+        :param vrouter_backend_sync_timeout_ms: timeout for remote backend syncs (during migration) - 0 turns it off. Defaults to 60000
         :param vrouter_registry_cache_capacity: number of ObjectRegistrations to keep cached
-        :param vrouter_keepalive_interval_secs: time (seconds) between probes of a cycle if the previous one was unacknowledged
+        :param vrouter_keepalive_interval_secs: time (seconds) between probes of a cycle if the previous one was unacknowledged. Defaults to 5
         :param vrouter_local_io_sleep_before_retry_usecs: delay (microseconds) before rerrying a request that failed with a retryable error
         :param vrouter_check_local_volume_potential_period: how often to recheck the local volume potential during migration
         """
