@@ -15,18 +15,29 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 
-from ovs.lib.helpers.vpool.container import Container
+from ovs.lib.helpers.vpool.base_installer import VPoolInstallerBase
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 
 
-class ShrinkInstaller(Container):
+class ShrinkInstaller(VPoolInstallerBase):
+    """
+    This class contains all code and functions to remove or shrink a vPool
+    """
 
     def __init__(self, name):
         super(ShrinkInstaller, self).__init__(name)
         self.is_new = False
 
     def validate(self, storagerouter=None, storagedriver=None):
+        """
+        Run additional validations on top of the validations of the base vpool installer
+        :param storagerouter: StorageRouter on which the vPool will be created or extended
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :param storagedriver: When passing a StorageDriver, perform validations when shrinking a vPool
+        :type storagedriver: ovs.dal.hybrids.storagedriver.StorageDriver
+        :return: None
+        """
         super(ShrinkInstaller, self).validate(storagerouter, storagedriver)
 
         if storagedriver is not None:

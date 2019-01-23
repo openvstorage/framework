@@ -1,2 +1,0 @@
-class Container(object):
-    pass

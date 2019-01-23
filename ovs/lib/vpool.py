@@ -47,11 +47,8 @@ from ovs.lib.helpers.vpool.installers.installer import VPoolInstaller as BaseVPo
 from ovs.lib.helpers.vpool.installers.extend_installer import ExtendInstaller as ExtendVPoolInstaller
 from ovs.lib.helpers.vpool.installers.create_installer import CreateInstaller as CreateVPoolInstaller
 from ovs.lib.helpers.vpool.installers.shrink_installer import ShrinkInstaller as ShrinkVPoolInstaller
-from ovs.lib.helpers.storagedriver.installers.shrink_installer import ShrinkInstaller as ShrinkSTDInstaller
-from ovs.lib.helpers.storagedriver.installers.create_installer import CreateInstaller as CreateSTDInstaller
-from ovs.lib.helpers.storagedriver.installers.extend_installer import ExtendInstaller as ExtendSTDInstaller
 from ovs.lib.helpers.storagerouter.installer import StorageRouterInstaller
-from ovs.lib.helpers.storagedriver.installers.installer import StorageDriverInstaller
+from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController

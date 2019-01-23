@@ -28,10 +28,10 @@ from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.vpool.shared import VPoolShared
-from ovs.lib.helpers.vpool.container import Container
+from ovs.lib.helpers.vpool.base_installer import VPoolInstallerBase
 
 
-class VPoolInstaller(Container):
+class VPoolInstaller(VPoolInstallerBase):
     """
     Class used to create/remove a vPool
     This class will be responsible for

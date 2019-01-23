@@ -24,7 +24,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig
 
 
-class Container(object):
+class VPoolInstallerBase(object):
     """
     This container class provides some basic information that is shared across vpool installers for create and extend, but also shrinking of vpools
     """
