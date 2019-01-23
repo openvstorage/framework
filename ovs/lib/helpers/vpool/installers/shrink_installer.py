@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 
-from ovs.lib.helpers.vpool.base_installer import VPoolInstallerBase
+from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 

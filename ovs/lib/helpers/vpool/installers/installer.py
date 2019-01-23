@@ -28,7 +28,7 @@ from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.vpool.shared import VPoolShared
-from ovs.lib.helpers.vpool.base_installer import VPoolInstallerBase
+from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
 
 
 class VPoolInstaller(VPoolInstallerBase):

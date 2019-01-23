@@ -44,13 +44,12 @@ from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.storagedriver import StorageDriverController
-from ovs.lib.helpers.vpool.container import Container
 from ovs.lib.helpers.vpool.shared import VPoolShared
 
 # Mypy
 # noinspection PyUnreachableCode
 if False:
-    from ovs.lib.helpers.vpool.installers.installer import VPoolInstaller
+    from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
 
 
 
@@ -72,8 +71,8 @@ class StorageDriverInstaller(object):
 
     _logger = Logger('lib')
 
-    def __init__(self, vp_container, configurations=None, storagedriver=None):
-        # type: (Container, Optional[Dict[any,any]], Optional[StorageDriver]) -> None
+    def __init__(self, vp_installer, configurations=None, storagedriver=None):
+        # type: (VPoolInstallerBase, Optional[Dict[any,any]], Optional[StorageDriver]) -> None
         """
         Initialize a StorageDriverInstaller class instance containing information about:
             - vPool information on which a new StorageDriver is going to be deployed, eg: global vPool configurations, vPool name, ...
@@ -86,10 +85,10 @@ class StorageDriverInstaller(object):
         if (configurations is None and storagedriver is None) or (configurations is not None and storagedriver is not None):
             raise RuntimeError('Configurations and storagedriver are mutual exclusive options')
 
-        self.sd_service = 'ovs-volumedriver_{0}'.format(vp_container.name)
-        self.dtl_service = 'ovs-dtl_{0}'.format(vp_container.name)
+        self.sd_service = 'ovs-volumedriver_{0}'.format(vp_installer.name)
+        self.dtl_service = 'ovs-dtl_{0}'.format(vp_installer.name)
         self.sr_installer = None
-        self.vp_container = vp_container
+        self.vp_installer = vp_installer
         self.storagedriver = storagedriver
         self.service_manager = ServiceFactory.get_manager()
 
@@ -182,11 +181,11 @@ class StorageDriverInstaller(object):
             if self.fragment_cache_backend_info is not None and alba_backend_guid_main == self.fragment_cache_backend_info['alba_backend_guid']:
                 raise RuntimeError('Backend and fragment cache backend cannot be the same')
 
-            if self.vp_container.is_new is False:
-                if alba_backend_guid_main != self.vp_container.vpool.metadata['backend']['backend_info']['alba_backend_guid']:
+            if self.vp_installer.is_new is False:
+                if alba_backend_guid_main != self.vp_installer.vpool.metadata['backend']['backend_info']['alba_backend_guid']:
                     raise RuntimeError('Incorrect ALBA Backend guid specified')
 
-                current_vpool_configuration = self.vp_container.vpool.configuration
+                current_vpool_configuration = self.vp_installer.vpool.configuration
                 for key, value in sd_configuration.iteritems():
                     current_value = current_vpool_configuration.get(key)
                     if value != current_value:
@@ -200,7 +199,7 @@ class StorageDriverInstaller(object):
                 self.fragment_cache_backend_info['sco_size'] = self.sco_size * 1024.0 ** 2
 
         # Cross reference
-        self.vp_container.sd_installer = self
+        self.vp_installer.sd_installer = self
 
     def create(self):
         """
@@ -223,7 +222,7 @@ class StorageDriverInstaller(object):
                         model_ports_in_use.append(proxy.service.ports[0])
             ports = System.get_free_ports(selected_range=port_range, exclude=model_ports_in_use, amount=4 + self.sr_installer.requested_proxies, client=self.sr_installer.root_client)
 
-            vpool = self.vp_container.vpool
+            vpool = self.vp_installer.vpool
             vrouter_id = '{0}{1}'.format(vpool.name, machine_id)
             storagedriver = StorageDriver()
             storagedriver.name = vrouter_id.replace('_', ' ')
@@ -391,8 +390,8 @@ class StorageDriverInstaller(object):
                 proxy_config['block_cache'] = block_cache_main_proxy if proxy_type == 'main' else block_cache_scrub_proxy
             return proxy_config
 
-        vpool = self.vp_container.vpool
-        read_preferences = self.vp_container.calculate_read_preferences()
+        vpool = self.vp_installer.vpool
+        read_preferences = self.vp_installer.calculate_read_preferences()
         manifest_cache_size = 500 * 1024 ** 2
         block_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_BLOCK]
         fragment_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_FRAGMENT]
@@ -475,7 +474,7 @@ class StorageDriverInstaller(object):
         if len(self.write_caches) == 0:
             raise RuntimeError('The StorageDriverPartition junctions have not been created yet')
 
-        vpool = self.vp_container.vpool
+        vpool = self.vp_installer.vpool
         gap_configuration = StorageDriverController.calculate_trigger_and_backoff_gap(cache_size=self.sr_installer.smallest_write_partition_size)
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
         arakoon_nodes = [{'host': node.ip,
@@ -541,7 +540,7 @@ class StorageDriverInstaller(object):
         if self.sr_installer is None:
             raise RuntimeError('No StorageRouterInstaller instance found')
 
-        vpool = self.vp_container.vpool
+        vpool = self.vp_installer.vpool
         root_client = self.sr_installer.root_client
         storagerouter = self.sr_installer.storagerouter
         alba_pkg_name, alba_version_cmd = PackageFactory.get_package_and_version_cmd_for(component=PackageFactory.COMP_ALBA)
@@ -631,8 +630,8 @@ class StorageDriverInstaller(object):
                 self._logger.exception('StorageDriver {0} - Disabling/stopping service {1} failed'.format(self.storagedriver.guid, service))
                 errors_found = True
 
-        sd_config_key = HOSTS_CONFIG_PATH.format(self.vp_container.vpool.guid, self.storagedriver.storagedriver_id)
-        if self.vp_container.storagedriver_amount <= 1 and Configuration.exists(sd_config_key):
+        sd_config_key = HOSTS_CONFIG_PATH.format(self.vp_installer.vpool.guid, self.storagedriver.storagedriver_id)
+        if self.vp_installer.storagedriver_amount <= 1 and Configuration.exists(sd_config_key):
             try:
                 for proxy in self.storagedriver.alba_proxies:
                     if self.service_manager.has_service(name=proxy.service.name, client=root_client):
@@ -665,7 +664,7 @@ class StorageDriverInstaller(object):
                         if 'MasterLookupResult.Error' not in rte.message:
                             raise
 
-                self.vp_container.vpool.clusterregistry_client.erase_node_configs()
+                self.vp_installer.vpool.clusterregistry_client.erase_node_configs()
             except RuntimeError:
                 self._logger.exception('StorageDriver {0} - Destroying filesystem and erasing node configs failed'.format(self.storagedriver.guid))
                 errors_found = True
@@ -693,8 +692,8 @@ class StorageDriverInstaller(object):
         """
         try:
             for proxy in self.storagedriver.alba_proxies:
-                Configuration.delete(PROXY_PATH.format(self.vp_container.vpool.guid), proxy.guid)
-            Configuration.delete(HOSTS_PATH.format(self.vp_container.vpool.guid, self.storagedriver.storagedriver_id))
+                Configuration.delete(PROXY_PATH.format(self.vp_installer.vpool.guid), proxy.guid)
+            Configuration.delete(HOSTS_PATH.format(self.vp_installer.vpool.guid, self.storagedriver.storagedriver_id))
             return False
         except Exception:
             self._logger.exception('Cleaning configuration management failed')
@@ -736,10 +735,10 @@ class StorageDriverInstaller(object):
                 service.delete()
 
             sd_can_be_deleted = True
-            if self.vp_container.storagedriver_amount <= 1:
+            if self.vp_installer.storagedriver_amount <= 1:
                 for relation in ['mds_services', 'storagedrivers', 'vdisks']:
                     expected_amount = 1 if relation == 'storagedrivers' else 0
-                    if len(getattr(self.vp_container.vpool, relation)) > expected_amount:
+                    if len(getattr(self.vp_installer.vpool, relation)) > expected_amount:
                         sd_can_be_deleted = False
                         break
 

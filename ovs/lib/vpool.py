@@ -94,7 +94,7 @@ class VPoolController(object):
 
         # Validate requested StorageDriver configurations
         cls._logger.info('vPool {0}: Validating StorageDriver configurations'.format(vp_installer.name))
-        sd_installer = StorageDriverInstaller(vp_container=vp_installer, # type: BaseVPoolInstaller
+        sd_installer = StorageDriverInstaller(vp_installer=vp_installer, # type: BaseVPoolInstaller
                                               configurations={'storage_ip': parameters.get('storage_ip'),
                                                               'caching_info': parameters.get('caching_info'),
                                                               'backend_info': {'main': parameters.get('backend_info'),
@@ -244,7 +244,7 @@ class VPoolController(object):
         vp_installer = ShrinkVPoolInstaller(name=storagedriver.vpool.name)
         vp_installer.validate(storagedriver=storagedriver)
 
-        sd_installer = StorageDriverInstaller(vp_container=vp_installer,
+        sd_installer = StorageDriverInstaller(vp_installer=vp_installer,
                                             storagedriver=storagedriver)
 
         cls._logger.info('StorageDriver {0} - Checking availability of related StorageRouters'.format(storagedriver.guid, storagedriver.name))
