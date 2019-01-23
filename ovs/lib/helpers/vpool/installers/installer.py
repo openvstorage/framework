@@ -18,25 +18,20 @@
 VpoolInstaller class responsible for adding/removing vPools
 """
 
-import re
 import copy
 import json
-from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_CONFIG
-from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, VPOOL_BASE_PATH
+from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.api.client import OVSClient
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, StorageDriverClient, StorageDriverConfiguration
-from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.vdisk import VDiskController
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.vpool.shared import VPoolShared
+from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
 
 
-class VPoolInstaller(object):
+class VPoolInstaller(VPoolInstallerBase):
     """
     Class used to create/remove a vPool
     This class will be responsible for
@@ -49,33 +44,18 @@ class VPoolInstaller(object):
         - refresh_metadata: Refresh the vPool's metadata (arakoon info, backend info, ...)
         - configure_cluster_registry: Configure the cluster registry
         - calculate_read_preferences: Retrieve the read preferences
-        - update_node_distance_map: Update the node_distance_map property when removing a StorageDriver
     """
-    _logger = Logger('lib')
 
     def __init__(self, name):
-        """
-        Initialize a StorageDriverInstaller class instance containing information about:
-            - vPool information on which a new StorageDriver is going to be deployed, eg: global vPool configurations, vPool name, ...
-            - Information about caching behavior
-            - Information about which ALBA Backends to use as main Backend, fragment cache Backend, block cache Backend
-            - Connection information about how to reach the ALBA Backends via the API
-            - StorageDriver configuration settings
-            - The storage IP address
-        """
-        if not re.match(pattern=ExtensionsToolbox.regex_vpool, string=name):
-            raise ValueError('Incorrect vPool name provided')
+        super(VPoolInstaller, self).__init__(name)
 
-        self.name = name
-        self.vpool = VPoolList.get_vpool_by_name(vpool_name=name)
         self.is_new = True if self.vpool is None else False
+
         self.mds_tlogs = None
         self.mds_safety = None
         self.mds_maxload = None
         self.mds_services = []
-        self.sd_installer = None
-        self.sr_installer = None
-        self.storagedriver_amount = 0 if self.vpool is None else len(self.vpool.storagedrivers)
+
         self.complete_backend_info = {}  # Used to store the Backend information retrieved via the API in a dict, because used in several places
 
     def create(self, **kwargs):
@@ -103,89 +83,6 @@ class VPoolInstaller(object):
         self.vpool.description = self.name
         self.vpool.rdma_enabled = kwargs.get('rdma_enabled', False)
         self.vpool.metadata_store_bits = 5
-        self.vpool.save()
-
-    def configure_mds(self, config):
-        """
-        Configure the global MDS settings for this vPool
-        :param config: MDS configuration settings (Can contain amount of tlogs to wait for during MDS checkup, MDS safety and the maximum load for an MDS)
-        :type config: dict
-        :raises RuntimeError: If specified safety not between 1 and 5
-                              If specified amount of tlogs is less than 1
-                              If specified maximum load is less than 10%
-        :return: None
-        :rtype: NoneType
-        """
-        if self.vpool is None:
-            raise RuntimeError('Cannot configure MDS settings when no vPool has been created yet')
-
-        ExtensionsToolbox.verify_required_params(verify_keys=True,
-                                                 actual_params=config,
-                                                 required_params={'mds_tlogs': (int, {'min': 1}, False),
-                                                                  'mds_safety': (int, {'min': 1, 'max': 5}, False),
-                                                                  'mds_maxload': (int, {'min': 10}, False)})
-
-        # Don't set a default value here, because we need to know whether these values have been specifically set or were set at None
-        self.mds_tlogs = config.get('mds_tlogs')
-        self.mds_safety = config.get('mds_safety')
-        self.mds_maxload = config.get('mds_maxload')
-        Configuration.set(key=MDS_CONFIG_PATH.format(self.vpool.guid),
-                          value={'mds_tlogs': self.mds_tlogs or 100,
-                                 'mds_safety': self.mds_safety or 3,
-                                 'mds_maxload': self.mds_maxload or 75})
-
-    def validate(self, storagerouter=None, storagedriver=None):
-        """
-        Perform some validations before creating or extending a vPool
-        :param storagerouter: StorageRouter on which the vPool will be created or extended
-        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
-        :param storagedriver: When passing a StorageDriver, perform validations when shrinking a vPool
-        :type storagedriver: ovs.dal.hybrids.storagedriver.StorageDriver
-        :raises ValueError: If extending a vPool which status is not RUNNING
-                RuntimeError: If this vPool's configuration does not meet the requirements
-                              If the vPool has already been extended on the specified StorageRouter
-        :return: None
-        :rtype: NoneType
-        """
-        if self.vpool is not None:
-            if self.vpool.status != VPool.STATUSES.RUNNING:
-                raise ValueError('vPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
-
-            ExtensionsToolbox.verify_required_params(actual_params=self.vpool.configuration,
-                                                     required_params={'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
-                                                                      'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
-                                                                      'write_buffer': (float, None),
-                                                                      'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
-                                                                      'tlog_multiplier': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.values())})
-
-            if storagerouter is not None:
-                for vpool_storagedriver in self.vpool.storagedrivers:
-                    if vpool_storagedriver.storagerouter_guid == storagerouter.guid:
-                        raise RuntimeError('A StorageDriver is already linked to this StorageRouter for vPool {0}'.format(self.vpool.name))
-            if storagedriver is not None:
-                VDiskController.sync_with_reality(vpool_guid=self.vpool.guid)
-                storagedriver.invalidate_dynamics('vdisks_guids')
-                if len(storagedriver.vdisks_guids) > 0:
-                    raise RuntimeError('There are still vDisks served from the given StorageDriver')
-
-                self.mds_services = [mds_service for mds_service in self.vpool.mds_services if mds_service.service.storagerouter_guid == storagedriver.storagerouter_guid]
-                for mds_service in self.mds_services:
-                    if len(mds_service.storagedriver_partitions) == 0 or mds_service.storagedriver_partitions[0].storagedriver is None:
-                        raise RuntimeError('Failed to retrieve the linked StorageDriver to this MDS Service {0}'.format(mds_service.service.name))
-
-    def update_status(self, status):
-        """
-        Update the status of the vPool
-        :param status: Status to set on the vPool
-        :type status: ovs.dal.hybrids.vpool.VPool.STATUSES
-        :raises ValueError: If unsupported status has been provided
-        :return: None
-        :rtype: NoneType
-        """
-        if status not in VPool.STATUSES:
-            raise ValueError('Allowed statuses are: {0}'.format(', '.join(VPool.STATUSES)))
-
-        self.vpool.status = status
         self.vpool.save()
 
     def revert_vpool(self, status):
@@ -392,44 +289,6 @@ class VPoolInstaller(object):
         self._logger.debug('Refreshed metadata : {0}'.format(new_metadata))
         self.vpool.save()
 
-    def configure_cluster_registry(self, exclude=None, apply_on=None, allow_raise=False):
-        """
-        Retrieve the cluster node configurations for the StorageDrivers related to the vPool without the excluded StorageDrivers
-        :param exclude: List of StorageDrivers to exclude from the node configurations
-        :type exclude: list
-        :param apply_on: Apply the updated cluster configurations on these StorageDrivers (or all but current if none provided)
-        :type apply_on: list[ovs.dal.hybrids.storagedriver.StorageDriver]
-        :param allow_raise: Allow the function to raise an exception instead of returning True when an exception occurred (Defaults to False)
-        :type allow_raise: bool
-        :raises Exception: When allow_raises is True and and updating the configuration would have failed
-        :return: A boolean indication whether something failed
-        :rtype: bool
-        """
-        if exclude is None:
-            exclude = []
-        if apply_on is None:
-            apply_on = []
-        try:
-            node_configs = []
-            for sd in self.vpool.storagedrivers:
-                if sd in exclude:
-                    continue
-                sd.invalidate_dynamics('cluster_node_config')
-                node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
-
-            self.vpool.clusterregistry_client.set_node_configs(node_configs)
-            for sd in apply_on or self.vpool.storagedrivers:
-                if sd == self.sd_installer.storagedriver:
-                    continue
-                self._logger.info('Applying cluster node config for StorageDriver {0}'.format(sd.storagedriver_id))
-                self.vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
-            return False
-        except Exception:
-            self._logger.exception('Updating the cluster node configurations failed')
-            if allow_raise is True:
-                raise
-            return True
-
     def calculate_read_preferences(self):
         """
         Calculates the read preferences to be used by the ALBA proxy services
@@ -464,41 +323,9 @@ class VPoolInstaller(object):
                     read_preferences.append(node_id)
         return read_preferences
 
-    def update_node_distance_map(self):
+    def ensure_exists(self, *args, **kwargs):
         """
-        Update the node distance map property for each StorageDriver when removing a StorageDriver
-        :return: A boolean indicating whether something went wrong
-        :rtype: bool
+        This abstract implementation should be implemented in its two inheriting classes: createInstaller and extendInstaller.
+        :return:
         """
-        try:
-            storagedriver = self.sd_installer.storagedriver
-            for sd in self.vpool.storagedrivers:
-                if sd != storagedriver:
-                    sd.invalidate_dynamics('cluster_node_config')
-                    config = sd.cluster_node_config
-                    if storagedriver.storagedriver_id in config['node_distance_map']:
-                        del config['node_distance_map'][storagedriver.storagedriver_id]
-            return False
-        except Exception:
-            self._logger.exception('Failed to update the node_distance_map property')
-            return True
-
-    def remove_mds_services(self):
-        """
-        Remove the MDS services related to the StorageDriver being deleted
-        :return: A boolean indicating whether something went wrong
-        :rtype: bool
-        """
-        # Removing MDS services
-        self._logger.info('Removing MDS services')
-        errors_found = False
-        for mds_service in self.mds_services:
-            try:
-                self._logger.info('Remove MDS service (number {0}) for StorageRouter with IP {1}'.format(mds_service.number, self.sr_installer.storagerouter.ip))
-                MDSServiceController.remove_mds_service(mds_service=mds_service,
-                                                        reconfigure=False,
-                                                        allow_offline=self.sr_installer.root_client is None)  # No root_client means the StorageRouter is offline
-            except Exception:
-                self._logger.exception('Removing MDS service failed')
-                errors_found = True
-        return errors_found
+        raise NotImplementedError('Should be implemented in Extend or Create VPool installer')

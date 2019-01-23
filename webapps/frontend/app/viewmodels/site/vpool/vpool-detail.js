@@ -364,7 +364,7 @@ define([
                     $.t('ovs:vpools.detail.refresh.started'),
                     $.t('ovs:vpools.detail.refresh.started_msg', { sr: sr.name(), vpool: self.vPool().name() })
                 );
-                StorageDriverService.refreshConfiguration(self.srSDMap()[sr.guid()].guid())
+                StoragedriverService.refreshConfiguration(self.srSDMap()[sr.guid()].guid())
                     .done(function(data) {
 
                         if (data === 0) {

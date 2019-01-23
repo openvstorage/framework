@@ -18,7 +18,6 @@
 VPoolController class responsible for making changes to existing vPools
 """
 
-import json
 import time
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
@@ -44,7 +43,10 @@ from ovs.extensions.storageserver.storagedriver import LocalStorageRouterClient,
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.vpool.shared import VPoolShared
-from ovs.lib.helpers.vpool.installer import VPoolInstaller
+from ovs.lib.helpers.vpool.installers.installer import VPoolInstaller as BaseVPoolInstaller
+from ovs.lib.helpers.vpool.installers.extend_installer import ExtendInstaller as ExtendVPoolInstaller
+from ovs.lib.helpers.vpool.installers.create_installer import CreateInstaller as CreateVPoolInstaller
+from ovs.lib.helpers.vpool.installers.shrink_installer import ShrinkInstaller as ShrinkVPoolInstaller
 from ovs.lib.helpers.storagerouter.installer import StorageRouterInstaller
 from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
 from ovs.lib.mdsservice import MDSServiceController
@@ -82,12 +84,17 @@ class VPoolController(object):
             raise RuntimeError('Could not find StorageRouter')
 
         # Validate requested vPool configurations
-        vp_installer = VPoolInstaller(name=parameters.get('vpool_name'))
+        vpool_name = parameters.get('vpool_name')
+        extending = True if VPoolList.get_vpool_by_name(vpool_name=vpool_name) else False
+        if extending:
+            vp_installer = ExtendVPoolInstaller(name=vpool_name)
+        else:
+            vp_installer = CreateVPoolInstaller(name=vpool_name)
         vp_installer.validate(storagerouter=storagerouter)
 
         # Validate requested StorageDriver configurations
         cls._logger.info('vPool {0}: Validating StorageDriver configurations'.format(vp_installer.name))
-        sd_installer = StorageDriverInstaller(vp_installer=vp_installer,
+        sd_installer = StorageDriverInstaller(vp_installer=vp_installer, # type: BaseVPoolInstaller
                                               configurations={'storage_ip': parameters.get('storage_ip'),
                                                               'caching_info': parameters.get('caching_info'),
                                                               'backend_info': {'main': parameters.get('backend_info'),
@@ -102,11 +109,7 @@ class VPoolController(object):
         try:
             # VPOOL CREATION
             # Create the vPool as soon as possible in the process to be displayed in the GUI (INSTALLING/EXTENDING state)
-            if vp_installer.is_new is True:
-                vp_installer.create(rdma_enabled=sd_installer.rdma_enabled)
-                vp_installer.configure_mds(config=parameters.get('mds_config_params', {}))
-            else:
-                vp_installer.update_status(status=VPool.STATUSES.EXTENDING)
+            vp_installer.ensure_exists(parameters.get('mds_config_params', {}))
 
             # ADDITIONAL VALIDATIONS
             # Check StorageRouter connectivity
@@ -161,14 +164,7 @@ class VPoolController(object):
                 raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
 
         # Cluster registry
-        try:
-            vp_installer.configure_cluster_registry(allow_raise=True)
-        except Exception:
-            if vp_installer.is_new is True:
-                vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
-            else:
-                vp_installer.revert_vpool(status=VPool.STATUSES.FAILURE)
-            raise
+        vp_installer.configure_cluster_registry(allow_raise=True)
 
         try:
             sd_installer.setup_proxy_configs()
@@ -245,11 +241,11 @@ class VPoolController(object):
         storagerouter = storagedriver.storagerouter
         cls._logger.info('StorageDriver {0} - Deleting StorageDriver {1}'.format(storagedriver.guid, storagedriver.name))
 
-        vp_installer = VPoolInstaller(name=storagedriver.vpool.name)
+        vp_installer = ShrinkVPoolInstaller(name=storagedriver.vpool.name)
         vp_installer.validate(storagedriver=storagedriver)
 
         sd_installer = StorageDriverInstaller(vp_installer=vp_installer,
-                                              storagedriver=storagedriver)
+                                            storagedriver=storagedriver)
 
         cls._logger.info('StorageDriver {0} - Checking availability of related StorageRouters'.format(storagedriver.guid, storagedriver.name))
         sr_client_map = SSHClient.get_clients(endpoints=[sd.storagerouter for sd in vp_installer.vpool.storagedrivers], user_names=['root'])

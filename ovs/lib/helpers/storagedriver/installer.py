@@ -20,7 +20,6 @@ StorageDriverInstaller class responsible for adding and removing StorageDrivers
 
 import re
 import copy
-import json
 import time
 from subprocess import CalledProcessError
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -50,7 +49,7 @@ from ovs.lib.helpers.vpool.shared import VPoolShared
 # Mypy
 # noinspection PyUnreachableCode
 if False:
-    from ovs.lib.helpers.vpool.installer import VPoolInstaller
+    from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
 
 
 
@@ -73,7 +72,7 @@ class StorageDriverInstaller(object):
     _logger = Logger('lib')
 
     def __init__(self, vp_installer, configurations=None, storagedriver=None):
-        # type: (VPoolInstaller, Optional[Dict[any,any]], Optional[StorageDriver]) -> None
+        # type: (VPoolInstallerBase, Optional[Dict[any,any]], Optional[StorageDriver]) -> None
         """
         Initialize a StorageDriverInstaller class instance containing information about:
             - vPool information on which a new StorageDriver is going to be deployed, eg: global vPool configurations, vPool name, ...
@@ -684,6 +683,7 @@ class StorageDriverInstaller(object):
 
         return errors_found
 
+    # todo offload these functions to shrink only
     def clean_config_management(self):
         """
         Remove the configuration management entries related to a StorageDriver removal
