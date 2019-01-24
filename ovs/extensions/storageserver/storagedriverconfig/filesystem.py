@@ -17,6 +17,7 @@
 from .base import BaseStorageDriverConfig
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs_extensions.constants.file_extensions import RAW
+from ovs_extensions.constants.storagedriver import FRAMEWORK_DTL_NO_SYNC, VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
 
 class FileSystemConfig(BaseStorageDriverConfig):
     """
@@ -57,11 +58,11 @@ class FileSystemConfig(BaseStorageDriverConfig):
         if fs_metadata_backend_arakoon_cluster_nodes is None:
             fs_metadata_backend_arakoon_cluster_nodes = []
 
-        if dtl_mode == StorageDriverClient.FRAMEWORK_DTL_NO_SYNC:
-            self.fs_dtl_config_mode = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
+        if dtl_mode == FRAMEWORK_DTL_NO_SYNC:
+            self.fs_dtl_config_mode = VOLDRV_DTL_MANUAL_MODE
         else:
             self.fs_dtl_mode = StorageDriverClient.VPOOL_DTL_MODE_MAP[dtl_mode]
-            self.fs_dtl_config_mode = StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
+            self.fs_dtl_config_mode = VOLDRV_DTL_AUTOMATIC_MODE
 
         self.fs_dtl_host = fs_dtl_host
         self.fs_dtl_port = fs_dtl_port
@@ -71,7 +72,6 @@ class FileSystemConfig(BaseStorageDriverConfig):
         self.fs_cache_dentries = fs_cache_dentries
         self.fs_raw_disk_suffix = fs_raw_disk_suffix
         self.fs_dtl_config_mode = fs_dtl_config_mode
-        self.fs_file_event_rules = fs_file_event_rules or [{'fs_file_event_rule_calls': ['Rename'], 'fs_file_event_rule_path_regex': '.*'}]
         self.fs_virtual_disk_format = fs_virtual_disk_format
         self.fs_enable_shm_interface = fs_enable_shm_interface
         self.fs_metadata_backend_type = fs_metadata_backend_type
@@ -82,3 +82,4 @@ class FileSystemConfig(BaseStorageDriverConfig):
         self.fs_metadata_backend_arakoon_cluster_nodes = fs_metadata_backend_arakoon_cluster_nodes
         self.fs_metadata_backend_mds_slave_max_tlogs_behind = fs_metadata_backend_mds_slave_max_tlogs_behind
         self.fs_metadata_backend_mds_apply_relocations_to_slaves = fs_metadata_backend_mds_apply_relocations_to_slaves
+        self.fs_file_event_rules = fs_file_event_rules or [{'fs_file_event_rule_calls': ['Rename'], 'fs_file_event_rule_path_regex': '.*'}]

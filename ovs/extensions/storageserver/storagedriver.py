@@ -25,6 +25,8 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger as OVSLogger
 from ovs_extensions.generic.remote import remote
 from volumedriver.storagerouter import storagerouterclient
+from ovs_extensions.constants.storagedriver import VOLDRV_DTL_SYNC, VOLDRV_DTL_ASYNC, VOLDRV_DTL_TRANSPORT_TCP, VOLDRV_DTL_TRANSPORT_RSOCKET, \
+FRAMEWORK_DTL_SYNC, FRAMEWORK_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, FRAMEWORK_DTL_TRANSPORT_TCP, FRAMEWORK_DTL_TRANSPORT_RSOCKET
 
 # Import below classes so the rest of the framework can always import from this module:
 # * We can inject mocks easier without having to make changes everywhere
@@ -89,19 +91,6 @@ class StorageDriverClient(object):
     storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
-
-    VOLDRV_DTL_SYNC = 'Synchronous'
-    VOLDRV_DTL_ASYNC = 'Asynchronous'
-    VOLDRV_DTL_MANUAL_MODE = 'Manual'
-    VOLDRV_DTL_AUTOMATIC_MODE = 'Automatic'
-    VOLDRV_DTL_TRANSPORT_TCP = 'TCP'
-    VOLDRV_DTL_TRANSPORT_RSOCKET = 'RSocket'
-
-    FRAMEWORK_DTL_SYNC = 'sync'
-    FRAMEWORK_DTL_ASYNC = 'a_sync'
-    FRAMEWORK_DTL_NO_SYNC = 'no_sync'
-    FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
-    FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
 
     VDISK_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: DTLMode.SYNCHRONOUS,
                           FRAMEWORK_DTL_ASYNC: DTLMode.ASYNCHRONOUS,

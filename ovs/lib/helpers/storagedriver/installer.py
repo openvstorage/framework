@@ -32,6 +32,7 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs_extensions.constants.vpools import GENERIC_SCRUB, PROXY_CONFIG_MAIN, HOSTS_CONFIG_PATH, HOSTS_PATH, PROXY_PATH
+from ovs_extensions.constants.storagedriver import FRAMEWORK_DTL_TRANSPORT_RSOCKET
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
@@ -153,7 +154,7 @@ class StorageDriverInstaller(object):
             self.sco_size = sd_configuration['sco_size']
             self.cluster_size = sd_configuration['cluster_size']
             self.write_buffer = sd_configuration['write_buffer']
-            self.rdma_enabled = sd_configuration['dtl_transport'] == StorageDriverClient.FRAMEWORK_DTL_TRANSPORT_RSOCKET
+            self.rdma_enabled = sd_configuration['dtl_transport'] == FRAMEWORK_DTL_TRANSPORT_RSOCKET
             self.dtl_transport = sd_configuration['dtl_transport']
             self.tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[self.sco_size]
 
@@ -467,7 +468,7 @@ class StorageDriverInstaller(object):
 
         backend_connection_config = BackendConnectionManager(self.storagedriver.alba_proxies, vpool, self.storagedriver.storagedriver_ip).to_dict()
 
-        storagedriver_config = StorageDriverConfig(vrouter_cluster_id=vpool.guid,
+        whole_config = StorageDriverConfig(vrouter_cluster_id=vpool.guid,
                                                    dtl_config=dtl_config,
                                                    filedriver_config=fd_config,
                                                    filesystem_config=fs_config,
@@ -479,7 +480,8 @@ class StorageDriverInstaller(object):
                                                    backend_config=backend_connection_config,
                                                    content_adressed_cache_config=content_adressed_cache_config)
 
-
+        storagedriver_config = StorageDriverConfiguration(vpool.guid, self.storagedriver.storagedriver_id)
+        storagedriver_config.configuration = whole_config
         storagedriver_config.save(client=self.sr_installer.root_client)
 
     def start_services(self):

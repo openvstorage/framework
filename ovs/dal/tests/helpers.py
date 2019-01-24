@@ -20,7 +20,6 @@ DalHelper module
 import os
 import copy
 import glob
-import json
 import shutil
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.disk import Disk
@@ -38,6 +37,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, GENERIC_SCRUB, HOSTS_CONFIG_PATH
+from ovs_extensions.constants.storagedriver import VOLDRV_DTL_ASYNC, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs_extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
@@ -49,7 +49,6 @@ from ovs_extensions.packages.packagefactory import PackageFactory
 from ovs_extensions.services.mockups.systemd import SystemdMock
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import LocalStorageRouterClient, MDSClient, StorageRouterClient
 from ovs.lib.helpers.decorators import Decorators
 from ovs.lib.helpers.toolbox import Toolbox
@@ -416,8 +415,8 @@ class DalHelper(object):
                           'file_driver': {'fd_cache_path': '',
                                           'fd_namespace': 'fd-{0}-{1}'.format(vpool.name, vpool.guid)},
                           'filesystem': {'fs_dtl_host': '',
-                                         'fs_dtl_mode': StorageDriverClient.VOLDRV_DTL_ASYNC,
-                                         'fs_dtl_config_mode': StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE,
+                                         'fs_dtl_mode': VOLDRV_DTL_ASYNC,
+                                         'fs_dtl_config_mode': VOLDRV_DTL_AUTOMATIC_MODE,
                                          'fs_virtual_disk_format': 'raw'},
                           'metadata_server': {},
                           'network_interface': {},

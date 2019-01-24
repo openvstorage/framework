@@ -22,6 +22,7 @@ import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
+from ovs_extensions.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_ASYNC
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration,\
@@ -128,7 +129,7 @@ class VPool(DataObject):
         volume_manager = storagedriver_config.configuration['volume_manager']
 
         dtl_host = file_system['fs_dtl_host']
-        dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
+        dtl_mode = file_system.get('fs_dtl_mode', VOLDRV_DTL_ASYNC)
         cluster_size = volume_manager['default_cluster_size'] / 1024
         dtl_transport = dtl['dtl_transport']
         sco_multiplier = volume_router['vrouter_sco_multiplier']
@@ -138,7 +139,7 @@ class VPool(DataObject):
 
         sco_size = sco_multiplier * cluster_size / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
-        dtl_enabled = not (dtl_config_mode == StorageDriverClient.VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
+        dtl_enabled = not (dtl_config_mode == VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
 
         try:
             mds_config = Configuration.get(MDS_CONFIG_PATH.format(self.guid))

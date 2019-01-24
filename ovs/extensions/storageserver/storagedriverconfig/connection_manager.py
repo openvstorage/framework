@@ -17,7 +17,7 @@
 import re
 from .base import BaseStorageDriverConfig
 from ovs.dal.hybrids.vpool import VPool
-from ovs_extensions.constants.transport import TCP_UPPER
+from ovs_extensions.constants.storagedriver import VOLDRV_DTL_TRANSPORT_TCP
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
 
@@ -105,7 +105,7 @@ class AlbaConnectionConfig(BaseStorageDriverConfig):
     component_identifier = 'backend_connection_manager'
 
     def __init__(self, alba_connection_host=None, alba_connection_port=None, alba_connection_preset=None, alba_connection_timeout=30,
-                 alba_connection_use_rora=True, alba_connection_transport=TCP_UPPER, alba_connection_rora_timeout_msecs=50,
+                 alba_connection_use_rora=True, alba_connection_transport=VOLDRV_DTL_TRANSPORT_TCP, alba_connection_rora_timeout_msecs=50,
                  alba_connection_rora_manifest_cache_capacity=25000, alba_connection_asd_connection_pool_capacity=10,
                  *args, **kwargs):
         """
@@ -119,6 +119,7 @@ class AlbaConnectionConfig(BaseStorageDriverConfig):
         :param alba_connection_rora_manifest_cache_capacity: Capacity of the RORA fetcher's manifest cache
         :param alba_connection_asd_connection_pool_capacity: connection pool (per ASD) capacity
         """
+        self.backend_type = 'ALBA'
         self.alba_connection_host = alba_connection_host
         self.alba_connection_port = alba_connection_port
         self.alba_connection_preset = alba_connection_preset
@@ -128,7 +129,6 @@ class AlbaConnectionConfig(BaseStorageDriverConfig):
         self.alba_connection_rora_timeout_msecs = alba_connection_rora_timeout_msecs
         self.alba_connection_rora_manifest_cache_capacity = alba_connection_rora_manifest_cache_capacity
         self.alba_connection_asd_connection_pool_capacity = alba_connection_asd_connection_pool_capacity
-        self.backend_type = 'ALBA'
 
 
 class S3ConnectionConfig(object):
