@@ -530,6 +530,24 @@ class Basic(unittest.TestCase):
         disk2.save()
         self.assertEqual(len(machine.disks), 1, 'There should be 1 disks on the machine')
 
+    def test_relation_invalidation_reference(self):
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        machine_disks = machine.disks
+        self.assertEqual(len(machine_disks), 1, 'There should be 1 disk on the machine')
+        disk1.machine = machine
+
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        self.assertEqual(len(machine_disks), 2, 'There should be two disks on the machine')
+
     def test_datalistactions(self):
         """
         Validates all actions that can be executed against DataLists
@@ -1373,6 +1391,53 @@ class Basic(unittest.TestCase):
         datalist._execute_query()
         self.assertIsNone(datalist.from_cache, 'The relation set should be fetched from the index')
         self.assertEqual(len(datalist), 0, 'No disks should be found')
+
+    def test_relation_consistency(self):
+        """
+        Validates whether the relation on an object is immutable
+        The API could set the query/sort when returning the relational datalist.
+        Relational datalist caches its result on a fixed key. This means that the datalist will return a cached result
+        which is invalid for a relation
+        Current solution. Set provided guids to true so it can be cached
+        In decorators - create a copy of the datalist (not the caching key)
+
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.description = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.description = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        # Separate disk
+        disk3 = TestDisk()
+        disk3.name = 'disk3'
+        disk3.description = 'disk1'
+        disk3.save()
+        # This is the same as machine.disks
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        datalist._execute_query()
+        self.assertIsNone(datalist.from_cache, 'The relation set should be fetched from the index')
+        self.assertEqual(len(datalist), 2, 'There should be two disks')
+
+        # Set the query on the relational property
+        query = {'type': DataList.where_operator.AND,
+                 'items': [('description', DataList.operator.EQUALS, 'disk1')]}
+        datalist.set_query(query)
+        datalist._execute_query()
+        self.assertFalse(datalist.from_cache, 'Datalist should not come from cache')
+        self.assertEqual(len(datalist), 1, 'There should be one disk as it should only query the relation set')
+
+        # Fetch the relation again
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        datalist._execute_query()
+        self.assertEqual(len(datalist), 2, 'Both disks should be found')
 
     def test_instance_checks(self):
         """

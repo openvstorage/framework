@@ -519,6 +519,7 @@ class DataObject(object):
                             item.save(recursive=True, skip=relation.foreign_key)
 
                 # Save object we point at (e.g. machine.vdisks - if this is machine)
+                # @todo should be within the same transaction to avoid errors
                 relations = RelationMapper.load_foreign_relations(self.__class__)
                 if relations is not None:
                     for key, info in relations.iteritems():

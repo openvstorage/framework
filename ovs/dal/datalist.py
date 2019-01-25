@@ -699,10 +699,12 @@ class DataList(object):
 
         persistent = PersistentFactory.get_client()
         own_name = own_class.__name__.lower()
-        datalist = DataList(remote_class, key='{0}_{1}_{2}'.format(own_name, own_guid, remote_key))
 
         reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|'.format(own_name, own_guid, own_key)
-        datalist._guids = [guid.replace(reverse_key, '') for guid in persistent.prefix(reverse_key)]
+        guids = [guid.replace(reverse_key, '') for guid in persistent.prefix(reverse_key)]
+
+        datalist = DataList(remote_class, guids=guids, key='{0}_{1}_{2}'.format(own_name, own_guid, remote_key))
+        datalist._guids = guids  # Set guids to avoid querying on all
         return datalist
 
     ######################
