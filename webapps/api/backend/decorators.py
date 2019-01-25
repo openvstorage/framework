@@ -241,7 +241,6 @@ def return_list(object_type, default_sort=None):
     """
     List decorator
     """
-    logger = Logger('API')
 
     def wrap(f):
         """
@@ -313,15 +312,9 @@ def return_list(object_type, default_sort=None):
                 # So instead of query on the 3 returned StorageRouter items,
                 # it will select all StorageRouter items again to query on.
                 # Set guids would clear the DataList and is not an option either
-                data_list = DataList(object_type, guids=function_result.guids)  # Copy for unit test!
-                # Set the current items to avoid doing the query again. This will save query work when no query
-                # is specified by the api callee
-                data_list._guids = function_result.guids
-                data_list._executed = True
-                # Deep copying the structure isn't required as the data will get serialized at the end of this function
-                # No mutation is possible
-                data_list._data = dict((key, value) for key, value in function_result._data.iteritems() if key in function_result.guids)
-                data_list._objects = dict((key, value) for key, value in function_result._objects.iteritems() if key in function_result.guids)
+                # # Deep copying the structure isn't required as the data will get serialized at the end of this function
+                # # No mutation is possible
+                data_list = function_result
             else:
                 # Has to be a normal list!
                 if not isinstance(function_result, list):
@@ -331,14 +324,15 @@ def return_list(object_type, default_sort=None):
                     if isinstance(function_result[0], basestring):
                         # GUIDS
                         data_list = DataList(object_type, guids=function_result)
-                    elif isinstance(function_result[0], object_type):
+                    elif isinstance(function_result[0], DataObject):
                         # Hybrids, reuse the data already given
                         data_list = DataList(object_type)
                         hybrids_mapped_by_guid = dict((hybrid.guid, hybrid) for hybrid in function_result)
                         data_list._executed = True
                         data_list._guids = hybrids_mapped_by_guid.keys()
                         data_list._objects = hybrids_mapped_by_guid
-                        data_list._data = dict([(hybrid.guid, {'guid': hybrid.guid, 'data': hybrid._data}) for hybrid in hybrids_mapped_by_guid.values()])
+                        data_list._data = dict([(hybrid.guid, {'guid': hybrid.guid, 'data': hybrid._data})
+                                                for hybrid in hybrids_mapped_by_guid.values()])
                     else:
                         raise ValueError('API decorated list function does not yield the correct item type!')
                 else:
@@ -558,11 +552,173 @@ def return_simple(mode=None):
     return wrap
 
 
-def limit(amount, per, timeout):
+class RateLimitContainer(object):
     """
-    Rate-limits the decorated call
+    Rate limit container object
+    """
+    volatile_client = VolatileFactory.get_client()
+
+    def __init__(self, key, calls, timeout):
+        # type: (str, List[float], float) -> None
+        """
+        Initialize a rate limit container object
+        :param key: Key to save the rate limit on
+        :type key: str
+        :param calls: A list of timestamps that represent a function call
+        :type calls: List[float]
+        :param timeout: End time of a function rate limit cooldown (if any)
+        :type timeout: float
+        """
+        self.key = key
+        self.calls = calls
+        self.timeout = timeout
+
+    def get_calls(self, younger_than_timestamp):
+        # type: (float) -> List[float]
+        """
+        Get the calls that are older than the given timestamp.
+        This filters out calls that are no longer relevant
+        :param younger_than_timestamp: Timestamp to check
+        :type younger_than_timestamp: float
+        :return:
+        """
+        return [call for call in self.calls if call > younger_than_timestamp]
+
+    def timeout_exceeds(self, timestamp):
+        # type: (float) -> bool
+        """
+        Check if the current timeout timestamp exceeds the given timestamp
+        :param timestamp: Timestamp to check
+        :type timestamp: float
+        :return:
+        """
+        return self.timeout and self.timeout > timestamp
+
+    def clear_timeout(self):
+        # type: () -> None
+        """
+        Clears the current timeout
+        :return: None
+        :rtype: NoneType
+        """
+        self.timeout = None
+
+    def save(self):
+        # type: () -> None
+        """
+        Save the current rate limit configuration
+        :return: None
+        :rtype: NoneType
+        """
+        self.volatile_client.set(self.key, dict((k, v) for k, v in vars(self).iteritems() if k != 'key'))
+
+
+class RateLimiter(object):
+    """
+    Exposes some of the rate limiting logic so that the unittests do not have to duplicate implementations
     """
     logger = Logger('api')
+    volatile_client = VolatileFactory.get_client()
+
+    def __init__(self, request, func, amount, per, timeout):
+        # type: (WSGIRequest, callable, int, int, int) -> None
+        """
+        Rate-limits the decorated call
+        :param request: Request object that was passed by Django
+        :type request: WSGIRequest
+        :param func: Decorated function
+        :type func: callable
+        :param amount: Amount of calls that can be handled at the same time (in seconds)
+        :type amount: int
+        :param per: Timeframe to ratelimit on (in seconds)
+        :type per: int
+        :param timeout: Cooldown period (in seconds)
+        :type timeout: int
+        """
+        self.request = request
+        self.func = func
+        self.amount = amount
+        self.per = per
+        self.timeout = timeout
+
+    @classmethod
+    def get_rate_limit_info(cls, request, func, key=None):
+        # type: (WSGIRequest, callable, Optional[str]) -> RateLimitContainer
+        """
+        Retrieve rate limiting info
+        :param request: Request object that was passed by Django
+        :type request: WSGIRequest
+        :param func: Decorated function
+        :type func: callable
+        :param key: Optionally supply the key to fetch
+        :type key: Optional[str]
+        :return: The rate limting info.
+        :rtype: RateLimitContainer
+        """
+
+        rate_limit_key = key or cls.build_ratelimit_key(request, func)
+        return RateLimitContainer(key=rate_limit_key, **cls.volatile_client.get(rate_limit_key, {'calls': [], 'timeout': None}))
+
+    def enforce_rate_limit(self):
+        # type: () -> None
+        """
+        Enforce the rate limit
+        :raises HttpTooManyRequestsException:
+        - When the cooldown period is in configured
+        - When the number of calls exceeded the threshold
+        """
+        now = time.time()
+        rate_limit_key = self.build_ratelimit_key(self.request, self.func)
+        with volatile_mutex(rate_limit_key):
+            rate_info = self.get_rate_limit_info(self.request, self.func, key=rate_limit_key)
+            if rate_info.timeout_exceeds(now):
+                self.logger.warning('Call {0} is being throttled with a wait of {1}'.format(rate_limit_key, rate_info.timeout - now))
+                raise HttpTooManyRequestsException(error='rate_limit_timeout',
+                                                   error_description='Rate limit timeout ({0}s remaining)'.format(round(rate_info.timeout- now, 2)))
+            rate_limit_timeframe_start = now - self.per
+            # Get the relevant calling timestamps and add the current call to the calls
+            calls_within_timeframe = rate_info.get_calls(rate_limit_timeframe_start) + [now]
+            # Re-save the calls
+            rate_info.calls = calls_within_timeframe
+            try:
+                if len(calls_within_timeframe) > self.amount:
+                    # Rate limiting exceeded. Initiate the cooldown
+                    rate_info.timeout = now + self.timeout
+                    self.logger.warning('Call {0} is being throttled with a wait of {1}'.format(rate_limit_key, self.timeout))
+                    raise HttpTooManyRequestsException(error='rate_limit_reached',
+                                                       error_description='Rate limit reached ({0} in last {1}s)'.format(len(calls_within_timeframe),
+                                                                                                                        self.per))
+            finally:
+                rate_info.save()
+
+    @staticmethod
+    def build_ratelimit_key(request, func):
+        # type: (WSGIRequest, callable) -> str
+        """
+        Get the built rate limit key
+        :param request: Request object that was passed by Django
+        :type request: WSGIRequest
+        :param func: Decorated function
+        :type func: callable
+        :return: The generated key
+        :rtype: str
+        """
+        return 'ovs_api_limit_{0}.{1}_{2}'.format(func.__module__,
+                                                  func.__name__,
+                                                  request.META['HTTP_X_REAL_IP'])
+
+
+def limit(amount, per, timeout):
+    # type: (int, int, int) -> callable
+    """
+    Rate-limits the decorated call
+    :param amount: Amount of calls that can be handled at the same time (in seconds)
+    :type amount: int
+    :param per: Timeframe to ratelimit on (in seconds)
+    :type per: int
+    :param timeout: Cooldown period (in seconds)
+    :type timeout: int
+    """
 
     def wrap(f):
         """
@@ -575,33 +731,8 @@ def limit(amount, per, timeout):
             Wrapped function
             """
             request = _find_request(args)
-
-            now = time.time()
-            key = 'ovs_api_limit_{0}.{1}_{2}'.format(
-                f.__module__, f.__name__,
-                request.META['HTTP_X_REAL_IP']
-            )
-            client = VolatileFactory.get_client()
-            with volatile_mutex(key):
-                rate_info = client.get(key, {'calls': [],
-                                             'timeout': None})
-                active_timeout = rate_info['timeout']
-                if active_timeout is not None:
-                    if active_timeout > now:
-                        logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, active_timeout - now))
-                        raise HttpTooManyRequestsException(error='rate_limit_timeout',
-                                                           error_description='Rate limit timeout ({0}s remaining)'.format(round(active_timeout - now, 2)))
-                    else:
-                        rate_info['timeout'] = None
-                rate_info['calls'] = [call for call in rate_info['calls'] if call > (now - per)] + [now]
-                calls = len(rate_info['calls'])
-                if calls > amount:
-                    rate_info['timeout'] = now + timeout
-                    client.set(key, rate_info)
-                    logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, timeout))
-                    raise HttpTooManyRequestsException(error='rate_limit_reached',
-                                                       error_description='Rate limit reached ({0} in last {1}s)'.format(calls, per))
-                client.set(key, rate_info)
+            rate_limiter = RateLimiter(request, f, amount, per, timeout)
+            rate_limiter.enforce_rate_limit()  # Will raise when the rate limit is hit
             return f(*args, **kwargs)
 
         return new_function

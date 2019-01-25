@@ -519,6 +519,7 @@ class DataObject(object):
                             item.save(recursive=True, skip=relation.foreign_key)
 
                 # Save object we point at (e.g. machine.vdisks - if this is machine)
+                # @todo should be within the same transaction to avoid errors
                 relations = RelationMapper.load_foreign_relations(self.__class__)
                 if relations is not None:
                     for key, info in relations.iteritems():
@@ -952,14 +953,19 @@ class DataObject(object):
         for key in properties_to_copy:
             setattr(self, key, getattr(other_object, key))
 
-    def clone(self):
+    def clone(self, reload_object=False):
         """
         Make an identical clone of the DataObject
+        :param reload_object: Reload the object data again when cloning
+        :type reload_object: bool
         """
-        if self.volatile is True:
-            clone = self.__class__(self.guid, data=self._data, datastore_wins=self._datastore_wins, volatile=self.volatile)
-        else:
+        if reload_object:
             clone = self.__class__(self.guid)
+        else:
+            clone = self.__class__(self.guid,
+                                   data=self._data,
+                                   datastore_wins=self._datastore_wins,
+                                   volatile=self.volatile)
         return clone
 
     def updated_on_datastore(self):
