@@ -20,6 +20,7 @@ Metadata views
 
 import json
 import time
+import logging
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -33,7 +34,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.client import OVSClient
 from ovs_extensions.api.exceptions import HttpMethodNotAllowedException
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -43,7 +43,7 @@ class MetadataView(View):
     """
     Implements retrieval of generic metadata about the services
     """
-    _logger = Logger('api')
+    _logger = logging.getLogger(__name__)
 
     @auto_response()
     @limit(amount=60, per=60, timeout=60)
@@ -137,6 +137,7 @@ class MetadataView(View):
 
 
 def relay(*args, **kwargs):
+
     """
     Relays any call to another node.
     Assume this example:
@@ -148,6 +149,8 @@ def relay(*args, **kwargs):
     * Mandatory: ip, port, client_id, client_secret
     * All other parameters will be passed through to the specified node
     """
+
+    logger = logging.getLogger(__name__)
 
     @authenticated()
     @required_roles(['read'])
@@ -189,7 +192,6 @@ def relay(*args, **kwargs):
             message = ex.detail
         if hasattr(ex, 'status_code'):
             status_code = ex.status_code
-        logger = Logger('api')
         logger.exception('Error relaying call: {0}'.format(message))
         return HttpResponse(json.dumps({'error_description': message,
                                         'error': 'relay_error'}),

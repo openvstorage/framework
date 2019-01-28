@@ -20,6 +20,7 @@ Django URL module for main API
 import os
 import imp
 import inspect
+import logging
 from inspect import getmembers
 from collections import namedtuple
 from django.conf.urls import patterns, include, url
@@ -29,10 +30,9 @@ from api.oauth2.tokenview import OAuth2TokenView
 from api.oauth2.redirectview import OAuth2RedirectView
 from api.openapi import OpenAPIView
 from api.view import MetadataView, relay
-from ovs.extensions.generic.logger import Logger
 
 
-logger = Logger('url')
+logger = logging.getLogger(__name__)
 
 
 Route = namedtuple('Route', ['url', 'mapping', 'name', 'detail', 'initkwargs'])

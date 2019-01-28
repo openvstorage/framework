@@ -16,6 +16,7 @@
 
 import time
 import logging
+from ovs.extensions.log import configure_logging
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
@@ -87,4 +88,5 @@ class HeartBeat(object):
 
 
 if __name__ == '__main__':
+    configure_logging()
     HeartBeat.pulse()

@@ -21,11 +21,11 @@ Middleware module
 import re
 import json
 import time
+import logging
 from django.http import HttpResponse
 from api.helpers import OVSResponse
 from ovs.dal.exceptions import MissingMandatoryFieldsException
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.logger import Logger
 
 
 class OVSMiddleware(object):
@@ -33,12 +33,13 @@ class OVSMiddleware(object):
     Middleware object
     """
 
+    logger = logging.getLogger(__name__)
+
     def process_exception(self, request, exception):
         """
         Logs information about the given error
         """
         _ = self, request
-        logger = Logger('api')
         if OVSMiddleware.is_own_httpexception(exception):
             return HttpResponse(exception.data,
                                 status=exception.status_code,
@@ -48,7 +49,7 @@ class OVSMiddleware(object):
                                             'error_description': exception.message}),
                                 status=400,
                                 content_type='application/json')
-        logger.exception('An unhandled exception occurred: {0}'.format(exception))
+        self.logger.exception('An unhandled exception occurred: {0}'.format(exception))
         return HttpResponse(
             json.dumps({'error': 'internal_server',
                         'error_description': exception.message}),

@@ -27,6 +27,7 @@ import uuid
 import logging
 import argparse
 from ovs.constants.logging import WATCHER_LOGGER
+from ovs.extensions.log import configure_logging
 from ovs_extensions.constants.arakoon import ARAKOON_CONFIG
 from ovs_extensions.constants.config import ARAKOON_NAME, CACC_LOCATION
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
@@ -232,6 +233,7 @@ class Watcher(object):
 
 
 if __name__ == '__main__':
+    configure_logging()
     parser = argparse.ArgumentParser(prog='framework-watcher', description='Framework watcher service')
 
     parser.add_argument('target', help='The target (sub)component to handle', choices=['volumedriver', 'config', 'framework'])

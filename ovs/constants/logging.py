@@ -15,6 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 OVS_LOGGER = 'ovs'
+API_LOGGER = 'webapps'
 
 UPDATE_LOGGER = '{}.update'.format(OVS_LOGGER)
 
@@ -38,3 +39,6 @@ UNITTEST_LOGGER = '{}.unittest'.format(OVS_LOGGER)
 
 # Watcher
 WATCHER_LOGGER = '{}.watcher'.format(OVS_LOGGER)
+
+# API
+OAUTH_LOGGER = '{}.oauth2'.format(API_LOGGER)

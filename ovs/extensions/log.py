@@ -21,7 +21,7 @@ import logging
 import requests
 import logging.config
 from ovs.constants.logging import OVS_LOGGER
-from ovs_extensions.log import get_ovs_formatter_config, EXTENSIONS_LOGGER_NAME
+from ovs_extensions.log import OVS_FORMATTER_CONFIG, EXTENSIONS_LOGGER_NAME
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonException
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.storageserver.storagedriver import LOG_LEVEL_MAPPING
@@ -53,7 +53,7 @@ DEFAULT_LOG_CONFIG = {'version': 1,
                       'disable_existing_loggers': False,
                       'formatters': {
                           'standard': {'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'},
-                          'ovs': get_ovs_formatter_config()
+                          'ovs': OVS_FORMATTER_CONFIG
                       },
                       'handlers': DEFAULT_LOG_HANDLER_CONFIG,
                       'loggers': {OVS_LOGGER: DEFAULT_LOGGER_CONFIG,

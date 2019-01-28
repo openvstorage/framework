@@ -29,6 +29,7 @@ from ConfigParser import RawConfigParser
 from distutils.version import LooseVersion
 from subprocess import check_output
 from threading import Thread
+from ovs.extensions.log import configure_logging
 from ovs.constants.logging import SUPPORT_AGENT_LOGGER
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
@@ -448,6 +449,7 @@ class SupportAgent(object):
 
 
 if __name__ == '__main__':
+    configure_logging()
     SupportAgent.logger.info('Starting up')
     client = SupportAgent()
     client.main()

@@ -22,6 +22,7 @@ import os
 import re
 import imp
 import inspect
+import logging
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -31,7 +32,6 @@ from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 
 
@@ -40,7 +40,7 @@ class OpenAPIView(View):
     """
     Implements retrieval of generic metadata about the services
     """
-    _logger = Logger('api')
+    _logger = logging.getLogger(__name__)
 
     @auto_response(beautify=True)
     @load()

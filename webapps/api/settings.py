@@ -17,6 +17,7 @@
 """
 Django settings module
 """
+
 import os
 from subprocess import check_output
 from ovs.extensions.generic.system import System
@@ -32,6 +33,9 @@ UNIQUE_ID = System.get_my_machine_id()
 UI_NAME = 'api'
 APP_NAME = 'api'
 BASE_WWW_DIR = os.path.dirname(__file__)
+
+# @todo enable oauth and webapp log. Here or in configure_logging :thinking_face:
+OVS_LOGGERS = {}
 
 BASE_FOLDER = '/opt/OpenvStorage/webapps/{0}'.format(APP_NAME)
 VERSION = (6, 7, 8, 9, 10)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...

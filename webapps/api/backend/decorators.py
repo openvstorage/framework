@@ -24,6 +24,7 @@ import json
 import math
 import time
 import inspect
+import logging
 from django.conf import settings
 from django.core.handlers.wsgi import WSGIRequest
 from functools import wraps
@@ -39,7 +40,6 @@ from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException,\
     HttpTooManyRequestsException, HttpUnauthorizedException, HttpUpgradeNeededException
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
@@ -47,6 +47,9 @@ if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from api.backend.serializers.mockups import FullSerializer
 else:
     from api.backend.serializers.serializers import FullSerializer
+
+
+logger = logging.getLogger(__name__)
 
 
 def _find_request(args):
@@ -99,7 +102,6 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
     """
     Parameter discovery decorator
     """
-    logger = Logger('api')
     regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
     def wrap(f):
@@ -617,7 +619,7 @@ class RateLimiter(object):
     """
     Exposes some of the rate limiting logic so that the unittests do not have to duplicate implementations
     """
-    logger = Logger('api')
+    logger = logging.getLogger(__name__)
     volatile_client = VolatileFactory.get_client()
 
     def __init__(self, request, func, amount, per, timeout):
@@ -744,7 +746,6 @@ def log(log_slow=True):
     Task logger
     :param log_slow: Indicates whether a slow call should be logged
     """
-    logger = Logger('api')
 
     def wrap(f):
         """

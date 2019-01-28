@@ -19,6 +19,7 @@ Token views
 """
 
 import time
+import logging
 import requests
 import datetime
 from django.views.generic import View
@@ -29,14 +30,14 @@ from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 
 
 class OAuth2RedirectView(View):
     """
     Implements OAuth 2 redirect views
     """
-    _logger = Logger('oauth2')
+
+    _logger = logging.getLogger(__name__)
 
     @log()
     @auto_response()
