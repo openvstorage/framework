@@ -15,9 +15,10 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 from .base import BaseStorageDriverConfig
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.constants.storagedriver import FRAMEWORK_DTL_NO_SYNC, VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs_extensions.constants.file_extensions import RAW
-from ovs_extensions.constants.storagedriver import FRAMEWORK_DTL_NO_SYNC, VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+
 
 class FileSystemConfig(BaseStorageDriverConfig):
     """
@@ -26,8 +27,8 @@ class FileSystemConfig(BaseStorageDriverConfig):
 
     component_identifier = 'filesystem'
 
-    def __init__(self, dtl_mode, fs_virtual_disk_format=RAW, fs_dtl_host='', fs_dtl_port=None, fs_dtl_mode=None, fs_ignore_sync=None, fs_max_open_files=None, fs_cache_dentries=None, fs_raw_disk_suffix=RAW,
-                 fs_dtl_config_mode=None, fs_file_event_rules=None, fs_enable_shm_interface=0, fs_metadata_backend_type='MDS',
+    def __init__(self, dtl_mode, fs_virtual_disk_format='raw', fs_dtl_host='', fs_dtl_port=None, fs_dtl_mode=None, fs_ignore_sync=None, fs_max_open_files=None, fs_cache_dentries=None, fs_raw_disk_suffix=RAW,
+                 fs_file_event_rules=None, fs_enable_shm_interface=0, fs_metadata_backend_type='MDS',
                  fs_enable_network_interface=1, fs_metadata_backend_mds_nodes=None, fs_metadata_backend_mds_timeout_secs=None, fs_metadata_backend_arakoon_cluster_id=None,
                  fs_metadata_backend_arakoon_cluster_nodes=None, fs_metadata_backend_mds_slave_max_tlogs_behind=None, fs_metadata_backend_mds_apply_relocations_to_slaves=None, *args, **kwargs):
         """
@@ -71,7 +72,6 @@ class FileSystemConfig(BaseStorageDriverConfig):
         self.fs_max_open_files = fs_max_open_files
         self.fs_cache_dentries = fs_cache_dentries
         self.fs_raw_disk_suffix = fs_raw_disk_suffix
-        self.fs_dtl_config_mode = fs_dtl_config_mode
         self.fs_virtual_disk_format = fs_virtual_disk_format
         self.fs_enable_shm_interface = fs_enable_shm_interface
         self.fs_metadata_backend_type = fs_metadata_backend_type

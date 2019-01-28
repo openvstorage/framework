@@ -24,9 +24,9 @@ DTL allocation rules:
 """
 import copy
 import unittest
+from ovs.constants.storagedriver import VOLDRV_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.tests.helpers import DalHelper
-from ovs_extensions.constants.storagedriver import VOLDRV_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs_extensions.log.logger import Logger
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import DTLConfig

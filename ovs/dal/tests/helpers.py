@@ -21,6 +21,7 @@ import os
 import copy
 import glob
 import shutil
+from ovs.constants.storagedriver import VOLDRV_DTL_ASYNC, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -37,7 +38,6 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, GENERIC_SCRUB, HOSTS_CONFIG_PATH
-from ovs_extensions.constants.storagedriver import VOLDRV_DTL_ASYNC, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs_extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration

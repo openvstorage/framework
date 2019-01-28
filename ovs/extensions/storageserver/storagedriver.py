@@ -19,14 +19,14 @@ Wrapper class for the storagedriver client of the voldrv team
 """
 import os
 import copy
+from ovs.constants.storagedriver import VOLDRV_DTL_SYNC, VOLDRV_DTL_ASYNC, VOLDRV_DTL_TRANSPORT_TCP, VOLDRV_DTL_TRANSPORT_RSOCKET, \
+FRAMEWORK_DTL_SYNC, FRAMEWORK_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, FRAMEWORK_DTL_TRANSPORT_TCP, FRAMEWORK_DTL_TRANSPORT_RSOCKET
 from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger as OVSLogger
 from ovs_extensions.generic.remote import remote
 from volumedriver.storagerouter import storagerouterclient
-from ovs_extensions.constants.storagedriver import VOLDRV_DTL_SYNC, VOLDRV_DTL_ASYNC, VOLDRV_DTL_TRANSPORT_TCP, VOLDRV_DTL_TRANSPORT_RSOCKET, \
-FRAMEWORK_DTL_SYNC, FRAMEWORK_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, FRAMEWORK_DTL_TRANSPORT_TCP, FRAMEWORK_DTL_TRANSPORT_RSOCKET
 
 # Import below classes so the rest of the framework can always import from this module:
 # * We can inject mocks easier without having to make changes everywhere

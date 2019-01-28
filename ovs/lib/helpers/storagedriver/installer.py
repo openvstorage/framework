@@ -22,6 +22,7 @@ import re
 import copy
 import time
 from subprocess import CalledProcessError
+from ovs.constants.storagedriver import FRAMEWORK_DTL_TRANSPORT_RSOCKET
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -32,7 +33,6 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs_extensions.constants.vpools import GENERIC_SCRUB, PROXY_CONFIG_MAIN, HOSTS_CONFIG_PATH, HOSTS_PATH, PROXY_PATH
-from ovs_extensions.constants.storagedriver import FRAMEWORK_DTL_TRANSPORT_RSOCKET
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
@@ -457,31 +457,30 @@ class StorageDriverInstaller(object):
                                                 default_cluster_size=self.cluster_size * 1024,
                                                 number_of_scos_in_tlog=self.tlog_multiplier,
                                                 non_disposable_scos_factor=float(self.write_buffer) / self.tlog_multiplier / self.sco_size)
+
         dist_store_config = DistributedLockStoreConfig(dls_arakoon_cluster_id=arakoon_cluster_name,
                                                        dls_arakoon_cluster_nodes=arakoon_nodes)
-        content_adressed_cache_config = ContentAddressedCacheConfig()
 
         dtl_config = DistributedTransactionLogConfig(dtl_path=self.storagedriver_partition_dtl.path,  # Not used, but required
                                                      dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[self.dtl_transport])
 
         fs_config = FileSystemConfig(dtl_mode=self.dtl_mode)
 
-        backend_connection_config = BackendConnectionManager(self.storagedriver.alba_proxies, vpool, self.storagedriver.storagedriver_ip).to_dict()
+        backend_connection_config = BackendConnectionManager(alba_proxies=self.storagedriver.alba_proxies, vpool=vpool, storage_ip=self.storagedriver.storage_ip)
 
         whole_config = StorageDriverConfig(vrouter_cluster_id=vpool.guid,
-                                                   dtl_config=dtl_config,
-                                                   filedriver_config=fd_config,
-                                                   filesystem_config=fs_config,
-                                                   vrouter_config=vrouter_config,
-                                                   scocache_config=scocache_config,
-                                                   vregistry_config=vregistry_config,
-                                                   dist_store_config=dist_store_config,
-                                                   volume_manager_config=volume_mgr_config,
-                                                   backend_config=backend_connection_config,
-                                                   content_adressed_cache_config=content_adressed_cache_config)
+                                           dtl_config=dtl_config,
+                                           filedriver_config=fd_config,
+                                           filesystem_config=fs_config,
+                                           dls_config=dist_store_config,
+                                           vrouter_config=vrouter_config,
+                                           scocache_config=scocache_config,
+                                           vregistry_config=vregistry_config,
+                                           volume_manager_config=volume_mgr_config,
+                                           backend_config=backend_connection_config)
 
         storagedriver_config = StorageDriverConfiguration(vpool.guid, self.storagedriver.storagedriver_id)
-        storagedriver_config.configuration = whole_config
+        storagedriver_config.configuration = whole_config.to_dict()
         storagedriver_config.save(client=self.sr_installer.root_client)
 
     def start_services(self):

@@ -256,6 +256,39 @@ class StorageDriverConfig(BaseStorageDriverConfig):
     # Compilation of all other objects
     component_identifier = 'complete_storagedriver_config'
 
+    def to_dict(self):
+        # type: () -> Dict[str, any]
+        """
+        Get the complete overview as a dict
+        :return: The complete overview as dict
+        :rtype: Dict[str, any]
+        """
+        self._config = {u'asio_service_manager': {u'asio_service_manager_io_service_per_thread': self.asio_service_manager_io_service_per_thread,
+                                                  u'asio_service_manager_threads': self.asio_service_manager_threads},
+                        u'backend_connection_manager': self.backend_config.to_dict(),
+                        u'backend_garbage_collector': {u'bgc_threads': self.bgc_threads},
+                        u'content_addressed_cache': self.contentcache_config.to_dict(),
+                        u'distributed_lock_store': self.dls_config.to_dict(),
+                        u'distributed_transaction_log': self.dtl_config.to_dict(),
+                        u'event_publisher': self.events_config.to_dict(),
+                        u'file_driver': self.filedriver_config.to_dict(),
+                        u'filesystem': self.filesystem_config.to_dict(),
+                        u'fuse': {u'fuse_min_workers': self.fuse_min_workers,
+                                 u'fuse_max_workers': self.fuse_max_workers},
+                        u'metadata_server': self.mds_config.to_dict(),
+                        u'network_interface': self.network_config.to_dict(),
+                        u'threadpool_component': {u'num_threads': self.num_threads},
+                        u'scocache': self.scocache_config.to_dict(),
+                        u'scrub_manager': self.scrub_manager_config.to_dict(),
+                        u'shm_interface': {u'shm_region_size': self.shm_region_size},
+                        u'stats_collector': {u'stats_collector_destination': self.stats_collector_destination,
+                                             u'stats_collector_interval_secs': self.stats_collector_interval_secs},
+                        u'volume_manager': self.volume_manager_config.to_dict(),
+                        u'volume_registry': self.vregistry_config.to_dict(),
+                        u'volume_router': self.vrouter_config.to_dict(),
+                        u'volume_router_cluster': {u'vrouter_cluster_id': self.vrouter_cluster_id}}
+        return ExtensionsToolbox.filter_dict_for_none(self._config)
+
     def __init__(self,
                  vrouter_cluster_id,  # type: str
                  filedriver_config,  # type: FileDriverConfig
@@ -265,7 +298,7 @@ class StorageDriverConfig(BaseStorageDriverConfig):
                  filesystem_config,  # type: FileSystemConfig
                  dtl_config,  # type: DistributedTransactionLogConfig
                  scocache_config,  # type: ScoCacheConfig
-                 backend_config=None,  # type: Optional[BackendConnectionManager]
+                 backend_config,  # type: BackendConnectionManager
                  mds_config=None,  # type: Optional[MetadataServerConfig]
                  dls_config=None,  # type: Optional[DistributedLockStoreConfig]
                  events_config=None,  # type: Optional[EventPublisherConfig]
@@ -311,9 +344,9 @@ class StorageDriverConfig(BaseStorageDriverConfig):
         self.filesystem_config = filesystem_config
         self.dtl_config = dtl_config
         self.scocache_config = scocache_config
+        self.backend_config = backend_config
 
         # Configs that can be None
-        self.backend_config = backend_config or BackendConnectionManager()  # type: BackendConnectionManager
         self.mds_config = mds_config or MetadataServerConfig()  # type: MetadataServerConfig
         self.dls_config = dls_config or DistributedLockStoreConfig()  # type: DistributedLockStoreConfig
         self.events_config = events_config or EventPublisherConfig()  # type: NetworkInterfaceConfig
@@ -321,36 +354,3 @@ class StorageDriverConfig(BaseStorageDriverConfig):
         self.contentcache_config = contentcache_config or ContentAddressedCacheConfig()  # type: ContentAddressedCacheConfig
         self.scrub_manager_config = scrub_manager_config or ScrubManagerConfig()  # type: ScrubManagerConfig
         self._config = {}
-
-    def to_dict(self):
-        # type: () -> Dict[str, any]
-        """
-        Get the complete overview as a dict
-        :return: The complete overview as dict
-        :rtype: Dict[str, any]
-        """
-        self._config = {'asio_service_manager': {'asio_service_manager_io_service_per_thread': self.asio_service_manager_io_service_per_thread,
-                                                 'asio_service_manager_threads': self.asio_service_manager_threads},
-                        'backend_connection_manager': self.backend_config.to_dict(),
-                        'backend_garbage_collector': {'bgc_threads': self.bgc_threads},
-                        'content_addressed_cache': self.contentcache_config.to_dict(),
-                        'distributed_lock_store': self.dls_config.to_dict(),
-                        'distributed_transaction_log': self.dtl_config.to_dict(),
-                        'event_publisher': self.events_config.to_dict(),
-                        'file_driver': self.filedriver_config.to_dict(),
-                        'filesystem': self.filesystem_config.to_dict(),
-                        'fuse': {'fuse_min_workers': self.fuse_min_workers,
-                                 'fuse_max_workers': self.fuse_max_workers},
-                        'metadata_server': self.mds_config.to_dict(),
-                        'network_interface': self.network_config.to_dict(),
-                        'threadpool_component': {'num_threads': self.num_threads},
-                        'scocache': self.scocache_config.to_dict(),
-                        'scrub_manager': self.scrub_manager_config.to_dict(),
-                        'shm_interface': {'shm_region_size': self.shm_region_size},
-                        'stats_collector': {'stats_collector_destination': self.stats_collector_destination,
-                                            'stats_collector_interval_secs': self.stats_collector_interval_secs},
-                        'volume_manager': self.volume_manager_config.to_dict(),
-                        'volume_registry': self.vregistry_config.to_dict(),
-                        'volume_router': self.vrouter_config.to_dict(),
-                        'volume_router_cluster': {'vrouter_cluster_id': self.vrouter_cluster_id}}
-        return ExtensionsToolbox.filter_dict_for_none(self._config)

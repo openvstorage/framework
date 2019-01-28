@@ -21,7 +21,7 @@ StorageRouterInstaller class used to validate / configure / edit StorageRouter s
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.extensions.generic.logger import Logger
 from ovs.lib.storagerouter import StorageRouterController
-from ovs_extensions.constants.roles import DTL, BACKEND, SCRUB, WRITE, DB
+from ovs.constants.roles import DTL, SCRUB, WRITE, DB
 
 
 class StorageRouterInstaller(object):

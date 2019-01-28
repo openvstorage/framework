@@ -19,10 +19,11 @@ VPool module
 """
 
 import time
+from ovs.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_ASYNC
+from ovs.constants.vpool import STATUS_DELETING, STATUS_EXTENDING, STATUS_FAILURE, STATUS_INSTALLING, STATUS_RUNNING, STATUS_SHRINKING
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
-from ovs_extensions.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_ASYNC
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration,\
@@ -36,7 +37,7 @@ class VPool(DataObject):
     """
     _logger = Logger('hybrids')
 
-    STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
+    STATUSES = DataObject.enumerator('Status', [STATUS_RUNNING, STATUS_SHRINKING, STATUS_INSTALLING, STATUS_FAILURE, STATUS_DELETING, STATUS_EXTENDING])
     CACHES = DataObject.enumerator('Cache', {'BLOCK': 'block',
                                              'FRAGMENT': 'fragment'})
 

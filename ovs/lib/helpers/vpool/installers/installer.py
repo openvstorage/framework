@@ -20,9 +20,9 @@ VpoolInstaller class responsible for adding/removing vPools
 
 import copy
 import json
-from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
 from ovs.dal.hybrids.vpool import VPool
 from ovs_extensions.api.client import OVSClient
+from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -33,7 +33,7 @@ from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
 
 class VPoolInstaller(VPoolInstallerBase):
     """
-    Class used to create/remove a vPool
+    Class used as parent class to create/extend a vPool
     This class will be responsible for
         - __init__: Validations whether the specified configurations are valid
         - create: Creation of a vPool pure model-wise

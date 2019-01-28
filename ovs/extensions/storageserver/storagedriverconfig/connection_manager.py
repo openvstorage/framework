@@ -16,8 +16,8 @@
 
 import re
 from .base import BaseStorageDriverConfig
+from ovs.constants.storagedriver import VOLDRV_DTL_TRANSPORT_TCP
 from ovs.dal.hybrids.vpool import VPool
-from ovs_extensions.constants.storagedriver import VOLDRV_DTL_TRANSPORT_TCP
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
 
@@ -29,10 +29,11 @@ class BackendConnectionManager(BaseStorageDriverConfig):
     component_identifier = 'backend_connection_manager'
 
     def __init__(self, vpool, storage_ip, alba_proxies,
-                 local_connection_path=None, backend_connection_pool_capacity=None, backend_interface_retries_on_error=None, backend_interface_retry_interval_secs=1, backend_interface_retry_interval_max_secs=None,
-                 backend_connection_pool_blacklist_secs=None, backend_interface_retry_backoff_multiplier=2.0, backend_interface_partial_read_retries_on_error=5,
-                 backend_interface_partial_read_timeout_msecs=None, backend_interface_partial_read_timeout_max_msecs=None, backend_interface_partial_read_timeout_multiplier=None, backend_interface_partial_read_retry_interval_msecs=None,
-                 backend_interface_partial_read_retry_interval_max_msecs=None, backend_interface_partial_read_retry_backoff_multiplier=None,  backend_type='MULTI', *args, **kwargs):
+                 local_connection_path=None, backend_connection_pool_capacity=None, backend_interface_retries_on_error=None, backend_interface_retry_interval_secs=1,
+                 backend_interface_retry_interval_max_secs=None, backend_connection_pool_blacklist_secs=None, backend_interface_retry_backoff_multiplier=2.0,
+                 backend_interface_partial_read_retries_on_error=5, backend_interface_partial_read_timeout_msecs=None, backend_interface_partial_read_timeout_max_msecs=None,
+                 backend_interface_partial_read_timeout_multiplier=None, backend_interface_partial_read_retry_interval_msecs=None, backend_interface_partial_read_retry_interval_max_msecs=None,
+                 backend_interface_partial_read_retry_backoff_multiplier=None,  backend_type='MULTI', *args, **kwargs):
         """
         Initiate the volumedriverfs config: backend_interface
         :param local_connection_path: When backend_type is LOCAL: path to use as LOCAL backend, otherwise ignored
@@ -56,9 +57,9 @@ class BackendConnectionManager(BaseStorageDriverConfig):
         if self.backend_type == 'LOCAL' and local_connection_path is None:
             raise RuntimeError('Local_connection_path needs to be provided if backendtype is LOCAL')
 
-        if not isinstance(self._vpool, VPool):
+        if not isinstance(vpool, VPool):
             raise RuntimeError('Backendconnection config needs a VPool instance to construct the storagedriverconfig')
-        if not re.match(storage_ip, ExtensionsToolbox.regex_ip):
+        if not re.match(ExtensionsToolbox.regex_ip, storage_ip):
             raise RuntimeError('Backendconnection config needs a valid IP to construct its storagedriverconfig')
 
         self._vpool = vpool
@@ -81,7 +82,7 @@ class BackendConnectionManager(BaseStorageDriverConfig):
         self.backend_interface_partial_read_retry_interval_max_msecs = backend_interface_partial_read_retry_interval_max_msecs
         self.backend_interface_partial_read_retry_backoff_multiplier = backend_interface_partial_read_retry_backoff_multiplier
 
-        self.alba_connection_config = AlbaConnectionConfig(**kwargs)
+        self._alba_connection_config = AlbaConnectionConfig(**kwargs)
 
     def to_dict(self):
         # type: () -> Dict[str, any]

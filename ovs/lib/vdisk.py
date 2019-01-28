@@ -25,6 +25,7 @@ import time
 import uuid
 import pickle
 import random
+from ovs.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
@@ -37,7 +38,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
-from ovs_extensions.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException

@@ -20,7 +20,7 @@ DiskPartition module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.disk import Disk
-from ovs_extensions.constants.roles import BACKEND, DB, DTL, SCRUB, WRITE
+from ovs.constants.roles import BACKEND, DB, DTL, SCRUB, WRITE
 
 
 class DiskPartition(DataObject):
