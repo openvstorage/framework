@@ -22,7 +22,7 @@ import re
 import copy
 import time
 from subprocess import CalledProcessError
-from ovs.constants.storagedriver import FRAMEWORK_DTL_TRANSPORT_RSOCKET
+from ovs.constants.storagedriver import FRAMEWORK_DTL_TRANSPORT_RSOCKET, CACHE_FRAGMENT, CACHE_BLOCK
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -162,16 +162,16 @@ class StorageDriverInstaller(object):
             self.block_cache_quota = caching_info.get('cache_quota_bc')
             self.block_cache_on_read = caching_info['block_cache_on_read']
             self.block_cache_on_write = caching_info['block_cache_on_write']
-            self.block_cache_backend_info = backend_info[StorageDriverConfiguration.CACHE_BLOCK]
-            self.block_cache_connection_info = connection_info[StorageDriverConfiguration.CACHE_BLOCK]
+            self.block_cache_backend_info = backend_info[CACHE_BLOCK]
+            self.block_cache_connection_info = connection_info[CACHE_BLOCK]
             self.block_cache_local = self.block_cache_backend_info is None and (self.block_cache_on_read is True or self.block_cache_on_write is True)
 
             # Fragment cache behavior configurations
             self.fragment_cache_quota = caching_info.get('cache_quota_fc')
             self.fragment_cache_on_read = caching_info['fragment_cache_on_read']
             self.fragment_cache_on_write = caching_info['fragment_cache_on_write']
-            self.fragment_cache_backend_info = backend_info[StorageDriverConfiguration.CACHE_FRAGMENT]
-            self.fragment_cache_connection_info = connection_info[StorageDriverConfiguration.CACHE_FRAGMENT]
+            self.fragment_cache_backend_info = backend_info[CACHE_FRAGMENT]
+            self.fragment_cache_connection_info = connection_info[CACHE_FRAGMENT]
             self.fragment_cache_local = self.fragment_cache_backend_info is None and (self.fragment_cache_on_read is True or self.fragment_cache_on_write is True)
 
             # Additional validations
@@ -410,8 +410,8 @@ class StorageDriverInstaller(object):
 
         for proxy_id, alba_proxy in enumerate(self.storagedriver.alba_proxies):
             # Generate cache information for main proxy
-            block_cache_main_proxy = _generate_proxy_cache_config(cache_type=StorageDriverConfiguration.CACHE_BLOCK, cache_settings=block_cache_settings, proxy_index=proxy_id)
-            fragment_cache_main_proxy = _generate_proxy_cache_config(cache_type=StorageDriverConfiguration.CACHE_FRAGMENT, cache_settings=fragment_cache_settings, proxy_index=proxy_id)
+            block_cache_main_proxy = _generate_proxy_cache_config(cache_type=CACHE_BLOCK, cache_settings=block_cache_settings, proxy_index=proxy_id)
+            fragment_cache_main_proxy = _generate_proxy_cache_config(cache_type=CACHE_FRAGMENT, cache_settings=fragment_cache_settings, proxy_index=proxy_id)
 
             # Generate cache information for scrub proxy
             block_cache_scrub_proxy = _generate_scrub_proxy_cache_config(cache_settings=block_cache_settings, main_proxy_cache_config=block_cache_main_proxy)
@@ -466,7 +466,7 @@ class StorageDriverInstaller(object):
 
         fs_config = FileSystemConfig(dtl_mode=self.dtl_mode)
 
-        backend_connection_config = BackendConnectionManager(alba_proxies=self.storagedriver.alba_proxies, vpool=vpool, storage_ip=self.storagedriver.storage_ip)
+        backend_connection_config = BackendConnectionManager(vpool=vpool, storagedriver=self.storagedriver)
 
         whole_config = StorageDriverConfig(vrouter_cluster_id=vpool.guid,
                                            dtl_config=dtl_config,

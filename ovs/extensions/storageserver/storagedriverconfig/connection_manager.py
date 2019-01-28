@@ -28,14 +28,16 @@ class BackendConnectionManager(BaseStorageDriverConfig):
 
     component_identifier = 'backend_connection_manager'
 
-    def __init__(self, vpool, storage_ip, alba_proxies,
+    def __init__(self, vpool, storagedriver,
                  local_connection_path=None, backend_connection_pool_capacity=None, backend_interface_retries_on_error=None, backend_interface_retry_interval_secs=1,
                  backend_interface_retry_interval_max_secs=None, backend_connection_pool_blacklist_secs=None, backend_interface_retry_backoff_multiplier=2.0,
                  backend_interface_partial_read_retries_on_error=5, backend_interface_partial_read_timeout_msecs=None, backend_interface_partial_read_timeout_max_msecs=None,
                  backend_interface_partial_read_timeout_multiplier=None, backend_interface_partial_read_retry_interval_msecs=None, backend_interface_partial_read_retry_interval_max_msecs=None,
-                 backend_interface_partial_read_retry_backoff_multiplier=None,  backend_type='MULTI', *args, **kwargs):
+                 backend_interface_partial_read_retry_backoff_multiplier=None, backend_type='MULTI', *args, **kwargs):
         """
         Initiate the volumedriverfs config: backend_interface
+        :param vpool: vpool object to use for configuration
+        :param storagedriver: storagedriver object to use for configuration
         :param local_connection_path: When backend_type is LOCAL: path to use as LOCAL backend, otherwise ignored
         :param backend_connection_pool_capacity: Capacity of the connection pool maintained by the BackendConnectionManager
         :param backend_interface_retries_on_error: How many times to retry a failed backend operation
@@ -51,7 +53,6 @@ class BackendConnectionManager(BaseStorageDriverConfig):
         :param backend_interface_partial_read_retry_interval_max_msecs: max delay before retrying a failed partial read in milliseconds
         :param backend_interface_partial_read_retry_backoff_multiplier: multiplier for the retry interval on each subsequent retry (< 0 -> backend_interface_retry_backoff_multiplier is used)
         :param backend_type: Type of backend connection one of ALBA, LOCAL, MULTI or S3, the other parameters in this section are only used when their correct backendtype is set. Defaults to MULTI
-
         """
         self.backend_type = backend_type
         if self.backend_type == 'LOCAL' and local_connection_path is None:
@@ -59,12 +60,10 @@ class BackendConnectionManager(BaseStorageDriverConfig):
 
         if not isinstance(vpool, VPool):
             raise RuntimeError('Backendconnection config needs a VPool instance to construct the storagedriverconfig')
-        if not re.match(ExtensionsToolbox.regex_ip, storage_ip):
-            raise RuntimeError('Backendconnection config needs a valid IP to construct its storagedriverconfig')
 
         self._vpool = vpool
-        self._storage_ip = storage_ip
-        self._alba_proxies = alba_proxies
+        self._storage_ip = storagedriver.storage_ip
+        self._alba_proxies = storagedriver.alba_proxies
 
         self.local_connection_path = local_connection_path
         self.backend_connection_pool_capacity = backend_connection_pool_capacity
@@ -95,7 +94,7 @@ class BackendConnectionManager(BaseStorageDriverConfig):
         config = super(BackendConnectionManager, self).to_dict()  # Instantiate known config so far
 
         for index, proxy in enumerate(sorted(self._alba_proxies, key=lambda k: k.service.ports[0])):
-            config[str(index)] = AlbaConnectionConfig(alba_connection_host=self._storage_ip,
+            config[str(index)] = AlbaConnectionConfig(alba_connection_host=proxy.storagedriver.storage_ip,
                                                       alba_connection_port=proxy.service.ports[0],
                                                       alba_connection_preset=self._vpool.metadata['backend']['backend_info']['preset']).to_dict()
         return config
