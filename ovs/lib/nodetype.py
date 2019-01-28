@@ -24,6 +24,7 @@ import sys
 import json
 import time
 from ovs.dal.hybrids.servicetype import ServiceType
+from ovs_extensions.constants.vpools import HOSTS_BASE_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger

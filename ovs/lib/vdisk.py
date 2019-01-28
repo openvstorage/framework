@@ -25,6 +25,7 @@ import time
 import uuid
 import pickle
 import random
+from ovs.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE, CACHE_BLOCK, CACHE_FRAGMENT
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
@@ -150,8 +151,8 @@ class VDiskController(object):
                 else:
                     vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
                     metadata = vpool.metadata['caching_info'].get(vdisk.storagerouter_guid, {})
-                    fcq = metadata.get(StorageDriverConfiguration.CACHE_FRAGMENT, {}).get('quota')
-                    bcq = metadata.get(StorageDriverConfiguration.CACHE_BLOCK, {}).get('quota')
+                    fcq = metadata.get(CACHE_FRAGMENT, {}).get('quota')
+                    bcq = metadata.get(CACHE_BLOCK, {}).get('quota')
                 if fcq is not None and fcq > 0:
                     fcq_action = 'Setting FCQ to {0}'.format(fcq)
                     fcq_command = ['--fragment-cache-quota', str(fcq)]
@@ -964,8 +965,8 @@ class VDiskController(object):
         if cache_quota is None:
             vdisk.invalidate_dynamics('storagerouter_guid')
             cache_info = vpool.metadata['caching_info'].get(vdisk.storagerouter_guid, {})  # type: dict
-            cache_info_fragment = cache_info.get(StorageDriverConfiguration.CACHE_FRAGMENT, {})  # type: dict
-            cache_info_block = cache_info.get(StorageDriverConfiguration.CACHE_BLOCK, {})  # type: dict
+            cache_info_fragment = cache_info.get(CACHE_FRAGMENT, {})  # type: dict
+            cache_info_block = cache_info.get(CACHE_BLOCK, {})  # type: dict
             cache_quota = {VPool.CACHES.FRAGMENT: cache_info_fragment.get('quota'),
                            VPool.CACHES.BLOCK: cache_info_block.get('quota')}
 
@@ -1231,7 +1232,7 @@ class VDiskController(object):
                     vpool_config = vpool.configuration
                     ExtensionsToolbox.verify_required_params(required_params={'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                                                                               'dtl_enabled': (bool, None),
-                                                                              'dtl_config_mode': (str, [StorageDriverClient.VOLDRV_DTL_MANUAL_MODE, StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE])},
+                                                                              'dtl_config_mode': (str, [VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE])},
                                                              actual_params=vpool_config)
 
                     volume_id = str(vdisk.volume_id)

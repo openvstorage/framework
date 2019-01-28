@@ -19,6 +19,8 @@ VPool module
 """
 
 import time
+from ovs.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_ASYNC
+from ovs.constants.vpool import STATUS_DELETING, STATUS_EXTENDING, STATUS_FAILURE, STATUS_INSTALLING, STATUS_RUNNING, STATUS_SHRINKING
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
@@ -35,7 +37,7 @@ class VPool(DataObject):
     """
     _logger = Logger('hybrids')
 
-    STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
+    STATUSES = DataObject.enumerator('Status', [STATUS_RUNNING, STATUS_SHRINKING, STATUS_INSTALLING, STATUS_FAILURE, STATUS_DELETING, STATUS_EXTENDING])
     CACHES = DataObject.enumerator('Cache', {'BLOCK': 'block',
                                              'FRAGMENT': 'fragment'})
 
@@ -128,7 +130,7 @@ class VPool(DataObject):
         volume_manager = storagedriver_config.configuration['volume_manager']
 
         dtl_host = file_system['fs_dtl_host']
-        dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
+        dtl_mode = file_system.get('fs_dtl_mode', VOLDRV_DTL_ASYNC)
         cluster_size = volume_manager['default_cluster_size'] / 1024
         dtl_transport = dtl['dtl_transport']
         sco_multiplier = volume_router['vrouter_sco_multiplier']
@@ -138,7 +140,7 @@ class VPool(DataObject):
 
         sco_size = sco_multiplier * cluster_size / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
-        dtl_enabled = not (dtl_config_mode == StorageDriverClient.VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
+        dtl_enabled = not (dtl_config_mode == VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
 
         try:
             mds_config = Configuration.get(MDS_CONFIG_PATH.format(self.guid))

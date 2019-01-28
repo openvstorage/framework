@@ -24,6 +24,7 @@ DTL allocation rules:
 """
 import copy
 import unittest
+from ovs.constants.storagedriver import VOLDRV_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.log.logger import Logger
@@ -75,7 +76,7 @@ class VDiskTest(unittest.TestCase):
         default_sco_size = vdisk_1.storagedriver_client.get_sco_multiplier(vdisk_1.volume_id) / 1024 * 4
         non_disposable_sco_factor = vdisk_1.storagedriver_client.get_sco_cache_max_non_disposable_factor(vdisk_1.volume_id)
         default_values = {'sco_size': default_sco_size,
-                          'dtl_mode': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC,
+                          'dtl_mode': FRAMEWORK_DTL_NO_SYNC,
                           'dtl_target': [],
                           'cache_quota': {'fragment': None,
                                           'block': None},
@@ -87,13 +88,13 @@ class VDiskTest(unittest.TestCase):
                              msg='Value for "{0}" does not match expected default value: {1} vs {2}'.format(key, configuration[key], value))
 
         # Attempt to set incorrect values
-        new_config_params = {'dtl_mode': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC,
+        new_config_params = {'dtl_mode': FRAMEWORK_DTL_NO_SYNC,
                              'sco_size': 4,
                              'dtl_target': [],
                              'cache_quota': {'fragment': 5 * 1024 ** 3,
                                              'block': 1024 ** 3},
                              'write_buffer': 128}
-        for key, values in {'dtl_mode': ['unknown', StorageDriverClient.VOLDRV_DTL_ASYNC],
+        for key, values in {'dtl_mode': ['unknown', VOLDRV_DTL_ASYNC],
                             'sco_size': list(set(range(257)).difference({4, 8, 16, 32, 64, 128})) + [-1],
                             'dtl_target': [{}, (), 0],
                             'cache_quota': [{'fragment': -1}, {'fragment': 1 * 1024.0 ** 3 - 1}, {'fragment': 1024 ** 4 + 1},
@@ -189,7 +190,7 @@ class VDiskTest(unittest.TestCase):
         # Set DTL with DTL disabled for vPool
         vpool_1 = structure['vpools'][1]
         DalHelper.set_vpool_storage_driver_configuration(vpool=vpool_1, config={'filesystem': {'fs_dtl_host': '',
-                                                                                               'fs_dtl_config_mode': StorageDriverClient.VOLDRV_DTL_MANUAL_MODE}})
+                                                                                               'fs_dtl_config_mode': VOLDRV_DTL_MANUAL_MODE}})
         vpool_1.invalidate_dynamics('configuration')
         self.assertFalse(expr=vpool_1.configuration['dtl_enabled'])
 
@@ -270,7 +271,7 @@ class VDiskTest(unittest.TestCase):
 
         # Set DTL with DTL disabled for vPool
         DalHelper.set_vpool_storage_driver_configuration(vpool=vpool_1, config={'filesystem': {'fs_dtl_host': '',
-                                                                                               'fs_dtl_config_mode': StorageDriverClient.VOLDRV_DTL_MANUAL_MODE}})
+                                                                                               'fs_dtl_config_mode': VOLDRV_DTL_MANUAL_MODE}})
         vpool_1.invalidate_dynamics('configuration')
         self.assertFalse(expr=vpool_1.configuration['dtl_enabled'])
 
@@ -349,7 +350,7 @@ class VDiskTest(unittest.TestCase):
         # Set DTL with DTL disabled for vPool
         vpool_1 = structure['vpools'][1]
         DalHelper.set_vpool_storage_driver_configuration(vpool=vpool_1, config={'filesystem': {'fs_dtl_host': '',
-                                                                                               'fs_dtl_config_mode': StorageDriverClient.VOLDRV_DTL_MANUAL_MODE}})
+                                                                                               'fs_dtl_config_mode': VOLDRV_DTL_MANUAL_MODE}})
         vpool_1.invalidate_dynamics('configuration')
         self.assertFalse(expr=vpool_1.configuration['dtl_enabled'])
 
@@ -475,7 +476,7 @@ class VDiskTest(unittest.TestCase):
         # Set DTL with DTL disabled for vPool
         vpool_1 = structure['vpools'][1]
         DalHelper.set_vpool_storage_driver_configuration(vpool=vpool_1, config={'filesystem': {'fs_dtl_host': '',
-                                                                                               'fs_dtl_config_mode': StorageDriverClient.VOLDRV_DTL_MANUAL_MODE}})
+                                                                                               'fs_dtl_config_mode': VOLDRV_DTL_MANUAL_MODE}})
         vpool_1.invalidate_dynamics('configuration')
         self.assertFalse(expr=vpool_1.configuration['dtl_enabled'])
 
@@ -528,7 +529,7 @@ class VDiskTest(unittest.TestCase):
 
         # Set DTL to any target in regular Domain, then add recovery Domain --> checkup_required
         DalHelper.set_vpool_storage_driver_configuration(vpool=vpool_1, config={'filesystem': {'fs_dtl_host': '',
-                                                                                               'fs_dtl_config_mode': StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE}})
+                                                                                               'fs_dtl_config_mode': VOLDRV_DTL_AUTOMATIC_MODE}})
         vpool_1.invalidate_dynamics('configuration')
         self.assertTrue(expr=vpool_1.configuration['dtl_enabled'])
 

@@ -14,11 +14,11 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 import os
+from ovs.constants.storagedriver import CACHE_BLOCK, CACHE_FRAGMENT
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI, REMOTE_CONFIG_BACKEND_CONFIG, REMOTE_CONFIG_BACKEND_BASE
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs_extensions.constants.vpools import PROXY_CONFIG_PATH
 
 
@@ -99,7 +99,7 @@ class VPoolShared(object):
         """
         present_remote_configs = dict([(key, REMOTE_CONFIG_BACKEND_CONFIG.format(key)) for key in list(Configuration.list(REMOTE_CONFIG_BACKEND_BASE))])
         in_use = set()
-        cache_types = [StorageDriverConfiguration.CACHE_FRAGMENT, StorageDriverConfiguration.CACHE_BLOCK]
+        cache_types = [CACHE_FRAGMENT, CACHE_BLOCK]
 
         for vpool in VPoolList.get_vpools():
             proxy_config_template = os.path.join(PROXY_CONFIG_PATH, 'main').format(vpool.guid)

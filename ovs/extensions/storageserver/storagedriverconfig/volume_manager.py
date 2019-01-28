@@ -24,7 +24,7 @@ class VolumeManagerConfig(BaseStorageDriverConfig):
 
     component_identifier = 'volume_manager'
 
-    def __init__(self, clean_interval, metadata_path, tlog_path, default_cluster_size=None, dtl_throttle_usecs=None, non_disposable_scos_factor=None,
+    def __init__(self, metadata_path, tlog_path, clean_interval=1, default_cluster_size=None, dtl_throttle_usecs=4000, non_disposable_scos_factor=None,
                  number_of_scos_in_tlog=None, read_cache_default_behaviour=None, read_cache_default_mode=None, sap_persist_interval=None,
                  sco_written_to_backend_action=None, required_tlog_freespace=None, required_meta_freespace=None, freespace_check_interval=None,
                  metadata_cache_capacity=None, metadata_mds_slave_max_tlogs_behind=None, arakoon_metadata_sequence_size=None, open_scos_per_volume=None,
@@ -32,9 +32,9 @@ class VolumeManagerConfig(BaseStorageDriverConfig):
                  dtl_connect_timeout_ms=None, dtl_check_interval_in_seconds=None, *args,**kwargs):
         """
         Initiate the volumedriverfs config: volumemanager
-        :param clean_interval: Interval between runs of scocache cleanups, in seconds. scocache_cleanup_trigger / clean_interval should be larger than the aggregated write speed to the scocache.
         :param metadata_path: Directory, where to create subdirectories in for volume metadata storage
         :param tlog_path: Directory, where to create subdirectories for volume tlogs
+        :param clean_interval: Interval between runs of scocache cleanups, in seconds. scocache_cleanup_trigger / clean_interval should be larger than the aggregated write speed to the scocache. Defaults to 1
         :param default_cluster_size:  size of a cluster in bytes
         :param non_disposable_scos_factor:  Factor to multiply number_of_scos_in_tlog with to determine the amount of non-disposable data permitted per volume
         :param number_of_scos_in_tlog: The number of SCOs that trigger a tlog rollover
@@ -49,7 +49,7 @@ class VolumeManagerConfig(BaseStorageDriverConfig):
         :param metadata_mds_slave_max_tlogs_behind: max number of TLogs a slave is allowed to run behind to still permit a failover to it
         :param arakoon_metadata_sequence_size: Size of Arakoon sequences used to send metadata pages to Arakoon
         :param open_scos_per_volume:  Number of open SCOs per volume
-        :param dtl_throttle_usecs: Timeout for retrying writes to the DTL
+        :param dtl_throttle_usecs: Timeout for retrying writes to the DTL. Defaults to 4000
         :param dtl_queue_depth:  Size of the queue of entries to be sent to the DTL
         :param dtl_write_trigger: Trigger to start writing entries in the foc queue to the backend
         :param dtl_request_timeout_ms:  Timeout for DTL requests

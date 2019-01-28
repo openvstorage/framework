@@ -20,13 +20,14 @@ DiskPartition module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.disk import Disk
+from ovs.constants.roles import BACKEND, DB, DTL, SCRUB, WRITE
 
 
 class DiskPartition(DataObject):
     """
     The DiskPartition class represents a partition on a physical Disk
     """
-    ROLES = DataObject.enumerator('Role', ['BACKEND', 'DB', 'DTL', 'SCRUB', 'WRITE'])
+    ROLES = DataObject.enumerator('Role', [BACKEND, DB, DTL, SCRUB, WRITE])
     VIRTUAL_STORAGE_LOCATION = '/mnt/storage'
 
     __properties = [Property('filesystem', str, mandatory=False, doc='The filesystem used on the partition'),

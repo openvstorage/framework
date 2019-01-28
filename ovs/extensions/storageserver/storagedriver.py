@@ -19,6 +19,8 @@ Wrapper class for the storagedriver client of the voldrv team
 """
 import os
 import copy
+from ovs.constants.storagedriver import VOLDRV_DTL_SYNC, VOLDRV_DTL_ASYNC, VOLDRV_DTL_TRANSPORT_TCP, VOLDRV_DTL_TRANSPORT_RSOCKET, \
+FRAMEWORK_DTL_SYNC, FRAMEWORK_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, FRAMEWORK_DTL_TRANSPORT_TCP, FRAMEWORK_DTL_TRANSPORT_RSOCKET
 from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
@@ -89,19 +91,6 @@ class StorageDriverClient(object):
     storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
-
-    VOLDRV_DTL_SYNC = 'Synchronous'
-    VOLDRV_DTL_ASYNC = 'Asynchronous'
-    VOLDRV_DTL_MANUAL_MODE = 'Manual'
-    VOLDRV_DTL_AUTOMATIC_MODE = 'Automatic'
-    VOLDRV_DTL_TRANSPORT_TCP = 'TCP'
-    VOLDRV_DTL_TRANSPORT_RSOCKET = 'RSocket'
-
-    FRAMEWORK_DTL_SYNC = 'sync'
-    FRAMEWORK_DTL_ASYNC = 'a_sync'
-    FRAMEWORK_DTL_NO_SYNC = 'no_sync'
-    FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
-    FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
 
     VDISK_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: DTLMode.SYNCHRONOUS,
                           FRAMEWORK_DTL_ASYNC: DTLMode.ASYNCHRONOUS,

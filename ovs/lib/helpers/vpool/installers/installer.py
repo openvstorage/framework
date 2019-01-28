@@ -20,20 +20,20 @@ VpoolInstaller class responsible for adding/removing vPools
 
 import copy
 import json
-from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
+from ovs.constants.storagedriver import CACHE_FRAGMENT, CACHE_BLOCK
 from ovs.dal.hybrids.vpool import VPool
 from ovs_extensions.api.client import OVSClient
+from ovs_extensions.constants.vpools import VPOOL_BASE_PATH
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.vpool.shared import VPoolShared
 from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
 
 
 class VPoolInstaller(VPoolInstallerBase):
     """
-    Class used to create/remove a vPool
+    Class used as parent class to create/extend a vPool
     This class will be responsible for
         - __init__: Validations whether the specified configurations are valid
         - create: Creation of a vPool pure model-wise
@@ -249,7 +249,7 @@ class VPoolInstaller(VPoolInstallerBase):
         # Create caching info object for current StorageRouter
         sr_guid = self.sr_installer.storagerouter.guid
         caching_info = {}
-        for cache_type in [StorageDriverConfiguration.CACHE_BLOCK, StorageDriverConfiguration.CACHE_FRAGMENT]:
+        for cache_type in [CACHE_BLOCK, CACHE_FRAGMENT]:
             cache_info = {'read': getattr(self.sd_installer, '{0}_on_read'.format(cache_type)),
                           'write': getattr(self.sd_installer, '{0}_on_write'.format(cache_type)),
                           'quota': getattr(self.sd_installer, '{0}_quota'.format(cache_type))}
