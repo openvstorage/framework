@@ -61,9 +61,8 @@ class BackendConnectionManager(BaseStorageDriverConfig):
         if not isinstance(vpool, VPool):
             raise RuntimeError('Backendconnection config needs a VPool instance to construct the storagedriverconfig')
 
+        self._storagedriver = storagedriver
         self._vpool = vpool
-        self._storage_ip = storagedriver.storage_ip
-        self._alba_proxies = storagedriver.alba_proxies
 
         self.local_connection_path = local_connection_path
         self.backend_connection_pool_capacity = backend_connection_pool_capacity
@@ -93,7 +92,7 @@ class BackendConnectionManager(BaseStorageDriverConfig):
 
         config = super(BackendConnectionManager, self).to_dict()  # Instantiate known config so far
 
-        for index, proxy in enumerate(sorted(self._alba_proxies, key=lambda k: k.service.ports[0])):
+        for index, proxy in enumerate(sorted(self._storagedriver.alba_proxies, key=lambda k: k.service.ports[0])):
             config[str(index)] = AlbaConnectionConfig(alba_connection_host=proxy.storagedriver.storage_ip,
                                                       alba_connection_port=proxy.service.ports[0],
                                                       alba_connection_preset=self._vpool.metadata['backend']['backend_info']['preset']).to_dict()
