@@ -18,14 +18,13 @@
 Generic test module
 """
 import re
-import unittest
+import logging
 from threading import Event
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.log.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.threadhelpers import Waiter
@@ -35,9 +34,10 @@ from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.generic.scrubber import Scrubber, ScrubShared, StackWorker
 from ovs.lib.graphite import GraphiteController
+from ovs.testing.testcase import LogTestCase
 
 
-class ScrubTestCase(unittest.TestCase):
+class ScrubTestCase(LogTestCase):
     """
     This test class will validate the various scenarios of the Generic logic
     """
@@ -45,6 +45,8 @@ class ScrubTestCase(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
+        super(ScrubTestCase, self).setUp()
+
         self.volatile, self.persistent = DalHelper.setup()
         self.graphite_controller = GraphiteController()
 
@@ -52,6 +54,8 @@ class ScrubTestCase(unittest.TestCase):
         """
         Clean up test suite
         """
+        super(ScrubTestCase, self).tearDown()
+
         DalHelper.teardown()
         ScrubShared._test_hooks = {}
         ScrubShared._unittest_data = {'setup': False}
@@ -81,11 +85,11 @@ class ScrubTestCase(unittest.TestCase):
             storagerouter.ip)
         storagerouter.disks[0].partitions[0].roles = []
         storagerouter.disks[0].partitions[0].save()
-        with self.assertRaises(ValueError) as raise_info:
+        with self.assertRaises(ValueError) as raise_info, self.assertLogs(level=logging.DEBUG) as logging_watcher:
             GenericController.execute_scrub(vdisk_guids=[vdisk.guid], manual=True)
         self.assertIn(member='No scrub locations found',
                       container=raise_info.exception.message)
-        logs = Logger._logs.get('lib', [])  # No logging should have happened yet
+        logs = logging_watcher.get_message_severity_map()  # No logging should have happened yet
         self.assertNotIn(member=expected_log,
                          container=logs)
 
@@ -95,9 +99,9 @@ class ScrubTestCase(unittest.TestCase):
         storagerouter.invalidate_dynamics('partition_config')
         SSHClient._raise_exceptions[storagerouter.ip] = {'users': ['root'],
                                                          'exception': UnableToConnectException('No route to host')}
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError), self.assertLogs(level=logging.DEBUG) as logging_watcher:
             GenericController.execute_scrub(vdisk_guids=[vdisk.guid], manual=True)
-        logs = Logger._logs['lib']
+        logs = logging_watcher.get_message_severity_map()
         self.assertIn(member=expected_log,
                       container=logs)
         self.assertEqual(first=logs[expected_log],
@@ -321,7 +325,8 @@ class ScrubTestCase(unittest.TestCase):
             vdisk = vdisks[vdisk_id]
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
-        GenericController.execute_scrub()
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            GenericController.execute_scrub()
         vdisk_namespaces = {}  # Validate all registered items are gone
         for vpool in vpools.values():
             vdisk_namespaces[ScrubShared._SCRUB_VDISK_KEY.format(vpool.name)] = []
@@ -334,7 +339,7 @@ class ScrubTestCase(unittest.TestCase):
         self.assertIn(
             member='Scrubber unittest - vPool {0} - vDisk {1} with guid {2} is a template, not scrubbing'.format(
                 vdisk_t.vpool.name, vdisk_t.name, vdisk_t.guid),
-            container=Logger._logs['lib'])
+            container=logging_watcher.get_message_severity_map())
 
     def test_location_specification(self):
         """
@@ -418,15 +423,15 @@ class ScrubTestCase(unittest.TestCase):
                                  list2=expected_work)
 
         # Scrub all volumes on specific StorageRouter
-        Logger._logs = {}
         for vdisk_id, vdisk in vdisks.iteritems():
             LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'] = range(vdisk_id)
-        GenericController.execute_scrub(storagerouter_guid=storagerouters[2].guid)
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            GenericController.execute_scrub(storagerouter_guid=storagerouters[2].guid)
         for vdisk_id, vdisk in vdisks.iteritems():
             self.assertListEqual(list1=LockedClient.scrub_controller['volumes'][vdisk.volume_id]['scrub_work'],
                                  list2=[],
                                  msg='Not all scrub work was applied for vDisk {0}'.format(vdisk.name))
-        logs = Logger._logs['lib']
+        logs = logging_watcher.get_message_severity_map()
         for log in logs:
             self.assertNotRegexpMatches(text=log,
                                         unexpected_regexp='.*Scrubber unittest - vPool [{0}|{1}] - StorageRouter {2} - .*'.format(
@@ -482,8 +487,8 @@ class ScrubTestCase(unittest.TestCase):
             vdisk = vdisks[vdisk_id]
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
-        Logger._logs = {}
-        GenericController.execute_scrub()
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            GenericController.execute_scrub()
         # Verify all threads have been 'consumed'
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0)
@@ -493,7 +498,7 @@ class ScrubTestCase(unittest.TestCase):
         for vdisk_namespace, namespace_value in vdisk_namespaces.iteritems():  # All registered items of this job should be cleaned up
             self.assertEquals(self.persistent.get(vdisk_namespace), namespace_value)
         counter = 0
-        for log in Logger._logs['lib']:
+        for log in logging_watcher.get_message_severity_map():
             if 'threads for proxy service' in log:
                 match = re.match(
                     '^Scrubber unittest - vPool ([1|2]) - StorageRouter ([1|2]) - Stack ([0|1]) - .*ovs-albaproxy.*_scrub',
@@ -848,8 +853,9 @@ class ScrubTestCase(unittest.TestCase):
                 namespace_value.append({'vdisk_guid': vdisk.guid, 'worker_pid': pid, 'worker_start': start_time,
                                         'storagerouter_guid': other_sr.guid})
                 self.persistent.set(vdisk_namespace, namespace_value)
-        GenericController.execute_scrub()
-        logs = Logger._logs['lib']
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            GenericController.execute_scrub()
+        logs = logging_watcher.get_message_severity_map()
         for registered_items in vdisk_namespaces.values():
             for registered_item in registered_items:
                 vdisk = VDisk(registered_item['vdisk_guid'])
@@ -937,8 +943,9 @@ class ScrubTestCase(unittest.TestCase):
                  # This will make the scrubber stacks to wait forever before deploying proxies
                  'post_stack_worker_deployment': lambda x: _inject_race(x)}
         ScrubShared._test_hooks.update(hooks)
-        GenericController.execute_scrub()
-        logs = Logger._logs['lib']
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            GenericController.execute_scrub()
+        logs = logging_watcher.get_message_severity_map()
         # Still working with only 1 proxy service
         re_use_logs = ['Re-using existing proxy services {0}'.format(proxy_name) for proxy_name in proxy_names]
         remove_logs = ['Cannot remove services {0} as it is still in use by others'.format(proxy_name) for proxy_name in
