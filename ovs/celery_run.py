@@ -23,6 +23,7 @@ from __future__ import absolute_import
 import os
 import uuid
 import yaml
+import logging
 import threading
 import traceback
 from celery import Celery
@@ -32,9 +33,9 @@ from celery.task.control import inspect
 from kombu import Queue
 from kombu.serialization import register
 from threading import Thread
+from ovs.constants.logging import CELERY_RUN_LOGGER
 from ovs.extensions.celery.extendedyaml import YamlExtender
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
@@ -116,7 +117,7 @@ class InspectMockup(object):
         return lambda: {'unittests': InspectMockup.states[item]}
 
 
-ovs_logger = Logger('celery')
+ovs_logger = logging.getLogger(CELERY_RUN_LOGGER)
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     inspect = InspectMockup
     celery = CeleryMockup()

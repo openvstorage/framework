@@ -16,9 +16,9 @@
 
 
 import re
+import logging
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig
@@ -29,7 +29,7 @@ class VPoolInstallerBase(object):
     This container class provides some basic information that is shared across vpool installers for create and extend, but also shrinking of vpools
     """
 
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, name):
         """

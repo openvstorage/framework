@@ -19,6 +19,7 @@ StorageRouterController class used to make changes to existing StorageRouters
 """
 
 import os
+import logging
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
@@ -29,7 +30,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.constants.vpools import VPOOL_BASE_PATH, PROXY_CONFIG_MAIN
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -38,7 +38,6 @@ from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import LOG_LEVEL_MAPPING
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import ovs_task
@@ -50,15 +49,9 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
-    _logger = Logger('lib')
-    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
+    _logger = logging.getLogger(__name__)
     _os_manager = OSFactory.get_manager()
     _service_manager = ServiceFactory.get_manager()
-
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.ping')

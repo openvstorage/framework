@@ -24,31 +24,13 @@ import inspect
 import logging
 import requests
 from ovs_extensions.generic.exceptions import InvalidCredentialsError, NotFoundError
-from ovs.extensions.generic.logger import Logger
-try:
-    from requests.packages.urllib3 import disable_warnings
-except ImportError:
-    try:
-        reload(requests)  # Required for 2.6 > 2.7 upgrade (new requests.packages module)
-    except ImportError:
-        pass  # So, this reload fails because of some FileNodeWarning that can't be found. But it did reload. Yay.
-    from requests.packages.urllib3 import disable_warnings
-from requests.packages.urllib3.exceptions import InsecurePlatformWarning
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
-from requests.packages.urllib3.exceptions import SNIMissingWarning
-logging.getLogger('urllib3').setLevel(logging.WARNING)
-logging.getLogger('requests').setLevel(logging.WARNING)
 
 
 class APIClient(object):
     """
     Basic API client: passes username and password in the Authorization header
     """
-    _logger = Logger('extensions-plugins')
-
-    disable_warnings(InsecurePlatformWarning)
-    disable_warnings(InsecureRequestWarning)
-    disable_warnings(SNIMissingWarning)
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, ip, port, credentials, timeout, log_min_duration=1):
         # type: (str, int, tuple, int, int) -> None

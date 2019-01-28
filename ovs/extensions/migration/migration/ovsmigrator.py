@@ -18,7 +18,8 @@
 OVS migration module
 """
 
-from ovs.extensions.generic.logger import Logger
+import logging
+from ovs.constants.logging import UPDATE_LOGGER
 from ovs.extensions.packages.packagefactory import PackageFactory
 
 
@@ -29,7 +30,7 @@ class ExtensionMigrator(object):
     identifier = PackageFactory.COMP_MIGRATION_FWK
     THIS_VERSION = 15
 
-    _logger = Logger('update')
+    _logger = logging.getLogger(UPDATE_LOGGER)
 
     def __init__(self):
         """ Init method """

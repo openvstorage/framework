@@ -19,9 +19,9 @@ Scrubber Module
 """
 import os
 import copy
-import json
 import time
 import uuid
+import logging
 from datetime import datetime
 from Queue import Empty, Queue
 from random import randint
@@ -47,7 +47,6 @@ from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs_extensions.storage.exceptions import AssertException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.generic.repeatingtimer import RepeatingTimer
@@ -63,7 +62,7 @@ class ScrubShared(object):
     _test_hooks = {}
     _unittest_data = {'setup': False}
 
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     _SCRUB_KEY = SCRUB_KEY  # Parent key for all scrub related jobs
     _SCRUB_NAMESPACE = 'ovs_jobs_scrub'

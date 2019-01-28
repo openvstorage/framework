@@ -23,11 +23,11 @@ import sys
 import json
 import time
 import signal
+import logging
 from ovs_extensions.constants.config import ARAKOON_NAME, CACC_LOCATION, CONFIG_STORE_LOCATION
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
@@ -45,7 +45,7 @@ class NodeInstallationController(object):
     """
     This class contains all logic for setting up an environment, installed with system-native packages
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     nodes = {}
     host_ips = set()

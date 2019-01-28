@@ -18,8 +18,10 @@
 Generic test module
 """
 import time
+import logging
 import datetime
 import unittest
+from ovs.constants.logging import UNITTEST_LOGGER
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.tests.helpers import DalHelper
@@ -36,7 +38,7 @@ class Generic(unittest.TestCase):
     """
     This test class will validate the various scenarios of the Generic logic
     """
-    _logger = Logger('unittest')
+    _logger = logging.getLogger(UNITTEST_LOGGER)
 
     def setUp(self):
         """

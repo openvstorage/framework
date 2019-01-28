@@ -25,6 +25,7 @@ import random
 import Queue
 import datetime
 import collections
+import logging
 from threading import Thread
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -33,29 +34,21 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
-from ovs.extensions.storageserver.storagedriver import LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, MDSNodeConfig, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.mds.catchup import MDSCatchUp
 from ovs.lib.helpers.mds.safety import SafetyEnsurer
 from ovs.lib.helpers.mds.shared import MDSShared
 from ovs.lib.helpers.toolbox import Schedule
-from volumedriver.storagerouter import storagerouterclient
 
 
 class MDSServiceController(MDSShared):
     """
     Contains all BLL related to MDSServices
     """
-    _logger = Logger('lib')
-    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
-
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
+    _logger = logging.getLogger(__name__)
 
     @staticmethod
     def remove_mds_service(mds_service, reconfigure, allow_offline=False):

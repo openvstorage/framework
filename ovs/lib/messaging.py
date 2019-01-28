@@ -17,9 +17,9 @@
 """
 Messaging module
 """
+import logging
 from functools import wraps
 from ovs_extensions.generic.filemutex import file_mutex
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
@@ -59,7 +59,7 @@ class MessageController(object):
     """
     TIMEOUT = 300
     _cache = VolatileFactory.get_client()
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     class Type(object):
         """

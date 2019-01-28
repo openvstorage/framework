@@ -27,7 +27,6 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Dynamic, Property, Relation
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import FSMetaDataClient, MaxRedirectsExceededException, ObjectRegistryClient, \
     SnapshotNotFoundException, StorageDriverClient, VolumeRestartInProgressException, is_connection_failure
@@ -41,7 +40,6 @@ class VDisk(DataObject):
 
     VDISK_NAME_REGEX = '^[0-9a-zA-Z][\-_a-zA-Z0-9]+[a-zA-Z0-9]$'
 
-    _logger = Logger('hybrids')
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
                     Property('size', int, doc='Size of the vDisk in Bytes.'),

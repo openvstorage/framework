@@ -18,6 +18,7 @@
 Shared module. Contains mds-related methods
 """
 
+import logging
 import collections
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservice import MDSService
@@ -29,16 +30,15 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, SRCObjectNotFoundException, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 
 
 class MDSShared(object):
 
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     @classmethod
     def get_mds_load(cls, mds_service):

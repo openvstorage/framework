@@ -17,14 +17,14 @@
 """
 Wrapper class for the storagedriver client of the voldrv team
 """
+
 import os
 import copy
+import logging
 from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger as OVSLogger
 from ovs_extensions.generic.remote import remote
-from volumedriver.storagerouter import storagerouterclient
 
 # Import below classes so the rest of the framework can always import from this module:
 # * We can inject mocks easier without having to make changes everywhere
@@ -84,11 +84,6 @@ class StorageDriverClient(object):
     """
     Client to access storagedriver client
     """
-    _log_level = LOG_LEVEL_MAPPING[OVSLogger('extensions').getEffectiveLevel()]
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
 
     VOLDRV_DTL_SYNC = 'Synchronous'
     VOLDRV_DTL_ASYNC = 'Asynchronous'
@@ -203,12 +198,7 @@ class MetadataServerClient(object):
     """
     Builds a MDSClient
     """
-    _logger = OVSLogger('extensions')
-    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
+    _logger = logging.getLogger(__name__)
 
     MDS_ROLE = type('MDSRole', (), {'MASTER': Role.Master,
                                     'SLAVE': Role.Slave})
@@ -319,18 +309,14 @@ class StorageDriverConfiguration(object):
     CACHE_BLOCK = 'block_cache'
     CACHE_FRAGMENT = 'fragment_cache'
 
+    _logger = logging.getLogger(__name__)
+
     def __init__(self, vpool_guid, storagedriver_id):
         """
         Initializes the class
         """
-        _log_level = LOG_LEVEL_MAPPING[OVSLogger('extensions').getEffectiveLevel()]
-        # noinspection PyCallByClass,PyTypeChecker
-        storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
-        # noinspection PyArgumentList
-        storagerouterclient.Logger.enableLogging()
 
         self._key = HOSTS_CONFIG_PATH.format(vpool_guid, storagedriver_id)
-        self._logger = OVSLogger('extensions')
         self._dirty_entries = []
 
         self.remote_path = Configuration.get_configuration_path(self._key).strip('/')
@@ -434,6 +420,7 @@ class StorageDriverConfiguration(object):
         """
         if section in self.configuration:
             del self.configuration[section]
+
 
 def is_connection_failure(exception):
     """

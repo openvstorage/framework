@@ -21,7 +21,8 @@ MigrationController module
 import os
 import copy
 import json
-from ovs.extensions.generic.logger import Logger
+import logging
+from ovs.constants.logging import UPDATE_LOGGER
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 
@@ -31,7 +32,7 @@ class MigrationController(object):
     This controller contains (part of the) migration code. It runs out-of-band with the updater so we reduce the risk of
     failures during the update
     """
-    _logger = Logger(name='update', forced_target_type='file')
+    _logger = logging.getLogger(UPDATE_LOGGER)
 
     @staticmethod
     @ovs_task(name='ovs.migration.migrate', schedule=Schedule(minute='0', hour='6'), ensure_single_info={'mode': 'DEFAULT'})

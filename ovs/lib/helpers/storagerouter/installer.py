@@ -18,8 +18,8 @@
 StorageRouterInstaller class used to validate / configure / edit StorageRouter settings when setting up a vPool on it
 """
 
+import logging
 from ovs.dal.hybrids.diskpartition import DiskPartition
-from ovs.extensions.generic.logger import Logger
 from ovs.lib.storagerouter import StorageRouterController
 
 
@@ -32,7 +32,7 @@ class StorageRouterInstaller(object):
         - validate_vpool_extendable: Validate whether the StorageRouter is eligible to have a/another vPool on it
     """
 
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, root_client, storagerouter, vp_installer, sd_installer):
         """

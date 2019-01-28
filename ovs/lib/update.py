@@ -21,7 +21,9 @@ Module for UpdateController
 import copy
 import time
 import inspect
+import logging
 from subprocess import CalledProcessError
+from ovs.constants.logging import UPDATE_LOGGER
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -30,7 +32,6 @@ from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs_extensions.constants.config import ARAKOON_NAME
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex, NoLockAvailableException
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -50,7 +51,7 @@ class UpdateController(object):
     """
     This class contains all logic for updating an environment
     """
-    _logger = Logger(name='update', forced_target_type='file')
+    _logger = logging.getLogger(UPDATE_LOGGER)
     _update_file = '/etc/ready_for_upgrade'
     _update_ongoing_file = '/etc/update_ongoing'
     _package_manager = PackageFactory.get_manager()

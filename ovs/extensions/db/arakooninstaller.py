@@ -19,7 +19,6 @@ Generic module for managing configuration somewhere
 """
 from ovs_extensions.db.arakoon.arakooninstaller import ArakoonClusterConfig as _ArakoonClusterConfig, ArakoonInstaller as _ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -61,7 +60,3 @@ class ArakoonInstaller(_ArakoonInstaller):
     @classmethod
     def _get_volatile_mutex(cls):
         return volatile_mutex
-
-    @classmethod
-    def _get_logger_instance(cls):
-        return Logger('extensions-db')

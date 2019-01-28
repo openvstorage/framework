@@ -19,7 +19,6 @@ Service Factory for the OVS Framework
 """
 
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs_extensions.services.servicefactory import ServiceFactory as _ServiceFactory
 
@@ -33,8 +32,6 @@ class ServiceFactory(_ServiceFactory):
     MONITOR_PREFIXES = ['ovs-']
     SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
     SERVICE_WATCHER_VOLDRV = 'watcher-volumedriver'
-
-    _logger = Logger('extensions')
 
     def __init__(self):
         """Init method"""

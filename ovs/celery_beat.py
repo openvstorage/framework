@@ -23,10 +23,11 @@ import imp
 import time
 import cPickle
 import inspect
+import logging
 from celery import current_app
 from celery.beat import Scheduler
+from ovs.constants.logging import CELERY_BEAT_LOGGER
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonSockNotReadable
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
@@ -40,12 +41,14 @@ class DistributedScheduler(Scheduler):
     """
     TIMEOUT = 60 * 30
 
+    _logger = logging.getLogger(CELERY_BEAT_LOGGER)
+
     def __init__(self, *args, **kwargs):
         """
         Initializes the distributed scheduler
         """
         self._mutex = volatile_mutex('celery_beat', 10)
-        self._logger = Logger('celery')
+
         self._has_lock = False
         self._lock_name = 'ovs_celery_beat_lock'
         self._entry_name = 'ovs_celery_beat_entries'

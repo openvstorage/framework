@@ -19,6 +19,7 @@ VPoolController class responsible for making changes to existing vPools
 """
 
 import time
+import logging
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -33,7 +34,6 @@ from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, PROXY_CONFIG_PATH, 
 from ovs_extensions.api.client import OVSClient
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
@@ -59,7 +59,7 @@ class VPoolController(object):
     """
     Contains all BLL related to VPools
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
     _service_manager = ServiceFactory.get_manager()
 
     @classmethod

@@ -21,16 +21,16 @@ GenericTaskController module
 import os
 import copy
 import time
+import logging
+from time import mktime
 from datetime import datetime, timedelta
 from threading import Thread
-from time import mktime
 from ovs_extensions.constants.config import ARAKOON_NAME, ARAKOON_NAME_UNITTEST
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.packages.packagefactory import PackageFactory
@@ -45,7 +45,7 @@ class GenericController(object):
     This controller contains all generic task code. These tasks can be
     executed at certain intervals and should be self-containing
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     @staticmethod
     @ovs_task(name='ovs.generic.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'), ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['ovs.generic.delete_snapshots']})

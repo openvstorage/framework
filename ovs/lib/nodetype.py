@@ -23,10 +23,11 @@ import re
 import sys
 import json
 import time
+import logging
 from ovs.dal.hybrids.servicetype import ServiceType
+from ovs_extensions.constants.vpools import HOSTS_BASE_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -41,7 +42,7 @@ class NodeTypeController(object):
     """
     This class contains all logic for promoting and demoting nodes in the cluster
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
