@@ -7,17 +7,23 @@ The default logging configuration looks like:
 ```
 {'disable_existing_loggers': False,
  'formatters': {'ovs': {'()': 'ovs_extensions.log.LogFormatter',
-                        'format': '%(asctime)s - %(hostname)s - %(process)s/%(thread)d - %(filename)s - %(funcName)s - %(sequence)s - %(levelname)s - %(message)s'},
+                        'format': '%(asctime)s - %(hostname)s - %(process)s/%(thread)d - %(name)s - %(funcName)s - %(sequence)s - %(levelname)s - %(message)s'},
                 'standard': {'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'}},
  'handlers': {'default': {'class': 'logging.StreamHandler',
                           'formatter': 'ovs',
                           'level': 'INFO'}},
- 'loggers': {'ovs': {'handlers': ['default'],
+ 'loggers': {'api': {'handlers': ['default'],
+                     'level': 'INFO',
+                     'propagate': True},
+             'ovs': {'handlers': ['default'],
                      'level': 'INFO',
                      'propagate': True},
              'ovs_extensions': {'handlers': ['default'],
                                 'level': 'INFO',
-                                'propagate': True}},
+                                'propagate': True},
+             'paramiko': {'level': 'WARNING'},
+             'requests': {'level': 'WARNING'},
+             'urllib3': {'level': 'WARNING'}},
  'version': 1}
  ```
 

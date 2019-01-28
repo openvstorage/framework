@@ -20,7 +20,7 @@ Log configuration module
 import logging
 import requests
 import logging.config
-from ovs.constants.logging import OVS_LOGGER
+from ovs.constants.logging import OVS_LOGGER, API_LOGGER
 from ovs_extensions.log import OVS_FORMATTER_CONFIG, EXTENSIONS_LOGGER_NAME
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonException
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
@@ -40,7 +40,7 @@ from requests.packages.urllib3.exceptions import SNIMissingWarning
 from volumedriver.storagerouter import storagerouterclient
 
 
-# Configures the root logger
+# Configures the logger
 DEFAULT_LOGGER_CONFIG = {'handlers': ['default'],
                          'level': 'INFO',
                          'propagate': True}
@@ -57,7 +57,11 @@ DEFAULT_LOG_CONFIG = {'version': 1,
                       },
                       'handlers': DEFAULT_LOG_HANDLER_CONFIG,
                       'loggers': {OVS_LOGGER: DEFAULT_LOGGER_CONFIG,
-                                  EXTENSIONS_LOGGER_NAME: DEFAULT_LOGGER_CONFIG}}
+                                  EXTENSIONS_LOGGER_NAME: DEFAULT_LOGGER_CONFIG,
+                                  API_LOGGER: DEFAULT_LOGGER_CONFIG,
+                                  'urllib3': {'level': 'WARNING'},
+                                  'paramiko': {'level': 'WARNING'},
+                                  'requests': {'level': 'WARNING'}}}
 
 
 def get_logging_info():
@@ -86,10 +90,6 @@ def configure_logging():
     disable_warnings(InsecurePlatformWarning)
     disable_warnings(InsecureRequestWarning)
     disable_warnings(SNIMissingWarning)
-
-    # Set api-related loggers to warning
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('requests').setLevel(logging.WARNING)
 
     # Setup Volumedriver logging
     _log_level = LOG_LEVEL_MAPPING[ovs_logger.getEffectiveLevel()]

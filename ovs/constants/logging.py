@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 OVS_LOGGER = 'ovs'
-API_LOGGER = 'webapps'
+API_LOGGER = 'api'
 
 UPDATE_LOGGER = '{}.update'.format(OVS_LOGGER)
 

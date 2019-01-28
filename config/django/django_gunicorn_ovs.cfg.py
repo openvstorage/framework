@@ -16,6 +16,7 @@
 
 import os
 import multiprocessing
+from ovs.extensions.log import configure_logging
 
 """
 Server socket
@@ -173,6 +174,14 @@ debug = False
 
 profiling_prefix = '.profile.'
 enable_profiling = False
+
+
+def on_starting(server):
+    _ = server
+    # Configure OpenvStorage logging before initializing django as the settings
+    # API logging is configured in the settings
+    configure_logging()
+
 
 if enable_profiling:
     import cProfile

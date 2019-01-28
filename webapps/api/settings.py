@@ -34,9 +34,6 @@ UI_NAME = 'api'
 APP_NAME = 'api'
 BASE_WWW_DIR = os.path.dirname(__file__)
 
-# @todo enable oauth and webapp log. Here or in configure_logging :thinking_face:
-OVS_LOGGERS = {}
-
 BASE_FOLDER = '/opt/OpenvStorage/webapps/{0}'.format(APP_NAME)
 VERSION = (6, 7, 8, 9, 10)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
 # WARNING: When removing oldest version(s)
@@ -157,6 +154,8 @@ CACHES = {
 }
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
+
+# OpenvStorage logging is setup when starting the gunicorn process
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -173,10 +172,16 @@ LOGGING = {
         },
     },
     'loggers': {
+        # Unsure if it's django as root logger or default
         'default': {
             'handlers': ['logfile'],
             'level': 'DEBUG',
-            'propogate': False
+            'propagate': False
         },
+        'django': {
+            'handlers': ['logfile'],
+            'level': 'DEBUG',
+            'propagate': False
+        }
     },
 }

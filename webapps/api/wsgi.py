@@ -28,13 +28,9 @@ that later delegates to the Django one. For example, you could introduce WSGI
 middleware here, or combine a Django application with an application of another
 framework.
 
+Started by the gunicorn cli
 """
 import os
-from ovs.extensions.log import configure_logging
-
-# Configure OpenvStorage logging before initializing django as the settings
-# API logging is configured in the settings
-configure_logging()
 
 # We defer to a DJANGO_SETTINGS_MODULE already in the environment.
 # This breaks if running multiple sites in the same mod_wsgi process.
