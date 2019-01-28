@@ -20,21 +20,20 @@ Generic test module
 import time
 import logging
 import datetime
-import unittest
 from ovs.constants.logging import UNITTEST_LOGGER
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.log.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.toolbox import Toolbox
+from ovs_extensions.testing.testcase import LogTestCase
 
 
-class Generic(unittest.TestCase):
+class Generic(LogTestCase):
     """
     This test class will validate the various scenarios of the Generic logic
     """
@@ -132,10 +131,11 @@ class Generic(unittest.TestCase):
         # Start collapse and make it fail for all clusters on StorageRouter 2
         SSHClient._raise_exceptions[storagerouter_2.ip] = {'users': ['ovs'],
                                                            'exception': UnableToConnectException('No route to host')}
-        GenericController.collapse_arakoon()
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            GenericController.collapse_arakoon()
 
         # Verify all log messages for each type of cluster
-        generic_logs = Logger._logs.get('lib', {})
+        generic_logs = logging_watcher.get_message_severity_map()
         for cluster_name in successful_clusters + failed_clusters + external_clusters:
             collect_msg = ('DEBUG', 'Collecting info for cluster {0}'.format(cluster_name))
             unreachable_msg = ('ERROR', 'Could not collapse any cluster on {0} (not reachable)'.format(storagerouter_2.name))
@@ -145,21 +145,13 @@ class Generic(unittest.TestCase):
             messages_to_validate = []
             if cluster_name in successful_clusters:
                 assert_function = self.assertIn
-                messages_to_validate.append(collect_msg)
-                messages_to_validate.append(unreachable_msg)
-                messages_to_validate.append(start_collapse_msg)
-                messages_to_validate.append(end_collapse_msg)
+                messages_to_validate.extend([collect_msg, unreachable_msg, start_collapse_msg, end_collapse_msg])
             elif cluster_name in failed_clusters:
                 assert_function = self.assertIn
-                messages_to_validate.append(collect_msg)
-                messages_to_validate.append(unreachable_msg)
-                messages_to_validate.append(start_collapse_msg)
-                messages_to_validate.append(failed_collapse_msg)
+                messages_to_validate.extend([collect_msg, unreachable_msg, start_collapse_msg, failed_collapse_msg])
             else:
                 assert_function = self.assertNotIn
-                messages_to_validate.append(collect_msg)
-                messages_to_validate.append(start_collapse_msg)
-                messages_to_validate.append(end_collapse_msg)
+                messages_to_validate.extend([collect_msg, start_collapse_msg, end_collapse_msg])
 
             for severity, message in messages_to_validate:
                 if assert_function == self.assertIn:

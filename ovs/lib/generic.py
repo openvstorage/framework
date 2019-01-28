@@ -38,6 +38,7 @@ from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.generic.scrubber import Scrubber
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.vdisk import VDiskController
+from ovs.testing import is_unittest_mode
 
 
 class GenericController(object):
@@ -210,7 +211,7 @@ class GenericController(object):
         """
         # GenericController.execute_scrub.request.id gets the current celery task id (None if executed directly)
         # Fetching the task_id with the hasattr because Unit testing does not execute the wrapper (No celery task but a normal function being called)
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             task_id = 'unittest'
         else:
             task_id = GenericController.execute_scrub.request.id if hasattr(GenericController.execute_scrub, 'request') else None
@@ -224,12 +225,10 @@ class GenericController(object):
         Collapse Arakoon's Tlogs
         :return: None
         """
-        from ovs_extensions.generic.toolbox import ExtensionsToolbox
-
         GenericController._logger.info('Arakoon collapse started')
         cluster_info = []
         storagerouters = StorageRouterList.get_storagerouters()
-        if os.environ.get('RUNNING_UNITTESTS') != 'True':
+        if not is_unittest_mode():
             cluster_info = [('cacc', storagerouters[0])]
 
         cluster_names = []
