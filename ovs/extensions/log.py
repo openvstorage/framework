@@ -24,7 +24,6 @@ from ovs.constants.logging import OVS_LOGGER, API_LOGGER
 from ovs_extensions.log import OVS_FORMATTER_CONFIG, EXTENSIONS_LOGGER_NAME
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonException
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
-from ovs.extensions.storageserver.storagedriver import LOG_LEVEL_MAPPING
 from ovs.extensions.generic.logger import Logger
 try:
     from requests.packages.urllib3 import disable_warnings
@@ -37,7 +36,6 @@ except ImportError:
 from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import SNIMissingWarning
-from volumedriver.storagerouter import storagerouterclient
 
 
 # Configures the logger
@@ -76,7 +74,8 @@ def get_logging_info():
         return {}
 
 
-def configure_logging():
+def configure_logging(configure_volumedriver_logging=True):
+    # type: (bool) -> None
     """
     Configure the OpenvStorage logging
     - Based
@@ -91,11 +90,14 @@ def configure_logging():
     disable_warnings(InsecureRequestWarning)
     disable_warnings(SNIMissingWarning)
 
-    # Setup Volumedriver logging
-    _log_level = LOG_LEVEL_MAPPING[ovs_logger.getEffectiveLevel()]
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
+    if configure_volumedriver_logging:
+        from ovs.extensions.storageserver.storagedriver import LOG_LEVEL_MAPPING
+        from volumedriver.storagerouter import storagerouterclient
+        # Setup Volumedriver logging
+        _log_level = LOG_LEVEL_MAPPING[ovs_logger.getEffectiveLevel()]
+        # noinspection PyCallByClass,PyTypeChecker
+        storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
+        # noinspection PyArgumentList
+        storagerouterclient.Logger.enableLogging()
 
 

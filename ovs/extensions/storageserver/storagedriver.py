@@ -18,9 +18,9 @@
 Wrapper class for the storagedriver client of the voldrv team
 """
 
-import os
 import copy
 import logging
+from ovs_extensions.constants import is_unittest_mode
 from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
@@ -43,7 +43,7 @@ try:
 except ImportError:
     from ovs.extensions.storageserver.tests.mockups import VolumeRestartInProgressException
 
-if os.environ.get('RUNNING_UNITTESTS') == 'True':
+if is_unittest_mode():
     from ovs.extensions.storageserver.tests.mockups import \
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
         MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient, \
@@ -179,7 +179,7 @@ class ObjectRegistryClient(object):
         Initializes the wrapper for a given vpool
         :param vpool: vPool for which the ObjectRegistryClient needs to be loaded
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             return ORClient(str(vpool.guid), None, None)
 
         key = vpool.identifier
@@ -253,7 +253,7 @@ class ClusterRegistryClient(object):
         Initializes the wrapper for a given vpool
         :param vpool: vPool for which the ClusterRegistryClient needs to be loaded
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             return ClusterRegistry(str(vpool.guid), None, None)
 
         key = vpool.identifier
@@ -287,7 +287,7 @@ class FSMetaDataClient(object):
         if FileSystemMetaDataClient is None:
             raise FeatureNotAvailableException()
 
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             return FileSystemMetaDataClient(str(vpool.guid), None, None)
 
         key = vpool.identifier

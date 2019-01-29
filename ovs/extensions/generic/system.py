@@ -18,8 +18,8 @@
 Generic system module, executing statements on local node
 """
 
-import os
 from ovs_extensions.caching.decorators import cache_file
+from ovs_extensions.constants import is_unittest_mode
 from ovs_extensions.generic.system import System as _System
 
 
@@ -46,7 +46,7 @@ class System(_System):
         :return: Machine ID
         :rtype: str
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             return cls._machine_id.get('none' if client is None else client.ip)
         if client is not None:
             return client.run(['cat', cls.OVS_ID_FILE]).strip()

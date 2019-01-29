@@ -28,6 +28,7 @@ import logging
 import threading
 from functools import wraps
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs_extensions.constants import is_unittest_mode
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
@@ -213,7 +214,7 @@ def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, c
             async_task = task_id is not None  # Async tasks have an ID, inline executed tasks have None as ID
             task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
             thread_name = threading.current_thread().getName()
-            unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
+            unittest_mode = is_unittest_mode()
             persistent_key = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)
             persistent_client = PersistentFactory.get_client()
 

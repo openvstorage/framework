@@ -22,7 +22,7 @@ DTL allocation rules:
     - If Domains configured, but no StorageRouters are found matching any of the Domains on the vDisk's StorageRouter, a random SR in the same vPool is chosen
     - If no Domains configured on the vDisk StorageRouter, any other StorageRouter on which the vPool has been extended is chosen
 """
-import unittest
+import logging
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
@@ -30,14 +30,14 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.tests.helpers import DalHelper
-from ovs_extensions.log.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, DTLMode
 from ovs.lib.vdisk import VDiskController
+from ovs_extensions.testing.testcase import LogTestCase
 
 
-class DTLCheckup(unittest.TestCase):
+class DTLCheckup(LogTestCase):
     """
     This test class will validate the various scenarios of the DTL checkup logic
     """
@@ -45,12 +45,16 @@ class DTLCheckup(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
+        super(DTLCheckup, self).setUp()
+
         DalHelper.setup()
 
     def tearDown(self):
         """
         Clean up the unittest
         """
+        super(DTLCheckup, self).tearDown()
+
         DalHelper.teardown()
 
     def _run_and_validate_dtl_checkup(self, vdisk, validations):
@@ -533,13 +537,13 @@ class DTLCheckup(unittest.TestCase):
                                                         {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
         # Delete the vDiskDomain on which the DTL resides, 1 other vDiskDomain remains, no changes should be made, but OVS_WARNING should be logged
         vdomain1.delete()
-        Logger._logs = {}
-        self._run_and_validate_dtl_checkup(vdisk=vdisk,
-                                           validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
-                                                        {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            self._run_and_validate_dtl_checkup(vdisk=vdisk,
+                                               validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
+                                                            {'key': 'port', 'value': 3},
+                                                            {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
         warning_logs = []
-        for log in Logger._logs['lib']:
+        for log in logging_watcher.get_message_severity_map():
             if 'OVS_WARNING' in log and 'manual DTL configuration is no longer' in log and vdisk.guid in log:
                 warning_logs.append(log)
         self.assertEqual(first=1, second=len(warning_logs))

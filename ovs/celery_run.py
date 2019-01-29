@@ -34,6 +34,7 @@ from celery.task.control import inspect
 from kombu import Queue
 from kombu.serialization import register
 from threading import Thread
+from ovs_extensions.constants import is_unittest_mode
 from ovs.constants.logging import CELERY_RUN_LOGGER, OVS_LOGGER
 from ovs.extensions.log import configure_logging
 from ovs.extensions.celery.extendedyaml import YamlExtender
@@ -121,7 +122,7 @@ class InspectMockup(object):
 
 ovs_logger = logging.getLogger(CELERY_RUN_LOGGER)
 
-if os.environ.get('RUNNING_UNITTESTS') == 'True':
+if is_unittest_mode():
     inspect = InspectMockup
     celery = CeleryMockup()
 else:

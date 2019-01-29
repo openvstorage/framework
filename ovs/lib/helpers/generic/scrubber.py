@@ -35,6 +35,7 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.constants import is_unittest_mode
 from ovs_extensions.constants.vpools import GENERIC_SCRUB, SCRUB_BASE_PATH
 from ovs_extensions.constants.framework import SCRUB_KEY, SCRUB_JOB
 from ovs.extensions.generic.configuration import Configuration
@@ -965,7 +966,7 @@ class Scrubber(ScrubShared):
 
         super(Scrubber, self).__init__(task_id or str(uuid.uuid4()))
 
-        if os.environ.get('RUNNING_UNITTESTS') == 'True' and not ScrubShared._unittest_data['setup']:
+        if is_unittest_mode() and not ScrubShared._unittest_data['setup']:
             self.setup_for_unittests()
 
         self.task_id = task_id  # Be able to differentiate between directly executed ones for debugging purposes

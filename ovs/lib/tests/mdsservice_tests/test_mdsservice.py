@@ -30,7 +30,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.testing.testcase import LogTestCase
+from ovs_extensions.testing.testcase import LogTestCase
 
 
 class MDSServices(LogTestCase):

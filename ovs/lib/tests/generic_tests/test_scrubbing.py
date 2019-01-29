@@ -34,7 +34,11 @@ from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.helpers.generic.scrubber import Scrubber, ScrubShared, StackWorker
 from ovs.lib.graphite import GraphiteController
-from ovs.testing.testcase import LogTestCase
+from ovs_extensions.testing.testcase import LogTestCase
+
+
+class ProxyDeploymentFailure(RuntimeError):
+    pass
 
 
 class ScrubTestCase(LogTestCase):
@@ -522,7 +526,7 @@ class ScrubTestCase(LogTestCase):
         - Proxy removal fail after scrub (All threads will try to clean up the proxy)
         """
         def _raise_exception(message):
-            raise RuntimeError(message)
+            raise ProxyDeploymentFailure(message)
 
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],
@@ -696,7 +700,7 @@ class ScrubTestCase(LogTestCase):
 
         def _raise_exception_second_proxy(self, alba_proxy_service):
             if alba_proxy_service.rsplit('_')[-1] == '1':
-                raise RuntimeError('Simulated second proxy failure')
+                raise ProxyDeploymentFailure('Simulated second proxy failure')
 
         structure = DalHelper.build_dal_structure(
             {'vpools': [1, 2],

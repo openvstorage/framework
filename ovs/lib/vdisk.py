@@ -37,6 +37,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.constants import is_unittest_mode
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -1081,7 +1082,7 @@ class VDiskController(object):
                 dtl_config = None
                 importances = VDiskController._retrieve_possible_dtl_targets(vdisk=vdisk, dtl_targets=dtl_targets)
                 for possible_storagerouters in importances:
-                    if os.environ.get('RUNNING_UNITTESTS') == 'True':
+                    if is_unittest_mode():
                         possible_storagerouters.sort(key=lambda i: i.guid)
                     else:
                         random.shuffle(possible_storagerouters)

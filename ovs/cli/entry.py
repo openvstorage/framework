@@ -15,9 +15,8 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 from ovs.cli import ovs
-from ovs.extensions.log import configure_logging
-
+# from ovs.extensions.log import configure_logging
 
 if __name__ == '__main__':
-    configure_logging()
+    # configure_logging(configure_volumedriver_logging=False)
     ovs()  # Invokes the ovs CLI

@@ -25,6 +25,7 @@ import logging
 from time import mktime
 from datetime import datetime, timedelta
 from threading import Thread
+from ovs_extensions.constants import is_unittest_mode
 from ovs_extensions.constants.config import ARAKOON_NAME, ARAKOON_NAME_UNITTEST
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicelist import ServiceList
@@ -38,7 +39,6 @@ from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.generic.scrubber import Scrubber
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.vdisk import VDiskController
-from ovs.testing import is_unittest_mode
 
 
 class GenericController(object):
