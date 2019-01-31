@@ -28,7 +28,7 @@ class BackendConnectionManager(BaseStorageDriverConfig):
 
     component_identifier = 'backend_connection_manager'
 
-    def __init__(self, vpool, storagedriver,
+    def __init__(self, preset=None, alba_proxies=None,
                  local_connection_path=None, backend_connection_pool_capacity=None, backend_interface_retries_on_error=None, backend_interface_retry_interval_secs=1,
                  backend_interface_retry_interval_max_secs=None, backend_connection_pool_blacklist_secs=None, backend_interface_retry_backoff_multiplier=2.0,
                  backend_interface_partial_read_retries_on_error=5, backend_interface_partial_read_timeout_msecs=None, backend_interface_partial_read_timeout_max_msecs=None,
@@ -36,8 +36,8 @@ class BackendConnectionManager(BaseStorageDriverConfig):
                  backend_interface_partial_read_retry_backoff_multiplier=None, backend_type='MULTI', *args, **kwargs):
         """
         Initiate the volumedriverfs config: backend_interface
-        :param vpool: vpool object to use for configuration
-        :param storagedriver: storagedriver object to use for configuration
+        :param preset: Name of the preset used for every backend
+        :param alba_proxies: datalist of alba proxies to use for configuration
         :param local_connection_path: When backend_type is LOCAL: path to use as LOCAL backend, otherwise ignored
         :param backend_connection_pool_capacity: Capacity of the connection pool maintained by the BackendConnectionManager
         :param backend_interface_retries_on_error: How many times to retry a failed backend operation
@@ -54,16 +54,14 @@ class BackendConnectionManager(BaseStorageDriverConfig):
         :param backend_interface_partial_read_retry_backoff_multiplier: multiplier for the retry interval on each subsequent retry (< 0 -> backend_interface_retry_backoff_multiplier is used)
         :param backend_type: Type of backend connection one of ALBA, LOCAL, MULTI or S3, the other parameters in this section are only used when their correct backendtype is set. Defaults to MULTI
         """
-        self.backend_type = backend_type
-        if self.backend_type == 'LOCAL' and local_connection_path is None:
+
+        if backend_type == 'LOCAL' and local_connection_path is None:
             raise RuntimeError('Local_connection_path needs to be provided if backendtype is LOCAL')
 
-        if not isinstance(vpool, VPool):
+        if preset and not isinstance(preset, basestring):
             raise RuntimeError('Backendconnection config needs a VPool instance to construct the storagedriverconfig')
 
-        self._storagedriver = storagedriver
-        self._vpool = vpool
-
+        self.backend_type = backend_type
         self.local_connection_path = local_connection_path
         self.backend_connection_pool_capacity = backend_connection_pool_capacity
         self.backend_interface_retries_on_error = backend_interface_retries_on_error
@@ -80,7 +78,18 @@ class BackendConnectionManager(BaseStorageDriverConfig):
         self.backend_interface_partial_read_retry_interval_max_msecs = backend_interface_partial_read_retry_interval_max_msecs
         self.backend_interface_partial_read_retry_backoff_multiplier = backend_interface_partial_read_retry_backoff_multiplier
 
-        self._alba_connection_config = AlbaConnectionConfig(**kwargs)
+        self._alba_config = {}
+        if alba_proxies and preset:
+            for index, proxy in enumerate(sorted(alba_proxies, key=lambda k: k.service.ports[0])):
+                self._alba_config[str(index)] = AlbaConnectionConfig(alba_connection_host=proxy.storagedriver.storage_ip,
+                                                                     alba_connection_port=proxy.service.ports[0],
+                                                                     alba_connection_preset=preset).to_dict()
+        else:
+            #todo this is dangerous as it does not block wrong parameters
+            for key, value in kwargs.iteritems():
+                if key not in vars(self):
+                    self._alba_config.update({key: value})
+
 
     def to_dict(self):
         # type: () -> Dict[str, any]
@@ -91,11 +100,8 @@ class BackendConnectionManager(BaseStorageDriverConfig):
         """
 
         config = super(BackendConnectionManager, self).to_dict()  # Instantiate known config so far
+        config.update(self._alba_config)
 
-        for index, proxy in enumerate(sorted(self._storagedriver.alba_proxies, key=lambda k: k.service.ports[0])):
-            config[str(index)] = AlbaConnectionConfig(alba_connection_host=proxy.storagedriver.storage_ip,
-                                                      alba_connection_port=proxy.service.ports[0],
-                                                      alba_connection_preset=self._vpool.metadata['backend']['backend_info']['preset']).to_dict()
         return config
 
 

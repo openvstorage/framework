@@ -466,7 +466,7 @@ class StorageDriverInstaller(object):
 
         fs_config = FileSystemConfig(dtl_mode=self.dtl_mode)
 
-        backend_connection_config = BackendConnectionManager(vpool=vpool, storagedriver=self.storagedriver)
+        backend_connection_config = BackendConnectionManager(preset=vpool.metadata['backend']['backend_info']['preset'], alba_proxies=self.storagedriver.alba_proxies)
 
         whole_config = StorageDriverConfig(vrouter_cluster_id=vpool.guid,
                                            dtl_config=dtl_config,
