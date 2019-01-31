@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import click
-from ovs_extensions.cli import OVSCommand
+from ..commands import OVSCommand
 
 extra_options = {'command_parameter_help': '[--rollback-on-failure]', 'cls': OVSCommand}
 

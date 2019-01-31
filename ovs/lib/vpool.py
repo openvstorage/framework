@@ -60,7 +60,6 @@ class VPoolController(object):
     Contains all BLL related to VPools
     """
     _logger = logging.getLogger(__name__)
-    _service_manager = ServiceFactory.get_manager()
 
     @classmethod
     @ovs_task(name='ovs.storagerouter.add_vpool')
@@ -232,6 +231,7 @@ class VPoolController(object):
         :return: None
         :rtype: NoneType
         """
+        service_manager = ServiceFactory.get_manager()
         # TODO: Add logging
         # TODO: Unit test individual pieces of code
         # Validations
@@ -404,9 +404,9 @@ class VPoolController(object):
         # Remove watcher volumedriver service if last StorageDriver on current StorageRouter
         if len(storagerouter.storagedrivers) == 0 and storagerouter not in offline_srs:  # ensure client is initialized for StorageRouter
             try:
-                if cls._service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client):
-                    cls._service_manager.stop_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client)
-                    cls._service_manager.remove_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client)
+                if service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client):
+                    service_manager.stop_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client)
+                    service_manager.remove_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client)
             except Exception:
                 cls._logger.exception('StorageDriver {0} - {1} service deletion failed'.format(storagedriver.guid, ServiceFactory.SERVICE_WATCHER_VOLDRV))
 

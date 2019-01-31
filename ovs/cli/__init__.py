@@ -21,6 +21,7 @@ However when loading in all other commands, the imports might/do fetch instances
 Which don't do anything or cannot be instantiated
 Thus we have to import controllers whenever we invoke a command :(
 """
+from __future__ import absolute_import
 
 import os
 # All CLI commands should output logging to the file to avoid cluttering
@@ -35,7 +36,8 @@ from .monitor import monitor_group
 from .services import framework_start, framework_stop
 from .update import update_command
 from .rollback import rollback_command
-from ovs_extensions.cli import OVSCLI, unittest_command
+from .unittesting import unittest_command
+from ovs_extensions.cli import OVSCLI
 from IPython import embed
 
 
