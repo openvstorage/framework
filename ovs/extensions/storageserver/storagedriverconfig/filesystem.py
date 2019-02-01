@@ -15,9 +15,8 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 from .base import BaseStorageDriverConfig
-from ovs.constants.storagedriver import FRAMEWORK_DTL_NO_SYNC, VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE
+from ovs.constants.storagedriver import FRAMEWORK_DTL_NO_SYNC, VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE, VPOOL_DTL_MODE_MAP
 from ovs_extensions.constants.file_extensions import RAW
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 
 
 class FileSystemConfig(BaseStorageDriverConfig):
@@ -35,7 +34,7 @@ class FileSystemConfig(BaseStorageDriverConfig):
         """
         Initiate the config of the volumedriver_fs: filesystem.
         First three parameters are encoded as function overloaded: either provde dtl_mode or either directly provide fs_dtl_config_mode (and fs_dtl_mode (conditionally)).
-        This is implemented to be able to construct this object directly from its config dict.
+        This is implemented to be able to construct this object directly from either object(params) or object.from_dict(config_dict).
 
         :param dtl_mode: either a_sync or no_sync:
         :param fs_dtl_mode: DTL mode : Asynchronous | Synchronous
@@ -61,11 +60,6 @@ class FileSystemConfig(BaseStorageDriverConfig):
         :param fs_metadata_backend_mds_apply_relocations_to_slaves: a bool indicating whether to apply relocations to slave MDS tables
         """
 
-        if dtl_mode is None and fs_dtl_config_mode is None:
-            raise RuntimeError('Either `dtl_mode` or `fs_dtl_config_mode` should be provided as a parameter')
-        if fs_dtl_config_mode == VOLDRV_DTL_AUTOMATIC_MODE and fs_dtl_mode is None:
-            raise RuntimeError('If `fs_dtl_config_mode` is set on {0}, `fs_dtl_mode` cannot be None'.format(VOLDRV_DTL_AUTOMATIC_MODE))
-
         if fs_metadata_backend_mds_nodes is None:
             fs_metadata_backend_mds_nodes = []
         if fs_metadata_backend_arakoon_cluster_nodes is None:
@@ -75,12 +69,11 @@ class FileSystemConfig(BaseStorageDriverConfig):
             if dtl_mode == FRAMEWORK_DTL_NO_SYNC:
                 self.fs_dtl_config_mode = VOLDRV_DTL_MANUAL_MODE
             else:
-                self.fs_dtl_mode = StorageDriverClient.VPOOL_DTL_MODE_MAP[dtl_mode]
                 self.fs_dtl_config_mode = VOLDRV_DTL_AUTOMATIC_MODE
+            self.fs_dtl_mode = VPOOL_DTL_MODE_MAP[dtl_mode]
         else:
             self.fs_dtl_config_mode = fs_dtl_config_mode
-            if fs_dtl_mode:
-                self.fs_dtl_mode = fs_dtl_mode
+            self.fs_dtl_mode = fs_dtl_mode
 
         self.fs_dtl_host = fs_dtl_host
         self.fs_dtl_port = fs_dtl_port

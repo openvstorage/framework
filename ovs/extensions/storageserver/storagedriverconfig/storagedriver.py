@@ -22,7 +22,6 @@ from .connection_manager import BackendConnectionManager
 from .filesystem import FileSystemConfig
 from .volume_router import VolumeRouterConfig
 from .volume_manager import VolumeManagerConfig
-from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
@@ -80,7 +79,7 @@ class NetworkInterfaceConfig(BaseStorageDriverConfig):
     component_identifier = 'network_interface'
 
     def __init__(self, network_uri=None, network_xio_slab_config=None, network_workqueue_max_threads=None, network_snd_rcv_queue_depth=None,
-                 network_max_neighbour_distance=StorageDriver.DISTANCES.FAR - 1, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
+                 network_max_neighbour_distance=9999, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: network config manager
         :param network_uri: When backend_type is S3: whether to do verbose logging

@@ -392,11 +392,11 @@ class StorageDriverController(object):
             for vpool_guid in Configuration.list('/ovs/vpools'):
                 for storagedriver_id in Configuration.list(HOSTS_BASE_PATH.format(vpool_guid)):
                     storagedriver_config = StorageDriverConfiguration(vpool_guid, storagedriver_id)
-                    storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=cluster_name,
-                                                                   vregistry_arakoon_cluster_nodes=arakoon_nodes)
-                    storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
-                                                                          dls_arakoon_cluster_id=cluster_name,
-                                                                          dls_arakoon_cluster_nodes=arakoon_nodes)
+                    storagedriver_config.volume_registry.vregistry_arakoon_cluster_id=cluster_name
+                    storagedriver_config.volume_registry.vregistry_arakoon_cluster_nodes=arakoon_nodes
+                    storagedriver_config.distributed_lock_store.dls_type = 'Arakoon'
+                    storagedriver_config.distributed_lock_store.dls_arakoon_cluster_id = cluster_name
+                    storagedriver_config.distributed_lock_store.dls_type = arakoon_nodes
                     storagedriver_config.save()
 
     @staticmethod

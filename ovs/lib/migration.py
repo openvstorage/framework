@@ -22,8 +22,10 @@ import os
 import copy
 import json
 from ovs.extensions.generic.logger import Logger
+from ovs.extensions.storageserver.storagedriverconfig import AlbaConnectionConfig
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
+
 
 
 class MigrationController(object):
@@ -185,17 +187,14 @@ class MigrationController(object):
             if 'backend_connection_manager' not in storagedriver_config.configuration:
                 continue
 
-            current_config = storagedriver_config.configuration['backend_connection_manager']
-            if current_config.get('backend_type') != 'MULTI':
+            current_config = storagedriver_config.configuration.backend_config
+            if current_config.backend_type != 'MULTI':
                 changes = True
                 backend_connection_manager = {'backend_type': 'MULTI'}
                 for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
-                    backend_connection_manager[str(index)] = copy.deepcopy(current_config)
-                    # noinspection PyUnresolvedReferences
-                    backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
-                    # noinspection PyUnresolvedReferences
-                    backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 5000
-                    # noinspection PyUnresolvedReferences
+                    AlbaConnectionConfig(alba_connection_use_rora=True,  # todo fixme probably wont work
+                                         alba_connection_rora_manifest_cache_capacity=5000,
+                                         **current_config)
                     for key, value in backend_connection_manager[str(index)].items():
                         if key.startswith('backend_interface'):
                             backend_connection_manager[key] = value

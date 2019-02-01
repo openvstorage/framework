@@ -189,7 +189,7 @@ class VPoolController(object):
                     if storagedriver_config.config_missing is False:
                         # Filesystem section in StorageDriver configuration are all parameters used for vDisks created directly on the filesystem
                         # So when a vDisk gets created on the filesystem, these MDSes will be assigned to them
-                        storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
+                        storagedriver_config.configuration.filesystem_config.fs_metadata_backend_mds_nodes = mds_config_set[sr.guid]
                         storagedriver_config.save(client=clients['ovs'])
 
             # Everything's reconfigured, refresh new cluster configuration

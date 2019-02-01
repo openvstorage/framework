@@ -17,8 +17,6 @@
 import re
 from .base import BaseStorageDriverConfig
 from ovs.constants.storagedriver import VOLDRV_DTL_TRANSPORT_TCP
-from ovs.dal.hybrids.vpool import VPool
-from ovs_extensions.generic.toolbox import ExtensionsToolbox
 
 
 class BackendConnectionManager(BaseStorageDriverConfig):

@@ -108,7 +108,7 @@ class MDSServiceController(MDSShared):
             # Generate the correct section in the StorageDriver's configuration
             MDSServiceController._logger.info('StorageRouter {0} - vPool {1}: Configuring StorageDriver with MDS nodes: {2}'.format(storagerouter.name, vpool.name, mds_nodes))
             storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
-            storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
+            storagedriver_config.configuration.mds_config.mds_nodes=mds_nodes
             storagedriver_config.save(root_client)
 
         # Clean up model
@@ -278,7 +278,7 @@ class MDSServiceController(MDSShared):
                     MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - Storing optimal MDS configuration: {2}'.format(vpool.name, storagerouter.name, optimal_mds_config))
                     # Filesystem section in StorageDriver configuration are all parameters used for vDisks created directly on the filesystem
                     # So when a vDisk gets created on the filesystem, these MDSes will be assigned to them
-                    storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=optimal_mds_config)
+                    storagedriver_config.configuration.filesystem_config.fs_metadata_backend_mds_nodes=optimal_mds_config
                     storagedriver_config.save(root_client)
 
             # Execute a safety check, making sure the master/slave configuration is optimal.

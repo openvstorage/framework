@@ -26,6 +26,7 @@ from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.logger import Logger as OVSLogger
 from ovs_extensions.generic.remote import remote
+from ovs.extensions.storageserver.storagedriverconfig import StorageDriverConfig
 from volumedriver.storagerouter import storagerouterclient
 
 # Import below classes so the rest of the framework can always import from this module:
@@ -309,6 +310,7 @@ class StorageDriverConfiguration(object):
     CACHE_FRAGMENT = 'fragment_cache'
 
     def __init__(self, vpool_guid, storagedriver_id):
+        # type: (str, str) -> None
         """
         Initializes the class
         """
@@ -325,12 +327,13 @@ class StorageDriverConfiguration(object):
         self.remote_path = Configuration.get_configuration_path(self._key).strip('/')
         # Load configuration
         if Configuration.exists(self._key):
-            self.configuration = Configuration.get(self._key)
+            self.configuration = StorageDriverConfig.from_dict(Configuration.get(self._key)) # type: StorageDriverConfig
             self.config_missing = False
         else:
-            self.configuration = {}
+            self.configuration = None  # type: StorageDriverConfig
             self.config_missing = True
             self._logger.debug('Could not find config {0}, a new one will be created'.format(self._key))
+        self._initial_config = copy.deepcopy(self.configuration)
 
     def save(self, client=None, force_reload=False):
         """
@@ -343,10 +346,12 @@ class StorageDriverConfiguration(object):
         :rtype: list
         """
         changes = []
-        Configuration.set(self._key, self.configuration)
+        exported_config = self.configuration.to_dict()
+        Configuration.set(self._key, exported_config)
 
         # No changes detected in the configuration management
-        if len(self._dirty_entries) == 0 and force_reload is False:
+        no_changes = self._initial_config.to_dict() == self.configuration.to_dict()
+        if no_changes and not force_reload:
             self._logger.debug('No need to apply changes, nothing changed')
             self.config_missing = False
             return changes
@@ -380,20 +385,23 @@ class StorageDriverConfiguration(object):
         for change in changes:
             if not isinstance(change, dict):
                 raise RuntimeError('Unexpected update_configuration output')
-            if 'param_name' not in change or 'old_value' not in change or 'new_value' not in change:
+            mandatory_change_keys = ['param_name', 'old_value','new_value']
+            if any([key not in change for key in mandatory_change_keys]):
                 raise RuntimeError('Unexpected update_configuration output. Expected different keys, but got {0}'.format(', '.join(change.keys())))
 
             param_name = change['param_name']
-            if force_reload is False:
-                if param_name not in self._dirty_entries:
-                    raise RuntimeError('Unexpected configuration change: {0}'.format(param_name))
-                self._dirty_entries.remove(param_name)
+            # @todo leftover from the dynamic days?
+            # if force_reload is False:
+            #     if param_name not in self._dirty_entries:
+            #         raise RuntimeError('Unexpected configuration change: {0}'.format(param_name))
+            #     self._dirty_entries.remove(param_name)
             self._logger.info('Changed {0} from "{1}" to "{2}"'.format(param_name, change['old_value'], change['new_value']))
         self._logger.info('Changes applied')
         if len(self._dirty_entries) > 0:
             self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self._dirty_entries)))
         self.config_missing = False
         self._dirty_entries = []
+        self._initial_config = exported_config
         return changes
 
     def __getattr__(self, item):
