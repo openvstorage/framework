@@ -183,7 +183,7 @@ class SafetyEnsurer(MDSShared):
         for index, config in enumerate(self.metadata_backend_config_start):  # Ordered MASTER, SLAVE(S)
             config_key = '{0}:{1}'.format(config['ip'], config['port'])
             service = services_by_socket.get(config_key)
-            if service is None:
+            if not service:
                 self._logger.critical('vDisk {0} - Storage leak detected. Namespace {1} for service {2} will never be deleted automatically because service does no longer exist in model'.format(self.vdisk.guid, self.vdisk.volume_id, config_key))
                 reconfigure_reasons.add('{0} {1} cannot be used anymore'.format('Master' if index == 0 else 'Slave', config_key))
             else:
@@ -208,7 +208,7 @@ class SafetyEnsurer(MDSShared):
             loads = self._get_mds_load(mds_service=service.mds_service)
             if service == self.master_service or service in self.slave_services:  # Service is still in use
                 load = loads[0]
-                if importance is not None:
+                if importance:
                     self.mds_layout[importance]['used'].append(service)
                 else:
                     reconfigure_reasons.add('Service {0} cannot be used anymore because StorageRouter with IP {1} is not part of the domains'.format(service.name, service.storagerouter.ip))
@@ -216,7 +216,7 @@ class SafetyEnsurer(MDSShared):
                 load = loads[1]
             self.services_load[service] = load
 
-            if importance is not None:
+            if importance:
                 nodes.add(service.storagerouter.ip)
                 self.mds_layout[importance]['available'].append(service)
                 if load <= self.max_load:
@@ -231,7 +231,7 @@ class SafetyEnsurer(MDSShared):
             reconfigure_reasons.add('Too much safety - Current: {0} - Expected: {1}'.format(len(current_service_ips), self.safety))
         if len(current_service_ips) < self.safety and len(current_service_ips) < len(nodes):
             reconfigure_reasons.add('Not enough safety - Current: {0} - Expected: {1}'.format(len(current_service_ips), self.safety))
-        if self.master_service is not None:
+        if self.master_service:
             if self.services_load[self.master_service] > self.max_load:
                 reconfigure_reasons.add('Master overloaded - Current load: {0}% - Max load: {1}%'.format(self.services_load[self.master_service], self.max_load))
             if self.master_service.storagerouter_guid != self.vdisk.storagerouter_guid:
@@ -265,7 +265,7 @@ class SafetyEnsurer(MDSShared):
         # If secondary domain present, check order in which the slave services are configured
         secondary = False
         for slave_service in self.slave_services:
-            if secondary is True and slave_service in self.mds_layout['primary']['used']:
+            if secondary and slave_service in self.mds_layout['primary']['used']:
                 reconfigure_reasons.add('A slave in secondary domain has priority over a slave in primary domain')
                 break
             if slave_service in self.mds_layout['secondary']['used']:
@@ -290,8 +290,12 @@ class SafetyEnsurer(MDSShared):
         previous_master = None
         log_start = 'vDisk {0}'.format(self.vdisk.guid)
 
-        if self.master_service is not None and self.master_service.storagerouter_guid == self.vdisk.storagerouter_guid and self.services_load[self.master_service] <= self.max_load and self.master_service in self.mds_layout['primary']['used']:
-            new_services.append(self.master_service)  # Master is OK, so add as 1st element to new configuration. Reconfiguration is now based purely on slave misconfiguration
+        if self.master_service \
+                and self.master_service.storagerouter_guid == self.vdisk.storagerouter_guid \
+                and self.services_load[self.master_service] <= self.max_load \
+                and self.master_service in self.mds_layout['primary']['used']:
+            # Master is OK, so add as 1st element to new configuration. Reconfiguration is now based purely on slave misconfiguration
+            new_services.append(self.master_service)
             self._logger.debug('{0} - Master is still OK, re-calculating slaves'.format(log_start))
         else:
             # Master is not OK --> try to find the best non-overloaded LOCAL MDS slave in the primary domain to make master
@@ -303,9 +307,10 @@ class SafetyEnsurer(MDSShared):
                 if service == self.master_service:
                     # Make sure the current master_service is not re-used as master for whatever reason
                     continue
-                next_load = self.services_load[service]  # This load indicates the load it would become if a vDisk would be moved to this Service
+                # This load indicates the load it would become if a vDisk would be moved to this Service
+                next_load = self.services_load[service]
                 if next_load <= self.max_load and service.storagerouter_guid == self.vdisk.storagerouter_guid:
-                    if current_load > next_load or (re_used_local_slave_service is None and new_local_master_service is None):
+                    if current_load > next_load or (not re_used_local_slave_service and not new_local_master_service):
                         current_load = next_load  # Load for least loaded service
                         new_local_master_service = service  # If no local slave is found to re-use, this new_local_master_service is used
                         if service in self.slave_services:
@@ -313,14 +318,14 @@ class SafetyEnsurer(MDSShared):
                             re_used_local_slave_service = service  # A slave service is found to re-use as new master
                             self.slave_services.remove(service)
 
-            if re_used_local_slave_service is None:
+            if not re_used_local_slave_service:
                 # There's no non-overloaded local slave found. Keep the current master (if available) and add a local MDS (if available) as slave.
                 # Next iteration, the newly added slave will be checked if it has caught up already
                 # If amount of tlogs to catchup is < configured amount of tlogs --> we wait for catchup, so master can be removed and slave can be promoted
-                if self.master_service is not None:
+                if self.master_service:
                     self._logger.debug('{0} - Keeping current master service'.format(log_start))
                     new_services.append(self.master_service)
-                if new_local_master_service is not None:
+                if new_local_master_service:
                     self._logger.debug('{0} - Adding new slave service {1}:{2} to catch up'.format(log_start, new_local_master_service.storagerouter.ip, new_local_master_service.ports[0]))
                     new_services.append(new_local_master_service)
             else:
@@ -361,6 +366,7 @@ class SafetyEnsurer(MDSShared):
                         previous_master = self.master_service
                 else:
                     # It's not up to date, keep the previous master (if available) and give the local slave some more time to catch up
+                    # @todo this needs to trigger a new job the new local master is there
                     if self.master_service is not None:
                         new_services.append(self.master_service)
                     new_services.append(re_used_local_slave_service)
@@ -445,7 +451,7 @@ class SafetyEnsurer(MDSShared):
         :param new_services: List of new services to be used in the reconfiguration (Master and slaves)
         Note the order matters here! First the master, then slaves in primary domain, then slaves in secondary domain
         :type new_services: List[Service]
-        :param previous_master_service: Previous master service incase the master should be switched around (None if no previous master)
+        :param previous_master_service: Previous master service in case the master should be switched around (None if no previous master)
         :type previous_master_service: Service
         :return: None
         :rtype: NoneType
@@ -529,7 +535,7 @@ class SafetyEnsurer(MDSShared):
             update_failure = True
             raise
         finally:
-            if update_failure is True:
+            if update_failure:
                 # Remove newly created namespaces when updating would go wrong to avoid storage leaks
                 for new_namespace_service in new_namespace_services:
                     client = self.mds_client_cache[new_namespace_service]

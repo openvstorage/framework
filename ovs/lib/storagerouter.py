@@ -1003,11 +1003,10 @@ class StorageRouterController(object):
             VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
         except:
             pass
-        for vdisk in vpool.vdisks:
-            try:
-                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
-            except:
-                pass
+        try:
+            MDSServiceController.mds_checkup()
+        except:
+            pass
         StorageRouterController._logger.info('Add vPool {0} ended successfully'.format(vpool_name))
 
     @staticmethod
