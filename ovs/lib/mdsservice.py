@@ -141,6 +141,22 @@ class MDSServiceController(MDSShared):
                         MDSServiceController._logger.exception('StorageRouter {0} - vPool {1}: Deleting directories failed'.format(storagerouter.name, vpool.name))
                         raise
 
+    # @staticmethod
+    # @ovs_task(name='ovs.mds.mds_checkup', ensure_single_info={'mode': 'CHAINED'})
+    # def mds_checkup_single():
+    #     """
+    #     Validates the current MDS setup/configuration and takes actions where required
+    #     Actions:
+    #         * Verify which StorageRouters are available
+    #         * Make mapping between vPools and its StorageRouters
+    #         * For each vPool make sure every StorageRouter has at least 1 MDS service with capacity available
+    #         * For each vPool retrieve the optimal configuration and store it for each StorageDriver
+    #         * For each vPool run an ensure safety for all vDisks
+    #     :raises RuntimeError: When ensure safety fails for any vDisk
+    #     :return: None
+    #     :rtype: NoneType
+    #     """
+
     @staticmethod
     @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'CHAINED'})
     def mds_checkup():
