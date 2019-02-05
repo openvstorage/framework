@@ -21,7 +21,7 @@ Helpers test module
 import time
 import unittest
 import threading
-from threading import Event, Thread
+from threading import Event, Thread, Condition, Lock
 from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.generic.threadhelpers import Waiter
 # noinspection PyProtectedMember
@@ -32,33 +32,31 @@ class Helpers(unittest.TestCase):
     """
     This test class will validate the various scenarios of the Helpers logic
     """
-    helpers = {}
-    exceptions = []
-
     def setUp(self):
         """
         (Re)Sets the stores on every test
         """
         self.volatile, self.persistent = DalHelper.setup()
+        self.exceptions = []
 
     def tearDown(self):
         """
         Clean up test suite
         """
         DalHelper.teardown()
+        Decorators._clean()
 
-    @staticmethod
-    def _execute_delayed_or_inline(fct, delayed, **kwargs):
-        if delayed is True:
+    def _execute_delayed_or_inline(self, fct, delayed, **kwargs):
+        if delayed:
             return_value = fct.delay(**kwargs)
             return_value['thread'].join()
             if return_value['exception'] is not None:
-                exceptions.append(return_value['exception'].message)
+                self.exceptions.append(return_value['exception'].message)
         else:
             try:
                 fct(**kwargs)
             except Exception as ex:
-                exceptions.append(ex.message)
+                self.exceptions.append(ex.message)
 
     @staticmethod
     def _wait_for(condition, debug=None):
@@ -106,26 +104,24 @@ class Helpers(unittest.TestCase):
                       container=raise_info.exception.message)
 
         # Discarding and Queueing of tasks
-        global helpers, exceptions
         waiter1 = Waiter(2)
         waiter2 = Waiter(2)
         waiter3 = Waiter(2)
         helpers = {'1': waiter1,
                    '2': waiter2,
                    '3': waiter3}
-        exceptions = []
 
-        thread1 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_initial', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
-        thread2 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
-        thread3 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_after_wait', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
-        thread4 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_other_args', args=(_function_wo_callback, True), kwargs={'arg1': 'other_arg'})
-        thread5 = Thread(target=Helpers._execute_delayed_or_inline, name='discarded_wo_callback_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
-        thread6 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_wo_callback_sync', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
-        thread7 = Thread(target=Helpers._execute_delayed_or_inline, name='discarded_w_callback_async', args=(_function_w_callback, True), kwargs={'arg1': 'arg'})
-        thread8 = Thread(target=Helpers._execute_delayed_or_inline, name='callback_w_callback_sync', args=(_function_w_callback, False), kwargs={'arg1': 'arg'})
-        thread9 = Thread(target=Helpers._execute_delayed_or_inline, name='callback_w_callback_sync_incorrect_args', args=(_function_w_callback_incorrect_args, False), kwargs={'arg1': 'arg'})
-        thread10 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_wo_callback_sync_timeout', args=(_function_wo_callback, False), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
-        thread11 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_sync_wait_for_async', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
+        thread1 = Thread(target=self._execute_delayed_or_inline, name='finished_async_initial', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread2 = Thread(target=self._execute_delayed_or_inline, name='exception_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
+        thread3 = Thread(target=self._execute_delayed_or_inline, name='finished_async_after_wait', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread4 = Thread(target=self._execute_delayed_or_inline, name='finished_async_other_args', args=(_function_wo_callback, True), kwargs={'arg1': 'other_arg'})
+        thread5 = Thread(target=self._execute_delayed_or_inline, name='discarded_wo_callback_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread6 = Thread(target=self._execute_delayed_or_inline, name='waited_wo_callback_sync', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
+        thread7 = Thread(target=self._execute_delayed_or_inline, name='discarded_w_callback_async', args=(_function_w_callback, True), kwargs={'arg1': 'arg'})
+        thread8 = Thread(target=self._execute_delayed_or_inline, name='callback_w_callback_sync', args=(_function_w_callback, False), kwargs={'arg1': 'arg'})
+        thread9 = Thread(target=self._execute_delayed_or_inline, name='callback_w_callback_sync_incorrect_args', args=(_function_w_callback_incorrect_args, False), kwargs={'arg1': 'arg'})
+        thread10 = Thread(target=self._execute_delayed_or_inline, name='exception_wo_callback_sync_timeout', args=(_function_wo_callback, False), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
+        thread11 = Thread(target=self._execute_delayed_or_inline, name='waited_sync_wait_for_async', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
 
         thread1.start()  # Start initial thread and wait for it to be EXECUTING
         Helpers._wait_for(condition=lambda: ('finished_async_initial_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['finished_async_initial_delayed'][0] == 'EXECUTING'))
@@ -271,22 +267,20 @@ class Helpers(unittest.TestCase):
                       container=raise_info.exception.message)
 
         # Discarding and Queueing of tasks
-        global helpers, exceptions
         event = Event()
         waiter = Waiter(3)
         helpers = {'waiter': None, 'event': event}
-        exceptions = []
-        thread1 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_initial', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
-        thread2 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
-        thread3 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_after_wait', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
-        thread4 = Thread(target=Helpers._execute_delayed_or_inline, name='finished_async_other_args', args=(_function_wo_callback, True), kwargs={'arg1': 'other_arg'})
-        thread5 = Thread(target=Helpers._execute_delayed_or_inline, name='discarded_wo_callback_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
-        thread6 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_wo_callback_sync', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
-        thread7 = Thread(target=Helpers._execute_delayed_or_inline, name='discarded_w_callback_async', args=(_function_w_callback, True), kwargs={'arg1': 'arg'})
-        thread8 = Thread(target=Helpers._execute_delayed_or_inline, name='callback_w_callback_sync', args=(_function_w_callback, False), kwargs={'arg1': 'arg'})
-        thread9 = Thread(target=Helpers._execute_delayed_or_inline, name='callback_w_callback_sync_incorrect_args', args=(_function_w_callback_incorrect_args, False), kwargs={'arg1': 'arg'})
-        thread10 = Thread(target=Helpers._execute_delayed_or_inline, name='exception_wo_callback_sync_timeout', args=(_function_wo_callback, False), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
-        thread11 = Thread(target=Helpers._execute_delayed_or_inline, name='waited_sync_wait_for_async', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
+        thread1 = Thread(target=self._execute_delayed_or_inline, name='finished_async_initial', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread2 = Thread(target=self._execute_delayed_or_inline, name='exception_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
+        thread3 = Thread(target=self._execute_delayed_or_inline, name='finished_async_after_wait', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread4 = Thread(target=self._execute_delayed_or_inline, name='finished_async_other_args', args=(_function_wo_callback, True), kwargs={'arg1': 'other_arg'})
+        thread5 = Thread(target=self._execute_delayed_or_inline, name='discarded_wo_callback_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
+        thread6 = Thread(target=self._execute_delayed_or_inline, name='waited_wo_callback_sync', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
+        thread7 = Thread(target=self._execute_delayed_or_inline, name='discarded_w_callback_async', args=(_function_w_callback, True), kwargs={'arg1': 'arg'})
+        thread8 = Thread(target=self._execute_delayed_or_inline, name='callback_w_callback_sync', args=(_function_w_callback, False), kwargs={'arg1': 'arg'})
+        thread9 = Thread(target=self._execute_delayed_or_inline, name='callback_w_callback_sync_incorrect_args', args=(_function_w_callback_incorrect_args, False), kwargs={'arg1': 'arg'})
+        thread10 = Thread(target=self._execute_delayed_or_inline, name='exception_wo_callback_sync_timeout', args=(_function_wo_callback, False), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
+        thread11 = Thread(target=self._execute_delayed_or_inline, name='waited_sync_wait_for_async', args=(_function_wo_callback, False), kwargs={'arg1': 'arg'})
 
         thread1.start()  # Start initial thread and wait for it to be EXECUTING
         Helpers._wait_for(condition=lambda: ('finished_async_initial_delayed' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['finished_async_initial_delayed'][0] == 'EXECUTING'))
@@ -377,27 +371,27 @@ class Helpers(unittest.TestCase):
         self.assertLess(a=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_initial_delayed'),  # Since thread3 waits for thread1 to finish, index should be lower for thread1
                         b=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_after_wait_delayed'))
 
-    def test_ensure_single_decorator_default(self):
+    def test_ensure_single_decorator_default_simple(self):
         """
         Tests Helpers._ensure_single functionality in DEFAULT mode
         Whether the first task is being executed sync or async, the 2nd will always be discarded
         This is because the 2nd task is being executed by another worker (or mocked to invoke this behavior)
         """
-        # DECORATED FUNCTIONS
         @ovs_task(name='unittest_task1', ensure_single_info={'mode': 'DEFAULT'})
-        def _function(arg1):
-            _ = arg1
-            helpers['waiter'].wait()
+        def _function(notify_event, wait_event):
+            # type: (Event, Event) -> None
+            notify_event.set()
+            wait_event.wait()
 
         @ovs_task(name='unittest_task2', ensure_single_info={'mode': 'DEFAULT', 'callback': Callback.call_back_function})
-        def _function_w_callback(arg1):
-            _ = arg1
-            helpers['waiter'].wait()
+        def _function_w_callback(notify_event, wait_event):
+            # type: (Event, Event) -> None
+            notify_event.set()
+            wait_event.wait()
 
-        @ovs_task(name='unittest_task3', ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['unittest_task1']})
-        def _function_w_extra_task_names(arg1):
-            _ = arg1
-            helpers['waiter'].wait()
+        # Threading control
+        event_notify = Event()
+        event_wait = Event()
 
         # | Task 1 Sync | Task 2 Sync | Callback |
         # |    False    |    False    |   No CB  |
@@ -408,51 +402,82 @@ class Helpers(unittest.TestCase):
         # |    True     |    False    |    CB    |
         # |    False    |    True     |    CB    |
         # |    True     |    True     |    CB    |
-        global helpers, exceptions
-        counter = 0
-        helpers = {'waiter': None}
-        exceptions = []
-        for task1_delayed, task2_delayed, func in [(False, False, _function),
-                                                   (True, False, _function),
-                                                   (False, True, _function),
-                                                   (True, True, _function),
-                                                   (False, False, _function_w_callback),
-                                                   (True, False, _function_w_callback),
-                                                   (False, True, _function_w_callback),
-                                                   (True, True, _function_w_callback)]:
-            waiter = Waiter(2)
-            helpers['waiter'] = waiter
-            thread1 = Thread(target=Helpers._execute_delayed_or_inline, name='unittest_thread1', args=(func, task1_delayed), kwargs={'arg1': 'arg1'})
-            thread2 = Thread(target=Helpers._execute_delayed_or_inline, name='unittest_thread2', args=(func, task2_delayed), kwargs={'arg1': 'arg2'})
+
+        for index, task_info in enumerate([(False, False, _function),
+                                           (True, False, _function),
+                                           (False, True, _function),
+                                           (True, True, _function),
+                                           (False, False, _function_w_callback),
+                                           (True, False, _function_w_callback),
+                                           (False, True, _function_w_callback),
+                                           (True, True, _function_w_callback)]):
+            task1_delayed, task2_delayed, func = task_info
+
+            print 'Task info: {}'.format(task_info)
+            thread1 = Thread(target=self._execute_delayed_or_inline, name='unittest_thread1', args=(func, task1_delayed),
+                             kwargs={'notify_event': event_notify, 'wait_event': event_wait})
+            thread2 = Thread(target=self._execute_delayed_or_inline, name='unittest_thread2', args=(func, task2_delayed),
+                             kwargs={'notify_event': event_notify, 'wait_event': event_wait})
+
+            # Make sure the threads don't lock up
+            event_wait.clear()
 
             thread1.start()
-            wait = 500
-            while waiter.get_counter() < 1:  # Wait for thread1 to be waiting, which will increase the counter to 1
-                time.sleep(0.01)
-                wait -= 1
-                if wait == 0:
-                    raise RuntimeError('Waiter did not reach 1 in time.')
+            event_notify.wait()  # Wait for the thread to come up
+            event_notify.clear()  # Clear it for the next one
+
+            # Wait for thread2 to complete (as it gets discarded/does callbacks instead of invoking the passed function)
             thread2.start()
             thread2.join()
-            waiter.wait()
+
+            # Let the threads start
+            event_wait.set()
+
             thread1.join()
 
             # Validate
-            thread_name_1 = thread1.name if task1_delayed is False else '{0}_delayed'.format(thread1.name)
-            thread_name_2 = thread2.name if task2_delayed is False else '{0}_delayed'.format(thread2.name)
+            thread_name_1 = thread1.name if not task1_delayed else '{0}_delayed'.format(thread1.name)
+            thread_name_2 = thread2.name if not task2_delayed else '{0}_delayed'.format(thread2.name)
             for thread_name in [thread_name_1, thread_name_2]:
                 self.assertIn(member=thread_name,
                               container=Decorators.unittest_thread_info_by_name)
             self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_1][0],
                              second='FINISHED')
-            if func == _function or task2_delayed is True:  # Callback function is only executed when waiting task is executed non-delayed
+            if func == _function or task2_delayed:  # Callback function is only executed when waiting task is executed non-delayed
                 self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
                                  second='DISCARDED')
             else:
                 self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
                                  second='CALLBACK')
-            counter += 1
             Decorators._clean()
+
+    def test_ensure_single_decorator_default_multiple_names(self):
+        """
+        Tests Helpers._ensure_single functionality in DEFAULT mode
+        Whether the first task is being executed sync or async, the 2nd will always be discarded
+        This is because the 2nd task is being executed by another worker (or mocked to invoke this behavior)
+        """
+        @ovs_task(name='unittest_task1', ensure_single_info={'mode': 'DEFAULT'})
+        def _function(notify_event, wait_event):
+            # type: (Event, Event) -> None
+            notify_event.set()
+            wait_event.wait()
+
+        @ovs_task(name='unittest_task2_callback', ensure_single_info={'mode': 'DEFAULT', 'callback': Callback.call_back_function})
+        def _function_w_callback(notify_event, wait_event):
+            # type: (Event, Event) -> None
+            notify_event.set()
+            wait_event.wait()
+
+        @ovs_task(name='unittest_task3_extra_names', ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['unittest_task1']})
+        def _function_w_extra_task_names(notify_event, wait_event):
+            # type: (Event, Event) -> None
+            notify_event.set()
+            wait_event.wait()
+
+        # Threading control
+        event_notify = Event()
+        event_wait = Event()
 
         # | Task 1 Sync | Task 2 Sync | Function order  |
         # |    False    |    False    | func 1 - func 2 |
@@ -463,41 +488,57 @@ class Helpers(unittest.TestCase):
         # |    True     |    False    | func 2 - func 1 |
         # |    False    |    True     | func 2 - func 1 |
         # |    True     |    True     | func 2 - func 1 |
-        for task1_delayed, task2_delayed, first_func, second_func in [(False, False, _function, _function_w_extra_task_names),
-                                                                      (True, False, _function, _function_w_extra_task_names),
-                                                                      (False, True, _function, _function_w_extra_task_names),
-                                                                      (True, True, _function, _function_w_extra_task_names),
-                                                                      (False, False, _function_w_extra_task_names, _function),
-                                                                      (True, False, _function_w_extra_task_names, _function),
-                                                                      (False, True, _function_w_extra_task_names, _function),
-                                                                      (True, True, _function_w_extra_task_names, _function)]:
-            waiter = Waiter(2)
-            helpers['waiter'] = waiter
-            thread1 = Thread(target=Helpers._execute_delayed_or_inline, name='unittest_thread1', args=(first_func, task1_delayed), kwargs={'arg1': 'arg1'})
-            thread2 = Thread(target=Helpers._execute_delayed_or_inline, name='unittest_thread2', args=(second_func, task2_delayed), kwargs={'arg1': 'arg2'})
+        for index, func_tuple in enumerate([(False, False, _function, _function_w_extra_task_names),
+                                           (True, False, _function, _function_w_extra_task_names),
+                                           (False, True, _function, _function_w_extra_task_names),
+                                           (True, True, _function, _function_w_extra_task_names),
+                                           (False, False, _function_w_extra_task_names, _function),
+                                           (True, False, _function_w_extra_task_names, _function),
+                                           (False, True, _function_w_extra_task_names, _function),
+                                           (True, True, _function_w_extra_task_names, _function)]):
 
-            thread1.start()
-            while waiter.get_counter() < 1:  # Wait for thread1 to be waiting, which will increase the counter to 1
-                time.sleep(0.01)
-            thread2.start()
-            thread2.join()
-            waiter.wait()
-            thread1.join()
+            task1_delayed, task2_delayed, first_func, second_func = func_tuple
+
+            kwargs_to_pass = {'notify_event': event_notify, 'wait_event': event_wait}
+            thread1 = Thread(target=self._execute_delayed_or_inline, name='unittest_thread1',
+                             args=(first_func, task1_delayed), kwargs=kwargs_to_pass)
+            thread2 = Thread(target=self._execute_delayed_or_inline, name='unittest_thread2',
+                             args=(second_func, task2_delayed), kwargs=kwargs_to_pass)
+            threads = [thread1, thread2]
+            # Make sure the threads lock up
+            event_wait.clear()
+
+            thread2_will_finish = first_func != _function
+
+            for thread in threads:
+                thread.start()
+                if thread != thread2 or thread2_will_finish:
+                    event_notify.wait()  # Wait for the thread to come up
+                    event_notify.clear()  # Clear it for the next one
+
+            # Let the threads start
+            event_wait.set()
+
+            for thread in threads:
+                thread.join()
 
             # Validate
-            thread_name_1 = thread1.name if task1_delayed is False else '{0}_delayed'.format(thread1.name)
-            thread_name_2 = thread2.name if task2_delayed is False else '{0}_delayed'.format(thread2.name)
+            thread_name_1 = thread1.name if not task1_delayed else '{0}_delayed'.format(thread1.name)
+            thread_name_2 = thread2.name if not task2_delayed else '{0}_delayed'.format(thread2.name)
             for thread_name in [thread_name_1, thread_name_2]:
                 self.assertIn(member=thread_name,
                               container=Decorators.unittest_thread_info_by_name)
             self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_1][0],
                              second='FINISHED')
-            if first_func == _function:  # Function 1 called first, so should have been completed, starting function 2 should be discarded due to 'extra_task_names'
-                self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
-                                 second='DISCARDED')
-            else:  # Function 2 called first, which should not block the execution of another function: function 1
-                self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
-                                 second='FINISHED')
+            # Function 2 called first, which should not block the execution of another function: function 1
+            if thread2_will_finish:
+                state = 'FINISHED'
+            # Function 1 called first, so should have been completed, starting function 2 should be discarded due to 'extra_task_names'
+            else:
+                state = 'DISCARDED'
+
+            self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
+                             second=state)
             Decorators._clean()
 
     def test_ensure_single_decorator_exceptions(self):

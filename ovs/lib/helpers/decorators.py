@@ -313,8 +313,8 @@ class EnsureSingle(object):
                     else:
                         raise EnsureSingleDoCallBack()
 
-                self.logger.info(self.message.format('Setting key {0}'.format(self.persistent_key)))
-                self.persistent_client.set(self.persistent_key, {'mode': self.ensure_single_container.mode, 'values': [{'task_id': self.task_id}]})
+            self.logger.info(self.message.format('Setting key {0}'.format(self.persistent_key)))
+            self.persistent_client.set(self.persistent_key, {'mode': self.ensure_single_container.mode, 'values': [{'task_id': self.task_id}]})
         success = True
         self.unittest_set_state_executing()
         self.logger.info('YIELDING {} {}'.format(self.ensure_single_container.task_name, self.thread_name))
