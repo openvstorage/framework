@@ -21,7 +21,7 @@ Helpers test module
 import time
 import unittest
 import threading
-from threading import Event, Thread, Condition, Lock
+from threading import Event, Thread
 from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.generic.threadhelpers import Waiter
 # noinspection PyProtectedMember
@@ -211,10 +211,10 @@ class Helpers(unittest.TestCase):
                                  second='Could not start within timeout of 0.1s while waiting for other tasks')
 
         # Validate total amount of exceptions, 3 expected (2 timeouts and 1 incorrect callback)
-        self.assertEqual(first=len(exceptions),
+        self.assertEqual(first=len(self.exceptions),
                          second=3)
         self.assertIn(member='call_back_function2() takes exactly 2 arguments (1 given)',
-                      container=exceptions)
+                      container=self.exceptions)
 
         # Validate the expected tasks which should have been waiting at some point
         self.assertListEqual(list1=sorted(Decorators.unittest_thread_info_by_state['WAITING']),
@@ -231,21 +231,24 @@ class Helpers(unittest.TestCase):
         """
         Tests Helpers._ensure_single functionality in DEDUPED mode
         """
+        name = 'unittest_task'
+        mode = 'DEDUPED'
+
         # DECORATED FUNCTIONS
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'DEDUPED', 'extra_task_names': []})
+        @ovs_task(name=name, ensure_single_info={'mode': mode, 'extra_task_names': []})
         def _function_w_extra_task_names():
             pass
 
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'DEDUPED', 'callback': Callback.call_back_function})
+        @ovs_task(name=name, ensure_single_info={'mode': mode, 'callback': Callback.call_back_function})
         def _function_w_callback(arg1):
             _ = arg1
             helpers['waiter'].wait()
 
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'DEDUPED', 'callback': Callback.call_back_function2})
+        @ovs_task(name=name, ensure_single_info={'mode': mode, 'callback': Callback.call_back_function2})
         def _function_w_callback_incorrect_args(arg1):
             _ = arg1
 
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'DEDUPED'})
+        @ovs_task(name=name, ensure_single_info={'mode': mode})
         def _function_wo_callback(arg1):
             _ = arg1
             if helpers['waiter'] is not None:
@@ -358,10 +361,10 @@ class Helpers(unittest.TestCase):
                                  second='Could not start within timeout of 0.1s while waiting for other tasks')
 
         # Validate total amount of exceptions, 3 expected (2 timeouts and 1 incorrect callback)
-        self.assertEqual(first=len(exceptions),
+        self.assertEqual(first=len(self.exceptions),
                          second=3)
         self.assertIn(member='call_back_function2() takes exactly 2 arguments (1 given)',
-                      container=exceptions)
+                      container=self.exceptions)
 
         # Validate the expected tasks which should have been waiting at some point
         self.assertListEqual(list1=sorted(Decorators.unittest_thread_info_by_state['WAITING']),
@@ -371,27 +374,35 @@ class Helpers(unittest.TestCase):
         self.assertLess(a=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_initial_delayed'),  # Since thread3 waits for thread1 to finish, index should be lower for thread1
                         b=Decorators.unittest_thread_info_by_state['FINISHED'].index('finished_async_after_wait_delayed'))
 
-    def test_ensure_single_decorator_default_simple(self):
+    def test_ensure_single_decorator_default_discard_callback(self):
         """
         Tests Helpers._ensure_single functionality in DEFAULT mode
+        Ensure that the task invokes a callback / gets discarded when a similar task is already running
         Whether the first task is being executed sync or async, the 2nd will always be discarded
         This is because the 2nd task is being executed by another worker (or mocked to invoke this behavior)
         """
-        @ovs_task(name='unittest_task1', ensure_single_info={'mode': 'DEFAULT'})
+        # Threading control
+        event_notify = Event()
+        event_wait = Event()
+        validation_notify = Event()
+
+        def after_validation_hook():
+            validation_notify.set()
+
+        mode = 'DEFAULT'
+        ensure_single_hooks = {'after_validation': after_validation_hook}
+
+        @ovs_task(name='unittest_task1', ensure_single_info={'mode': mode, 'hooks': ensure_single_hooks})
         def _function(notify_event, wait_event):
             # type: (Event, Event) -> None
             notify_event.set()
             wait_event.wait()
 
-        @ovs_task(name='unittest_task2', ensure_single_info={'mode': 'DEFAULT', 'callback': Callback.call_back_function})
+        @ovs_task(name='unittest_task2', ensure_single_info={'mode': mode, 'callback': Callback.call_back_function, 'hooks': ensure_single_hooks})
         def _function_w_callback(notify_event, wait_event):
             # type: (Event, Event) -> None
             notify_event.set()
             wait_event.wait()
-
-        # Threading control
-        event_notify = Event()
-        event_wait = Event()
 
         # | Task 1 Sync | Task 2 Sync | Callback |
         # |    False    |    False    |   No CB  |
@@ -402,7 +413,6 @@ class Helpers(unittest.TestCase):
         # |    True     |    False    |    CB    |
         # |    False    |    True     |    CB    |
         # |    True     |    True     |    CB    |
-
         for index, task_info in enumerate([(False, False, _function),
                                            (True, False, _function),
                                            (False, True, _function),
@@ -413,27 +423,29 @@ class Helpers(unittest.TestCase):
                                            (True, True, _function_w_callback)]):
             task1_delayed, task2_delayed, func = task_info
 
-            print 'Task info: {}'.format(task_info)
             thread1 = Thread(target=self._execute_delayed_or_inline, name='unittest_thread1', args=(func, task1_delayed),
                              kwargs={'notify_event': event_notify, 'wait_event': event_wait})
             thread2 = Thread(target=self._execute_delayed_or_inline, name='unittest_thread2', args=(func, task2_delayed),
                              kwargs={'notify_event': event_notify, 'wait_event': event_wait})
+            threads = [thread1, thread2]
 
-            # Make sure the threads don't lock up
-            event_wait.clear()
+            # Clear state
+            for event in [validation_notify, event_wait, event_notify]:
+                event.clear()
+            Decorators._clean()
 
             thread1.start()
-            event_notify.wait()  # Wait for the thread to come up
-            event_notify.clear()  # Clear it for the next one
+            event_notify.wait()  # Make sure that the first thread did its execution
+            validation_notify.clear()  # Clear the validation hook of the first thread
 
-            # Wait for thread2 to complete (as it gets discarded/does callbacks instead of invoking the passed function)
             thread2.start()
-            thread2.join()
-
+            # Wait until the decorator did its thing
+            validation_notify.wait()
             # Let the threads start
             event_wait.set()
 
-            thread1.join()
+            for thread in threads:
+                thread.join()
 
             # Validate
             thread_name_1 = thread1.name if not task1_delayed else '{0}_delayed'.format(thread1.name)
@@ -449,35 +461,37 @@ class Helpers(unittest.TestCase):
             else:
                 self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
                                  second='CALLBACK')
-            Decorators._clean()
 
-    def test_ensure_single_decorator_default_multiple_names(self):
+    def test_ensure_single_decorator_default_extra_names(self):
         """
         Tests Helpers._ensure_single functionality in DEFAULT mode
+        Ensure that the task with extra names gets discard if the extra named tasks are already running
         Whether the first task is being executed sync or async, the 2nd will always be discarded
         This is because the 2nd task is being executed by another worker (or mocked to invoke this behavior)
         """
-        @ovs_task(name='unittest_task1', ensure_single_info={'mode': 'DEFAULT'})
+        # Threading control
+        event_notify = Event()
+        event_wait = Event()
+        validation_notify = Event()
+
+        def after_validation_hook():
+            validation_notify.set()
+
+        mode = 'DEFAULT'
+        ensure_single_hooks = {'after_validation': after_validation_hook}
+        task_1 = 'unittest_task1'
+
+        @ovs_task(name=task_1, ensure_single_info={'mode': mode, 'hooks': ensure_single_hooks})
         def _function(notify_event, wait_event):
             # type: (Event, Event) -> None
             notify_event.set()
             wait_event.wait()
 
-        @ovs_task(name='unittest_task2_callback', ensure_single_info={'mode': 'DEFAULT', 'callback': Callback.call_back_function})
-        def _function_w_callback(notify_event, wait_event):
-            # type: (Event, Event) -> None
-            notify_event.set()
-            wait_event.wait()
-
-        @ovs_task(name='unittest_task3_extra_names', ensure_single_info={'mode': 'DEFAULT', 'extra_task_names': ['unittest_task1']})
+        @ovs_task(name='unittest_task3_extra_names', ensure_single_info={'mode': mode, 'extra_task_names': [task_1], 'hooks': ensure_single_hooks})
         def _function_w_extra_task_names(notify_event, wait_event):
             # type: (Event, Event) -> None
             notify_event.set()
             wait_event.wait()
-
-        # Threading control
-        event_notify = Event()
-        event_wait = Event()
 
         # | Task 1 Sync | Task 2 Sync | Function order  |
         # |    False    |    False    | func 1 - func 2 |
@@ -499,23 +513,26 @@ class Helpers(unittest.TestCase):
 
             task1_delayed, task2_delayed, first_func, second_func = func_tuple
 
-            kwargs_to_pass = {'notify_event': event_notify, 'wait_event': event_wait}
             thread1 = Thread(target=self._execute_delayed_or_inline, name='unittest_thread1',
-                             args=(first_func, task1_delayed), kwargs=kwargs_to_pass)
+                             args=(first_func, task1_delayed),
+                             kwargs={'notify_event': event_notify, 'wait_event': event_wait})
             thread2 = Thread(target=self._execute_delayed_or_inline, name='unittest_thread2',
-                             args=(second_func, task2_delayed), kwargs=kwargs_to_pass)
+                             args=(second_func, task2_delayed),
+                             kwargs={'notify_event': event_notify, 'wait_event': event_wait})
             threads = [thread1, thread2]
-            # Make sure the threads lock up
-            event_wait.clear()
 
-            thread2_will_finish = first_func != _function
+            # Clear state
+            for event in [validation_notify, event_wait, event_notify]:
+                event.clear()
+            Decorators._clean()
 
-            for thread in threads:
-                thread.start()
-                if thread != thread2 or thread2_will_finish:
-                    event_notify.wait()  # Wait for the thread to come up
-                    event_notify.clear()  # Clear it for the next one
+            thread1.start()
+            event_notify.wait()  # Make sure that the first thread did its execution
+            validation_notify.clear()  # Clear the validation hook of the first thread
 
+            thread2.start()
+            # Wait until the decorator did its thing
+            validation_notify.wait()
             # Let the threads start
             event_wait.set()
 
@@ -530,16 +547,15 @@ class Helpers(unittest.TestCase):
                               container=Decorators.unittest_thread_info_by_name)
             self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_1][0],
                              second='FINISHED')
-            # Function 2 called first, which should not block the execution of another function: function 1
-            if thread2_will_finish:
-                state = 'FINISHED'
             # Function 1 called first, so should have been completed, starting function 2 should be discarded due to 'extra_task_names'
-            else:
+            if first_func == _function:
                 state = 'DISCARDED'
+            else:  # Function 2 called first, which should not block the execution of another function: function 1
+                state = 'FINISHED'
 
+            print 'Thread name {}'.format(thread_name_2)
             self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
                              second=state)
-            Decorators._clean()
 
     def test_ensure_single_decorator_exceptions(self):
         """
