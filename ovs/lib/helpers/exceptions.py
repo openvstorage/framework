@@ -43,3 +43,9 @@ class EnsureSingleNoRunTimeInfo(EnsureSingleException):
     """
     Raised when the ensure single would perform an operation without knowing anything about the runtime
     """
+
+
+class EnsureSingleSimilarJobsCompleted(EnsureSingleException):
+    """
+    Raised when polling and all relevant jobs have been completed or removed
+    """

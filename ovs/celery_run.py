@@ -57,7 +57,7 @@ class CeleryMockup(object):
         def _wrapper(func):
             def _wrapped(*arguments, **kwarguments):
                 _ = arguments, kwarguments
-                if 'bind' in kwargs:
+                if kwargs.get('bind'):
                     return func(type('Task', (), {'request': type('Request', (), {'id': None})}), *arguments, **kwarguments)
                 return func(*arguments, **kwarguments)
 

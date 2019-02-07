@@ -235,7 +235,7 @@ class Helpers(unittest.TestCase):
         mode = 'DEDUPED'
 
         # DECORATED FUNCTIONS
-        @ovs_task(name=name, ensure_single_info={'mode': mode, 'extra_task_names': []})
+        @ovs_task(name=name, ensure_single_info={'mode': mode, 'extra_task_names': ['another_test']})
         def _function_w_extra_task_names():
             pass
 
@@ -272,7 +272,9 @@ class Helpers(unittest.TestCase):
         # Discarding and Queueing of tasks
         event = Event()
         waiter = Waiter(3)
+
         helpers = {'waiter': None, 'event': event}
+
         thread1 = Thread(target=self._execute_delayed_or_inline, name='finished_async_initial', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
         thread2 = Thread(target=self._execute_delayed_or_inline, name='exception_async', args=(_function_wo_callback, True), kwargs={'arg1': 'arg', 'ensure_single_timeout': 0.1})
         thread3 = Thread(target=self._execute_delayed_or_inline, name='finished_async_after_wait', args=(_function_wo_callback, True), kwargs={'arg1': 'arg'})
