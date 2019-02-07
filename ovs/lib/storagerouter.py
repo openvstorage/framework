@@ -1004,7 +1004,7 @@ class StorageRouterController(object):
         except:
             pass
         try:
-            MDSServiceController.mds_checkup()
+            MDSServiceController.mds_checkup_single(vpool.guid)
         except:
             pass
         StorageRouterController._logger.info('Add vPool {0} ended successfully'.format(vpool_name))
@@ -1319,7 +1319,7 @@ class StorageRouterController(object):
 
         StorageRouterController._logger.info('Remove StorageDriver - Guid {0} - Running MDS checkup'.format(storage_driver.guid))
         try:
-            MDSServiceController.mds_checkup()
+            MDSServiceController.mds_checkup_single(vpool.guid)
         except Exception:
             StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - MDS checkup failed'.format(storage_driver.guid))
 
