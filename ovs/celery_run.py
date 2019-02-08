@@ -218,7 +218,6 @@ def _get_registration_update_transaction():
         # Yield task registration keys which are <ensure_single_key>_<task_name>_<ensure_single_mode>
         try:
             registrations = persistent.get(key)
-            print key, registrations
             if not registrations:
                 continue
             # Filter out all the tasks are are no longer running within celery

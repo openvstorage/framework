@@ -672,13 +672,27 @@ class EnsureSingle(object):
                 self.logger.info(self.message.format('Deleting key {0}'.format(self.task_registration_key)))
                 self.persistent_client.delete(self.task_registration_key, must_exist=False)
 
-    @ensure_run_time_info()
-    @contextmanager
-    def lock_chained_mode(self, kwargs_dict, timeout):
+    def _filter_ignorable_arguments(self, kwargs_dict):
+        # type: (dict) -> dict
         """
-        Lock the function in chained mode
+        Filter out all ignorable arguments from the passed keywords
         :param kwargs_dict: Dict containing all arguments as key word arguments
         :type kwargs_dict: dict
+        :return: The filtered dict
+        :rtype: dict
+        """
+        filtered_kwargs = kwargs_dict.copy()
+        for key in self.ensure_single_container.ignore_arguments:
+            filtered_kwargs.pop(key, None)
+        return filtered_kwargs
+
+    @ensure_run_time_info()
+    @contextmanager
+    def lock_chained_mode(self, kwargs, timeout):
+        """
+        Lock the function in chained mode
+        :param kwargs: Dict containing all arguments as key word arguments
+        :type kwargs: dict
         :param timeout: Polling timeout in seconds
         :type timeout: float
         :raises: EnsureSingleTaskDiscarded: If the task was discarded
@@ -688,32 +702,37 @@ class EnsureSingle(object):
         self.validate_no_extra_names()
 
         # Update kwargs with args
+        kwargs_dict = self._filter_ignorable_arguments(kwargs)
         params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
         task_log_format = 'task {0} {1}'
         task_log_name = task_log_format.format(self.ensure_single_container.task_name, params_info)
         task_log_id = task_log_format.format(self.task_id, params_info)
 
-        # Validate whether another job with same params is being executed, skip if so
-        # 1st registration is a running job, we check all other queued jobs for identical params
-        self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id), job_limit=1, registrations_to_skip=1)
+        try:
+            self.run_hook('before_validation')
+            # Validate whether another job with same params is being executed, skip if so
+            # 1st registration is a running job, we check all other queued jobs for identical params
+            self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id), job_limit=1, registrations_to_skip=1)
 
-        self.logger.info('New {0} scheduled for execution'.format(task_log_name))
-        new_task_data = {'kwargs': kwargs_dict, 'task_id': self.task_id, 'timestamp': self.now}
-        self._register_task(new_task_data)
+            self.logger.info('New {0} scheduled for execution'.format(task_log_name))
+            new_task_data = {'kwargs': kwargs_dict, 'task_id': self.task_id, 'timestamp': self.now}
+            self._register_task(new_task_data)
 
-        # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
-        first_registration = None
-        slept = 0
-        while slept < timeout:
-            current_registrations, initial_registrations = self.get_task_registrations()
-            if current_registrations:
-                first_registration = current_registrations[0]['timestamp']
-            if first_registration == self.now:
-                break
+            # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
+            first_registration = None
+            slept = 0
+            while slept < timeout:
+                current_registrations, initial_registrations = self.get_task_registrations()
+                if current_registrations:
+                    first_registration = current_registrations[0]['timestamp']
+                if first_registration == self.now:
+                    break
 
-            self.unittest_set_state_waiting()
-            slept += self.poll_sleep_time
-            time.sleep(self.poll_sleep_time)
+                self.unittest_set_state_waiting()
+                slept += self.poll_sleep_time
+                time.sleep(self.poll_sleep_time)
+        finally:
+            self.run_hook('after_validation')
 
         successful = True
         try:
@@ -726,6 +745,7 @@ class EnsureSingle(object):
                 raise EnsureSingleTimeoutReached(timeout_message)
 
             self.unittest_set_state_executing()
+            self.run_hook('before_execution')
             yield
         # Release
         except:
@@ -736,15 +756,16 @@ class EnsureSingle(object):
                 self.unittest_set_state_finished()
                 self.logger.info('Task {0} finished successfully'.format(self.ensure_single_container.task_name))
             self._unregister_task(new_task_data)
+            self.run_hook('after_execution')
 
     @ensure_run_time_info()
     @contextmanager
-    def lock_deduped_mode(self, kwargs_dict, timeout):
+    def lock_deduped_mode(self, kwargs, timeout):
         # type: (dict, float) -> None
         """
         Lock the function in deduped mode
-        :param kwargs_dict: Dict containing all arguments as key word arguments
-        :type kwargs_dict: dict
+        :param kwargs: Dict containing all arguments as key word arguments
+        :type kwargs: dict
         :param timeout: Polling timeout in seconds
         :type timeout: float
         :raises: EnsureSingleTaskDiscarded: If the task was discarded
@@ -753,31 +774,36 @@ class EnsureSingle(object):
         """
         self.validate_no_extra_names()
 
+        kwargs_dict = self._filter_ignorable_arguments(kwargs)
         params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
         task_log_format = 'task {0} {1}'
         task_log_name = task_log_format.format(self.ensure_single_container.task_name, params_info)
         task_log_id = task_log_format.format(self.task_id, params_info)
 
         # Acquire
-        # Validate whether another job with same params is being executed
-        # 1st job with same params is being executed, 2nd is scheduled for execution ==> Discard current
-        self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id), job_limit=2)
+        try:
+            self.run_hook('before_validation')
+            # Validate whether another job with same params is being executed
+            # 1st job with same params is being executed, 2nd is scheduled for execution ==> Discard current
+            self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id), job_limit=2)
 
-        self.logger.info('New {0} scheduled for execution'.format(task_log_name))
-        new_task_data = {'kwargs': kwargs_dict, 'task_id': self.task_id, 'timestamp': self.now}
-        self._register_task(new_task_data)
+            self.logger.info('New {0} scheduled for execution'.format(task_log_name))
+            new_task_data = {'kwargs': kwargs_dict, 'task_id': self.task_id, 'timestamp': self.now}
+            self._register_task(new_task_data)
 
-        # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
-        slept = 0
-        while slept < timeout:
-            current_registrations, initial_registrations = self.get_task_registrations()
-            queued_jobs = [t_d for t_d in current_registrations if t_d['kwargs'] == kwargs_dict]
-            if len(queued_jobs) == 1:
-                # The only queued job. No more need to poll
-                break
-            self.unittest_set_state_waiting()
-            slept += self.poll_sleep_time
-            time.sleep(self.poll_sleep_time)
+            # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
+            slept = 0
+            while slept < timeout:
+                current_registrations, initial_registrations = self.get_task_registrations()
+                queued_jobs = [t_d for t_d in current_registrations if t_d['kwargs'] == kwargs_dict]
+                if len(queued_jobs) == 1:
+                    # The only queued job. No more need to poll
+                    break
+                self.unittest_set_state_waiting()
+                slept += self.poll_sleep_time
+                time.sleep(self.poll_sleep_time)
+        finally:
+            self.run_hook('after_validation')
 
         successful = True
         try:
@@ -788,7 +814,7 @@ class EnsureSingle(object):
                 self.unittest_set_state_exception('Could not start within timeout of {0}s while queued'.format(timeout))
                 timeout_message = '{0} - Task {1} could not be started within timeout of {2}s'.format(self.message, self.ensure_single_container.task_name, timeout)
                 raise EnsureSingleTimeoutReached(timeout_message)
-
+            self.run_hook('before_execution')
             self.unittest_set_state_executing()
             yield
         # Release
@@ -800,6 +826,7 @@ class EnsureSingle(object):
                 self.unittest_set_state_finished()
                 self.logger.info('Task {0} finished successfully'.format(self.ensure_single_container.task_name))
             self._unregister_task(new_task_data)
+            self.run_hook('after_execution')
 
     @ensure_run_time_info()
     @contextmanager
@@ -854,6 +881,7 @@ class EnsureSingle(object):
         :raises: EnsureSingleSimilarJobsCompleted
         """
         self.unittest_set_state_waited()
+        self.run_hook('before_discard')
         raise EnsureSingleSimilarJobsCompleted()
 
     def discard_task(self, message=''):

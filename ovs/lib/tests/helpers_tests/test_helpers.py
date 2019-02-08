@@ -26,6 +26,7 @@ from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.generic.threadhelpers import Waiter
 # noinspection PyProtectedMember
 from ovs.lib.helpers.decorators import Decorators, ovs_task, ensure_single_default, EnsureSingleContainer
+from ovs.celery_run import _clean_cache, InspectMockup
 
 
 class Helpers(unittest.TestCase):
@@ -45,6 +46,7 @@ class Helpers(unittest.TestCase):
         """
         DalHelper.teardown()
         Decorators._clean()
+        InspectMockup.clean()
 
     def _execute_delayed_or_inline(self, fct, delayed, **kwargs):
         if delayed:
@@ -67,6 +69,17 @@ class Helpers(unittest.TestCase):
             time.sleep(0.01)
             if time.time() > start + 5:
                 raise RuntimeError('Waiting for condition timed out')
+            
+    @staticmethod
+    def _check_condition(_state, _thread_name):
+        def _check():
+            current_state = Decorators.unittest_thread_info_by_name.get(_thread_name, [None])[0]
+            if current_state == _state:
+                return True
+            # print 'Waiting for {0}, currently {1}'.format(_state, current_state)
+            return False
+
+        return _check
 
     def test_ensure_single_decorator_chained(self):
         """
@@ -557,7 +570,6 @@ class Helpers(unittest.TestCase):
             else:  # Function 2 called first, which should not block the execution of another function: function 1
                 state = 'FINISHED'
 
-            print 'Thread name {}'.format(thread_name_2)
             self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
                              second=state)
 
@@ -585,81 +597,77 @@ class Helpers(unittest.TestCase):
         self.assertEqual(first=raise_info.exception.message,
                          second='The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
 
-    def test_selective_cache_clearing(self):
+    def test_selective_cache_clearing_default(self):
         """
         Validates whether the clear cache logic only discards keys for tasks that are not running (anymore)
+        For default mode
         """
-        from ovs.celery_run import _clean_cache, InspectMockup
-        _ = self
-
-        def _check_condition(_state, _thread_name):
-            def _check():
-                current_state = Decorators.unittest_thread_info_by_name.get(_thread_name, [None])[0]
-                if current_state == _state:
-                    return True
-                # print 'Waiting for {0}, currently {1}'.format(_state, current_state)
-                return False
-            return _check
-
-        InspectMockup.clean()
-        container = {'waiter': None}
-
         @ovs_task(name='selective_test_1', ensure_single_info={'mode': 'DEFAULT'})
         def _function1():
-            container['waiter'].wait()
+            waiter.wait()
 
-        container['waiter'] = Waiter(2)
+        InspectMockup.clean()
+        waiter = Waiter(2)
+
         _function1.delay(_thread_name='async_test_1_1')
-        Helpers._wait_for(condition=_check_condition('EXECUTING', 'async_test_1_1_delayed'))
+        Helpers._wait_for(condition=self._check_condition('EXECUTING', 'async_test_1_1_delayed'))
         _function1.delay(_thread_name='async_test_1_2')
-        Helpers._wait_for(condition=_check_condition('DISCARDED', 'async_test_1_2_delayed'))
+        Helpers._wait_for(condition=self._check_condition('DISCARDED', 'async_test_1_2_delayed'))
         _clean_cache()
         _function1.delay(_thread_name='async_test_1_3')
-        Helpers._wait_for(condition=_check_condition('DISCARDED', 'async_test_1_3_delayed'))
-        container['waiter'].wait()
-        Helpers._wait_for(condition=_check_condition('FINISHED', 'async_test_1_1_delayed'))
+        Helpers._wait_for(condition=self._check_condition('DISCARDED', 'async_test_1_3_delayed'))
+        waiter.wait()
+        Helpers._wait_for(condition=self._check_condition('FINISHED', 'async_test_1_1_delayed'))
 
-        InspectMockup.clean()
-
+    def test_selective_cache_clearing_deduped(self):
+        """
+        Validates whether the clear cache logic only discards keys for tasks that are not running (anymore)
+        For deduped mode
+        """
+        
         @ovs_task(name='selective_test_2', ensure_single_info={'mode': 'DEDUPED'})
-        def _function2():
-            container['waiter'].wait()
+        def deduped_function():
+            waiter.wait()
 
-        container['waiter'] = Waiter(2)
-        _function2.delay(_thread_name='async_test_2_1')
-        Helpers._wait_for(condition=_check_condition('EXECUTING', 'async_test_2_1_delayed'))
-        _function2.delay(_thread_name='async_test_2_2')
-        Helpers._wait_for(condition=_check_condition('WAITING', 'async_test_2_2_delayed'))
-        _function2.delay(_thread_name='async_test_2_3')
-        Helpers._wait_for(condition=_check_condition('DISCARDED', 'async_test_2_3_delayed'))
+        waiter = Waiter(2)
+        deduped_function.delay(_thread_name='async_test_2_1')
+        Helpers._wait_for(condition=self._check_condition('EXECUTING', 'async_test_2_1_delayed'))
+        deduped_function.delay(_thread_name='async_test_2_2')
+        Helpers._wait_for(condition=self._check_condition('WAITING', 'async_test_2_2_delayed'))
+        deduped_function.delay(_thread_name='async_test_2_3')
+        Helpers._wait_for(condition=self._check_condition('DISCARDED', 'async_test_2_3_delayed'))
         _clean_cache()
-        _function2.delay(_thread_name='async_test_2_4')
-        Helpers._wait_for(condition=_check_condition('WAITING', 'async_test_2_2_delayed'))
-        Helpers._wait_for(condition=_check_condition('DISCARDED', 'async_test_2_4_delayed'))
-        container['waiter'].wait()
-        Helpers._wait_for(condition=_check_condition('FINISHED', 'async_test_2_1_delayed'))
-        Helpers._wait_for(condition=_check_condition('FINISHED', 'async_test_2_2_delayed'))
+        deduped_function.delay(_thread_name='async_test_2_4')
+        Helpers._wait_for(condition=self._check_condition('WAITING', 'async_test_2_2_delayed'))
+        Helpers._wait_for(condition=self._check_condition('DISCARDED', 'async_test_2_4_delayed'))
+        waiter.wait()
+        Helpers._wait_for(condition=self._check_condition('FINISHED', 'async_test_2_1_delayed'))
+        Helpers._wait_for(condition=self._check_condition('FINISHED', 'async_test_2_2_delayed'))
 
-        InspectMockup.clean()
+    def test_selective_cache_clearing_chained(self):
+        """
+        Validates whether the clear cache logic only discards keys for tasks that are not running (anymore)
+        For chained mode
+        """
 
         @ovs_task(name='selective_test_3', ensure_single_info={'mode': 'CHAINED'})
-        def _function3():
-            container['waiter'].wait()
+        def chained_function():
+            waiter.wait()
 
-        container['waiter'] = Waiter(2)
-        _function3.delay(_thread_name='async_test_3_1')
-        Helpers._wait_for(condition=_check_condition('EXECUTING', 'async_test_3_1_delayed'))
-        _function3.delay(_thread_name='async_test_3_2')
-        Helpers._wait_for(condition=_check_condition('WAITING', 'async_test_3_2_delayed'))
-        _function3.delay(_thread_name='async_test_3_3')
-        Helpers._wait_for(condition=_check_condition('DISCARDED', 'async_test_3_3_delayed'))
+        waiter = Waiter(2)
+        chained_function.delay(_thread_name='async_test_3_1')
+        Helpers._wait_for(condition=self._check_condition('EXECUTING', 'async_test_3_1_delayed'))
+        chained_function.delay(_thread_name='async_test_3_2')
+        Helpers._wait_for(condition=self._check_condition('WAITING', 'async_test_3_2_delayed'))
+        chained_function.delay(_thread_name='async_test_3_3')
+        Helpers._wait_for(condition=self._check_condition('DISCARDED', 'async_test_3_3_delayed'))
         _clean_cache()
-        _function3.delay(_thread_name='async_test_3_4')
-        Helpers._wait_for(condition=_check_condition('WAITING', 'async_test_3_2_delayed'))
-        Helpers._wait_for(condition=_check_condition('DISCARDED', 'async_test_3_4_delayed'))
-        container['waiter'].wait()
-        Helpers._wait_for(condition=_check_condition('FINISHED', 'async_test_3_1_delayed'))
-        Helpers._wait_for(condition=_check_condition('FINISHED', 'async_test_3_2_delayed'))
+        chained_function.delay(_thread_name='async_test_3_4')
+        Helpers._wait_for(condition=self._check_condition('WAITING', 'async_test_3_2_delayed'))
+        Helpers._wait_for(condition=self._check_condition('DISCARDED', 'async_test_3_4_delayed'))
+        waiter.wait()
+        Helpers._wait_for(condition=self._check_condition('FINISHED', 'async_test_3_1_delayed'))
+        Helpers._wait_for(condition=self._check_condition('FINISHED', 'async_test_3_2_delayed'))
 
 
 class Callback(object):
