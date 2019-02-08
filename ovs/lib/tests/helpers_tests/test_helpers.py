@@ -25,7 +25,7 @@ from threading import Event, Thread
 from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.generic.threadhelpers import Waiter
 # noinspection PyProtectedMember
-from ovs.lib.helpers.decorators import Decorators, _ensure_single, ovs_task
+from ovs.lib.helpers.decorators import Decorators, ovs_task, ensure_single_default, EnsureSingleContainer
 
 
 class Helpers(unittest.TestCase):
@@ -72,20 +72,22 @@ class Helpers(unittest.TestCase):
         """
         Tests Helpers._ensure_single functionality in CHAINED mode
         """
-        # DECORATED FUNCTIONS
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'CHAINED', 'extra_task_names': []})
+        name = 'unittest_task'
+        mode = 'CHAINED'
+
+        @ovs_task(name=name, ensure_single_info={'mode': mode, 'extra_task_names': ['another_task']})
         def _function_w_extra_task_names():
             pass
 
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'CHAINED', 'callback': Callback.call_back_function})
+        @ovs_task(name=name, ensure_single_info={'mode': mode, 'callback': Callback.call_back_function})
         def _function_w_callback(arg1):
             _ = arg1
 
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'CHAINED', 'callback': Callback.call_back_function2})
+        @ovs_task(name=name, ensure_single_info={'mode': mode, 'callback': Callback.call_back_function2})
         def _function_w_callback_incorrect_args(arg1):
             _ = arg1
 
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'CHAINED'})
+        @ovs_task(name=name, ensure_single_info={'mode': mode})
         def _function_wo_callback(arg1):
             _ = arg1
             threadname = threading.current_thread().getName()
@@ -563,18 +565,18 @@ class Helpers(unittest.TestCase):
         """
         Tests Helpers._ensure_single decorator basic exception handling
         """
-        # Use unsupported mode
-        @ovs_task(name='unittest_task', ensure_single_info={'mode': 'UNKNOWN'})
-        def _function1():
-            pass
-
         with self.assertRaises(ValueError) as raise_info:
-            _function1()
+            # Use unsupported mode
+            @ovs_task(name='unittest_task', ensure_single_info={'mode': 'UNKNOWN'})
+            def _function1():
+                pass
         self.assertEqual(first=raise_info.exception.message,
                          second='Unsupported mode "UNKNOWN" provided')
 
         # Use ensure_single without bind=True
-        @_ensure_single(task_name='unittest_task', mode='DEFAULT')
+        ensure_single_container = EnsureSingleContainer('unittest_task', 'DEFAULT')
+
+        @ensure_single_default(ensure_single_container)
         def _function1():
             pass
 

@@ -29,7 +29,7 @@ from functools import wraps
 from contextlib import contextmanager
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
+from ovs_extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached, EnsureSingleDoCallBack, EnsureSingleTaskDiscarded,\
     EnsureSingleNoRunTimeInfo, EnsureSingleSimilarJobsCompleted
@@ -68,7 +68,7 @@ def log(event_type):
         Wrapper function
         :param f: Function to log something about
         """
-
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
@@ -92,8 +92,6 @@ def log(event_type):
             # Call the function
             return f(*args, **kwargs)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
 
     return wrap
@@ -157,8 +155,10 @@ def ovs_task(name, schedule=None, ensure_single_info=None):
                 f = ensure_single_default(ensure_single_container)(f)
             elif ensure_single_container.mode == 'DEDUPED':
                 f = ensure_single_deduped(ensure_single_container)(f)
+            elif ensure_single_container.mode == 'CHAINED':
+                f = ensure_single_chained(ensure_single_container)(f)
             else:
-                f = _ensure_single(task_name=name, **ensure_single_info)(f)
+                raise ValueError('Unsupported mode "{0}" provided'.format(ensure_single_container.mode))
         return celery.task(name=name, schedule=schedule, bind=bind)(f)
     return wrapper
 
@@ -265,6 +265,61 @@ def ensure_single_deduped(ensure_single_container):
     return ensure_single_deduped_wrap
 
 
+def ensure_single_chained(ensure_single_container):
+    # type: (EnsureSingleContainer) -> callable
+    """
+    Decorator ensuring a new task cannot be started in case a certain task is
+    running, scheduled or reserved.
+
+    Keep also in mind that validation will be executed by the worker itself, so if the task is scheduled on
+    a worker currently processing a "duplicate" task, it will only get validated after the first
+    one completes, which will result in the fact that the task will execute normally.
+
+    Mode: CHAINED: Identical as DEDUPED with the exception that tasks will be executed in serial.
+                 - Tasks with identical arguments will be executed in serial (Subsequent tasks with same params will be discarded if 1 waiting task with these params already in queue)
+                 - Tasks with different arguments will be executed in serial
+
+    Note: the 'ensure_single_timeout' keyword is reserved on decorator function their arguments.
+
+    :param ensure_single_container: EnsureSingle container instance
+    :type ensure_single_container: EnsureSingleContainer
+    :return: Pointer to function
+    :rtype: func
+    """
+
+    def ensure_single_chained_wrap(f):
+        """
+        Wrapper function
+        :param f: Function to wrap
+        """
+
+        @wraps(f)
+        def ensure_single_chained_inner(self, *args, **kwargs):
+            """
+            Wrapped function
+            :param self: With bind=True, the celery task result itself is passed in
+            :param args: Arguments without default values
+            :param kwargs: Arguments with default values
+            """
+            ensure_single = EnsureSingle(ensure_single_container, self)
+            default_timeout = 10 if ensure_single.unittest_mode else ensure_single_container.global_timeout
+            timeout = kwargs.pop('ensure_single_timeout', default_timeout)
+            kwargs_dict = ensure_single.get_all_arguments_as_kwargs(f, args, kwargs)
+            try:
+                with ensure_single.lock_chained_mode(kwargs_dict, timeout):
+                    return f(*args, **kwargs)
+            except EnsureSingleTaskDiscarded:
+                return ensure_single.do_discard()
+            except EnsureSingleDoCallBack:
+                return ensure_single.do_callback(*args, **kwargs)
+            except EnsureSingleSimilarJobsCompleted:
+                # Nothing to do here
+                return None
+
+        return ensure_single_chained_inner
+    return ensure_single_chained_wrap
+
+
 def ensure_run_time_info():
     """
     Ensure that the runtime information is present
@@ -341,7 +396,7 @@ class EnsureSingle(object):
         """
         self.ensure_single_container = ensure_single_container
         # Storage
-        self.persistent_key = '{0}_{1}'.format(ENSURE_SINGLE_KEY, ensure_single_container.task_name)
+        self.persistent_key = self.generate_key_for_task(ensure_single_container.task_name)
         self.persistent_client = PersistentFactory.get_client()
         self.task_id, self.async_task = self.get_task_id_and_async(task)
 
@@ -376,18 +431,7 @@ class EnsureSingle(object):
         :return: The created key
         :rtype: str
         """
-        return '{}_{}'.format(self.persistent_key, self.ensure_single_container.mode.lower())
-
-    @property
-    def log_identifier(self):
-        # type: () -> str
-        """
-        Log message to identify the current ensure single runner
-        :return: The identification string
-        :rtype: str
-        """
-        # @todo use same format as self.message
-        return 'Ensure single {0} mode - ID {1}'.format(self.ensure_single_container.mode, self.now)
+        return self.generate_key_for_task_with_mode(self.ensure_single_container.task_name)
 
     def set_task(self, task):
         # type: (celery.AsyncResult) -> None
@@ -487,6 +531,29 @@ class EnsureSingle(object):
         # In case of a sync task, that means it does not need to be executed anymore
         return len(current_registrations) > 0 and next((t_d for t_d in current_registrations if timestamp_identifier == t_d['timestamp']), None) is not None
 
+    @staticmethod
+    def generate_key_for_task(task_name):
+        # type: (str) -> str
+        """
+        Generate a persistent key for a task
+        :param task_name: Name of the task to generate the key for
+        :type task_name: str
+        :return: The generated key
+        :rtype: str
+        """
+        return '{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)
+
+    def generate_key_for_task_with_mode(self, task_name):
+        # type: (str) -> str
+        """
+        Generate a persistent key for a task with mode in it
+        :param task_name: Name of the task to generate the key for
+        :type task_name: str
+        :return: The generated key
+        :rtype: str
+        """
+        return '{0}_{1}'.format(self.generate_key_for_task(task_name), self.ensure_single_container.mode.lower())
+
     def poll_task_completion(self, timeout, timestamp_identifier, task_log=None):
         # type: (float, str, str) -> None
         """
@@ -515,13 +582,13 @@ class EnsureSingle(object):
                 self.logger.error('{0} waited {1}s for similar tasks to finish, but timeout was reached'.format(task_log, slept))
                 exception_message = 'Could not start within timeout of {0}s while waiting for other tasks'.format(timeout)
                 self.unittest_set_state_exception(exception_message)
-                timeout_message = '{0} - {1} could not be started within timeout of {2}s'.format(self.log_identifier, task_log, timeout)
+                timeout_message = '{0} - {1} could not be started within timeout of {2}s'.format(self.message, task_log, timeout)
                 raise EnsureSingleTimeoutReached(timeout_message)
 
             self.unittest_set_state_waiting()
 
-    def _ensure_job_limit(self, kwargs_dict, timeout, task_logs, job_limit=2):
-        # type: (dict, float, Tuple[str, str], int) -> None
+    def _ensure_job_limit(self, kwargs_dict, timeout, task_logs, job_limit=2, registrations_to_skip=0):
+        # type: (dict, float, Tuple[str, str], int, int) -> None
         """
         Ensure that the number of jobs don't exceed the limit
         - Test if the current job limit is not reach
@@ -534,6 +601,9 @@ class EnsureSingle(object):
         :type task_logs: Tuple[str, str]
         :param job_limit: Number of jobs to keep running at any given time
         :type job_limit: int
+        # @todo is this sane? Can't it be done with just the job limit?
+        :param registrations_to_skip: Number of registrations to skip. This number indicates how many jobs can be ignored before counting the limit
+        :type registrations_to_skip: int
         :return: None
         :raises: EnsureSingleTaskDiscarded: If the task was discarded
         :raises: EnsureSingleDoCallBack: If the task is required to call the callback function instead of the task function
@@ -544,12 +614,12 @@ class EnsureSingle(object):
         current_registrations, initial_registrations = self.get_task_registrations()
 
         job_counter = 0
-        for task_data in current_registrations:
+        for task_data in current_registrations[registrations_to_skip:]:
             if task_data['kwargs'] != kwargs_dict:
                 continue
             # Another job with the same registration
             job_counter += 1
-            if job_counter == 2:  # 1st job with same params is being executed, 2nd is scheduled for execution ==> Discard current
+            if job_counter == job_limit:
                 if self.async_task:  # Not waiting for other jobs to finish since asynchronously
                     discard_message = 'Execution of {0} discarded because of identical parameters'.format(task_log_id)
                     self.discard_task(discard_message)
@@ -562,12 +632,10 @@ class EnsureSingle(object):
                 # Let's wait for 2nd job in queue to have finished if no callback provided
                 self.poll_task_completion(timeout=timeout, timestamp_identifier=task_data['timestamp'])
 
-    def _register_task(self, key, registration_data):
-        # type: (str, any) -> list
+    def _register_task(self, registration_data):
+        # type: (any) -> list
         """
         Registers the execution of the task
-        :param key: Key to register the task under
-        :type key: str
         :param registration_data: Dict containing all arguments as key word arguments
         :type registration_data: any
         :return: All registrations
@@ -577,26 +645,97 @@ class EnsureSingle(object):
         with volatile_mutex(self.persistent_key, wait=5):
             current_registrations, initial_registrations = self.get_task_registrations()
             current_registrations.append(registration_data)
-            self.persistent_client.set(key, current_registrations)
+            self.persistent_client.set(self.task_registration_key, current_registrations)
         return current_registrations
 
-    def _unregister_task(self, task_data):
-        # type: (dict) -> None
+    def _unregister_task(self, task_data=None, delete=False):
+        # type: (dict, bool) -> None
         """
         Unregisters the execution of the task
         :param task_data: Dict containing all information about the task to unregister
         :type task_data: dict
+        :param delete: Delete the registration key
+        :type delete: bool
         :return: None
         """
         # @todo use transaction
         with volatile_mutex(self.persistent_key, wait=5):
+            if task_data:
+                current_registrations, initial_registrations = self.get_task_registrations()
+                try:
+                    current_registrations.remove(task_data)
+                    self.persistent_client.set(self.task_registration_key, current_registrations)
+                except ValueError:
+                    # Registration was already removed
+                    pass
+            if delete:
+                self.logger.info(self.message.format('Deleting key {0}'.format(self.task_registration_key)))
+                self.persistent_client.delete(self.task_registration_key, must_exist=False)
+
+    @ensure_run_time_info()
+    @contextmanager
+    def lock_chained_mode(self, kwargs_dict, timeout):
+        """
+        Lock the function in chained mode
+        :param kwargs_dict: Dict containing all arguments as key word arguments
+        :type kwargs_dict: dict
+        :param timeout: Polling timeout in seconds
+        :type timeout: float
+        :raises: EnsureSingleTaskDiscarded: If the task was discarded
+        :raises: EnsureSingleDoCallBack: If the task is required to call the callback function instead of the task function
+        :raises: EnsureSingleSimilarJobsCompleted: If the task was waiting on a similar task to end but those tasks have finished
+        """
+        self.validate_no_extra_names()
+
+        # Update kwargs with args
+        params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
+        task_log_format = 'task {0} {1}'
+        task_log_name = task_log_format.format(self.ensure_single_container.task_name, params_info)
+        task_log_id = task_log_format.format(self.task_id, params_info)
+
+        # Validate whether another job with same params is being executed, skip if so
+        # 1st registration is a running job, we check all other queued jobs for identical params
+        self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id), job_limit=1, registrations_to_skip=1)
+
+        self.logger.info('New {0} scheduled for execution'.format(task_log_name))
+        new_task_data = {'kwargs': kwargs_dict, 'task_id': self.task_id, 'timestamp': self.now}
+        self._register_task(new_task_data)
+
+        # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
+        first_registration = None
+        slept = 0
+        while slept < timeout:
             current_registrations, initial_registrations = self.get_task_registrations()
-            try:
-                current_registrations.remove(task_data)
-                self.persistent_client.set(self.task_registration_key, current_registrations)
-            except ValueError:
-                # Registration was already removed
-                pass
+            if current_registrations:
+                first_registration = current_registrations[0]['timestamp']
+            if first_registration == self.now:
+                break
+
+            self.unittest_set_state_waiting()
+            slept += self.poll_sleep_time
+            time.sleep(self.poll_sleep_time)
+
+        successful = True
+        try:
+            if slept:
+                self.logger.info('{0} had to wait {1} seconds before being able to start'.format(task_log_name, slept))
+            if slept >= timeout:
+                self.logger.error('Could not start {0}, within expected time ({1}s). Removed it from queue'.format(task_log_name, timeout))
+                self.unittest_set_state_exception('Could not start within timeout of {0}s while queued'.format(timeout))
+                timeout_message = '{0} - Task {1} could not be started within timeout of {2}s'.format(self.message, self.ensure_single_container.task_name, timeout)
+                raise EnsureSingleTimeoutReached(timeout_message)
+
+            self.unittest_set_state_executing()
+            yield
+        # Release
+        except:
+            successful = False
+            raise
+        finally:
+            if successful:
+                self.unittest_set_state_finished()
+                self.logger.info('Task {0} finished successfully'.format(self.ensure_single_container.task_name))
+            self._unregister_task(new_task_data)
 
     @ensure_run_time_info()
     @contextmanager
@@ -621,11 +760,12 @@ class EnsureSingle(object):
 
         # Acquire
         # Validate whether another job with same params is being executed
-        self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id))
+        # 1st job with same params is being executed, 2nd is scheduled for execution ==> Discard current
+        self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id), job_limit=2)
 
         self.logger.info('New {0} scheduled for execution'.format(task_log_name))
         new_task_data = {'kwargs': kwargs_dict, 'task_id': self.task_id, 'timestamp': self.now}
-        self._register_task(self.task_registration_key, new_task_data)
+        self._register_task(new_task_data)
 
         # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
         slept = 0
@@ -646,7 +786,7 @@ class EnsureSingle(object):
             if slept >= timeout:
                 self.logger.error('Could not start {0}, within expected time ({1}s). Removed it from queue'.format(task_log_name, timeout))
                 self.unittest_set_state_exception('Could not start within timeout of {0}s while queued'.format(timeout))
-                timeout_message = '{0} - Task {1} could not be started within timeout of {2}s'.format(self.log_identifier, self.ensure_single_container.task_name, timeout)
+                timeout_message = '{0} - Task {1} could not be started within timeout of {2}s'.format(self.message, self.ensure_single_container.task_name, timeout)
                 raise EnsureSingleTimeoutReached(timeout_message)
 
             self.unittest_set_state_executing()
@@ -677,7 +817,7 @@ class EnsureSingle(object):
             self.run_hook('before_validation')
             with volatile_mutex(self.persistent_key, wait=5):
                 for task in self.ensure_single_container.task_names:
-                    key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
+                    key_to_check = self.generate_key_for_task_with_mode(task)
                     if self.persistent_client.exists(key_to_check):
                         # Raising errors as potential long functions should not be invoked in the acquire phase
                         if self.async_task or not self.ensure_single_container.callback:
@@ -685,7 +825,7 @@ class EnsureSingle(object):
                         else:
                             self.callback_task()
             self.logger.info(self.message.format('Setting key {0}'.format(self.persistent_key)))
-            self.persistent_client.set(self.persistent_key, {'mode': self.ensure_single_container.mode, 'values': [{'task_id': self.task_id}]})
+            self._register_task({'task_id': self.task_id})
         finally:
             self.run_hook('after_validation')
 
@@ -703,10 +843,7 @@ class EnsureSingle(object):
                 self.unittest_set_state_finished()
                 self.logger.info(self.message.format('Task {0} finished successfully'.format(self.ensure_single_container.task_name)))
             # Release
-            # @todo remove mutex and use asserts instead
-            with volatile_mutex(self.persistent_key, wait=5):
-                self.logger.info(self.message.format('Deleting key {0}'.format(self.persistent_key)))
-                self.persistent_client.delete(self.persistent_key, must_exist=False)
+            self._unregister_task(delete=True)
             self.run_hook('after_execution')
 
     def discard_task_similar_jobs(self):
@@ -814,7 +951,6 @@ class EnsureSingle(object):
         :return: None
         """
         if self.unittest_mode:
-            # @todo remove
             self.logger.info('Setting {} to {}'.format(self.thread_name, (state, value)))
             Decorators.unittest_thread_info_by_name[self.thread_name] = (state, value)
 
@@ -887,240 +1023,6 @@ class EnsureSingle(object):
         :return: None
         """
         return self.unittest_set_state('EXCEPTION', exception_message)
-
-
-def _ensure_single(task_name, mode, extra_task_names=None, global_timeout=300, callback=None, ignore_arguments=None):
-    """
-    Decorator ensuring a new task cannot be started in case a certain task is
-    running, scheduled or reserved.
-
-    Keep also in mind that validation will be executed by the worker itself, so if the task is scheduled on
-    a worker currently processing a "duplicate" task, it will only get validated after the first
-    one completes, which will result in the fact that the task will execute normally.
-
-    Allowed modes:
-     - DEFAULT: De-duplication based on the task's name. If any new task with the same name is scheduled it will be
-                discarded
-     - DEDUPED: De-duplication based on the task's name and arguments. If a new task with the same name and arguments
-                is scheduled while the first one is currently being executed, it will be allowed on the queue (to make
-                sure there will be at least one new execution). All subsequent identical tasks will be discarded.
-                 - Tasks with identical arguments will be executed in serial (Subsequent tasks with same params will be discarded if 1 waiting task with these params already in queue)
-                 - Tasks with different arguments will be executed in parallel
-     - CHAINED: Identical as DEDUPED with the exception that tasks will be executed in serial.
-                 - Tasks with identical arguments will be executed in serial (Subsequent tasks with same params will be discarded if 1 waiting task with these params already in queue)
-                 - Tasks with different arguments will be executed in serial
-
-    :param task_name: Name of the task to ensure its singularity
-    :type task_name: str
-    :param extra_task_names: Extra tasks to take into account
-    :type extra_task_names: list
-    :param mode: Mode of the ensure single. Allowed values: DEFAULT, CHAINED
-    :type mode: str
-    :param global_timeout: Timeout before raising error (Only applicable in CHAINED mode)
-    :type global_timeout: int
-    :param callback: Call back function which will be executed if identical task in progress
-    :type callback: func
-    :param ignore_arguments: Arguments to ignore when CHAINED or DEDUPED. These arguments will not be accounted for
-    when checking if a task is already queued up
-    :type ignore_arguments: list
-    :return: Pointer to function
-    :rtype: func
-    """
-    logger = LogHandler.get('lib', name='ensure single')
-
-    def wrap(f):
-        """
-        Wrapper function
-        :param f: Function to check
-        """
-        def new_function(self, *args, **kwargs):
-            """
-            Wrapped function
-            :param self: With bind=True, the celery task result itself is passed in
-            :param args: Arguments without default values
-            :param kwargs: Arguments with default values
-            """
-            def log_message(message, level='info'):
-                """
-                Log a message with some additional information
-                :param message: Message to log
-                :param level:   Log level
-                :return:        None
-                """
-                if level not in ('info', 'warning', 'debug', 'error', 'exception'):
-                    raise ValueError('Unsupported log level "{0}" specified'.format(level))
-                if unittest_mode is False:
-                    complete_message = 'Ensure single {0} mode - ID {1} - {2}'.format(mode, now, message)
-                else:
-                    complete_message = 'Ensure single {0} mode - ID {1} - {2} - {3}'.format(mode, now, threading.current_thread().getName(), message)
-                getattr(logger, level)(complete_message)
-
-            def update_value(key, append, value_to_update=None):
-                """
-                Store the specified value in the PersistentFactory
-                :param key:             Key to store the value for
-                :param append:          If True, the specified value will be appended else element at index 0 will be popped
-                :param value_to_update: Value to append to the list or remove from the list
-                :return:                Updated value
-                """
-                with volatile_mutex(name=key, wait=5):
-                    vals = list(persistent_client.get_multi([key], must_exist=False))
-                    if vals[0] is not None:
-                        val = vals[0]
-                        if append is True and value_to_update is not None:
-                            val['values'].append(value_to_update)
-                        elif append is False and value_to_update is not None:
-                            for value_item in val['values']:
-                                if value_item == value_to_update:
-                                    val['values'].remove(value_item)
-                                    break
-                        elif append is False and len(val['values']) > 0:
-                            val['values'].pop(0)
-                    else:
-                        log_message('Setting initial value for key {0}'.format(key))
-                        val = {'mode': mode,
-                               'values': []}
-                    persistent_client.set(key, val)
-                return val
-
-            if not hasattr(self, 'request'):
-                raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
-
-            now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
-            task_id = self.request.id
-            async_task = task_id is not None  # Async tasks have an ID, inline executed tasks have None as ID
-            task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
-            thread_name = threading.current_thread().getName()
-            unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
-            persistent_key = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)
-            persistent_client = PersistentFactory.get_client()
-
-            if mode == 'CHAINED':
-                if extra_task_names is not None:
-                    log_message('Extra tasks are not allowed in this mode',
-                                level='error')
-                    raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
-
-                # Update kwargs with args
-                sleep = 1 if unittest_mode is False else 0.1
-                timeout = kwargs.pop('ensure_single_timeout', 10 if unittest_mode is True else global_timeout)
-                function_info = inspect.getargspec(f)
-                kwargs_dict = {}
-                for index, arg in enumerate(args):
-                    kwargs_dict[function_info.args[index]] = arg
-                kwargs_dict.update(kwargs)
-                params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
-
-                # Set the key in arakoon if non-existent
-                value = update_value(key=persistent_key,
-                                     append=True)
-
-                # Validate whether another job with same params is being executed, skip if so
-                for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
-                    if item['kwargs'] == kwargs_dict:
-                        if async_task is True:  # Not waiting for other jobs to finish since asynchronously
-                            log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
-                            if unittest_mode is True:
-                                Decorators.unittest_thread_info_by_name[thread_name] = ('DISCARDED', None)
-                            return None
-
-                        # If executed inline (sync), execute callback if any provided
-                        if callback is not None:
-                            log_message('Execution of task {0} {1} in progress, executing callback function'.format(task_name, params_info))
-                            if unittest_mode is True:
-                                Decorators.unittest_thread_info_by_name[thread_name] = ('CALLBACK', None)
-                            return callback(*args, **kwargs)
-
-                        # Let's wait for 2nd job in queue to have finished if no callback provided
-                        slept = 0
-                        while slept < timeout:
-                            log_message('Task {0} {1} is waiting for similar tasks to finish - ({2})'.format(task_name, params_info, slept + sleep))
-                            values = list(persistent_client.get_multi([persistent_key], must_exist=False))
-                            if values[0] is None:
-                                if unittest_mode is True:
-                                    Decorators.unittest_thread_info_by_name[thread_name] = ('WAITED', None)
-                                return None  # All pending jobs have been deleted in the meantime, no need to wait
-                            if item['timestamp'] not in [value['timestamp'] for value in values[0]['values']]:
-                                if unittest_mode is True:
-                                    Decorators.unittest_thread_info_by_name[thread_name] = ('WAITED', None)
-                                return None  # Similar tasks have been executed, so sync task currently waiting can return without having been executed
-                            slept += sleep
-                            time.sleep(sleep)
-                            if slept >= timeout:
-                                log_message('Task {0} {1} waited {2}s for similar tasks to finish, but timeout was reached'.format(task_name, params_info, slept),
-                                            level='error')
-                                if unittest_mode is True:
-                                    Decorators.unittest_thread_info_by_name[thread_name] = ('EXCEPTION', 'Could not start within timeout of {0}s while waiting for other tasks'.format(timeout))
-                                raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
-                                                                                                                                                                 now,
-                                                                                                                                                                 task_name,
-                                                                                                                                                                 timeout))
-                            if unittest_mode is True:
-                                if thread_name not in Decorators.unittest_thread_info_by_state['WAITING']:
-                                    Decorators.unittest_thread_info_by_state['WAITING'].append(thread_name)
-
-                log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
-                update_value(key=persistent_key,
-                             append=True,
-                             value_to_update={'kwargs': kwargs_dict,
-                                              'task_id': task_id,
-                                              'timestamp': now})
-
-                # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
-                first_element = None
-                slept = 0
-                while slept < timeout:
-                    values = list(persistent_client.get_multi([persistent_key], must_exist=False))
-                    if values[0] is not None:
-                        value = values[0]
-                        first_element = value['values'][0]['timestamp'] if len(value['values']) > 0 else None
-
-                    if first_element == now:
-                        try:
-                            if slept > 0:
-                                log_message('Task {0} {1} had to wait {2} seconds before being able to start'.format(task_name,
-                                                                                                                     params_info,
-                                                                                                                     slept))
-                            if unittest_mode is True:
-                                Decorators.unittest_thread_info_by_name[thread_name] = ('EXECUTING', None)
-                            output = f(*args, **kwargs)
-                            if unittest_mode is True:
-                                Decorators.unittest_thread_info_by_name[thread_name] = ('FINISHED', None)
-                                Decorators.unittest_thread_info_by_state['FINISHED'].append(thread_name)
-                            log_message('Task {0} finished successfully'.format(task_name))
-                            return output
-                        finally:
-                            update_value(key=persistent_key,
-                                         append=False)
-                    else:
-                        if unittest_mode is True:
-                            if thread_name not in Decorators.unittest_thread_info_by_state['WAITING']:
-                                Decorators.unittest_thread_info_by_name[thread_name] = ('WAITING', None)
-                                Decorators.unittest_thread_info_by_state['WAITING'].append(thread_name)
-
-                    slept += sleep
-                    time.sleep(sleep)
-                    if slept >= timeout:
-                        update_value(key=persistent_key,
-                                     append=False,
-                                     value_to_update={'kwargs': kwargs_dict,
-                                                      'task_id': task_id,
-                                                      'timestamp': now})
-                        log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
-                                    level='error')
-                        if unittest_mode is True:
-                            Decorators.unittest_thread_info_by_name[thread_name] = ('EXCEPTION', 'Could not start within timeout of {0}s while queued'.format(timeout))
-                        raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
-                                                                                                                                                         now,
-                                                                                                                                                         task_name,
-                                                                                                                                                         timeout))
-            else:
-                raise ValueError('Unsupported mode "{0}" provided'.format(mode))
-
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
-        return new_function
-    return wrap
 
 
 def add_hooks(hook_type, hooks):

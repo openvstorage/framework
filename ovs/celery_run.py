@@ -34,7 +34,6 @@ from kombu import Queue
 from threading import Thread
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.messaging import MessageController
@@ -192,36 +191,66 @@ def load_ovs_logger(**kwargs):
         kwargs['logger'] = LogHandler.get('celery', name='celery')
 
 
-def _clean_cache():
-    loghandler = LogHandler.get('celery', name='celery')
-    loghandler.info('Executing celery "clear_cache" startup script...')
+def _get_registration_update_transaction():
+    """
+    Gets the transaction to execute
+    - Checks if the current task registrations are still active
+    - All registrations that can be discarded will be discarded
+    - If no active registrations are found, the task registration key will get removed
+    :return: Transaction guid
+    :rtype: str
+    """
     from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
+
+    logger = LogHandler.get('celery', name='celery')
+
     active = inspect().active()
-    active_tasks = []
-    if active is not None:
+    active_task_ids = []
+    # Retrieve active tasks from celery
+    if active:
         for tasks in active.itervalues():
-            active_tasks += [task['id'] for task in tasks]
-    cache = PersistentFactory.get_client()
-    for key in cache.prefix(ENSURE_SINGLE_KEY):
+            active_task_ids += [task['id'] for task in tasks]
+
+    persistent = PersistentFactory.get_client()
+    transaction = persistent.begin_transaction()
+
+    for key in persistent.prefix(ENSURE_SINGLE_KEY):
+        # Yield task registration keys which are <ensure_single_key>_<task_name>_<ensure_single_mode>
         try:
-            with volatile_mutex(name=key, wait=5):
-                entry = cache.get(key)
-                values = entry.get('values', [])
-                new_values = []
-                for v in values:
-                    task_id = v.get('task_id')
-                    if task_id is not None and task_id in active_tasks:
-                        new_values.append(v)
-                if len(new_values) > 0:
-                    entry['values'] = new_values
-                    cache.set(key, entry)
-                    loghandler.info('Updated key {0}'.format(key))
-                else:
-                    cache.delete(key)
-                    loghandler.info('Deleted key {0}'.format(key))
+            registrations = persistent.get(key)
+            print key, registrations
+            if not registrations:
+                continue
+            # Filter out all the tasks are are no longer running within celery
+            running_registrations = []
+            for registration in registrations:
+                task_id = registration.get('task_id')
+                if task_id and task_id in active_task_ids:
+                    running_registrations.append(registration)
+            if running_registrations:
+                if running_registrations == registrations:
+                    # No changes required to be made
+                    continue
+                persistent.assert_value(key, running_registrations, transaction=transaction)
+                persistent.set(key, running_registrations, transaction=transaction)
+                logger.info('Updated key {0}'.format(key))
+            elif not running_registrations:
+                persistent.assert_value(key, running_registrations, transaction=transaction)
+                persistent.delete(key, transaction=transaction)
+                logger.info('Deleted key {0}'.format(key))
         except KeyNotFoundException:
             pass
-    loghandler.info('Executing celery "clear_cache" startup script... done')
+    return transaction
+
+
+def _clean_cache():
+
+    logger = LogHandler.get('celery', name='celery')
+    logger.info('Executing celery "clear_cache" startup script...')
+    persistent = PersistentFactory.get_client()
+
+    persistent.apply_callback_transaction(_get_registration_update_transaction, max_retries=5)
+    logger.info('Executing celery "clear_cache" startup script... done')
 
 
 if __name__ == '__main__':
