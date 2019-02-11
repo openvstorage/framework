@@ -573,6 +573,155 @@ class Helpers(unittest.TestCase):
             self.assertEqual(first=Decorators.unittest_thread_info_by_name[thread_name_2][0],
                              second=state)
 
+    def test_ensure_single_decorator_runtime_hooks_default(self):
+        """
+        Test the runtime hooking of the ensure single decorator
+        :return:
+        """
+        # threading control
+        function_event = Event()
+        mode = 'DEFAULT'
+
+        def do_hook(event_to_set, hook):
+            event_to_set.set()
+
+        @ovs_task(name='unittest_task', ensure_single_info={'mode': mode})
+        def deduped(*args, **kwargs):
+            function_event.set()
+
+        runtime_hooks = {}
+        events = [('before_validation', Event()), ('after_validation', Event()), ('before_execution', Event()), ('after_execution', Event())]
+        for hook_time, event in events:
+            runtime_hooks[hook_time] = lambda event_to_set=event, hook=hook_time: do_hook(event_to_set, hook)
+
+        thread = deduped.delay(ensure_single_runtime_hooks=runtime_hooks)['thread']
+        for hook_time, event in events:
+            # Will deadlock if not set
+            event.wait()
+        thread.join() # Wait for result
+        self.assertTrue(function_event.is_set())
+
+    def test_ensure_single_decorator_runtime_hooks_deduped(self):
+        """
+        Test the runtime hooking of the ensure single decorator
+        :return:
+        """
+        # threading control
+        function_event = Event()
+        mode = 'DEDUPED'
+
+        def do_hook(event_to_set, hook):
+            event_to_set.set()
+
+        @ovs_task(name='unittest_task', ensure_single_info={'mode': mode})
+        def default(*args, **kwargs):
+            function_event.set()
+
+        runtime_hooks = {}
+        events = [('before_validation', Event()), ('after_validation', Event()), ('before_execution', Event()), ('after_execution', Event())]
+        for hook_time, event in events:
+            runtime_hooks[hook_time] = lambda event_to_set=event, hook=hook_time: do_hook(event_to_set, hook)
+
+        thread = default.delay(ensure_single_runtime_hooks=runtime_hooks)['thread']
+        for hook_time, event in events:
+            event.wait()
+        thread.join()
+        self.assertTrue(function_event.is_set())
+
+    def test_ensure_single_decorator_runtime_hooks_chained(self):
+        """
+        Test the runtime hooking of the ensure single decorator
+        :return:
+        """
+        # threading control
+        function_event = Event()
+        mode = 'CHAINED'
+
+        def do_hook(event_to_set, hook):
+            event_to_set.set()
+
+        @ovs_task(name='unittest_task', ensure_single_info={'mode': mode})
+        def chained(*args, **kwargs):
+            function_event.set()
+
+        runtime_hooks = {}
+        events = [('before_validation', Event()), ('after_validation', Event()), ('before_execution', Event()), ('after_execution', Event())]
+        for hook_time, event in events:
+            runtime_hooks[hook_time] = lambda event_to_set=event, hook=hook_time: do_hook(event_to_set, hook)
+
+        thread = chained.delay(ensure_single_runtime_hooks=runtime_hooks)['thread']
+        for hook_time, event in events:
+            # Will deadlock
+            event.wait()
+        thread.join()
+        self.assertTrue(function_event.is_set())
+
+    def test_ensure_single_decorator_ignore_arguments(self):
+        """
+        Test the ignore arguments of the ensure single decorator
+        :return:
+        """
+        # threading control
+        validation_event = Event()
+
+        function_event = Event()
+        mode = 'DEDUPED'
+
+        def after_validation():
+            validation_event.set()
+
+        def after_execution(event_to_set):
+            event_to_set.set()
+
+        hooks = {'after_validation': after_validation}
+
+        @ovs_task(name='unittest_task_1', ensure_single_info={'mode': mode, 'hooks': hooks})
+        def deduped_no_ignore(arg_1, ignore_arg_2):
+            function_event.wait()
+
+        @ovs_task(name='unittest_task_2', ensure_single_info={'mode': mode, 'ignore_arguments': ['ignore_arg_2'], 'hooks': hooks})
+        def deduped(arg_1, ignore_arg_2):
+            function_event.wait()
+
+        for func in [deduped_no_ignore, deduped]:
+            # Clean shared state
+            Decorators._clean()
+            function_event.clear()
+            validation_event.clear()
+
+            arg_1 = 'test'
+            execution_event_1 = Event()
+            runtime_hooks_1 = {'after_execution': lambda e=execution_event_1: after_execution(e)}
+            thread_1 = Thread(name='thread_1', target=func, args=(), kwargs={'arg_1': arg_1,
+                                                                             'ignore_arg_2': 'same',
+                                                                             'ensure_single_runtime_hooks': runtime_hooks_1})
+            thread_1.start()
+            validation_event.wait()
+            validation_event.clear()
+
+            execution_event_2 = Event()
+            runtime_hooks_2 = {'after_execution': lambda e=execution_event_2: after_execution(e)}
+            thread_2 = Thread(name='thread_2', target=func, args=(), kwargs={'arg_1': arg_1,
+                                                                             'ignore_arg_2': 'different',
+                                                                             'ensure_single_timeout': 0.1,
+                                                                             'ensure_single_runtime_hooks': runtime_hooks_2})
+            thread_2.start()
+            validation_event.wait()
+            validation_event.clear()
+
+            function_event.set()
+            for execution_event in [execution_event_1, execution_event_2]:
+                execution_event.wait()
+
+            for thread in [thread_1, thread_2]:
+                thread.join()
+            # When not ignoring the second param: the executions aren't mutually exclusive. Both will finish
+            if func == deduped_no_ignore:
+                assertion = self.assertFalse
+            else:
+                assertion = self.assertTrue
+            assertion('thread_2' in Decorators.unittest_thread_info_by_name and Decorators.unittest_thread_info_by_name['thread_2'][0] == 'EXCEPTION')
+
     def test_ensure_single_decorator_exceptions(self):
         """
         Tests Helpers._ensure_single decorator basic exception handling

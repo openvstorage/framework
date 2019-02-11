@@ -38,6 +38,7 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
+from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.helpers.mds.catchup import MDSCatchUp
 from ovs.lib.helpers.mds.safety import SafetyEnsurer
 from ovs.lib.helpers.mds.shared import MDSShared
@@ -46,21 +47,10 @@ from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 
 
-class MDSCheckupSingleRunning(Exception):
-    """
-    Raised when the MDS checkup is already running for the VPool
-    Caught in the complete mds_checkup
-    """
-
-
 class MDSCheckupEnsureSafetyFailures(Exception):
     """
     Raised when errors occur during an mds checkup for a single VPool
     """
-
-
-def mds_checkup_single_callback():
-    raise MDSCheckupSingleRunning()
 
 
 class MDSServiceController(MDSShared):
@@ -218,8 +208,7 @@ class MDSServiceController(MDSShared):
         return mds_dict, offline_nodes
 
     @staticmethod
-    @ovs_task(name='ovs.mds.mds_checkup_single', ensure_single_info={'mode': 'CHAINED',
-                                                                     'callback': mds_checkup_single_callback,
+    @ovs_task(name='ovs.mds.mds_checkup_single', ensure_single_info={'mode': 'DEDUPED',
                                                                      'ignore_arguments': ['mds_dict', 'offline_nodes']})
     def mds_checkup_single(vpool_guid, mds_dict=None, offline_nodes=None):
         # type: (str, collections.OrderedDict, List[StorageRouter]) -> None
@@ -364,10 +353,10 @@ class MDSServiceController(MDSShared):
         ensure_safety_failures = []
         for vpool, storagerouter_info in mds_dict.iteritems():
             try:
-                MDSServiceController.mds_checkup_single(vpool.guid, mds_dict, offline_nodes)
+                MDSServiceController.mds_checkup_single(vpool.guid, mds_dict, offline_nodes, ensure_single_timeout=1)
             except MDSCheckupEnsureSafetyFailures as ex:
                 ensure_safety_failures.append(ex)
-            except MDSCheckupSingleRunning:
+            except EnsureSingleTimeoutReached:
                 # This exception is raised by the callback. The mds checkup calls the single checkup inline which can
                 # invoke the callback if the same instance is already running (because of extend/shrink)
                 MDSServiceController._logger.info('MDS Checkup single already running for VPool {}'.format(vpool.guid))

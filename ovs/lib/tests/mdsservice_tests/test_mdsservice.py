@@ -20,6 +20,7 @@ MDSService test module
 
 import json
 import unittest
+from threading import Event, Thread
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
@@ -1500,6 +1501,41 @@ class MDSServices(unittest.TestCase):
                                             'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_5/scratch',
                                             'port': 10003,
                                             'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_5/db'})
+
+    def test_checkup_exclusivity_single_checkup_running(self):
+        """
+        Test that only one checkup/vpool can happen at the same time
+        Relies on the ensure single for locking. This test validates that the full checkup can handle the mutex error
+        Simulates
+        - scheduled mds checkup running while single checkup is still doing its thing
+        """
+        # Threading control
+        validation_event = Event()
+        execution_event = Event()
+
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1, 2],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
+        )
+        vpools = structure['vpools'].values()
+
+        vpool_1, vpool_2 = vpools
+        runtime_hooks = {'before_execution': lambda: execution_event.wait(),
+                         'after_validation': lambda : validation_event.set()}
+
+        # Running in a thread to simulate a direct invocation
+        single_vpool_task = Thread(target=MDSServiceController.mds_checkup_single, args=(vpool_1.guid,), kwargs={'ensure_single_runtime_hooks': runtime_hooks})
+        single_vpool_task.start()
+        # Wait for it to go to execution phase
+        validation_event.wait()
+        MDSServiceController.mds_checkup()
+        execution_event.set()
+        single_vpool_task.join()
+
+        already_running_logs = [log for log in LogHandler._logs['lib_mds'] if log.startswith('MDS Checkup single already running for VPool')]
+        self.assertEqual(len(already_running_logs), 1)
 
     def test_ensure_safety_excluded_storagerouters(self):
         """

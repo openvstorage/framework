@@ -195,7 +195,8 @@ def ensure_single_default(ensure_single_container):
             :param kwargs: Arguments with default values
             """
             ensure_single = EnsureSingle(ensure_single_container, self)
-
+            ensure_single_kwargs = ensure_single.get_ensure_single_runtime_kwargs(kwargs)
+            ensure_single.update_runtime_arguments(**ensure_single_kwargs)
             try:
                 with ensure_single.lock_default_mode():
                     return f(*args, **kwargs)
@@ -249,7 +250,8 @@ def ensure_single_deduped(ensure_single_container):
             ensure_single = EnsureSingle(ensure_single_container, self)
             default_timeout = 10 if ensure_single.unittest_mode else ensure_single_container.global_timeout
             timeout = kwargs.pop('ensure_single_timeout', default_timeout)
-            kwargs_dict = ensure_single.get_all_arguments_as_kwargs(f, args, kwargs)
+            kwargs_dict, ensure_single_kwargs = ensure_single.get_all_arguments_as_kwargs(f, args, kwargs)
+            ensure_single.update_runtime_arguments(**ensure_single_kwargs)
             try:
                 with ensure_single.lock_deduped_mode(kwargs_dict, timeout):
                     return f(*args, **kwargs)
@@ -304,7 +306,8 @@ def ensure_single_chained(ensure_single_container):
             ensure_single = EnsureSingle(ensure_single_container, self)
             default_timeout = 10 if ensure_single.unittest_mode else ensure_single_container.global_timeout
             timeout = kwargs.pop('ensure_single_timeout', default_timeout)
-            kwargs_dict = ensure_single.get_all_arguments_as_kwargs(f, args, kwargs)
+            kwargs_dict, ensure_single_kwargs = ensure_single.get_all_arguments_as_kwargs(f, args, kwargs)
+            ensure_single.update_runtime_arguments(**ensure_single_kwargs)
             try:
                 with ensure_single.lock_chained_mode(kwargs_dict, timeout):
                     return f(*args, **kwargs)
@@ -408,6 +411,7 @@ class EnsureSingle(object):
         self.thread_name = None
         self.unittest_mode = None
         self.message = None
+        self.runtime_hooks = {}
         self.gather_run_time_info()
 
     @property
@@ -443,18 +447,6 @@ class EnsureSingle(object):
         """
         self.task_id, self.async_task = self.get_task_id_and_async(task)
 
-    def log_message(self, message, level='info'):
-        """
-        Log a message with some additional information
-        :param message: Message to log
-        :param level:   Log level
-        :return:        None
-        """
-        if not hasattr(self.logger, level):
-            raise ValueError('Unsupported log level "{0}" specified'.format(level))
-
-        getattr(self.logger, level)(self.message.format(message))
-
     @staticmethod
     def get_task_id_and_async(task):
         """
@@ -479,26 +471,63 @@ class EnsureSingle(object):
             self.logger.error('Extra tasks are not allowed in this mode')
             raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(self.ensure_single_container.mode, self.now))
 
-    @staticmethod
-    def get_all_arguments_as_kwargs(func, args, kwargs):
-        # type: (callable, tuple, dict) -> dict
+    def update_runtime_arguments(self, ensure_single_runtime_hooks=None):
+        # type: (dict) -> None
+        """
+        Update the state of the object with arguments fetched at runtime
+        :param ensure_single_runtime_hooks: Hooks to run at runtime. Same behaviour as the hooks of the ensure
+        single container
+        :return: None
+        """
+        if ensure_single_runtime_hooks:
+            # Do not update the ensure single container hooks as they will be updated for every function
+            self.runtime_hooks.update(ensure_single_runtime_hooks)
+
+    @classmethod
+    def get_all_arguments_as_kwargs(cls, func, args, kwargs):
+        # type: (callable, tuple, dict) -> Tuple[dict, dict]
         """
         Retrieve all arguments passed to a function as key-word arguments
+        Will pop reserved keywords
+        - ensure_single_runtime_hooks: Hooks given at runtime for the ensure single
         :param func: Function to get all arguments as key-word arguments for
         :type func: callable
         :param args: Arguments passed to the function
         :type args: tuple
         :param kwargs: Key words passed to the functoin
         :type kwargs: dict
-        :return: Key word arguments
-        :rtype: dict
+        :return: Tuple with Key word arguments of the function and extra arguments for the ensure single
+        :rtype: Tuple[dict, dict]
         """
         function_info = inspect.getargspec(func)
         kwargs_dict = {}
         for index, arg in enumerate(args):
             kwargs_dict[function_info.args[index]] = arg
         kwargs_dict.update(kwargs)
-        return kwargs_dict
+        ensure_single_kwargs = cls.get_ensure_single_runtime_kwargs(kwargs_dict)
+        # Pop all keys returned by ensure_single
+        for key in ensure_single_kwargs:
+            kwargs.pop(key, None)
+
+        return kwargs_dict, ensure_single_kwargs
+
+    @staticmethod
+    def get_ensure_single_runtime_kwargs(kwargs):
+        # type: (dict) -> dict
+        """
+        Retrieve a dict with all ensure_single runtime kwargs
+        Note: will mutate the passed on kwargs
+        :param kwargs: Kwargs passed ot the function
+        :type kwargs: dict
+        :return:
+        """
+        # ensure_single_timeout is an argument that could be here but it does not fit because of the default value
+        reserved_keywords = ['ensure_single_runtime_hooks']
+        ensure_single_kwargs = {}
+        for reserved_keyword in reserved_keywords:
+            if reserved_keyword in kwargs:
+                ensure_single_kwargs[reserved_keyword] = kwargs.pop(reserved_keyword)
+        return ensure_single_kwargs
 
     def get_task_registrations(self):
         # type: () -> Tuple[List[any], any]
@@ -949,7 +978,7 @@ class EnsureSingle(object):
         :rtype: NoneType
         """
         if self.unittest_mode:
-            hook_func = self.ensure_single_container.hooks.get(hook)
+            hook_func = self.runtime_hooks.get(hook) or self.ensure_single_container.hooks.get(hook)
             if not hook_func:
                 return
             hook_func()
