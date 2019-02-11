@@ -22,9 +22,11 @@ from .connection_manager import BackendConnectionManager
 from .filesystem import FileSystemConfig
 from .volume_router import VolumeRouterConfig
 from .volume_manager import VolumeManagerConfig
+from ovs.constants.storagedriver import NETWORK_MAX_NEIGHBOUR_DISTANCE
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
+
 
 class VolumeRegistryConfig(BaseStorageDriverConfig):
 
@@ -79,7 +81,7 @@ class NetworkInterfaceConfig(BaseStorageDriverConfig):
     component_identifier = 'network_interface'
 
     def __init__(self, network_uri=None, network_xio_slab_config=None, network_workqueue_max_threads=None, network_snd_rcv_queue_depth=None,
-                 network_max_neighbour_distance=9999, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
+                 network_max_neighbour_distance=NETWORK_MAX_NEIGHBOUR_DISTANCE, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: network config manager
         :param network_uri: When backend_type is S3: whether to do verbose logging
@@ -357,6 +359,12 @@ class StorageDriverConfig(BaseStorageDriverConfig):
 
     @staticmethod
     def from_dict(whole_config):
+        """
+        Initiate a storagedriverconfig object from a volumedriver config dictionairy
+        :param whole_config: Volumedriver config dict
+        :type whole_config: dict
+        :return: Storagedriverconfig object
+        """
 
         def _fetch_partial_config(object):
             if object.component_identifier in whole_config:
@@ -383,7 +391,6 @@ class StorageDriverConfig(BaseStorageDriverConfig):
         dls_config = _fetch_partial_config(DistributedLockStoreConfig)
         contentcache_config = _fetch_partial_config(ContentAddressedCacheConfig)
 
-
         # Fill created objects in in __init__ and use remaining config values to fill in other params of the __init__
         return StorageDriverConfig(vrouter_cluster_id=vrouter_cluster_id,
                                    dtl_config=dtl_config,
@@ -400,5 +407,6 @@ class StorageDriverConfig(BaseStorageDriverConfig):
                                    scrub_manager_config=scrub_manager_config,
                                    network_config=network_config,
                                    contentcache_config=contentcache_config,**whole_config)
+
 
 

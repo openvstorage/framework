@@ -192,9 +192,9 @@ class MigrationController(object):
                 changes = True
                 backend_connection_manager = {'backend_type': 'MULTI'}
                 for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
-                    AlbaConnectionConfig(alba_connection_use_rora=True,  # todo fixme probably wont work
-                                         alba_connection_rora_manifest_cache_capacity=5000,
-                                         **current_config)
+                    alba_config = AlbaConnectionConfig(alba_connection_use_rora=True,
+                                  alba_connection_rora_manifest_cache_capacity=5000,
+                                  **current_config.to_dict()[str(index)])
                     for key, value in backend_connection_manager[str(index)].items():
                         if key.startswith('backend_interface'):
                             backend_connection_manager[key] = value
@@ -222,8 +222,7 @@ class MigrationController(object):
                         backend_connection_manager[key] = value
 
             if changes is True:
-                storagedriver_config.clear_backend_connection_manager()
-                storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
+                storagedriver_config.configuration.backend_config = current_config
                 storagedriver_config.save(root_client)
 
                 # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
@@ -389,7 +388,7 @@ class MigrationController(object):
                 if 'backend_connection_manager' not in storagedriver_config.configuration:
                     continue
 
-                current_config = storagedriver_config.configuration['backend_connection_manager']
+                current_config = storagedriver_config.configuration.backend_config
                 for key, value in current_config.iteritems():
                     if key.isdigit() is True:
                         if value.get('alba_connection_asd_connection_pool_capacity') != 10:
@@ -403,8 +402,7 @@ class MigrationController(object):
                             value['alba_connection_rora_manifest_cache_capacity'] = 25000
 
                 if changes is True:
-                    storagedriver_config.clear_backend_connection_manager()
-                    storagedriver_config.configure_backend_connection_manager(**current_config)
+                    storagedriver_config.configuration.backend_config = current_config
                     storagedriver_config.save(root_client)
 
                     # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
