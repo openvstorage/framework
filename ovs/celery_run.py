@@ -217,10 +217,20 @@ def _get_registration_update_transaction():
     for key in persistent.prefix(ENSURE_SINGLE_KEY):
         # Yield task registration keys which are <ensure_single_key>_<task_name>_<ensure_single_mode>
         try:
-            registrations = persistent.get(key)
-            if not registrations:
+            initial_registrations = persistent.get(key)
+            if not initial_registrations:
                 continue
             # Filter out all the tasks are are no longer running within celery
+            # @todo might be better to do in update code?
+            # Transition from dict to list. Key must also change
+            if isinstance(initial_registrations, dict):
+                mode = initial_registrations['mode']
+                registrations = initial_registrations['values']
+                key_to_save = '{0}_{1}'.format(key, mode.lower())
+            else:
+                registrations = initial_registrations
+                key_to_save = key
+
             running_registrations = []
             for registration in registrations:
                 task_id = registration.get('task_id')
@@ -230,13 +240,16 @@ def _get_registration_update_transaction():
                 if running_registrations == registrations:
                     # No changes required to be made
                     continue
-                persistent.assert_value(key, running_registrations, transaction=transaction)
-                persistent.set(key, running_registrations, transaction=transaction)
-                logger.info('Updated key {0}'.format(key))
+                persistent.assert_value(key, initial_registrations, transaction=transaction)
+                if key_to_save != key:
+                    # Delete the old key
+                    persistent.delete(key, transaction=transaction)
+                persistent.set(key_to_save, running_registrations, transaction=transaction)
+                logger.info('Updating key {0}'.format(key))
             elif not running_registrations:
-                persistent.assert_value(key, running_registrations, transaction=transaction)
+                persistent.assert_value(key, initial_registrations, transaction=transaction)
                 persistent.delete(key, transaction=transaction)
-                logger.info('Deleted key {0}'.format(key))
+                logger.info('Deleting key {0}'.format(key))
         except KeyNotFoundException:
             pass
     return transaction
