@@ -1317,11 +1317,12 @@ class StorageRouterController(object):
                 errors_found = True
                 StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - Cleaning up vpool from the model failed'.format(storage_driver.guid))
 
-        StorageRouterController._logger.info('Remove StorageDriver - Guid {0} - Running MDS checkup'.format(storage_driver.guid))
-        try:
-            MDSServiceController.mds_checkup_single(vpool.guid)
-        except Exception:
-            StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - MDS checkup failed'.format(storage_driver.guid))
+        if storage_drivers_left:
+            StorageRouterController._logger.info('Remove StorageDriver - Guid {0} - Running MDS checkup'.format(storage_driver.guid))
+            try:
+                MDSServiceController.mds_checkup_single(vpool.guid)
+            except Exception:
+                StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - MDS checkup failed'.format(storage_driver.guid))
 
         if errors_found is True:
             if storage_drivers_left is True:
