@@ -616,11 +616,11 @@ class EnsureSingle(object):
 
             self.unittest_set_state_waiting()
 
-    def _ensure_job_limit(self, kwargs_dict, timeout, task_logs, job_limit=2, registrations_to_skip=0):
-        # type: (dict, float, Tuple[str, str], int, int) -> None
+    def _ensure_job_limit(self, kwargs_dict, timeout, task_logs, job_limit=2):
+        # type: (dict, float, Tuple[str, str], int) -> None
         """
         Ensure that the number of jobs don't exceed the limit
-        - Test if the current job limit is not reach
+        - Test if the current job limit is not reached
         - If job limit is reached: check if the task should be discarded, callbacked or waiting for a job to start
         :param kwargs_dict: Dict containing all arguments as key word arguments
         :type kwargs_dict: dict
@@ -630,9 +630,6 @@ class EnsureSingle(object):
         :type task_logs: Tuple[str, str]
         :param job_limit: Number of jobs to keep running at any given time
         :type job_limit: int
-        # @todo is this sane? Can't it be done with just the job limit?
-        :param registrations_to_skip: Number of registrations to skip. This number indicates how many jobs can be ignored before counting the limit
-        :type registrations_to_skip: int
         :return: None
         :raises: EnsureSingleTaskDiscarded: If the task was discarded
         :raises: EnsureSingleDoCallBack: If the task is required to call the callback function instead of the task function
@@ -643,7 +640,7 @@ class EnsureSingle(object):
         current_registrations, initial_registrations = self.get_task_registrations()
 
         job_counter = 0
-        for task_data in current_registrations[registrations_to_skip:]:
+        for task_data in current_registrations:
             if task_data['kwargs'] != kwargs_dict:
                 continue
             # Another job with the same registration
@@ -741,7 +738,7 @@ class EnsureSingle(object):
             self.run_hook('before_validation')
             # Validate whether another job with same params is being executed, skip if so
             # 1st registration is a running job, we check all other queued jobs for identical params
-            self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id), job_limit=1, registrations_to_skip=1)
+            self._ensure_job_limit(kwargs_dict, timeout, (task_log_name, task_log_id), job_limit=2)
 
             self.logger.info('New {0} scheduled for execution'.format(task_log_name))
             new_task_data = {'kwargs': kwargs_dict, 'task_id': self.task_id, 'timestamp': self.now}
@@ -766,13 +763,13 @@ class EnsureSingle(object):
         successful = True
         try:
             if slept:
-                self.logger.info('{0} had to wait {1} seconds before being able to start'.format(task_log_name, slept))
-            if slept >= timeout:
-                self.logger.error('Could not start {0}, within expected time ({1}s). Removed it from queue'.format(task_log_name, timeout))
-                self.unittest_set_state_exception('Could not start within timeout of {0}s while queued'.format(timeout))
-                timeout_message = '{0} - Task {1} could not be started within timeout of {2}s'.format(self.message, self.ensure_single_container.task_name, timeout)
-                raise EnsureSingleTimeoutReached(timeout_message)
-
+                if slept >= timeout:
+                    self.logger.error('Could not start {0}, within expected time ({1}s). Removed it from queue'.format(task_log_name, timeout))
+                    self.unittest_set_state_exception('Could not start within timeout of {0}s while queued'.format(timeout))
+                    timeout_message = '{0} - Task {1} could not be started within timeout of {2}s'.format(self.message, self.ensure_single_container.task_name, timeout)
+                    raise EnsureSingleTimeoutReached(timeout_message)
+                else:
+                    self.logger.info('{0} had to wait {1} seconds before being able to start'.format(task_log_name, slept))
             self.unittest_set_state_executing()
             self.run_hook('before_execution')
             yield
@@ -837,12 +834,13 @@ class EnsureSingle(object):
         successful = True
         try:
             if slept:
-                self.logger.info('{0} had to wait {1} seconds before being able to start'.format(task_log_name, slept))
-            if slept >= timeout:
-                self.logger.error('Could not start {0}, within expected time ({1}s). Removed it from queue'.format(task_log_name, timeout))
-                self.unittest_set_state_exception('Could not start within timeout of {0}s while queued'.format(timeout))
-                timeout_message = '{0} - Task {1} could not be started within timeout of {2}s'.format(self.message, self.ensure_single_container.task_name, timeout)
-                raise EnsureSingleTimeoutReached(timeout_message)
+                if slept >= timeout:
+                    self.logger.error('Could not start {0}, within expected time ({1}s). Removed it from queue'.format(task_log_name, timeout))
+                    self.unittest_set_state_exception('Could not start within timeout of {0}s while queued'.format(timeout))
+                    timeout_message = '{0} - Task {1} could not be started within timeout of {2}s'.format(self.message, self.ensure_single_container.task_name, timeout)
+                    raise EnsureSingleTimeoutReached(timeout_message)
+                else:
+                    self.logger.info('{0} had to wait {1} seconds before being able to start'.format(task_log_name, slept))
             self.run_hook('before_execution')
             self.unittest_set_state_executing()
             yield
@@ -1008,7 +1006,7 @@ class EnsureSingle(object):
         :return: None
         """
         if self.unittest_mode:
-            self.logger.info('Setting {} to {}'.format(self.thread_name, (state, value)))
+            self.logger.info('Setting {0} to {1}'.format(self.thread_name, (state, value)))
             Decorators.unittest_thread_info_by_name[self.thread_name] = (state, value)
 
     def unittest_set_state_executing(self):
