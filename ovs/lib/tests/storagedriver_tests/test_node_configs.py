@@ -323,3 +323,26 @@ class NodeConfigTest(unittest.TestCase):
         configs = vpool.clusterregistry_client.get_node_configs()
         for config in configs:
             _validate_node_config(config, expected_map)
+
+    def test_configuration(self):
+        self.persistent._clean()
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        vpool = structure['vpools'][1]
+        storagedrivers = structure['storagedrivers']
+        from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+        storagedriver_configuration = StorageDriverConfiguration(vpool.guid, storagedrivers[1].storagedriver_id)
+        config = storagedriver_configuration.configuration
+
+        # Test basic functionality of the save and std objects
+        self.assertEquals(config.dls_config.dls_type, 'Arakoon')
+        self.assertEquals(config.filedriver_config.fd_extent_cache_capacity, 1024)
+        config.dls_config.dls_type = 'Arakoon2'
+        config.filedriver_config.fd_extent_cache_capacity = 1025
+        self.assertNotEqual(config.dls_config.dls_type, 'Arakoon')
+        storagedriver_configuration.save()
+        self.assertEquals(config.dls_config.dls_type, 'Arakoon2')
+        self.assertEquals(config.filedriver_config.fd_extent_cache_capacity, 1025)

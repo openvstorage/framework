@@ -364,7 +364,7 @@ class StorageDriverConfiguration(object):
         # Retrieve the changes from volumedriver
         self._logger.info('Applying local storagedriver configuration changes{0}'.format('' if client is None else ' on {0}'.format(client.ip)))
         try:
-            if client:
+            if not client:
                 changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
             else:
                 with remote(client.ip, [LocalStorageRouterClient]) as rem:
