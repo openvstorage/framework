@@ -327,7 +327,7 @@ class VDiskController(object):
             VDiskController._logger.info('Migration - Guid {0} - ID {1} - Detected migration for vDisk {2}'.format(vdisk.guid, vdisk.volume_id, vdisk.name))
             if sd is not None:
                 VDiskController._logger.info('Migration - Guid {0} - ID {1} - Storage Router {2} is the new owner of vDisk {3}'.format(vdisk.guid, vdisk.volume_id, sd.storagerouter.name, vdisk.name))
-            MDSServiceController.mds_checkup()
+            MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
             VDiskController.dtl_checkup(vdisk_guid=vdisk.guid)
 
     @staticmethod
