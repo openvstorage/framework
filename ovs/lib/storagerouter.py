@@ -1003,11 +1003,10 @@ class StorageRouterController(object):
             VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
         except:
             pass
-        for vdisk in vpool.vdisks:
-            try:
-                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
-            except:
-                pass
+        try:
+            MDSServiceController.mds_checkup_single(vpool.guid)
+        except:
+            pass
         StorageRouterController._logger.info('Add vPool {0} ended successfully'.format(vpool_name))
 
     @staticmethod
@@ -1318,11 +1317,12 @@ class StorageRouterController(object):
                 errors_found = True
                 StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - Cleaning up vpool from the model failed'.format(storage_driver.guid))
 
-        StorageRouterController._logger.info('Remove StorageDriver - Guid {0} - Running MDS checkup'.format(storage_driver.guid))
-        try:
-            MDSServiceController.mds_checkup()
-        except Exception:
-            StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - MDS checkup failed'.format(storage_driver.guid))
+        if storage_drivers_left:
+            StorageRouterController._logger.info('Remove StorageDriver - Guid {0} - Running MDS checkup'.format(storage_driver.guid))
+            try:
+                MDSServiceController.mds_checkup_single(vpool.guid)
+            except Exception:
+                StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - MDS checkup failed'.format(storage_driver.guid))
 
         if errors_found is True:
             if storage_drivers_left is True:
