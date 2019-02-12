@@ -362,12 +362,6 @@ class VPoolController(object):
                 cls._logger.exception('StorageDriver {0} - Cleaning up vPool from the model failed'.format(storagedriver.guid))
             Configuration.delete('/ovs/vpools/{0}'.format(vp_installer.vpool.guid))
 
-        cls._logger.info('StorageDriver {0} - Running MDS checkup'.format(storagedriver.guid))
-        try:
-            MDSServiceController.mds_checkup()
-        except Exception:
-            cls._logger.exception('StorageDriver {0} - MDS checkup failed'.format(storagedriver.guid))
-
         # Update vPool status
         if errors_found is True:
             if vp_installer.storagedriver_amount > 1:
