@@ -207,11 +207,10 @@ class VPoolController(object):
             VDiskController.dtl_checkup(vpool_guid=vp_installer.vpool.guid, ensure_single_timeout=600)
         except:
             pass
-        for vdisk in vp_installer.vpool.vdisks:
-            try:
-                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
-            except:
-                pass
+        try:
+            MDSServiceController.mds_checkup_single(vp_installer.vpool.guid)
+        except:
+            pass
         vp_installer.update_status(status=VPool.STATUSES.RUNNING)
         cls._logger.info('Add vPool {0} ended successfully'.format(vp_installer.name))
 
@@ -347,6 +346,12 @@ class VPoolController(object):
                 VDiskController.dtl_checkup(vpool_guid=vp_installer.vpool.guid, ensure_single_timeout=600)
             except Exception:
                 cls._logger.exception('StorageDriver {0} - DTL checkup failed for vPool {1} with guid {2}'.format(storagedriver.guid, vp_installer.name, vp_installer.vpool.guid))
+            StorageRouterController._logger.info('Remove StorageDriver - Guid {0} - Running MDS checkup'.format(storagedriver.guid))
+            try:
+                MDSServiceController.mds_checkup_single(vp_installer.vpool.guid)
+            except Exception:
+                StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - MDS checkup failed'.format(storagedriver.guid))
+
         else:
             cls._logger.info('StorageDriver {0} - Removing vPool from model'.format(storagedriver.guid))
             # Clean up model
