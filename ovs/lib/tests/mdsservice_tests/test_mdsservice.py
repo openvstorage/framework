@@ -1534,7 +1534,7 @@ class MDSServices(unittest.TestCase):
         execution_event.set()
         single_vpool_task.join()
 
-        already_running_logs = [log for log in LogHandler._logs['lib_mds'] if log.startswith('MDS Checkup single already running for VPool')]
+        already_running_logs = [log for log in Logger._logs['lib'] if log.startswith('MDS Checkup single already running for VPool')]
         self.assertEqual(len(already_running_logs), 1)
 
     def test_ensure_safety_excluded_storagerouters(self):
