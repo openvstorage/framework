@@ -936,8 +936,8 @@ class VDiskController(object):
         vpool = vdisk.vpool
 
         storagedriver_config = StorageDriverConfiguration(vpool.guid, vdisk.storagedriver_id)
-        volume_manager = storagedriver_config.configuration.get('volume_manager', {})
-        cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
+        volume_manager = storagedriver_config.configuration.volume_manager_config
+        cluster_size = storagedriver_config.configuration.volume_manager_config.default_cluster_size or 4096
 
         volume_id = str(vdisk.volume_id)
         try:
@@ -1632,7 +1632,7 @@ class VDiskController(object):
 
         ratio = vdisk.pagecache_ratio
         storagedriver_config = StorageDriverConfiguration(vdisk.vpool_guid, storagedriver_id)
-        cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
+        cluster_size = storagedriver_config.configuration.volume_manager_config.default_cluster_size or 4096
 
         # Calculate the number of metadata entries per page.
         entries_per_page = float(2 ** vdisk.vpool.metadata_store_bits)

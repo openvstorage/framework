@@ -22,10 +22,11 @@ from .connection_manager import BackendConnectionManager
 from .filesystem import FileSystemConfig
 from .volume_router import VolumeRouterConfig
 from .volume_manager import VolumeManagerConfig
-from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.constants.storagedriver import NETWORK_MAX_NEIGHBOUR_DISTANCE
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
+
 
 class VolumeRegistryConfig(BaseStorageDriverConfig):
 
@@ -80,7 +81,7 @@ class NetworkInterfaceConfig(BaseStorageDriverConfig):
     component_identifier = 'network_interface'
 
     def __init__(self, network_uri=None, network_xio_slab_config=None, network_workqueue_max_threads=None, network_snd_rcv_queue_depth=None,
-                 network_max_neighbour_distance=StorageDriver.DISTANCES.FAR - 1, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
+                 network_max_neighbour_distance=NETWORK_MAX_NEIGHBOUR_DISTANCE, network_workqueue_ctrl_max_threads=None, *args, **kwargs):
         """
         Initiate the volumedriverfs config: network config manager
         :param network_uri: When backend_type is S3: whether to do verbose logging
@@ -354,3 +355,58 @@ class StorageDriverConfig(BaseStorageDriverConfig):
         self.contentcache_config = contentcache_config or ContentAddressedCacheConfig()  # type: ContentAddressedCacheConfig
         self.scrub_manager_config = scrub_manager_config or ScrubManagerConfig()  # type: ScrubManagerConfig
         self._config = {}
+
+
+    @staticmethod
+    def from_dict(whole_config):
+        """
+        Initiate a storagedriverconfig object from a volumedriver config dictionairy
+        :param whole_config: Volumedriver config dict
+        :type whole_config: dict
+        :return: Storagedriverconfig object
+        """
+
+        def _fetch_partial_config(object):
+            if object.component_identifier in whole_config:
+                return object(**whole_config.get(object.component_identifier))
+            else:
+                return object()
+
+        # Create mandatory objects
+        vrouter_cluster_id = whole_config['volume_router_cluster']['vrouter_cluster_id']
+        scocache_config = ScoCacheConfig(**whole_config[ScoCacheConfig.component_identifier])
+        filedriver_config = FileDriverConfig(**whole_config[FileDriverConfig.component_identifier])
+        filesystem_config = FileSystemConfig(**whole_config[FileSystemConfig.component_identifier])
+        vrouter_config = VolumeRouterConfig(**whole_config[VolumeRouterConfig.component_identifier])
+        vregistry_config = VolumeRegistryConfig(**whole_config[VolumeRegistryConfig.component_identifier])
+        volume_manager_config = VolumeManagerConfig(**whole_config[VolumeManagerConfig.component_identifier])
+        backend_config = BackendConnectionManager(**whole_config[BackendConnectionManager.component_identifier])
+        dtl_config = DistributedTransactionLogConfig(**whole_config[DistributedTransactionLogConfig.component_identifier])
+
+        # Create optional objects
+        mds_config = _fetch_partial_config(MetadataServerConfig)
+        events_config = _fetch_partial_config(EventPublisherConfig)
+        scrub_manager_config = _fetch_partial_config(ScrubManagerConfig)
+        network_config = _fetch_partial_config(NetworkInterfaceConfig)
+        dls_config = _fetch_partial_config(DistributedLockStoreConfig)
+        contentcache_config = _fetch_partial_config(ContentAddressedCacheConfig)
+
+        # Fill created objects in in __init__ and use remaining config values to fill in other params of the __init__
+        return StorageDriverConfig(vrouter_cluster_id=vrouter_cluster_id,
+                                   dtl_config=dtl_config,
+                                   filedriver_config=filedriver_config,
+                                   filesystem_config=filesystem_config,
+                                   dls_config=dls_config,
+                                   vrouter_config=vrouter_config,
+                                   scocache_config=scocache_config,
+                                   vregistry_config=vregistry_config,
+                                   volume_manager_config=volume_manager_config,
+                                   backend_config=backend_config,
+                                   mds_config=mds_config,
+                                   events_config=events_config,
+                                   scrub_manager_config=scrub_manager_config,
+                                   network_config=network_config,
+                                   contentcache_config=contentcache_config,**whole_config)
+
+
+

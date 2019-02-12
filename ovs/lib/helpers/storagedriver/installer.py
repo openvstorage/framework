@@ -363,7 +363,7 @@ class StorageDriverInstaller(object):
                                                                 'preset': cache_settings['backend_info']['preset']}],
                                  'manifest_cache_size': manifest_cache_size}]
 
-            if cache_type == StorageDriverConfiguration.CACHE_BLOCK:
+            if cache_type == CACHE_BLOCK:
                 path = '{0}/bc'.format(self.storagedriver_partitions_caches[proxy_index].path)
             else:
                 path = '{0}/fc'.format(self.storagedriver_partitions_caches[proxy_index].path)
@@ -397,8 +397,8 @@ class StorageDriverInstaller(object):
         vpool = self.vp_installer.vpool
         read_preferences = self.vp_installer.calculate_read_preferences()
         manifest_cache_size = 500 * 1024 ** 2
-        block_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_BLOCK]
-        fragment_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][StorageDriverConfiguration.CACHE_FRAGMENT]
+        block_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][CACHE_BLOCK]
+        fragment_cache_settings = vpool.metadata['caching_info'][self.storagedriver.storagerouter_guid][CACHE_FRAGMENT]
 
         # Obtain all arakoon configurations for each Backend (main, block cache, fragment cache)
         arakoon_data = {'abm': VPoolShared.retrieve_local_alba_arakoon_config(vpool.metadata['backend']['backend_info']['alba_backend_guid'])}
@@ -466,7 +466,7 @@ class StorageDriverInstaller(object):
 
         fs_config = FileSystemConfig(dtl_mode=self.dtl_mode)
 
-        backend_connection_config = BackendConnectionManager(vpool=vpool, storagedriver=self.storagedriver)
+        backend_connection_config = BackendConnectionManager(preset=vpool.metadata['backend']['backend_info']['preset'], alba_proxies=self.storagedriver.alba_proxies)
 
         whole_config = StorageDriverConfig(vrouter_cluster_id=vpool.guid,
                                            dtl_config=dtl_config,
@@ -480,7 +480,7 @@ class StorageDriverInstaller(object):
                                            backend_config=backend_connection_config)
 
         storagedriver_config = StorageDriverConfiguration(vpool.guid, self.storagedriver.storagedriver_id)
-        storagedriver_config.configuration = whole_config.to_dict()
+        storagedriver_config.configuration = whole_config
         storagedriver_config.save(client=self.sr_installer.root_client)
 
     def start_services(self):
