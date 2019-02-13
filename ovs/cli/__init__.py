@@ -23,11 +23,8 @@ Thus we have to import controllers whenever we invoke a command :(
 """
 from __future__ import absolute_import
 
-import os
-# All CLI commands should output logging to the file to avoid cluttering
-os.environ['OVS_LOGTYPE_OVERRIDE'] = 'file'
-
 import click
+import logging.config
 from .setup import setup_group
 from .config import config_group
 from .misc import collect_logs, version_command
@@ -44,7 +41,17 @@ from IPython import embed
 @click.group(name='ovs', help='Open the OVS python shell or run an ovs command', invoke_without_command=True, cls=OVSCLI)
 @click.pass_context
 def ovs(ctx):
+    # @todo configure logging for both file and console
     if ctx.invoked_subcommand is None:
+        # Avoid import side effects
+        # @todo might be better to let ipython this
+        # Ipython steps:
+        # file: ~/.ipython/profile_default/ipython_config.py
+        # if file does not exist:
+        # ipython profile create
+        # Set ipython_exec_lines = ['import logging.config', 'from ovs.extensions.log import get_log_config_shells', 'logging.config.dictConfig(get_log_config_shells())']
+        from ovs.extensions.log import get_log_config_shells
+        logging.config.dictConfig(get_log_config_shells())
         embed()
     # Documentation purposes:
     # else:
