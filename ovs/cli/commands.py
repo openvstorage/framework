@@ -31,20 +31,20 @@ def configure_cli_logging(unittest_mode=False):
     """
     Configure the logging when running the ovs cli
     Makes everything log to 'ovs_cli.log' when not running unittests
+    Has to be called explicitely when using ctx.invoked_subcommand is None in groups!
     """
     # Avoid side effects from importing. Keep the volumedriver singletons mocked when unittesting
-    from ovs.extensions.log import LOG_CONFIG_BASE, OVS_FORMATTER_NAME, configure_volumedriver_logger, get_logging_info
+    from ovs.extensions.log import LOG_CONFIG_BASE, OVS_FORMATTER_NAME, configure_volumedriver_logger, get_logging_info, get_file_logging_config, LOGGER_FILE_MAP_ALWAYS_FILE
 
     cli_handler_name = 'cli_handler'
 
     log_info = get_logging_info()
-    logger_root_config = {'handlers': [cli_handler_name],
-                          'level': log_info.level}
-    # Configure the root logger
-    LOG_CONFIG_BASE['loggers'][''] = logger_root_config
+
     # Setup the handler. Re-uses the ovs formatter
     cli_log_path = None
     handler_config = {'formatter': OVS_FORMATTER_NAME}
+    new_handlers = {}
+    new_loggers = {}
     if unittest_mode:
         # Attach a nullhandler. Suppress all logging
         handler_config.update({'class': 'logging.NullHandler'})
@@ -52,10 +52,19 @@ def configure_cli_logging(unittest_mode=False):
         cli_log_path = os.path.join(LOG_PATH, 'ovs_cli.log')
         handler_config.update({'class': 'logging.FileHandler',
                                'filename': os.path.join(LOG_PATH, 'ovs_cli.log')})
+        # Add special cases
+        new_handlers, new_loggers = get_file_logging_config(log_info, LOGGER_FILE_MAP_ALWAYS_FILE.keys())
+
+    # Configure the root logger
+    loggers = {'': {'handlers': [cli_handler_name], 'level': log_info.level}}
+    handlers = {cli_handler_name: handler_config}
+
+    loggers.update(new_loggers)
+    handlers.update(new_handlers)
 
     logger_config = copy.deepcopy(LOG_CONFIG_BASE)
-    logger_config['loggers'][''] = logger_root_config
-    logger_config['handlers'] = {cli_handler_name: handler_config}
+    logger_config['loggers'].update(loggers)
+    logger_config['handlers'].update(handlers)
 
     logging.config.dictConfig(logger_config)
 
@@ -80,6 +89,9 @@ class UnittestCommand(_OVSCommand):
             # Log the start of the command with the current time
             logger.info('Starting command: {0}'.format(ctx.command_path))
             super(UnittestCommand, self).invoke(ctx)
+        except:
+            logger.exception('Exception during {0}'.format(ctx.command_path))
+            raise
         finally:
             disable_unittest_mode()
 
@@ -95,8 +107,11 @@ class OVSCommand(_OVSCommand):
         """
         Invoke the command
         """
-        configure_cli_logging()
-        # Log the start of the command with the current time
-        logger.info('Starting command: {0}'.format(ctx.command_path))
-
-        super(OVSCommand, self).invoke(ctx)
+        try:
+            configure_cli_logging()
+            # Log the start of the command with the current time
+            logger.info('Starting command: {0}'.format(ctx.command_path))
+            super(OVSCommand, self).invoke(ctx)
+        except:
+            logger.exception('Exception during {0}'.format(ctx.command_path))
+            raise

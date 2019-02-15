@@ -36,7 +36,7 @@ from kombu.serialization import register
 from threading import Thread
 from ovs_extensions.constants import is_unittest_mode
 from ovs.constants.logging import CELERY_RUN_LOGGER, OVS_LOGGER
-from ovs.extensions.log import configure_logging
+from ovs.extensions.log import configure_logging, get_ovs_streamhandler
 from ovs.extensions.celery.extendedyaml import YamlExtender
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
@@ -201,10 +201,9 @@ def load_ovs_logger(**kwargs):
     # Setting it up in this hook means that celery is still starting up. This avoids configuring it once more
     # if the celery_run is imported
     configure_logging()
-    # The celery logger inherits from the ovs logger. Let's fetch that one first
-    ovs_main_logger = logging.getLogger(OVS_LOGGER)
+    # Setup a stream handler logger
     if 'logger' in kwargs:
-        kwargs['logger'].handlers = [ovs_main_logger.handlers[0]]  # Overrule the default celery handlers with OVSes custom handler
+        kwargs['logger'].handlers = [get_ovs_streamhandler()]  # Overrule the default celery handlers with OVSes custom handler
 
 
 def _clean_cache():

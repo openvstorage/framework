@@ -21,9 +21,9 @@ import copy
 import logging
 import requests
 import logging.config
-from ovs.constants.logging import LOGGER_FILE_MAP, UPDATE_LOGGER, CORE_LOGGERS, VOLUMEDRIVER_CLIENT_LOG_PATH, OVS_SHELL_LOG_PATH
+from ovs.constants.logging import LOGGER_FILE_MAP, LOGGER_FILE_MAP_ALWAYS_FILE, CORE_LOGGERS, VOLUMEDRIVER_CLIENT_LOG_PATH, OVS_SHELL_LOG_PATH
 from ovs_extensions.constants.logging import TARGET_TYPES, TARGET_TYPE_REDIS, TARGET_TYPE_CONSOLE, TARGET_TYPE_FILE
-from ovs_extensions.log import OVS_FORMATTER_CONFIG
+from ovs_extensions.log import OVS_FORMATTER_CONFIG, LogFormatter, LOG_FORMAT
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonException
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 try:
@@ -137,9 +137,10 @@ def get_logging_info():
     :rtype: dict
     """
     try:
-        return LogInfoContainer(**Configuration.get('/ovs/framework/logging'))
+        configuration = Configuration.get('/ovs/framework/logging')
     except (IOError, NotFoundException, ArakoonException):
-        return LogInfoContainer()
+        configuration = {}
+    return LogInfoContainer(**configuration)
 
 
 def get_file_logging_config(log_info, logger_names=None):
@@ -165,7 +166,9 @@ def get_file_logging_config(log_info, logger_names=None):
         handlers[log_handler_name] = {'class': 'logging.FileHandler',
                                       'formatter': OVS_FORMATTER_NAME,
                                       'filename': log_file_path}
-        logger_config = {'handlers': [log_handler_name], 'propagate': True}
+        # Non root loggers will propagate and creat duplicate logs within the root loggers file
+        # Currently the case as the console logging should both output to file and the console for the special loggers
+        logger_config = {'handlers': [log_handler_name], 'propagate': True, 'level': log_info.level}
         loggers[logger_name] = logger_config
 
     return handlers, loggers
@@ -193,7 +196,7 @@ def get_redis_logging_config(log_info):
                                    'queue': logging_queue,
                                    'client': Redis(host=log_info.redis_log_container.host,
                                                    port=log_info.redis_log_container.port)}
-    logger_config = {'handlers': [OVS_REDIS_HANDLER], 'propagate': True}
+    logger_config = {'handlers': [OVS_REDIS_HANDLER], 'propagate': True, 'level': log_info.level}
 
     # Reconfigure the loggers
     for logger_name in CORE_LOGGERS:
@@ -208,6 +211,8 @@ def get_log_config():
     Retrieve the log config as the user configured it in the config management
     Generating the config completely instead of reconfiguring the loggers after the default config was applied
     Reconfiguration would require handlers to be removed and would be more of a hassle
+    Note: loggers pass log records both to own handlers and to parent logger objects when propagating
+    See: https://docs.python.org/2/howto/logging.html#logging-flow
     :return: The log config
     :rtype: dict
     """
@@ -230,7 +235,7 @@ def get_log_config():
         new_handlers, new_loggers = get_redis_logging_config(log_info)
     elif log_info.log_type == TARGET_TYPE_CONSOLE:
         # Always make sure that the update logger logs to a file
-        new_handlers, new_loggers = get_file_logging_config(log_info, [UPDATE_LOGGER])
+        new_handlers, new_loggers = get_file_logging_config(log_info, LOGGER_FILE_MAP_ALWAYS_FILE.keys())
 
     handlers.update(new_handlers)
     loggers.update(new_loggers)
@@ -269,6 +274,18 @@ def get_log_config_shells(log_path=OVS_SHELL_LOG_PATH):
     logger_config['handlers'].update(handlers)
 
     return logger_config
+
+
+def get_ovs_streamhandler():
+    # type: () -> logging.StreamHandler
+    """
+    Build an ovs streamhandler. Used for logging to console in process bound code
+    :return: A streamhandler
+    """
+    formatter = LogFormatter(LOG_FORMAT)
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    return handler
 
 
 def configure_logging(configure_volumedriver_logging=True):

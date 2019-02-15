@@ -1,4 +1,4 @@
-# Copyright (C) 2016 iNuron NV
+# Copyright (C) 2019 iNuron NV
 #
 # This file is part of Open vStorage Open Source Edition (OSE),
 # as available from
@@ -14,7 +14,11 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-"""
-This package contains all OVS python logic
-This directory is used for dynamical loading using imp. This means that it won't be able to resolve
-"""
+COMMAND_PROFILE_LOCATE = ['ipython', 'locate', 'profile']
+COMMAND_PROFILE_CREATE = ['ipython', 'profile', 'create']
+
+CONFIG_FILE_NAME = 'ipython_config.py'
+LOGGING_EXEC_LINES = ['import logging.config',
+                      'from ovs.extensions.log import get_log_config_shells',
+                      'logging.config.dictConfig(get_log_config_shells())']
+LOGGING_EXEC_LINES_CONFIG = 'c.InteractiveShellApp.exec_lines = {}\n'.format(LOGGING_EXEC_LINES)

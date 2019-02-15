@@ -15,21 +15,24 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import click
+from ..commands import OVSCommand
+
+extra_options = {'cls': OVSCommand}
 
 
-@click.command('mds', help='Watch Open vStorage MDS clusters for all vPools per StorageRouter')
+@click.command('mds', help='Watch Open vStorage MDS clusters for all vPools per StorageRouter', **extra_options)
 def mds():
     from ovs.lib.mdsservice import MDSServiceController
     MDSServiceController.monitor_mds_layout()
 
 
-@click.command('services', help='Watch Open vStorage services')
+@click.command('services', help='Watch Open vStorage services', **extra_options)
 def services():
     from ovs.extensions.services.servicefactory import ServiceFactory
     ServiceFactory.get_manager().monitor_services()
 
 
-@click.command('heartbeat', help='Send an internal heartbeat')
+@click.command('heartbeat', help='Send an internal heartbeat', **extra_options)
 def heartbeat():
     from ovs.extensions.generic.heartbeat import HeartBeat
     HeartBeat.pulse()

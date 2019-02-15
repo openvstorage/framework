@@ -16,7 +16,7 @@
 
 import click
 from .misc import collect_logs as _collect_logs
-from ovs_extensions.cli.commands import OVSGroup, OVSCommand
+from ..commands import OVSCommand
 
 
 extra_options = {'section_header':'Miscellaneous',

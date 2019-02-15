@@ -43,13 +43,7 @@ from IPython import embed
 def ovs(ctx):
     # @todo configure logging for both file and console
     if ctx.invoked_subcommand is None:
-        # Avoid import side effects
-        # @todo might be better to let ipython this
-        # Ipython steps:
-        # file: ~/.ipython/profile_default/ipython_config.py
-        # if file does not exist:
-        # ipython profile create
-        # Set ipython_exec_lines = ['import logging.config', 'from ovs.extensions.log import get_log_config_shells', 'logging.config.dictConfig(get_log_config_shells())']
+        # Configuring logging is not necessary here. It will invoke the ipython shell which is configured.
         from ovs.extensions.log import get_log_config_shells
         logging.config.dictConfig(get_log_config_shells())
         embed()
