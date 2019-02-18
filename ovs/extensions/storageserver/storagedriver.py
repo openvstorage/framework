@@ -21,10 +21,13 @@ Wrapper class for the storagedriver client of the voldrv team
 import copy
 import logging
 from ovs_extensions.constants import is_unittest_mode
+from ovs.constants.storagedriver import VOLDRV_DTL_SYNC, VOLDRV_DTL_ASYNC, VOLDRV_DTL_TRANSPORT_TCP, VOLDRV_DTL_TRANSPORT_RSOCKET, \
+    FRAMEWORK_DTL_SYNC, FRAMEWORK_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, FRAMEWORK_DTL_TRANSPORT_TCP, FRAMEWORK_DTL_TRANSPORT_RSOCKET
 from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.remote import remote
+from ovs.extensions.storageserver.storagedriverconfig import StorageDriverConfig
 
 # Import below classes so the rest of the framework can always import from this module:
 # * We can inject mocks easier without having to make changes everywhere
@@ -34,10 +37,11 @@ from ovs_extensions.generic.remote import remote
 from volumedriver.storagerouter.storagerouterclient import \
     ClusterContact, ClusterNodeConfig, ClusterNotReachableException, \
     DTLConfig, DTLConfigMode, DTLMode, Logger, \
-    MaxRedirectsExceededException, MDSMetaDataBackendConfig,  MDSNodeConfig, \
+    MaxRedirectsExceededException, MDSMetaDataBackendConfig, MDSNodeConfig, \
     ObjectNotFoundException as SRCObjectNotFoundException, \
     ReadCacheBehaviour, ReadCacheMode, SnapshotNotFoundException, \
     Role, Severity, Statistics, VolumeInfo
+
 try:
     from volumedriver.storagerouter.storagerouterclient import VolumeRestartInProgressException
 except ImportError:
@@ -52,11 +56,11 @@ else:
     from volumedriver.storagerouter.storagerouterclient import \
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
         MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient
+
     try:
         from volumedriver.storagerouter.storagerouterclient import FileSystemMetaDataClient
     except ImportError:
         FileSystemMetaDataClient = None
-
 
 LOG_LEVEL_MAPPING = {0: Severity.debug,
                      10: Severity.debug,
@@ -84,19 +88,6 @@ class StorageDriverClient(object):
     """
     Client to access storagedriver client
     """
-
-    VOLDRV_DTL_SYNC = 'Synchronous'
-    VOLDRV_DTL_ASYNC = 'Asynchronous'
-    VOLDRV_DTL_MANUAL_MODE = 'Manual'
-    VOLDRV_DTL_AUTOMATIC_MODE = 'Automatic'
-    VOLDRV_DTL_TRANSPORT_TCP = 'TCP'
-    VOLDRV_DTL_TRANSPORT_RSOCKET = 'RSocket'
-
-    FRAMEWORK_DTL_SYNC = 'sync'
-    FRAMEWORK_DTL_ASYNC = 'a_sync'
-    FRAMEWORK_DTL_NO_SYNC = 'no_sync'
-    FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
-    FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
 
     VDISK_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: DTLMode.SYNCHRONOUS,
                           FRAMEWORK_DTL_ASYNC: DTLMode.ASYNCHRONOUS,
@@ -167,6 +158,7 @@ class ObjectRegistryClient(object):
     """
     Client to access the object registry
     """
+
     def __init__(self):
         """
         Dummy init method
@@ -241,6 +233,7 @@ class ClusterRegistryClient(object):
     """
     Builds a CRClient
     """
+
     def __init__(self):
         """
         Dummy init method
@@ -272,6 +265,7 @@ class FSMetaDataClient(object):
     """
     Builds a FileSystemMetaDataClient
     """
+
     def __init__(self):
         """
         Dummy init method
@@ -312,22 +306,23 @@ class StorageDriverConfiguration(object):
     _logger = logging.getLogger(__name__)
 
     def __init__(self, vpool_guid, storagedriver_id):
+        # type: (str, str) -> None
         """
         Initializes the class
         """
 
         self._key = HOSTS_CONFIG_PATH.format(vpool_guid, storagedriver_id)
-        self._dirty_entries = []
 
         self.remote_path = Configuration.get_configuration_path(self._key).strip('/')
         # Load configuration
         if Configuration.exists(self._key):
-            self.configuration = Configuration.get(self._key)
+            self.configuration = StorageDriverConfig.from_dict(Configuration.get(self._key))  # type: StorageDriverConfig
             self.config_missing = False
         else:
-            self.configuration = {}
+            self.configuration = None  # type: StorageDriverConfig
             self.config_missing = True
             self._logger.debug('Could not find config {0}, a new one will be created'.format(self._key))
+        self._initial_config = copy.deepcopy(self.configuration)
 
     def save(self, client=None, force_reload=False):
         """
@@ -340,86 +335,50 @@ class StorageDriverConfiguration(object):
         :rtype: list
         """
         changes = []
-        Configuration.set(self._key, self.configuration)
+        if not self.configuration:
+            raise RuntimeError('Configuration for path {0} has not been configured yet'.format(self.remote_path))
+        exported_config = self.configuration.to_dict()
+        Configuration.set(self._key, exported_config)
 
         # No changes detected in the configuration management
-        if len(self._dirty_entries) == 0 and force_reload is False:
+        no_changes = self._initial_config == exported_config
+        if no_changes and not force_reload:
             self._logger.debug('No need to apply changes, nothing changed')
             self.config_missing = False
             return changes
 
         # Retrieve the changes from volumedriver
         self._logger.info('Applying local storagedriver configuration changes{0}'.format('' if client is None else ' on {0}'.format(client.ip)))
-        reloaded = False
         try:
-            if client is None:
+            if not client:
                 changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
             else:
                 with remote(client.ip, [LocalStorageRouterClient]) as rem:
                     changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
-            reloaded = True
         except Exception as exception:
             if not is_connection_failure(exception):
                 raise
 
         # No changes
         if len(changes) == 0:
-            if reloaded is True:
-                if len(self._dirty_entries) > 0:
-                    self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self._dirty_entries)))
-            else:
-                self._logger.warning('Changes were not applied since StorageDriver is unavailable')
             self.config_missing = False
-            self._dirty_entries = []
             return changes
 
         # Verify the output of the changes and log them
         for change in changes:
             if not isinstance(change, dict):
                 raise RuntimeError('Unexpected update_configuration output')
-            if 'param_name' not in change or 'old_value' not in change or 'new_value' not in change:
+            mandatory_change_keys = ['param_name', 'old_value', 'new_value']
+            if any([key not in change for key in mandatory_change_keys]):
                 raise RuntimeError('Unexpected update_configuration output. Expected different keys, but got {0}'.format(', '.join(change.keys())))
 
             param_name = change['param_name']
-            if force_reload is False:
-                if param_name not in self._dirty_entries:
-                    raise RuntimeError('Unexpected configuration change: {0}'.format(param_name))
-                self._dirty_entries.remove(param_name)
             self._logger.info('Changed {0} from "{1}" to "{2}"'.format(param_name, change['old_value'], change['new_value']))
         self._logger.info('Changes applied')
-        if len(self._dirty_entries) > 0:
-            self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self._dirty_entries)))
         self.config_missing = False
-        self._dirty_entries = []
+        self._initial_config = exported_config
         return changes
 
-    def __getattr__(self, item):
-        from ovs_extensions.generic.toolbox import ExtensionsToolbox
-
-        if item.startswith('configure_'):
-            section = ExtensionsToolbox.remove_prefix(item, 'configure_')
-            return lambda **kwargs: self._add(section, **kwargs)
-        if item.startswith('clear_'):
-            section = ExtensionsToolbox.remove_prefix(item, 'clear_')
-            return lambda: self._delete(section)
-
-    def _add(self, section, **kwargs):
-        """
-        Configures a section
-        """
-        for item, value in kwargs.iteritems():
-            if section not in self.configuration:
-                self.configuration[section] = {}
-            if item not in self.configuration[section] or self.configuration[section][item] != value:
-                self._dirty_entries.append(item)
-            self.configuration[section][item] = value
-
-    def _delete(self, section):
-        """
-        Removes a section from the configuration
-        """
-        if section in self.configuration:
-            del self.configuration[section]
 
 
 def is_connection_failure(exception):

@@ -20,6 +20,8 @@ VPoolController class responsible for making changes to existing vPools
 
 import time
 import logging
+from ovs.constants.storagedriver import CACHE_BLOCK, CACHE_FRAGMENT
+from ovs.constants.vpool import STATUS_SHRINKING, STATUS_DELETING, STATUS_RUNNING
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -28,10 +30,10 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.api.client import OVSClient
 from ovs_extensions.constants.arakoon import ARAKOON_ABM_CONFIG
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, PROXY_CONFIG_PATH, HOSTS_CONFIG_PATH, VPOOL_BASE_PATH
-from ovs_extensions.api.client import OVSClient
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.remote import remote
@@ -97,11 +99,11 @@ class VPoolController(object):
                                               configurations={'storage_ip': parameters.get('storage_ip'),
                                                               'caching_info': parameters.get('caching_info'),
                                                               'backend_info': {'main': parameters.get('backend_info'),
-                                                                               StorageDriverConfiguration.CACHE_BLOCK: parameters.get('backend_info_bc'),
-                                                                               StorageDriverConfiguration.CACHE_FRAGMENT: parameters.get('backend_info_fc')},
+                                                                               CACHE_BLOCK: parameters.get('backend_info_bc'),
+                                                                               CACHE_FRAGMENT: parameters.get('backend_info_fc')},
                                                               'connection_info': {'main': parameters.get('connection_info'),
-                                                                                  StorageDriverConfiguration.CACHE_BLOCK: parameters.get('connection_info_bc'),
-                                                                                  StorageDriverConfiguration.CACHE_FRAGMENT: parameters.get('connection_info_fc')},
+                                                                                  CACHE_BLOCK: parameters.get('connection_info_bc'),
+                                                                                  CACHE_FRAGMENT: parameters.get('connection_info_fc')},
                                                               'sd_configuration': parameters.get('config_params')})
 
         partitions_mutex = volatile_mutex('add_vpool_partitions_{0}'.format(storagerouter.guid))
@@ -143,7 +145,7 @@ class VPoolController(object):
         except Exception:
             cls._logger.exception('Something went wrong during the validation or modeling of vPool {0} on StorageRouter {1}'.format(vp_installer.name, storagerouter.name))
             partitions_mutex.release()
-            vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
+            vp_installer.revert_vpool(status=STATUS_RUNNING)
             raise
 
         # Arakoon setup
@@ -154,12 +156,12 @@ class VPoolController(object):
                     break
             except Exception:
                 cls._logger.exception('Arakoon checkup for voldrv cluster failed')
-                vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
+                vp_installer.revert_vpool(status=STATUS_RUNNING)
                 raise
             counter += 1
             time.sleep(1)
             if counter == 300:
-                vp_installer.revert_vpool(status=VPool.STATUSES.RUNNING)
+                vp_installer.revert_vpool(status=STATUS_RUNNING)
                 raise RuntimeError('Arakoon checkup for the StorageDriver cluster could not be started')
 
         # Cluster registry
@@ -186,7 +188,7 @@ class VPoolController(object):
                     if storagedriver_config.config_missing is False:
                         # Filesystem section in StorageDriver configuration are all parameters used for vDisks created directly on the filesystem
                         # So when a vDisk gets created on the filesystem, these MDSes will be assigned to them
-                        storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
+                        storagedriver_config.configuration.filesystem_config.fs_metadata_backend_mds_nodes = mds_config_set[sr.guid]
                         storagedriver_config.save(client=clients['ovs'])
 
             # Everything's reconfigured, refresh new cluster configuration
@@ -205,12 +207,11 @@ class VPoolController(object):
             VDiskController.dtl_checkup(vpool_guid=vp_installer.vpool.guid, ensure_single_timeout=600)
         except:
             pass
-        for vdisk in vp_installer.vpool.vdisks:
-            try:
-                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
-            except:
-                pass
-        vp_installer.update_status(status=VPool.STATUSES.RUNNING)
+        try:
+            MDSServiceController.mds_checkup_single(vp_installer.vpool.guid)
+        except:
+            pass
+        vp_installer.update_status(status=STATUS_RUNNING)
         cls._logger.info('Add vPool {0} ended successfully'.format(vp_installer.name))
 
     # @classmethod
@@ -288,9 +289,9 @@ class VPoolController(object):
 
         # Start removal
         if vp_installer.storagedriver_amount > 1:
-            vp_installer.update_status(status=VPool.STATUSES.SHRINKING)
+            vp_installer.update_status(status=STATUS_SHRINKING)
         else:
-            vp_installer.update_status(status=VPool.STATUSES.DELETING)
+            vp_installer.update_status(status=STATUS_DELETING)
 
         # Clean up stale vDisks
         cls._logger.info('StorageDriver {0} - Removing stale vDisks'.format(storagedriver.guid))
@@ -326,8 +327,8 @@ class VPoolController(object):
                 vdisks.append(vdisk)
                 cls._logger.critical('StorageDriver {0} - vDisk {1} {2} - MDS Services have not been migrated away'.format(storagedriver.guid, vdisk.guid, vdisk.name))
         if len(vdisks) > 0:
-            # Put back in RUNNING, so it can be used again. Errors keep on displaying in GUI now anyway
-            vp_installer.update_status(status=VPool.STATUSES.RUNNING)
+            # Put back in STATUS_RUNNING, so it can be used again. Errors keep on displaying in GUI now anyway
+            vp_installer.update_status(status=STATUS_RUNNING)
             raise RuntimeError('Not all MDS Services have been successfully migrated away')
 
         # Start with actual removal
@@ -359,6 +360,12 @@ class VPoolController(object):
                 VDiskController.dtl_checkup(vpool_guid=vp_installer.vpool.guid, ensure_single_timeout=600)
             except Exception:
                 cls._logger.exception('StorageDriver {0} - DTL checkup failed for vPool {1} with guid {2}'.format(storagedriver.guid, vp_installer.name, vp_installer.vpool.guid))
+            StorageRouterController._logger.info('Remove StorageDriver - Guid {0} - Running MDS checkup'.format(storagedriver.guid))
+            try:
+                MDSServiceController.mds_checkup_single(vp_installer.vpool.guid)
+            except Exception:
+                StorageRouterController._logger.exception('Remove StorageDriver - Guid {0} - MDS checkup failed'.format(storagedriver.guid))
+
         else:
             cls._logger.info('StorageDriver {0} - Removing vPool from model'.format(storagedriver.guid))
             # Clean up model
@@ -369,12 +376,6 @@ class VPoolController(object):
                 cls._logger.exception('StorageDriver {0} - Cleaning up vPool from the model failed'.format(storagedriver.guid))
             Configuration.delete(VPOOL_BASE_PATH.format(vp_installer.vpool.guid))
 
-        cls._logger.info('StorageDriver {0} - Running MDS checkup'.format(storagedriver.guid))
-        try:
-            MDSServiceController.mds_checkup()
-        except Exception:
-            cls._logger.exception('StorageDriver {0} - MDS checkup failed'.format(storagedriver.guid))
-
         # Update vPool status
         if errors_found is True:
             if vp_installer.storagedriver_amount > 1:
@@ -382,7 +383,7 @@ class VPoolController(object):
             raise RuntimeError('1 or more errors occurred while trying to remove the StorageDriver. Please check the logs for more information')
 
         if vp_installer.storagedriver_amount > 1:
-            vp_installer.update_status(status=VPool.STATUSES.RUNNING)
+            vp_installer.update_status(status=STATUS_RUNNING)
         cls._logger.info('StorageDriver {0} - Deleted StorageDriver {1}'.format(storagedriver.guid, storagedriver.name))
 
         if len(VPoolList.get_vpools()) == 0:

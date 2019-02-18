@@ -40,12 +40,11 @@ from ovs.extensions.log import configure_logging, get_ovs_streamhandler
 from ovs.extensions.celery.extendedyaml import YamlExtender
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs_extensions.storage.exceptions import KeyNotFoundException
-from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.messaging import MessageController
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.storage.exceptions import KeyNotFoundException
 
 
 class CeleryMockup(object):
@@ -62,7 +61,7 @@ class CeleryMockup(object):
         def _wrapper(func):
             def _wrapped(*arguments, **kwarguments):
                 _ = arguments, kwarguments
-                if 'bind' in kwargs:
+                if kwargs.get('bind'):
                     return func(type('Task', (), {'request': type('Request', (), {'id': None})}), *arguments, **kwarguments)
                 return func(*arguments, **kwarguments)
 
@@ -206,34 +205,74 @@ def load_ovs_logger(**kwargs):
         kwargs['logger'].handlers = [get_ovs_streamhandler()]  # Overrule the default celery handlers with OVSes custom handler
 
 
-def _clean_cache():
-    ovs_logger.info('Executing celery "clear_cache" startup script...')
+def _get_registration_update_transaction():
+    """
+    Gets the transaction to execute
+    - Checks if the current task registrations are still active
+    - All registrations that can be discarded will be discarded
+    - If no active registrations are found, the task registration key will get removed
+    :return: Transaction guid
+    :rtype: str
+    """
     from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
+
     active = inspect().active()
-    active_tasks = []
-    if active is not None:
+    active_task_ids = []
+    # Retrieve active tasks from celery
+    if active:
         for tasks in active.itervalues():
-            active_tasks += [task['id'] for task in tasks]
-    cache = PersistentFactory.get_client()
-    for key in cache.prefix(ENSURE_SINGLE_KEY):
+            active_task_ids += [task['id'] for task in tasks]
+
+    persistent = PersistentFactory.get_client()
+    transaction = persistent.begin_transaction()
+
+    for key in persistent.prefix(ENSURE_SINGLE_KEY):
+        # Yield task registration keys which are <ensure_single_key>_<task_name>_<ensure_single_mode>
         try:
-            with volatile_mutex(name=key, wait=5):
-                entry = cache.get(key)
-                values = entry.get('values', [])
-                new_values = []
-                for v in values:
-                    task_id = v.get('task_id')
-                    if task_id is not None and task_id in active_tasks:
-                        new_values.append(v)
-                if len(new_values) > 0:
-                    entry['values'] = new_values
-                    cache.set(key, entry)
-                    ovs_logger.info('Updated key {0}'.format(key))
-                else:
-                    cache.delete(key)
-                    ovs_logger.info('Deleted key {0}'.format(key))
+            initial_registrations = persistent.get(key)
+            if not initial_registrations:
+                continue
+            # Filter out all the tasks are are no longer running within celery
+            # @todo might be better to do in update code?
+            # Transition from dict to list. Key must also change
+            if isinstance(initial_registrations, dict):
+                mode = initial_registrations['mode']
+                registrations = initial_registrations['values']
+                key_to_save = '{0}_{1}'.format(key, mode.lower())
+            else:
+                registrations = initial_registrations
+                key_to_save = key
+
+            running_registrations = []
+            for registration in registrations:
+                task_id = registration.get('task_id')
+                if task_id and task_id in active_task_ids:
+                    running_registrations.append(registration)
+            if running_registrations:
+                if running_registrations == registrations:
+                    # No changes required to be made
+                    continue
+                persistent.assert_value(key, initial_registrations, transaction=transaction)
+                if key_to_save != key:
+                    # Delete the old key
+                    persistent.delete(key, transaction=transaction)
+                persistent.set(key_to_save, running_registrations, transaction=transaction)
+                ovs_logger.info('Updating key {0}'.format(key))
+            elif not running_registrations:
+                persistent.assert_value(key, initial_registrations, transaction=transaction)
+                persistent.delete(key, transaction=transaction)
+                ovs_logger.info('Deleting key {0}'.format(key))
         except KeyNotFoundException:
             pass
+    return transaction
+
+
+def _clean_cache():
+
+    ovs_logger.info('Executing celery "clear_cache" startup script...')
+    persistent = PersistentFactory.get_client()
+
+    persistent.apply_callback_transaction(_get_registration_update_transaction, max_retries=5)
     ovs_logger.info('Executing celery "clear_cache" startup script... done')
 
 

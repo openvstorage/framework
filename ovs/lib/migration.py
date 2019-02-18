@@ -23,6 +23,7 @@ import copy
 import json
 import logging
 from ovs.constants.logging import UPDATE_LOGGER
+from ovs.extensions.storageserver.storagedriverconfig import AlbaConnectionConfig
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 
@@ -53,6 +54,7 @@ class MigrationController(object):
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.dal.lists.vpoollist import VPoolList
         from ovs_extensions.api.client import OVSClient
+        from ovs.constants.storagedriver import CACHE_BLOCK, CACHE_FRAGMENT
         from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
         from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI, REMOTE_CONFIG_BACKEND_BASE
         from ovs_extensions.constants.vpools import PROXY_CONFIG_MAIN, PROXY_CONFIG_PATH, GENERIC_SCRUB
@@ -170,14 +172,14 @@ class MigrationController(object):
                 proxy_config_key = PROXY_CONFIG_MAIN.format(vpool.guid, alba_proxy.guid)
                 proxy_config = None if Configuration.exists(key=proxy_config_key) is False else Configuration.get(proxy_config_key)
                 if proxy_config is not None:
-                    fragment_cache = proxy_config.get(StorageDriverConfiguration.CACHE_FRAGMENT, ['none', {}])
+                    fragment_cache = proxy_config.get(CACHE_FRAGMENT, ['none', {}])
                     if fragment_cache[0] == 'alba' and fragment_cache[1].get('cache_on_write') is True:  # Accelerated ALBA configured
                         fragment_cache_scrub_info = copy.deepcopy(fragment_cache)
                         fragment_cache_scrub_info[1]['cache_on_read'] = False
                         proxy_scrub_config_key = GENERIC_SCRUB.format(vpool.guid)
                         proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
-                        if proxy_scrub_config is not None and proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] == ['none']:
-                            proxy_scrub_config[StorageDriverConfiguration.CACHE_FRAGMENT] = fragment_cache_scrub_info
+                        if proxy_scrub_config is not None and proxy_scrub_config[CACHE_FRAGMENT] == ['none']:
+                            proxy_scrub_config[CACHE_FRAGMENT] = fragment_cache_scrub_info
                             Configuration.set(key=proxy_scrub_config_key, value=proxy_scrub_config)
 
             # Update 'backend_connection_manager' section
@@ -186,17 +188,14 @@ class MigrationController(object):
             if 'backend_connection_manager' not in storagedriver_config.configuration:
                 continue
 
-            current_config = storagedriver_config.configuration['backend_connection_manager']
-            if current_config.get('backend_type') != 'MULTI':
+            current_config = storagedriver_config.configuration.backend_config
+            if current_config.backend_type != 'MULTI':
                 changes = True
                 backend_connection_manager = {'backend_type': 'MULTI'}
                 for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
-                    backend_connection_manager[str(index)] = copy.deepcopy(current_config)
-                    # noinspection PyUnresolvedReferences
-                    backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
-                    # noinspection PyUnresolvedReferences
-                    backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 5000
-                    # noinspection PyUnresolvedReferences
+                    alba_config = AlbaConnectionConfig(alba_connection_use_rora=True,
+                                  alba_connection_rora_manifest_cache_capacity=5000,
+                                  **current_config.to_dict()[str(index)])
                     for key, value in backend_connection_manager[str(index)].items():
                         if key.startswith('backend_interface'):
                             backend_connection_manager[key] = value
@@ -224,8 +223,7 @@ class MigrationController(object):
                         backend_connection_manager[key] = value
 
             if changes is True:
-                storagedriver_config.clear_backend_connection_manager()
-                storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
+                storagedriver_config.configuration.backend_config = current_config
                 storagedriver_config.save(root_client)
 
                 # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
@@ -282,11 +280,11 @@ class MigrationController(object):
                                                                     'port': None,
                                                                     'local': None}}
                                }
-            structure_map = {StorageDriverConfiguration.CACHE_BLOCK: {'read': 'block_cache_on_read',
+            structure_map = {CACHE_BLOCK: {'read': 'block_cache_on_read',
                                                                       'write': 'block_cache_on_write',
                                                                       'quota': 'quota_bc',
                                                                       'backend_prefix': 'backend_bc_{0}'},
-                             StorageDriverConfiguration.CACHE_FRAGMENT: {'read': 'fragment_cache_on_read',
+                             CACHE_FRAGMENT: {'read': 'fragment_cache_on_read',
                                                                          'write': 'fragment_cache_on_write',
                                                                          'quota': 'quota_fc',
                                                                          'backend_prefix': 'backend_aa_{0}'}}
@@ -360,7 +358,7 @@ class MigrationController(object):
             manifest_cache_size = 500 * 1024 * 1024
             if Configuration.exists(key=_proxy_config_key):
                 _proxy_config = Configuration.get(key=_proxy_config_key)
-                for cache_type in [StorageDriverConfiguration.CACHE_BLOCK, StorageDriverConfiguration.CACHE_FRAGMENT]:
+                for cache_type in [CACHE_BLOCK, CACHE_FRAGMENT]:
                     if cache_type in _proxy_config and _proxy_config[cache_type][0] == 'alba':
                         if _proxy_config[cache_type][1]['manifest_cache_size'] != manifest_cache_size:
                             updated = True
@@ -391,7 +389,7 @@ class MigrationController(object):
                 if 'backend_connection_manager' not in storagedriver_config.configuration:
                     continue
 
-                current_config = storagedriver_config.configuration['backend_connection_manager']
+                current_config = storagedriver_config.configuration.backend_config
                 for key, value in current_config.iteritems():
                     if key.isdigit() is True:
                         if value.get('alba_connection_asd_connection_pool_capacity') != 10:
@@ -405,8 +403,7 @@ class MigrationController(object):
                             value['alba_connection_rora_manifest_cache_capacity'] = 25000
 
                 if changes is True:
-                    storagedriver_config.clear_backend_connection_manager()
-                    storagedriver_config.configure_backend_connection_manager(**current_config)
+                    storagedriver_config.configuration.backend_config = current_config
                     storagedriver_config.save(root_client)
 
                     # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
@@ -708,7 +705,7 @@ class MigrationController(object):
                                 main_proxy_config['albamgr_cfg_url'] = Configuration.get_configuration_path(REMOTE_CONFIG_BACKEND_INI.format(main_backend_guid))
 
                             # Update caching info
-                            for cache_type in [StorageDriverConfiguration.CACHE_FRAGMENT, StorageDriverConfiguration.CACHE_BLOCK]:
+                            for cache_type in [CACHE_FRAGMENT, CACHE_BLOCK]:
                                 if storagerouter_info[cache_type]['is_backend']:
                                     backend_info = storagerouter_info[cache_type]['backend_info']
                                     # Make sure replacing config is present

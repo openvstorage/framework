@@ -28,7 +28,9 @@ import collections
 import logging
 from threading import Thread
 from ovs.dal.hybrids.diskpartition import DiskPartition
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -38,10 +40,17 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
+from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.helpers.mds.catchup import MDSCatchUp
 from ovs.lib.helpers.mds.safety import SafetyEnsurer
 from ovs.lib.helpers.mds.shared import MDSShared
 from ovs.lib.helpers.toolbox import Schedule
+
+
+class MDSCheckupEnsureSafetyFailures(Exception):
+    """
+    Raised when errors occur during an mds checkup for a single VPool
+    """
 
 
 class MDSServiceController(MDSShared):
@@ -101,7 +110,7 @@ class MDSServiceController(MDSShared):
             # Generate the correct section in the StorageDriver's configuration
             MDSServiceController._logger.info('StorageRouter {0} - vPool {1}: Configuring StorageDriver with MDS nodes: {2}'.format(storagerouter.name, vpool.name, mds_nodes))
             storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
-            storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
+            storagedriver_config.configuration.mds_config.mds_nodes=mds_nodes
             storagedriver_config.save(root_client)
 
         # Clean up model
@@ -137,23 +146,20 @@ class MDSServiceController(MDSShared):
                         raise
 
     @staticmethod
-    @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'CHAINED'})
-    def mds_checkup():
+    def _get_mds_information(vpools=None):
+        # type: (Optional[List[VPool]]) -> Tuple[collections.OrderedDict, List[StorageRouter]]
         """
-        Validates the current MDS setup/configuration and takes actions where required
-        Actions:
-            * Verify which StorageRouters are available
-            * Make mapping between vPools and its StorageRouters
-            * For each vPool make sure every StorageRouter has at least 1 MDS service with capacity available
-            * For each vPool retrieve the optimal configuration and store it for each StorageDriver
-            * For each vPool run an ensure safety for all vDisks
-        :raises RuntimeError: When ensure safety fails for any vDisk
-        :return: None
-        :rtype: NoneType
+        Retrieve a complete overview of all storagerouters and their mds layout
+        :param vpools: VPools to get the overview for
+        :type vpools: List[VPool]
+        :return: - An overview with the vpool as keys, storagerouter - client, services and storagedriver map
+                 - All storagerouters that were offline
+        :rtype: Tuple[collection.OrderedDict, List[StorageRouter]]
         """
-        MDSServiceController._logger.info('Started')
-
         # Verify StorageRouter availability
+        if vpools is None:
+            vpools = VPoolList.get_vpools()
+
         root_client_cache = {}
         storagerouters = StorageRouterList.get_storagerouters()
         storagerouters.sort(key=lambda _sr: ExtensionsToolbox.advanced_sort(element=_sr.ip, separator='.'))
@@ -170,7 +176,7 @@ class MDSServiceController(MDSShared):
 
         # Create mapping per vPool and its StorageRouters
         mds_dict = collections.OrderedDict()
-        for vpool in sorted(VPoolList.get_vpools(), key=lambda k: k.name):
+        for vpool in sorted(vpools, key=lambda k: k.name):
             MDSServiceController._logger.info('vPool {0}'.format(vpool.name))
             mds_dict[vpool] = {}
 
@@ -194,97 +200,164 @@ class MDSServiceController(MDSShared):
                                                       'storagedriver': None}
                 MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - Service on port {2}'.format(vpool.name, storagerouter.name, service.ports[0]))
                 mds_dict[vpool][storagerouter]['services'].append(mds_service)
+        return mds_dict, offline_nodes
 
-        failures = []
-        for vpool, storagerouter_info in mds_dict.iteritems():
-            # Make sure there's at least 1 MDS on every StorageRouter that's not overloaded
-            # Remove all MDS Services which have been manually marked for removal (by setting its capacity to 0)
-            max_load = Configuration.get('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)))
-            for storagerouter in sorted(storagerouter_info, key=lambda k: k.ip):
-                total_load = 0.0
-                root_client = mds_dict[vpool][storagerouter]['client']
-                mds_services = mds_dict[vpool][storagerouter]['services']
+    @staticmethod
+    @ovs_task(name='ovs.mds.mds_checkup_single', ensure_single_info={'mode': 'DEDUPED',
+                                                                     'ignore_arguments': ['mds_dict', 'offline_nodes']})
+    def mds_checkup_single(vpool_guid, mds_dict=None, offline_nodes=None):
+        # type: (str, collections.OrderedDict, List[StorageRouter]) -> None
+        """
+        Validates the current MDS setup/configuration and takes actions where required
+        Actions:
+            * Verify which StorageRouters are available
+            * Make mapping between vPools and its StorageRouters
+            * For each vPool make sure every StorageRouter has at least 1 MDS service with capacity available
+            * For each vPool retrieve the optimal configuration and store it for each StorageDriver
+            * For each vPool run an ensure safety for all vDisks
+        :param vpool_guid: Guid of the VPool to do the checkup for
+        :type vpool_guid: str
+        :param mds_dict: OrderedDict containing all mds related information
+        :type mds_dict: collections.OrderedDict
+        :param offline_nodes: Nodes that are marked as unreachable
+        :type offline_nodes: List[StorageRouter]
+        :raises RuntimeError: When ensure safety fails for any vDisk
+        :return: None
+        :rtype: NoneType
+        :raises: MDSCheckupEnsureSafetyFailures when the ensure safety has failed for any vdisk
+        """
+        params_to_verify = [mds_dict, offline_nodes]
+        vpool = VPool(vpool_guid)
 
-                for mds_service in list(sorted(mds_services, key=lambda k: k.number)):
-                    port = mds_service.service.ports[0]
-                    number = mds_service.number
-                    # Manual intervention required here in order for the MDS to be cleaned up
-                    # @TODO: Remove this and make a dynamic calculation to check which MDSes to remove
-                    if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
-                        MDSServiceController._logger.warning('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Removing'.format(vpool.name, storagerouter.name, number, port))
-                        try:
-                            MDSServiceController.remove_mds_service(mds_service=mds_service, reconfigure=True, allow_offline=root_client is None)
-                        except Exception:
-                            MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Failed to remove'.format(vpool.name, storagerouter.name, number, port))
-                        mds_services.remove(mds_service)
+        if any(p is not None for p in params_to_verify) and not all(p is not None for p in params_to_verify):
+            raise ValueError('Both mds_dict and offline_nodes must be given instead of providing either one')
+        if not mds_dict:
+            mds_dict, offline_nodes = MDSServiceController._get_mds_information([vpool])
+
+        ensure_safety_failures = []
+        storagerouter_info = mds_dict[vpool]
+        # Make sure there's at least 1 MDS on every StorageRouter that's not overloaded
+        # Remove all MDS Services which have been manually marked for removal (by setting its capacity to 0)
+        max_load = Configuration.get('{0}|mds_maxload'.format(MDS_CONFIG_PATH.format(vpool.guid)))
+        for storagerouter in sorted(storagerouter_info, key=lambda k: k.ip):
+            total_load = 0.0
+            root_client = mds_dict[vpool][storagerouter]['client']
+            mds_services = mds_dict[vpool][storagerouter]['services']
+
+            for mds_service in list(sorted(mds_services, key=lambda k: k.number)):
+                port = mds_service.service.ports[0]
+                number = mds_service.number
+                # Manual intervention required here in order for the MDS to be cleaned up
+                # @TODO: Remove this and make a dynamic calculation to check which MDSes to remove
+                if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
+                    MDSServiceController._logger.warning('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Removing'.format(vpool.name, storagerouter.name, number, port))
+                    try:
+                        MDSServiceController.remove_mds_service(mds_service=mds_service, reconfigure=True, allow_offline=root_client is None)
+                    except Exception:
+                        MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Failed to remove'.format(vpool.name, storagerouter.name, number, port))
+                    mds_services.remove(mds_service)
+                else:
+                    _, next_load = MDSServiceController.get_mds_load(mds_service=mds_service)
+                    if next_load == float('inf'):
+                        total_load = sys.maxint * -1  # Cast to lowest possible value if any MDS service capacity is set to infinity
                     else:
-                        _, next_load = MDSServiceController.get_mds_load(mds_service=mds_service)
-                        if next_load == float('inf'):
-                            total_load = sys.maxint * -1  # Cast to lowest possible value if any MDS service capacity is set to infinity
-                        else:
-                            total_load += next_load
+                        total_load += next_load
 
-                        if next_load < max_load:
-                            MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Capacity available - Load at {4}%'.format(vpool.name, storagerouter.name, number, port, next_load))
-                        else:
-                            MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: No capacity available - Load at {4}%'.format(vpool.name, storagerouter.name, number, port, next_load))
+                    if next_load < max_load:
+                        MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: Capacity available - Load at {4}%'.format(vpool.name, storagerouter.name, number, port, next_load))
+                    else:
+                        MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - MDS Service {2} on port {3}: No capacity available - Load at {4}%'.format(vpool.name, storagerouter.name, number, port, next_load))
 
-                if total_load >= max_load * len(mds_services):
-                    mds_services_to_add = int(math.ceil((total_load - max_load * len(mds_services)) / max_load))
-                    MDSServiceController._logger.info('vPool {0} - StorageRouter {1} - Average load per service {2:.2f}% - Max load per service {3:.2f}% - {4} MDS service{5} will be added'.format(
-                        vpool.name, storagerouter.name, total_load / len(mds_services), max_load, mds_services_to_add, '' if mds_services_to_add == 1 else 's'
-                    ))
+            if total_load >= max_load * len(mds_services):
+                mds_services_to_add = int(math.ceil((total_load - max_load * len(mds_services)) / max_load))
+                MDSServiceController._logger.info('vPool {0} - StorageRouter {1} - Average load per service {2:.2f}% - Max load per service {3:.2f}% - {4} MDS service{5} will be added'.format(
+                    vpool.name, storagerouter.name, total_load / len(mds_services), max_load, mds_services_to_add, '' if mds_services_to_add == 1 else 's'
+                ))
 
-                    for _ in range(mds_services_to_add):
-                        MDSServiceController._logger.info('vPool {0} - StorageRouter {1} - Adding new MDS Service'.format(vpool.name, storagerouter.name))
-                        try:
-                            mds_services.append(MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool))
-                        except Exception:
-                            MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - Failed to create new MDS Service'.format(vpool.name, storagerouter.name))
+                for _ in range(mds_services_to_add):
+                    MDSServiceController._logger.info('vPool {0} - StorageRouter {1} - Adding new MDS Service'.format(vpool.name, storagerouter.name))
+                    try:
+                        mds_services.append(MDSServiceController.prepare_mds_service(storagerouter=storagerouter, vpool=vpool))
+                    except Exception:
+                        MDSServiceController._logger.exception('vPool {0} - StorageRouter {1} - Failed to create new MDS Service'.format(vpool.name, storagerouter.name))
 
-            # After potentially having added new MDSes, retrieve the optimal configuration
-            mds_config_set = {}
+        # After potentially having added new MDSes, retrieve the optimal configuration
+        mds_config_set = {}
+        try:
+            mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool, offline_nodes=offline_nodes)
+            MDSServiceController._logger.debug('vPool {0} - Optimal configuration {1}'.format(vpool.name, mds_config_set))
+        except (NotFoundException, RuntimeError):
+            MDSServiceController._logger.exception('vPool {0} - Failed to retrieve the optimal configuration'.format(vpool.name))
+
+        # Apply the optimal MDS configuration per StorageDriver
+        for storagerouter in sorted(storagerouter_info, key=lambda k: k.ip):
+            root_client = mds_dict[vpool][storagerouter]['client']
+            storagedriver = mds_dict[vpool][storagerouter]['storagedriver']
+
+            if storagedriver is None:
+                MDSServiceController._logger.critical('vPool {0} - StorageRouter {1} - No matching StorageDriver found'.format(vpool.name, storagerouter.name))
+                continue
+            if storagerouter.guid not in mds_config_set:
+                MDSServiceController._logger.critical('vPool {0} - StorageRouter {1} - Not marked as offline, but could not retrieve an optimal MDS config'.format(vpool.name, storagerouter.name))
+                continue
+            if root_client is None:
+                MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - Marked as offline, not setting optimal MDS configuration'.format(vpool.name, storagerouter.name))
+                continue
+
+            storagedriver_config = StorageDriverConfiguration(vpool_guid=vpool.guid, storagedriver_id=storagedriver.storagedriver_id)
+            if storagedriver_config.config_missing is False:
+                optimal_mds_config = mds_config_set[storagerouter.guid]
+                MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - Storing optimal MDS configuration: {2}'.format(vpool.name, storagerouter.name, optimal_mds_config))
+                # Filesystem section in StorageDriver configuration are all parameters used for vDisks created directly on the filesystem
+                # So when a vDisk gets created on the filesystem, these MDSes will be assigned to them
+                storagedriver_config.configuration.filesystem_config.fs_metadata_backend_mds_nodes=optimal_mds_config
+                storagedriver_config.save(root_client)
+
+        # Execute a safety check, making sure the master/slave configuration is optimal.
+        MDSServiceController._logger.info('vPool {0} - Ensuring safety for all vDisks'.format(vpool.name))
+        for vdisk in vpool.vdisks:
             try:
-                mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool, offline_nodes=offline_nodes)
-                MDSServiceController._logger.debug('vPool {0} - Optimal configuration {1}'.format(vpool.name, mds_config_set))
-            except (NotFoundException, RuntimeError):
-                MDSServiceController._logger.exception('vPool {0} - Failed to retrieve the optimal configuration'.format(vpool.name))
+                MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
+            except Exception:
+                message = 'Ensure safety for vDisk {0} with guid {1} failed'.format(vdisk.name, vdisk.guid)
+                MDSServiceController._logger.exception(message)
+                ensure_safety_failures.append(message)
 
-            # Apply the optimal MDS configuration per StorageDriver
-            for storagerouter in sorted(storagerouter_info, key=lambda k: k.ip):
-                root_client = mds_dict[vpool][storagerouter]['client']
-                storagedriver = mds_dict[vpool][storagerouter]['storagedriver']
+        if ensure_safety_failures:
+            raise MDSCheckupEnsureSafetyFailures('\n - ' + '\n - '.join(ensure_safety_failures))
 
-                if storagedriver is None:
-                    MDSServiceController._logger.critical('vPool {0} - StorageRouter {1} - No matching StorageDriver found'.format(vpool.name, storagerouter.name))
-                    continue
-                if storagerouter.guid not in mds_config_set:
-                    MDSServiceController._logger.critical('vPool {0} - StorageRouter {1} - Not marked as offline, but could not retrieve an optimal MDS config'.format(vpool.name, storagerouter.name))
-                    continue
-                if root_client is None:
-                    MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - Marked as offline, not setting optimal MDS configuration'.format(vpool.name, storagerouter.name))
-                    continue
+    @staticmethod
+    @ovs_task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'), ensure_single_info={'mode': 'CHAINED'})
+    def mds_checkup():
+        """
+        Validates the current MDS setup/configuration and takes actions where required
+        Actions:
+            * Verify which StorageRouters are available
+            * Make mapping between vPools and its StorageRouters
+            * For each vPool make sure every StorageRouter has at least 1 MDS service with capacity available
+            * For each vPool retrieve the optimal configuration and store it for each StorageDriver
+            * For each vPool run an ensure safety for all vDisks
+        :raises RuntimeError: When ensure safety fails for any vDisk
+        :return: None
+        :rtype: NoneType
+        """
+        MDSServiceController._logger.info('Started')
 
-                storagedriver_config = StorageDriverConfiguration(vpool_guid=vpool.guid, storagedriver_id=storagedriver.storagedriver_id)
-                if storagedriver_config.config_missing is False:
-                    optimal_mds_config = mds_config_set[storagerouter.guid]
-                    MDSServiceController._logger.debug('vPool {0} - StorageRouter {1} - Storing optimal MDS configuration: {2}'.format(vpool.name, storagerouter.name, optimal_mds_config))
-                    # Filesystem section in StorageDriver configuration are all parameters used for vDisks created directly on the filesystem
-                    # So when a vDisk gets created on the filesystem, these MDSes will be assigned to them
-                    storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=optimal_mds_config)
-                    storagedriver_config.save(root_client)
+        mds_dict, offline_nodes = MDSServiceController._get_mds_information(VPoolList.get_vpools())
 
-            # Execute a safety check, making sure the master/slave configuration is optimal.
-            MDSServiceController._logger.info('vPool {0} - Ensuring safety for all vDisks'.format(vpool.name))
-            for vdisk in vpool.vdisks:
-                try:
-                    MDSServiceController.ensure_safety(vdisk_guid=vdisk.guid)
-                except Exception:
-                    message = 'Ensure safety for vDisk {0} with guid {1} failed'.format(vdisk.name, vdisk.guid)
-                    MDSServiceController._logger.exception(message)
-                    failures.append(message)
-        if len(failures) > 0:
-            raise RuntimeError('\n - ' + '\n - '.join(failures))
+        ensure_safety_failures = []
+        for vpool, storagerouter_info in mds_dict.iteritems():
+            try:
+                MDSServiceController.mds_checkup_single(vpool.guid, mds_dict, offline_nodes, ensure_single_timeout=1)
+            except MDSCheckupEnsureSafetyFailures as ex:
+                ensure_safety_failures.append(ex)
+            except EnsureSingleTimeoutReached:
+                # This exception is raised by the callback. The mds checkup calls the single checkup inline which can
+                # invoke the callback if the same instance is already running (because of extend/shrink)
+                MDSServiceController._logger.info('MDS Checkup single already running for VPool {}'.format(vpool.guid))
+
+        if ensure_safety_failures:
+            raise RuntimeError(''.join((str(failure) for failure in ensure_safety_failures)))
         MDSServiceController._logger.info('Finished')
 
     # noinspection PyUnresolvedReferences

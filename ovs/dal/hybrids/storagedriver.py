@@ -26,9 +26,10 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.constants.storagedriver import CACHE_FRAGMENT, CACHE_BLOCK
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 
 
 class StorageDriver(DataObject):
@@ -127,14 +128,14 @@ class StorageDriver(DataObject):
         :rtype: dict
         """
         vpool_backend_info = {'backend': copy.deepcopy(self.vpool.metadata['backend']),
-                              'caching_info': {StorageDriverConfiguration.CACHE_BLOCK: {'read': False,
-                                                                                        'write': False,
-                                                                                        'quota': None,
-                                                                                        'backend_info': None},  # Will contain connection info if it wouldn't be None
-                                               StorageDriverConfiguration.CACHE_FRAGMENT: {'read': False,
-                                                                                           'write': False,
-                                                                                           'quota': None,
-                                                                                           'backend_info': None}}}
+                              'caching_info': {CACHE_BLOCK: {'read': False,
+                                                             'write': False,
+                                                             'quota': None,
+                                                             'backend_info': None},  # Will contain connection info if it wouldn't be None
+                                               CACHE_FRAGMENT: {'read': False,
+                                                                'write': False,
+                                                                'quota': None,
+                                                                'backend_info': None}}}
         if 'caching_info' not in self.vpool.metadata:
             self._logger.critical('Metadata structure has not been updated yet')
             return vpool_backend_info

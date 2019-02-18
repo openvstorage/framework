@@ -19,20 +19,22 @@ VPool module
 """
 
 import time
+from ovs.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_ASYNC
+from ovs.constants.vpool import STATUS_DELETING, STATUS_EXTENDING, STATUS_FAILURE, STATUS_INSTALLING, STATUS_RUNNING, STATUS_SHRINKING
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
 from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration,\
     LocalStorageRouterClient
-
+from ovs.extensions.storageserver.storagedriverconfig import StorageDriverConfig
 
 class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
     deploy vDisks. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
     """
-    STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
+    STATUSES = DataObject.enumerator('Status', [STATUS_RUNNING, STATUS_SHRINKING, STATUS_INSTALLING, STATUS_FAILURE, STATUS_DELETING, STATUS_EXTENDING])
     CACHES = DataObject.enumerator('Cache', {'BLOCK': 'block',
                                              'FRAGMENT': 'fragment'})
 
@@ -114,28 +116,23 @@ class VPool(DataObject):
         if not self.storagedrivers or not self.storagedrivers[0].storagerouter:
             return {}
 
-        storagedriver_config = StorageDriverConfiguration(self.guid, self.storagedrivers[0].storagedriver_id)
-        for expected_key in ['distributed_transaction_log', 'filesystem', 'volume_router', 'volume_manager']:
-            if expected_key not in storagedriver_config.configuration:
-                return {}
+        storagedriver_config = StorageDriverConfiguration(self.guid, self.storagedrivers[0].storagedriver_id).configuration # type: StorageDriverConfig
 
-        dtl = storagedriver_config.configuration['distributed_transaction_log']
-        file_system = storagedriver_config.configuration['filesystem']
-        volume_router = storagedriver_config.configuration['volume_router']
-        volume_manager = storagedriver_config.configuration['volume_manager']
+        file_system = storagedriver_config.filesystem_config
+        volume_manager = storagedriver_config.volume_manager_config
 
-        dtl_host = file_system['fs_dtl_host']
-        dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
-        cluster_size = volume_manager['default_cluster_size'] / 1024
-        dtl_transport = dtl['dtl_transport']
-        sco_multiplier = volume_router['vrouter_sco_multiplier']
-        dtl_config_mode = file_system['fs_dtl_config_mode']
-        tlog_multiplier = volume_manager['number_of_scos_in_tlog']
-        non_disposable_sco_factor = volume_manager['non_disposable_scos_factor']
+        dtl_host = file_system.fs_dtl_host
+        dtl_mode = file_system.fs_dtl_mode or  VOLDRV_DTL_ASYNC
+        dtl_config_mode = file_system.fs_dtl_config_mode
+        dtl_transport = storagedriver_config.dtl_config.dtl_transport
+        cluster_size = volume_manager.default_cluster_size / 1024
+        tlog_multiplier = volume_manager.number_of_scos_in_tlog
+        non_disposable_sco_factor = volume_manager.non_disposable_scos_factor
+        sco_multiplier = storagedriver_config.vrouter_config.vrouter_sco_multiplier
 
         sco_size = sco_multiplier * cluster_size / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
-        dtl_enabled = not (dtl_config_mode == StorageDriverClient.VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
+        dtl_enabled = not (dtl_config_mode == VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
 
         try:
             mds_config = Configuration.get(MDS_CONFIG_PATH.format(self.guid))

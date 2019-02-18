@@ -19,6 +19,7 @@ MonitoringController module
 """
 
 import logging
+from ovs.constants.storagedriver import CACHE_BLOCK, CACHE_FRAGMENT
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -26,7 +27,6 @@ from ovs_extensions.api.client import OVSClient
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 
@@ -73,8 +73,8 @@ class MonitoringController(object):
         """
         MonitoringController._logger.info('Starting vDisk caching quota verification...')
         alba_guid_size_map = {}
-        vdisk_cache_quota_mapping = {StorageDriverConfiguration.CACHE_BLOCK: 'block',
-                                     StorageDriverConfiguration.CACHE_FRAGMENT: 'fragment'}
+        vdisk_cache_quota_mapping = {CACHE_BLOCK: 'block',
+                                     CACHE_FRAGMENT: 'fragment'}
         for storagedriver in StorageDriverList.get_storagedrivers():
             storagedriver.invalidate_dynamics(['vpool_backend_info', 'vdisks_guids'])
             for cache_type, cache_type_data in storagedriver.vpool_backend_info['caching_info'].iteritems():

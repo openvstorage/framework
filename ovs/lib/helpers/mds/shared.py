@@ -245,7 +245,7 @@ class MDSShared(object):
             # Generate the correct section in the StorageDriver's configuration
             try:
                 storagedriver_config = StorageDriverConfiguration(vpool.guid, storagedriver.storagedriver_id)
-                storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
+                storagedriver_config.configuration.mds_config.mds_nodes = mds_nodes
                 storagedriver_config.save(client)
             except Exception:
                 cls._logger.exception('StorageRouter {0} - vPool {1}: Configuring StorageDriver failed. Reverting model changes'.format(storagerouter.name, vpool.name))

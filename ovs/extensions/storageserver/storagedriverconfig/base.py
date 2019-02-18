@@ -142,7 +142,14 @@ class BaseStorageDriverConfig(object):
         :return: Dict
         :rtype: Dict[str, any]
         """
-        return vars(self)
+        all_attributes = vars(self).copy()
+        for key, value in all_attributes.copy().iteritems():
+            if key.startswith('_'):
+                all_attributes.pop(key)
+                continue
+            all_attributes.pop(key)
+            all_attributes[u'{0}'.format(key)] = value
+        return all_attributes
 
     def __eq__(self, other):
         # type: (BaseStorageDriverConfig) -> bool

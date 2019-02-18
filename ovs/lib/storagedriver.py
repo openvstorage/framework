@@ -35,7 +35,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, is_connection_failure, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, is_connection_failure, LocalStorageRouterClient, StorageDriverClient, StorageDriverConfiguration, StorageDriverConfig
 from ovs.lib.helpers.decorators import add_hooks, log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
@@ -392,11 +392,12 @@ class StorageDriverController(object):
             for vpool_guid in Configuration.list('/ovs/vpools'):
                 for storagedriver_id in Configuration.list(HOSTS_BASE_PATH.format(vpool_guid)):
                     storagedriver_config = StorageDriverConfiguration(vpool_guid, storagedriver_id)
-                    storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=cluster_name,
-                                                                   vregistry_arakoon_cluster_nodes=arakoon_nodes)
-                    storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
-                                                                          dls_arakoon_cluster_id=cluster_name,
-                                                                          dls_arakoon_cluster_nodes=arakoon_nodes)
+                    config = storagedriver_config.configuration
+                    config.vregistry_config.vregistry_arakoon_cluster_id=cluster_name
+                    config.vregistry_config.vregistry_arakoon_cluster_nodes=arakoon_nodes
+                    config.dls_config.dls_type = 'Arakoon'
+                    config.dls_config.dls_arakoon_cluster_id = cluster_name
+                    config.dls_config.dls_type = arakoon_nodes
                     storagedriver_config.save()
 
     @staticmethod
@@ -440,4 +441,7 @@ class StorageDriverController(object):
         # TODO: Implement for reconfiguring purposes
         storagedriver = StorageDriver(storagedriver_guid)
         # Get a difference between the current config and the requested one
+        storagedriver_config = StorageDriverConfiguration(storagedriver.vpool.guid, storagedriver.storagedriver_id)
+        current_config = storagedriver_config.configuration
+        new_config = StorageDriverConfig(**requested_config)
         return {}

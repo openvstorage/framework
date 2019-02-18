@@ -21,6 +21,7 @@ StorageRouterInstaller class used to validate / configure / edit StorageRouter s
 import logging
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.lib.storagerouter import StorageRouterController
+from ovs.constants.roles import DTL, SCRUB, WRITE, DB
 
 
 class StorageRouterInstaller(object):
@@ -78,14 +79,14 @@ class StorageRouterInstaller(object):
         if not 1 <= requested_size <= 10240:
             raise RuntimeError('The requested global WRITE buffer size should be between 1GiB and 10240GiB')
 
-        usable_partitions = [part for part in self.partition_info.get(DiskPartition.ROLES.WRITE, []) if part['usable'] is True]
+        usable_partitions = [part for part in self.partition_info.get(WRITE, []) if part['usable'] is True]
         available_size = sum(part['available'] for part in usable_partitions)
         requested_size *= 1024.0 ** 3
 
         if requested_size > available_size:
             requested_gib = requested_size / 1024.0 ** 3
             available_gib = available_size / 1024.0 ** 3
-            raise RuntimeError('Too much space requested for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.WRITE, available_gib, requested_gib))
+            raise RuntimeError('Too much space requested for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(WRITE, available_gib, requested_gib))
 
         self.write_partitions = usable_partitions
         self.global_write_buffer_available_size = available_size
@@ -120,7 +121,7 @@ class StorageRouterInstaller(object):
                 largest_sata_write_partition = info['guid']
 
         if largest_ssd_write_partition is None and largest_sata_write_partition is None:
-            raise RuntimeError('No {0} partition found to put the local caches on'.format(DiskPartition.ROLES.WRITE))
+            raise RuntimeError('No {0} partition found to put the local caches on'.format(WRITE))
 
         self.requested_proxies = requested_proxies
         self.largest_write_partition = DiskPartition(largest_ssd_write_partition or largest_sata_write_partition)
@@ -163,15 +164,15 @@ class StorageRouterInstaller(object):
 
         # Validate SCRUB role available on any StorageRouter
         if StorageRouterController.check_scrub_partition_present() is False:
-            raise RuntimeError('At least 1 StorageRouter must have a partition with a {0} role'.format(DiskPartition.ROLES.SCRUB))
+            raise RuntimeError('At least 1 StorageRouter must have a partition with a {0} role'.format(SCRUB))
 
         # Validate required roles present
-        for required_role in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE]:
+        for required_role in [DB, DTL, WRITE]:
             if required_role not in self.partition_info:
                 raise RuntimeError('Missing required partition with a {0} role'.format(required_role))
             elif len(self.partition_info[required_role]) == 0:
                 raise RuntimeError('At least 1 partition with a {0} role is required per StorageRouter'.format(required_role))
-            elif required_role in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL]:
+            elif required_role in [DB, DTL]:
                 if len(self.partition_info[required_role]) > 1:
                     raise RuntimeError('Only 1 partition with a {0} role is allowed per StorageRouter'.format(required_role))
             else:
@@ -181,7 +182,7 @@ class StorageRouterInstaller(object):
 
         # Validate mount points are mounted
         for role, part_info in self.partition_info.iteritems():
-            if role not in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]:
+            if role not in [DB, DTL, WRITE, SCRUB]:
                 continue
 
             for part in part_info:
