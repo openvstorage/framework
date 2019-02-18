@@ -36,8 +36,9 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.constants import is_unittest_mode
-from ovs_extensions.constants.vpools import GENERIC_SCRUB, SCRUB_BASE_PATH
 from ovs_extensions.constants.framework import SCRUB_KEY, SCRUB_JOB
+from ovs_extensions.constants.logging import TARGET_TYPE_FILE
+from ovs_extensions.constants.vpools import GENERIC_SCRUB, SCRUB_BASE_PATH
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.logger import Logger
@@ -609,7 +610,7 @@ class StackWorker(ScrubShared):
                         # Lease per vpool
                         lease_interval = Configuration.get('/ovs/vpools/{0}/scrub/tweaks|locked_lease_interval'.format(self.vpool.guid), default=lease_interval)
                         # Register that the disk is being scrubbed
-                        log_path = Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)
+                        log_path = Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=TARGET_TYPE_FILE)
                         location_data = {'scrub_directory': self.scrub_directory,
                                          'storagerouter_guid': self.storagerouter.guid,
                                          'log_path': log_path}

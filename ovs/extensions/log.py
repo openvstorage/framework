@@ -168,7 +168,11 @@ def get_file_logging_config(log_info, logger_names=None):
                                       'filename': log_file_path}
         # Non root loggers will propagate and creat duplicate logs within the root loggers file
         # Currently the case as the console logging should both output to file and the console for the special loggers
-        logger_config = {'handlers': [log_handler_name], 'propagate': True, 'level': log_info.level}
+        if logger_name in LOGGER_FILE_MAP_ALWAYS_FILE:
+            logger_config = {'handlers': [log_handler_name], 'propagate': True, 'level': logging.DEBUG}
+        else:
+            logger_config = {'handlers': [log_handler_name], 'propagate': True}
+
         loggers[logger_name] = logger_config
 
     return handlers, loggers

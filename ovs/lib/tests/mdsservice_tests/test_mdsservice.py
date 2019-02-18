@@ -1531,15 +1531,17 @@ class MDSServices(LogTestCase):
                          'after_validation': lambda : validation_event.set()}
 
         # Running in a thread to simulate a direct invocation
-        single_vpool_task = Thread(target=MDSServiceController.mds_checkup_single, args=(vpool_1.guid,), kwargs={'ensure_single_runtime_hooks': runtime_hooks})
-        single_vpool_task.start()
-        # Wait for it to go to execution phase
-        validation_event.wait()
-        MDSServiceController.mds_checkup()
-        execution_event.set()
-        single_vpool_task.join()
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            single_vpool_task = Thread(target=MDSServiceController.mds_checkup_single, args=(vpool_1.guid,), kwargs={'ensure_single_runtime_hooks': runtime_hooks})
+            single_vpool_task.start()
+            # Wait for it to go to execution phase
+            validation_event.wait()
+            MDSServiceController.mds_checkup()
+            execution_event.set()
+            single_vpool_task.join()
 
-        already_running_logs = [log for log in Logger._logs['lib'] if log.startswith('MDS Checkup single already running for VPool')]
+        logs = logging_watcher.get_message_severity_map().keys()
+        already_running_logs = [log for log in logs if log.strip().startswith('MDS Checkup single already running for VPool')]
         self.assertEqual(len(already_running_logs), 1)
 
     def test_ensure_safety_excluded_storagerouters(self):
