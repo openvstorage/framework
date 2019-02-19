@@ -21,6 +21,7 @@ import uuid
 import copy
 import time
 import json
+import logging
 import inspect
 import hashlib
 from random import randint
@@ -30,7 +31,6 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 from ovs.dal.helpers import Descriptor, DalToolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
@@ -147,7 +147,7 @@ class DataObject(object):
     _properties = []  # Blueprint data of the object type
     _dynamics = []    # Timeout of readonly object properties cache
     _relations = []   # Blueprint for relations
-    _logger = Logger('dal')
+    _logger = logging.getLogger(__name__)
 
     NAMESPACE = 'ovs_data'  # Arakoon namespace
 

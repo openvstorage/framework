@@ -20,13 +20,14 @@ Contains the process method for processing rabbitmq messages
 
 import json
 import inspect
+import logging
 import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from celery.task.control import revoke
 from google.protobuf.descriptor import FieldDescriptor
+from ovs.constants.logging import RABBITMQ_LOGGER, VOLUMEDRIVER_EVENT_LOGGER
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 CINDER_VOLUME_UPDATE_CACHE = {}
@@ -39,7 +40,7 @@ def process(queue, body, mapping):
     :param body:    Body of the message
     :param mapping:
     """
-    logger = Logger('extensions-rabbitmq')
+    logger = logging.getLogger(RABBITMQ_LOGGER)
     if queue == Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'):
         cache = VolatileFactory.get_client()
         all_extensions = []
@@ -172,7 +173,7 @@ def _log(task, kwargs, storagedriver_id):
     Log an event
     """
     metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(storagedriver_id).guid}
-    _logger = Logger('volumedriver_event')
+    _logger = logging.getLogger(VOLUMEDRIVER_EVENT_LOGGER)
     _logger.info('[{0}.{1}] - {2} - {3}'.format(
         task.__class__.__module__,
         task.__class__.__name__,

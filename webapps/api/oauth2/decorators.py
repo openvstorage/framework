@@ -19,15 +19,18 @@ Contains various decorator
 """
 import json
 import time
+import logging
 from django.contrib.auth import authenticate, login
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import HttpResponse
 from functools import wraps
 from rest_framework.request import Request
 from ovs_extensions.api.exceptions import HttpForbiddenException, HttpTooManyRequestsException
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+
+
+logger = logging.getLogger(__name__)
 
 
 def _find_request(args):
@@ -73,7 +76,6 @@ def limit(amount, per, timeout):
     """
     Rate-limits the decorated call
     """
-    logger = Logger('oauth2')
 
     def wrap(f):
         """
@@ -125,7 +127,6 @@ def log():
     """
     Task logger
     """
-    logger = Logger('oauth2')
 
     def wrap(f):
         """

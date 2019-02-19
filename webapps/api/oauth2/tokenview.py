@@ -22,6 +22,7 @@ import time
 import json
 import base64
 import hashlib
+import logging
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -33,14 +34,13 @@ from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
 from ovs_extensions.api.exceptions import HttpBadRequestException
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 
 
 class OAuth2TokenView(View):
     """
     Implements OAuth 2 token views
     """
-    logger = Logger('api')
+    logger = logging.getLogger(__name__)
 
     @log()
     @auto_response()

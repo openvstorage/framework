@@ -17,22 +17,22 @@
 """
 DiskController module
 """
+import logging
 from ovs.constants.s3 import S3_BASE
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.disk import DiskTools, Disk as GenericDisk, Partition as GenericPartition
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs_extensions.generic.system import System
 from ovs.lib.helpers.decorators import ovs_task
+
 
 class DiskController(object):
     """
     Contains all BLL wrt physical Disks
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     @staticmethod
     @ovs_task(name='ovs.disk.sync_with_reality', ensure_single_info={'mode': 'CHAINED'})

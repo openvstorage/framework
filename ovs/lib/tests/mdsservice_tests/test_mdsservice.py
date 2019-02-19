@@ -19,7 +19,7 @@ MDSService test module
 """
 
 import json
-import unittest
+import logging
 from threading import Event, Thread
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
@@ -28,13 +28,13 @@ from ovs.dal.hybrids.service import Service
 from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.log.logger import Logger
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.mdsservice import MDSServiceController
+from ovs_extensions.testing.testcase import LogTestCase
 
 
-class MDSServices(unittest.TestCase):
+class MDSServices(LogTestCase):
     """
     This test class will validate the various scenarios of the MDSService logic
     """
@@ -42,6 +42,8 @@ class MDSServices(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
+        super(MDSServices, self).setUp()
+
         self.volatile, self.persistent = DalHelper.setup()
         Configuration.set('/ovs/framework/logging|path', '/var/log/ovs')
         Configuration.set('/ovs/framework/logging|level', 'DEBUG')
@@ -53,6 +55,8 @@ class MDSServices(unittest.TestCase):
         """
         Clean up test suite
         """
+        super(MDSServices, self).tearDown()
+
         DalHelper.teardown()
 
     def _check_reality(self, configs, loads, vdisks, mds_services, display=False):
@@ -302,14 +306,14 @@ class MDSServices(unittest.TestCase):
         junction.save()
 
         self.assertEqual(first=len(copy_mds_services) + 1, second=len(vdisk_1.mds_services))  # Temporarily have 1 additional junction service
-        Logger._logs['lib'] = {}  # Reset log entries
-        MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_1)  # Re-running sync should remove the duplicate
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_1)  # Re-running sync should remove the duplicate
         self.assertEqual(first=len(copy_mds_services), second=len(vdisk_1.mds_services))  # Sync vDisk with reality should have updated the model
         self.assertEqual(first=copy_mds_services[0], second=vdisk_1.mds_services[0].mds_service)
         self.assertEqual(first=True, second=vdisk_1.mds_services[0].is_master)
 
         relevant_logs = []  # Verify that the logging shows the reason is 'Duplicate'
-        for log_entry, log_level in Logger._logs['lib'].iteritems():
+        for log_entry, log_level in logging_watcher.get_message_severity_map().iteritems():
             if 'Deleting junction service 10.0.0.1:1 : Duplicate' in log_entry:
                 relevant_logs.append(log_level)
         self.assertEqual(first=1, second=len(relevant_logs))
@@ -323,14 +327,14 @@ class MDSServices(unittest.TestCase):
         junction.save()
 
         self.assertEqual(first=len(copy_mds_services) + 1, second=len(vdisk_1.mds_services))  # Temporarily have 1 additional junction service
-        Logger._logs['lib'] = {}  # Reset log entries
-        MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_1)  # Re-running sync should remove the unknown entry
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_1)  #   Re-running sync should remove the unknown entry
         self.assertEqual(first=len(copy_mds_services), second=len(vdisk_1.mds_services))  # Sync vDisk with reality should have updated the model
         self.assertEqual(first=copy_mds_services[0], second=vdisk_1.mds_services[0].mds_service)
         self.assertEqual(first=True, second=vdisk_1.mds_services[0].is_master)
 
         relevant_logs = []  # Verify that the logging shows the reason is 'Unknown'
-        for log_entry, log_level in Logger._logs['lib'].iteritems():
+        for log_entry, log_level in logging_watcher.get_message_severity_map().iteritems():
             if 'Deleting junction service 10.0.0.3:4 : Unknown by StorageDriver' in log_entry:
                 relevant_logs.append(log_level)
         self.assertEqual(first=1, second=len(relevant_logs))
@@ -357,15 +361,15 @@ class MDSServices(unittest.TestCase):
         mds_services[5].storagedriver_partitions[0].delete()
         mds_services[5].delete()
         mds_services[5].service.delete()
-        Logger._logs['lib'] = {}
-        MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_4)
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            MDSServiceController._sync_vdisk_to_reality(vdisk=vdisk_4)
         mds_master = [junction.mds_service for junction in vdisk_4.mds_services if junction.is_master is True]
         self.assertEqual(first=len(copy_mds_services), second=len(vdisk_4.mds_services))
         self.assertEqual(first=1, second=len(mds_master))  # Only 1 junction should be master
         self.assertEqual(first=copy_mds_services[0], second=mds_master[0])  # 1st entry in StorageDriver MDSes should be master
 
         relevant_logs = []  # Verify that the logging shows a CRITICAL entry
-        for log_entry, log_level in Logger._logs['lib'].iteritems():
+        for log_entry, log_level in logging_watcher.get_message_severity_map().iteritems():
             if 'Failed to find an MDS Service for 10.0.0.4:5. Creating a new MDS Service' in log_entry:
                 relevant_logs.append(log_level)
         self.assertEqual(first=1, second=len(relevant_logs))
@@ -1527,15 +1531,17 @@ class MDSServices(unittest.TestCase):
                          'after_validation': lambda : validation_event.set()}
 
         # Running in a thread to simulate a direct invocation
-        single_vpool_task = Thread(target=MDSServiceController.mds_checkup_single, args=(vpool_1.guid,), kwargs={'ensure_single_runtime_hooks': runtime_hooks})
-        single_vpool_task.start()
-        # Wait for it to go to execution phase
-        validation_event.wait()
-        MDSServiceController.mds_checkup()
-        execution_event.set()
-        single_vpool_task.join()
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            single_vpool_task = Thread(target=MDSServiceController.mds_checkup_single, args=(vpool_1.guid,), kwargs={'ensure_single_runtime_hooks': runtime_hooks})
+            single_vpool_task.start()
+            # Wait for it to go to execution phase
+            validation_event.wait()
+            MDSServiceController.mds_checkup()
+            execution_event.set()
+            single_vpool_task.join()
 
-        already_running_logs = [log for log in Logger._logs['lib'] if log.startswith('MDS Checkup single already running for VPool')]
+        logs = logging_watcher.get_message_severity_map().keys()
+        already_running_logs = [log for log in logs if log.strip().startswith('MDS Checkup single already running for VPool')]
         self.assertEqual(len(already_running_logs), 1)
 
     def test_ensure_safety_excluded_storagerouters(self):

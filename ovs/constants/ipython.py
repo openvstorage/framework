@@ -14,14 +14,11 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-import click
-from ..commands import OVSCommand
+COMMAND_PROFILE_LOCATE = ['ipython', 'locate', 'profile']
+COMMAND_PROFILE_CREATE = ['ipython', 'profile', 'create']
 
-
-@click.command('node', help='Remove node from cluster', command_parameter_help='<ip>', cls=OVSCommand)
-@click.argument('IP')
-@click.option('--force-yes', required=False, default=False, is_flag=True)
-def remove_node(ip, force_yes):
-    from ovs.lib.noderemoval import NodeRemovalController
-    NodeRemovalController.remove_node(node_ip=str(ip), silent=force_yes)
-
+CONFIG_FILE_NAME = 'ipython_config.py'
+LOGGING_EXEC_LINES = ['import logging.config',
+                      'from ovs.extensions.log import get_log_config_shells',
+                      'logging.config.dictConfig(get_log_config_shells())']
+LOGGING_EXEC_LINES_CONFIG = 'c.InteractiveShellApp.exec_lines = {}\n'.format(LOGGING_EXEC_LINES)

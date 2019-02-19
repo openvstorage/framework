@@ -18,12 +18,13 @@
 SSHClient module
 Used for remote or local command execution
 """
-import os
 import time
 from ovs.dal.helpers import Descriptor
 # Do not remove unused imports, they are imported elsewhere from here
 # noinspection PyUnresolvedReferences
-from ovs_extensions.generic.sshclient import SSHClient as _SSHClient, UnableToConnectException, NotAuthenticatedException, CalledProcessTimeout, TimeOutException
+from ovs_extensions.constants import is_unittest_mode
+from ovs_extensions.generic.sshclient import SSHClient as _SSHClient, UnableToConnectException,\
+    NotAuthenticatedException, CalledProcessTimeout, TimeOutException
 
 
 class SSHClient(_SSHClient):
@@ -53,7 +54,7 @@ class SSHClient(_SSHClient):
             storagerouter = StorageRouter(endpoint.guid)
             endpoint = storagerouter.ip
 
-        unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
+        unittest_mode = is_unittest_mode()
 
         if storagerouter is not None and unittest_mode is False:
             self._check_storagerouter(storagerouter, True)

@@ -18,8 +18,8 @@
 Package Factory module
 """
 
+import logging
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.packages.packagefactory import PackageFactory as _PackageFactory
 
 
@@ -29,7 +29,7 @@ class PackageFactory(_PackageFactory):
     """
     # Allow the user to add a custom release name
     RELEASE_NAME_FILE = '/opt/OpenvStorage/config/release_name'
-    _logger = Logger('extensions-packages')
+    _logger = logging.getLogger(__name__)
 
     def __init__(self):
         """

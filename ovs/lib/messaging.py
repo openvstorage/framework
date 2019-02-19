@@ -17,9 +17,9 @@
 """
 Messaging module
 """
+import logging
 from functools import wraps
 from ovs_extensions.generic.filemutex import file_mutex
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
@@ -58,8 +58,7 @@ class MessageController(object):
     clients. It covers a long-polling scenario providing a realtime-alike experience.
     """
     TIMEOUT = 300
-    _cache = VolatileFactory.get_client()
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     class Type(object):
         """
@@ -74,14 +73,16 @@ class MessageController(object):
         """
         Returns all subscriptions
         """
-        return MessageController._cache.get('msg_subscriptions', [])
+        volatile = VolatileFactory.get_client()
+        return volatile.get('msg_subscriptions', [])
 
     @staticmethod
     def subscriptions(subscriber_id):
         """
         Returns all subscriptions for a given subscriber
         """
-        return MessageController._cache.get('msg_subscriptions_{0}'.format(subscriber_id), [])
+        volatile = VolatileFactory.get_client()
+        return volatile.get('msg_subscriptions_{0}'.format(subscriber_id), [])
 
     @staticmethod
     @synchronized()
@@ -89,12 +90,13 @@ class MessageController(object):
         """
         Subscribes a given subscriber to a set of Types
         """
-        MessageController._cache.set('msg_subscriptions_{0}'.format(subscriber_id), subscriptions, MessageController.TIMEOUT)
-        all_subscriptions = MessageController._cache.get('msg_subscriptions', [])
+        volatile = VolatileFactory.get_client()
+        volatile.set('msg_subscriptions_{0}'.format(subscriber_id), subscriptions, MessageController.TIMEOUT)
+        all_subscriptions = volatile.get('msg_subscriptions', [])
         for subscription in subscriptions:
             if subscription not in all_subscriptions:
                 all_subscriptions.append(subscription)
-        MessageController._cache.set('msg_subscriptions', all_subscriptions, MessageController.TIMEOUT)
+        volatile.set('msg_subscriptions', all_subscriptions, MessageController.TIMEOUT)
 
     @staticmethod
     @synchronized()
@@ -102,10 +104,11 @@ class MessageController(object):
         """
         Re-caches all subscriptions
         """
+        volatile = VolatileFactory.get_client()
         try:
             subscriber_key = 'msg_subscriptions_{0}'.format(subscriber_id)
-            MessageController._cache.set(subscriber_key, MessageController._cache.get(subscriber_key, []), MessageController.TIMEOUT)
-            MessageController._cache.set('msg_subscriptions', MessageController._cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
+            volatile.set(subscriber_key, volatile.get(subscriber_key, []), MessageController.TIMEOUT)
+            volatile.set('msg_subscriptions', volatile.get('msg_subscriptions', []), MessageController.TIMEOUT)
         except Exception:
             MessageController._logger.exception('Error resetting subscriptions')
             raise
@@ -115,9 +118,10 @@ class MessageController(object):
         """
         Gets all messages pending for a given subscriber, from a given message id
         """
+        volatile = VolatileFactory.get_client()
         try:
-            subscriptions = MessageController._cache.get('msg_subscriptions_{0}'.format(subscriber_id), [])
-            all_messages = MessageController._cache.get('msg_messages', [])
+            subscriptions = volatile.get('msg_subscriptions_{0}'.format(subscriber_id), [])
+            all_messages = volatile.get('msg_messages', [])
             messages = []
             last_message_id = 0
             for message in all_messages:
@@ -136,21 +140,23 @@ class MessageController(object):
         """
         Adds a new message to the messaging queue
         """
-        last_message_id = max([m['id'] for m in MessageController._cache.get('msg_messages', [])] + [0])
+        volatile = VolatileFactory.get_client()
+        last_message_id = max([m['id'] for m in volatile.get('msg_messages', [])] + [0])
         message = {'id': last_message_id + 1,
                    'type': message_type,
                    'body': body}
-        messages = MessageController._cache.get('msg_messages', [])
+        messages = volatile.get('msg_messages', [])
         messages.append(message)
-        MessageController._cache.set('msg_messages', messages, MessageController.TIMEOUT)
+        volatile.set('msg_messages', messages, MessageController.TIMEOUT)
 
     @staticmethod
     def last_message_id():
         """
         Gets the last messageid
         """
+        volatile = VolatileFactory.get_client()
         try:
-            return max([m['id'] for m in MessageController._cache.get('msg_messages', [])] + [0])
+            return max([m['id'] for m in volatile.get('msg_messages', [])] + [0])
         except Exception:
             MessageController._logger.exception('Error loading last message id')
             raise

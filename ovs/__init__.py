@@ -16,4 +16,5 @@
 
 """
 This package contains all OVS python logic
+This directory is used for dynamical loading using imp. This means that it won't be able to resolve
 """

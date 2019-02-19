@@ -17,10 +17,10 @@
 """
 Generic test module
 """
-import os
 import time
 import datetime
 import unittest
+from ovs_extensions.constants import is_running_on_travis
 from ovs.dal.tests.helpers import DalHelper
 from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
@@ -206,8 +206,7 @@ class SnapshotTestCase(unittest.TestCase):
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
-        travis = 'TRAVIS' in os.environ and os.environ['TRAVIS'] == 'true'
-        if travis is True:
+        if is_running_on_travis():
             self._print_message('Running in Travis, reducing output.')
         base = datetime.datetime.now().date()
         minute = 60

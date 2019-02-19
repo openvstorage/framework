@@ -19,17 +19,18 @@ Statsmonkey module responsible for retrieving certain statistics from the cluste
 Classes: StatsMonkeyController
 """
 
+import logging
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.monitoring.statsmonkey import StatsMonkey
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
+
 
 class StatsMonkeyController(StatsMonkey):
     """
@@ -40,7 +41,7 @@ class StatsMonkeyController(StatsMonkey):
         * get_stats_vpools
         * get_stats_storagerouters
     """
-    _logger = Logger(name='lib')
+    _logger = logging.getLogger(__name__)
     _dynamic_dependencies = {'get_stats_vpools': {VPool: ['statistics']},  # The statistics being retrieved depend on the caching timeouts of these properties
                              'get_stats_storagerouters': {StorageRouter: ['statistics']}}
 

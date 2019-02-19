@@ -21,8 +21,10 @@ Celery entry point module
 from __future__ import absolute_import
 
 import os
+import sys
 import uuid
 import yaml
+import logging
 import threading
 import traceback
 from celery import Celery
@@ -32,9 +34,11 @@ from celery.task.control import inspect
 from kombu import Queue
 from kombu.serialization import register
 from threading import Thread
+from ovs_extensions.constants import is_unittest_mode
+from ovs.constants.logging import CELERY_RUN_LOGGER, OVS_LOGGER
+from ovs.extensions.log import configure_logging, get_ovs_streamhandler
 from ovs.extensions.celery.extendedyaml import YamlExtender
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
@@ -115,8 +119,9 @@ class InspectMockup(object):
         return lambda: {'unittests': InspectMockup.states[item]}
 
 
-ovs_logger = Logger('celery')
-if os.environ.get('RUNNING_UNITTESTS') == 'True':
+ovs_logger = logging.getLogger(CELERY_RUN_LOGGER)
+
+if is_unittest_mode():
     inspect = InspectMockup
     celery = CeleryMockup()
 else:
@@ -188,9 +193,16 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 @after_setup_task_logger.connect
 @after_setup_logger.connect
 def load_ovs_logger(**kwargs):
-    """Load a logger."""
+    """
+    Load a logger
+    """
+    # Setup ovs logging.
+    # Setting it up in this hook means that celery is still starting up. This avoids configuring it once more
+    # if the celery_run is imported
+    configure_logging()
+    # Setup a stream handler logger
     if 'logger' in kwargs:
-        kwargs['logger'].handlers = [ovs_logger.handlers[0]]  # Overrule the default celery handlers with OVSes custom handler
+        kwargs['logger'].handlers = [get_ovs_streamhandler()]  # Overrule the default celery handlers with OVSes custom handler
 
 
 def _get_registration_update_transaction():
@@ -265,6 +277,6 @@ def _clean_cache():
 
 
 if __name__ == '__main__':
-    import sys
+    configure_logging()
     if len(sys.argv) == 2 and sys.argv[1] == 'clear_cache':
         _clean_cache()

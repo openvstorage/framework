@@ -21,6 +21,7 @@ Module for the Support Agent
 import json
 import time
 import base64
+import logging
 import requests
 import collections
 from collections import OrderedDict
@@ -28,14 +29,16 @@ from ConfigParser import RawConfigParser
 from distutils.version import LooseVersion
 from subprocess import check_output
 from threading import Thread
+from ovs.extensions.log import configure_logging
+from ovs.constants.logging import SUPPORT_AGENT_LOGGER
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
 from ovs_extensions.constants.config import CONFIG_STORE_LOCATION
 from ovs.lib.helpers.toolbox import Toolbox
+
 
 class ConfigurationNotFoundError(RuntimeError):
     """
@@ -54,7 +57,7 @@ class SupportAgentCache(object):
     """
     # @TODO Think about clearing the cache when an update has been issued
 
-    logger = Logger('extensions-support')
+    logger = logging.getLogger(SUPPORT_AGENT_LOGGER)
 
     CACHE_REFRESH_TIME = 60 * 5
 
@@ -87,7 +90,7 @@ class SupportAgent(object):
     """
     Represents the Support client
     """
-    logger = Logger('extensions-support')
+    logger = logging.getLogger(SUPPORT_AGENT_LOGGER)
 
     _MISSING = object()  # Used to check missing properties in function
 
@@ -446,6 +449,7 @@ class SupportAgent(object):
 
 
 if __name__ == '__main__':
+    configure_logging()
     SupportAgent.logger.info('Starting up')
     client = SupportAgent()
     client.main()

@@ -11,18 +11,36 @@ else
         echo `openssl rand -base64 64 | tr -dc A-Z-a-z-0-9 | head -c 16` > /etc/openvstorage_id
     fi
 
-    user_exists=$(id -a ovs > /dev/null 2>&1; echo $?)
-    if [[ $user_exists -eq 1 ]]
+    LOG_GROUP=ovs_logging
+    OVS_USER=ovs
+    USER_EXISTS=$(id -a ${OVS_USER} > /dev/null 2>&1; echo $?)
+    GROUP_EXISTS=$(getent group ${LOG_GROUP} > /dev/null 2>&1; echo $?)
+    if [[ $USER_EXISTS -ne 0 ]]
     then
         echo 'Creating OVS user'
-        useradd ovs -d /opt/OpenvStorage
-        [ -f /etc/sudoers.d/ovs ] || echo '%ovs ALL=NOPASSWD: ALL' >> /etc/sudoers.d/ovs
+        useradd ${OVS_USER} -d /opt/OpenvStorage
+        [ -f /etc/sudoers.d/${OVS_USER} ] || echo "%${OVS_USER} ALL=NOPASSWD: ALL" >> /etc/sudoers.d/${OVS_USER}
     else
         echo 'OVS user already exists'
     fi
 
-    # logging
-    mkdir -p /var/log/ovs/volumedriver
-    chown -R ovs:ovs /var/log/ovs
-    chmod 750 /var/log/ovs
+    if [[ $GROUP_EXISTS -ne 0 ]]
+    then
+        echo "Creating OVS Logging group: ${LOG_GROUP}"
+        groupadd ${LOG_GROUP}
+        for user in ${OVS_USER} root
+        do
+             usermod -a -G ${LOG_GROUP} $user
+        done
+    fi
+
+    # Setup logging permissions
+    OVS_LOG_DIR=/var/log/ovs
+    echo "Setting up OpenvStorage logging"
+    mkdir -p ${OVS_LOG_DIR}/volumedriver
+    chown -R ovs:${LOG_GROUP} ${OVS_LOG_DIR}
+    # Set sticky bit. All log files will be owned by the group of the created dir instead of the users group
+    chmod 2775 ${OVS_LOG_DIR}
+    # Set the ACL so that all files created within the directory get group rwx permissions
+    setfacl -d -R -m group:${LOG_GROUP}:rwx ${OVS_LOG_DIR}
 fi

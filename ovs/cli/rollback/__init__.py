@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import click
-from ovs_extensions.cli import OVSCommand
+from ..commands import OVSCommand
 
 
 @click.command('rollback', help='Roll back a failed setup on this node', section_header='Rollback', cls=OVSCommand)

@@ -25,11 +25,12 @@ import time
 import random
 import string
 import inspect
+import logging
 import subprocess
 from celery.schedules import crontab
+from ovs_extensions.constants import is_unittest_mode
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.interactive import Interactive
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 
 
@@ -57,7 +58,7 @@ class Toolbox(object):
         :return: The functions found decorated with the specified hooks
         :rtype: list
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             return Toolbox._function_pointers.get('{0}-{1}'.format(component, sub_component), [])
 
         functions = []
@@ -247,7 +248,7 @@ class Schedule(object):
     """
     This decorator adds a schedule to a function. All arguments are these from celery's "crontab" class
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs

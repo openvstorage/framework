@@ -44,7 +44,6 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs_extensions.generic.tests.sshclient_mock import MockedSSHClient
-from ovs_extensions.log.logger import Logger
 from ovs_extensions.packages.packagefactory import PackageFactory
 from ovs_extensions.services.mockups.systemd import SystemdMock
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -105,7 +104,6 @@ class DalHelper(object):
         # noinspection PyProtectedMember
         StorageRouterClient._clean()
 
-        Logger._logs = {}
         DataList._test_hooks = {}
         Toolbox._function_pointers = {}
         # Clean underlying persistent store

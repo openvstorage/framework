@@ -25,6 +25,7 @@ import time
 import uuid
 import pickle
 import random
+import logging
 from ovs.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE, CACHE_BLOCK, CACHE_FRAGMENT
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.domain import Domain
@@ -37,20 +38,20 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs_extensions.constants import is_unittest_mode
 from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, is_connection_failure, LOG_LEVEL_MAPPING, MDSMetaDataBackendConfig, \
+from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, is_connection_failure, MDSMetaDataBackendConfig, \
                                                        MDSNodeConfig, StorageDriverClient, StorageDriverConfiguration, VolumeRestartInProgressException
 from ovs.lib.helpers.decorators import log, ovs_task
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
-from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
+from volumedriver.storagerouter import VolumeDriverEvents_pb2
 
 
 class VDiskController(object):
@@ -58,13 +59,8 @@ class VDiskController(object):
     Contains all BLL regarding VDisks
     """
     _VOLDRV_EVENT_KEY = 'voldrv_event_vdisk_{0}'
-    _logger = Logger('lib')
-    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
 
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
+    _logger = logging.getLogger(__name__)
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.list_volumes')
@@ -1087,7 +1083,7 @@ class VDiskController(object):
                 dtl_config = None
                 importances = VDiskController._retrieve_possible_dtl_targets(vdisk=vdisk, dtl_targets=dtl_targets)
                 for possible_storagerouters in importances:
-                    if os.environ.get('RUNNING_UNITTESTS') == 'True':
+                    if is_unittest_mode():
                         possible_storagerouters.sort(key=lambda i: i.guid)
                     else:
                         random.shuffle(possible_storagerouters)

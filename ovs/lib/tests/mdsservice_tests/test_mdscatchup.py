@@ -19,12 +19,12 @@ MDSService test module
 """
 
 import gevent
-import unittest
+import logging
+import gevent.hub
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
-from ovs_extensions.log.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -32,9 +32,10 @@ from ovs.extensions.storageserver.tests.mockups import MDSClient
 from ovs_extensions.testing.exceptions import WorkerLossException
 from ovs.lib.helpers.mds.catchup import MDSCatchUp
 from ovs.lib.mdsservice import MDSServiceController
+from ovs_extensions.testing.testcase import LogTestCase
 
 
-class MDSCatchupTest(unittest.TestCase):
+class MDSCatchupTest(LogTestCase):
     """
     This test class will validate the various scenarios of the MDSService logic
     """
@@ -42,6 +43,12 @@ class MDSCatchupTest(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
+        super(MDSCatchupTest, self).setUp()
+
+        # Suppress the greenlet outputting the workerlost exception
+        self.gevent_hub_not_error_old = gevent.hub.Hub.NOT_ERROR
+        gevent.hub.Hub.NOT_ERROR = (WorkerLossException,)
+
         self.volatile, self.persistent = DalHelper.setup()
         Configuration.set('/ovs/framework/logging|path', '/var/log/ovs')
         Configuration.set('/ovs/framework/logging|level', 'DEBUG')
@@ -53,6 +60,10 @@ class MDSCatchupTest(unittest.TestCase):
         """
         Clean up test suite
         """
+        super(MDSCatchupTest, self).tearDown()
+
+        gevent.hub.Hub.NOT_ERROR = self.gevent_hub_not_error_old
+
         DalHelper.teardown()
 
     @classmethod
@@ -141,11 +152,11 @@ class MDSCatchupTest(unittest.TestCase):
 
         self._prepare_catchup(structure)
 
-        catch_up_1 = MDSCatchUp(vdisk.guid)
-        catch_up_thread = gevent.spawn(self.catch_up_worker, catch_up_1)
-        gevent.sleep(0)  # Start the gevent scheduling
-        catch_up_thread.join()  # Wait for the worker lost to raise
-        logs = Logger._logs['lib']
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            catch_up_1 = MDSCatchUp(vdisk.guid)
+            catch_up_thread = gevent.spawn(self.catch_up_worker, catch_up_1)
+            gevent.sleep(0)  # Start the gevent scheduling
+            catch_up_thread.join()  # Wait for the worker lost to raise
         MDSCatchUp.reset_cache()
         # No catchup should have happened
         for mds_key, volume_id, tlogs_start in catch_up_list:
@@ -153,9 +164,12 @@ class MDSCatchupTest(unittest.TestCase):
             self.assertEqual(tlogs_start, current_tlogs, 'No catchup should have been invoked')
             # Clear the exception
             MDSClient.set_catchup_hook(mds_key, vdisk.volume_id, lambda: None)
+
         # Next iteration should not fail
-        catch_up_2 = MDSCatchUp(vdisk.guid)
-        catch_up_2.catch_up(async=False)
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            catch_up_2 = MDSCatchUp(vdisk.guid)
+            catch_up_2.catch_up(async=False)
+        logs = logging_watcher.get_message_severity_map()
         no_longer_relevant_logs = [log for log in logs if log.endswith('on the next save as it is no longer relevant')]
         self.assertEqual(len(no_longer_relevant_logs), 1, 'Items should have been discarded as the state was no longer relevant')
         for mds_key, volume_id, tlogs in catch_up_list:
@@ -285,8 +299,9 @@ class MDSCatchupTest(unittest.TestCase):
         catch_up = MDSCatchUp(vdisk.guid)
         registration_data = catch_up._relevant_contexts[0]
         self.persistent.set(catch_up.mds_key, [registration_data])
-        catch_up.catch_up(async=False)
-        logs = Logger._logs['lib']
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            catch_up.catch_up(async=False)
+        logs = logging_watcher.get_message_severity_map()
         catch_up_logs = [catch_up._format_message(log) for log in already_registered_logs]
         for log in catch_up_logs:
             self.assertIn(log, logs)
@@ -328,9 +343,10 @@ class MDSCatchupTest(unittest.TestCase):
         catch_up = MDSCatchUp(vdisk.guid)
         registration_data = catch_up._relevant_contexts[0]
         self.persistent.set(catch_up.mds_key, [registration_data])
-        catch_up.catch_up()
-        catch_up.wait()
-        logs = Logger._logs['lib']
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            catch_up.catch_up()
+            catch_up.wait()
+        logs = logging_watcher.get_message_severity_map()
         catch_up_logs = [catch_up._format_message(log) for log in already_registered_logs]
         for log in catch_up_logs:
             self.assertIn(log, logs)
@@ -440,7 +456,6 @@ class MDSCatchupTest(unittest.TestCase):
         catch_up_thread = gevent.spawn(self.catch_up_worker, catch_up_1)
         gevent.sleep(0)  # Start the gevent scheduling
         catch_up_thread.join()  # Wait for the worker lost to raise
-        logs = Logger._logs['lib']
         MDSCatchUp.reset_cache()
         # No catchup should have happened
         for mds_key, volume_id, tlogs_start in catch_up_list:
@@ -448,9 +463,12 @@ class MDSCatchupTest(unittest.TestCase):
             self.assertEqual(tlogs_start, current_tlogs, 'No catchup should have been invoked')
             # Clear the exception
             MDSClient.set_catchup_hook(mds_key, vdisk.volume_id, lambda: None)
+
         # Next iteration should not fail
-        catch_up_2 = MDSCatchUp(vdisk.guid)
-        catch_up_2.catch_up(async=False)
+        with self.assertLogs(level=logging.DEBUG) as logging_watcher:
+            catch_up_2 = MDSCatchUp(vdisk.guid)
+            catch_up_2.catch_up(async=False)
+        logs = logging_watcher.get_message_severity_map()
         no_longer_relevant_logs = [log for log in logs if log.endswith('on the next save as it is no longer relevant')]
         self.assertEqual(len(no_longer_relevant_logs), 1, 'Items should have been discarded as the state was no longer relevant')
         for mds_key, volume_id, tlogs in catch_up_list:

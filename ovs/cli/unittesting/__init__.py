@@ -13,15 +13,16 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
+from __future__ import absolute_import
 
 import click
-from ..commands import OVSCommand
+from ..commands import UnittestCommand
+from ovs_extensions.cli.unittesting import unittest_command_unwrapped
 
 
-@click.command('node', help='Remove node from cluster', command_parameter_help='<ip>', cls=OVSCommand)
-@click.argument('IP')
-@click.option('--force-yes', required=False, default=False, is_flag=True)
-def remove_node(ip, force_yes):
-    from ovs.lib.noderemoval import NodeRemovalController
-    NodeRemovalController.remove_node(node_ip=str(ip), silent=force_yes)
+@click.command('unittest', help='Run all or a part of the OVS unittest suite', section_header='Unittest', cls=UnittestCommand)
+@click.argument('action', required=False, default=None, type=click.STRING)
+@click.option('--averages', is_flag=True, default=False)
+def unittest_command(action, averages):
+    return unittest_command_unwrapped(action, averages)
 

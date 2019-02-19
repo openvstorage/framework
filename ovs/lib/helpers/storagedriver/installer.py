@@ -21,6 +21,7 @@ StorageDriverInstaller class responsible for adding and removing StorageDrivers
 import re
 import copy
 import time
+import logging
 from subprocess import CalledProcessError
 from ovs.constants.storagedriver import FRAMEWORK_DTL_TRANSPORT_RSOCKET, CACHE_FRAGMENT, CACHE_BLOCK
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -55,7 +56,6 @@ if False:
     from ovs.lib.helpers.vpool.installers.base_installer import VPoolInstallerBase
     from ovs.extensions.storageserver.storagedriverconfig.connection_manager import AlbaConnectionConfig
 
-
 class StorageDriverInstaller(object):
     """
     Class used to create/remove a StorageDriver to/from a StorageRouter
@@ -72,7 +72,7 @@ class StorageDriverInstaller(object):
     SERVICE_TEMPLATE_DTL = 'ovs-dtl'
     SERVICE_TEMPLATE_PROXY = 'ovs-albaproxy'
 
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, vp_installer, configurations=None, storagedriver=None):
         # type: (VPoolInstallerBase, Optional[Dict[any,any]], Optional[StorageDriver]) -> None

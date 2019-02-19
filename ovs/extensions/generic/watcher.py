@@ -24,13 +24,15 @@ import sys
 import time
 import pika
 import uuid
+import logging
 import argparse
+from ovs.constants.logging import WATCHER_LOGGER
+from ovs.extensions.log import configure_logging
 from ovs_extensions.constants.arakoon import ARAKOON_CONFIG
 from ovs_extensions.constants.config import ARAKOON_NAME, CACC_LOCATION
 from ovs_extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
 from ovs.extensions.db.arakooninstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.storage.persistent.pyrakoonstore import PyrakoonStore
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -60,9 +62,10 @@ class Watcher(object):
     """
     LOG_CONTENTS = None
 
+    _logger = logging.getLogger(WATCHER_LOGGER)  # Script is invoked with python ... -> __name__ == __main__
+
     def __init__(self, target, mode, level=0):
-        # type: () -> None
-        self._logger = Logger('extensions-generic')
+        # type: (str, str, int) -> None
         self.target = target
         self.mode = mode
         self.level = level  # Minimal level to log
@@ -230,6 +233,7 @@ class Watcher(object):
 
 
 if __name__ == '__main__':
+    configure_logging()
     parser = argparse.ArgumentParser(prog='framework-watcher', description='Framework watcher service')
 
     parser.add_argument('target', help='The target (sub)component to handle', choices=['volumedriver', 'config', 'framework'])

@@ -16,7 +16,7 @@
 
 import re
 import click
-from ovs_extensions.cli import OVSCommand
+from ..commands import OVSCommand
 
 extra_options = {'command_parameter_help': 'framework [ip|all]',
                  'cls': OVSCommand}

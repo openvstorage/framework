@@ -20,13 +20,13 @@ MDS Safety module
 
 import math
 import time
+import logging
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient, SRCObjectNotFoundException
@@ -37,7 +37,7 @@ class SafetyEnsurer(MDSShared):
     """
     Class responsible to ensure the MDS Safety of a volume
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, vdisk_guid, excluded_storagerouter_guids=None):
         """

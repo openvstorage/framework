@@ -25,6 +25,8 @@ from ovs_extensions.log.logger import Logger as _Logger
 class Logger(_Logger):
     """
     Logger class
+
+    WARNING: the use of this logger is deprecated in favor of using python default logging
     """
     LOG_PATH = '/var/log/ovs'
 

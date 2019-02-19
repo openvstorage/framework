@@ -19,9 +19,9 @@ Scrubber Module
 """
 import os
 import copy
-import json
 import time
 import uuid
+import logging
 from datetime import datetime
 from Queue import Empty, Queue
 from random import randint
@@ -35,8 +35,10 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs_extensions.constants.vpools import GENERIC_SCRUB, SCRUB_BASE_PATH
+from ovs_extensions.constants import is_unittest_mode
 from ovs_extensions.constants.framework import SCRUB_KEY, SCRUB_JOB
+from ovs_extensions.constants.logging import TARGET_TYPE_FILE
+from ovs_extensions.constants.vpools import GENERIC_SCRUB, SCRUB_BASE_PATH
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.logger import Logger
@@ -47,7 +49,6 @@ from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs_extensions.storage.exceptions import AssertException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.generic.repeatingtimer import RepeatingTimer
@@ -63,7 +64,7 @@ class ScrubShared(object):
     _test_hooks = {}
     _unittest_data = {'setup': False}
 
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     _SCRUB_KEY = SCRUB_KEY  # Parent key for all scrub related jobs
     _SCRUB_NAMESPACE = 'ovs_jobs_scrub'
@@ -609,7 +610,7 @@ class StackWorker(ScrubShared):
                         # Lease per vpool
                         lease_interval = Configuration.get('/ovs/vpools/{0}/scrub/tweaks|locked_lease_interval'.format(self.vpool.guid), default=lease_interval)
                         # Register that the disk is being scrubbed
-                        log_path = Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=Logger.TARGET_TYPE_FILE)
+                        log_path = Logger.get_sink_path(source='scrubber_{0}'.format(self.vpool.name), forced_target_type=TARGET_TYPE_FILE)
                         location_data = {'scrub_directory': self.scrub_directory,
                                          'storagerouter_guid': self.storagerouter.guid,
                                          'log_path': log_path}
@@ -966,7 +967,7 @@ class Scrubber(ScrubShared):
 
         super(Scrubber, self).__init__(task_id or str(uuid.uuid4()))
 
-        if os.environ.get('RUNNING_UNITTESTS') == 'True' and not ScrubShared._unittest_data['setup']:
+        if is_unittest_mode() and not ScrubShared._unittest_data['setup']:
             self.setup_for_unittests()
 
         self.task_id = task_id  # Be able to differentiate between directly executed ones for debugging purposes

@@ -21,9 +21,9 @@ Module for NodeRemovalController
 import os
 import re
 import sys
+import logging
 from ovs_extensions.constants.config import CACC_LOCATION, CONFIG_STORE_LOCATION
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, TimeOutException, UnableToConnectException
@@ -37,7 +37,7 @@ class NodeRemovalController(object):
     """
     This class contains all logic for removing a node from the cluster
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     @staticmethod
     def remove_node(node_ip, silent=None):

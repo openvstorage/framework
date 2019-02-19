@@ -19,6 +19,7 @@ VPoolController class responsible for making changes to existing vPools
 """
 
 import time
+import logging
 from ovs.constants.storagedriver import CACHE_BLOCK, CACHE_FRAGMENT
 from ovs.constants.vpool import STATUS_SHRINKING, STATUS_DELETING, STATUS_RUNNING
 from ovs.dal.hybrids.servicetype import ServiceType
@@ -35,7 +36,6 @@ from ovs_extensions.constants.framework import REMOTE_CONFIG_BACKEND_INI
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH, PROXY_CONFIG_PATH, HOSTS_CONFIG_PATH, VPOOL_BASE_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs_extensions.generic.toolbox import ExtensionsToolbox
@@ -61,8 +61,7 @@ class VPoolController(object):
     """
     Contains all BLL related to VPools
     """
-    _logger = Logger('lib')
-    _service_manager = ServiceFactory.get_manager()
+    _logger = logging.getLogger(__name__)
 
     @classmethod
     @ovs_task(name='ovs.storagerouter.add_vpool')
@@ -233,6 +232,7 @@ class VPoolController(object):
         :return: None
         :rtype: NoneType
         """
+        service_manager = ServiceFactory.get_manager()
         # TODO: Add logging
         # TODO: Unit test individual pieces of code
         # Validations
@@ -405,9 +405,9 @@ class VPoolController(object):
         # Remove watcher volumedriver service if last StorageDriver on current StorageRouter
         if len(storagerouter.storagedrivers) == 0 and storagerouter not in offline_srs:  # ensure client is initialized for StorageRouter
             try:
-                if cls._service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client):
-                    cls._service_manager.stop_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client)
-                    cls._service_manager.remove_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client)
+                if service_manager.has_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client):
+                    service_manager.stop_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client)
+                    service_manager.remove_service(ServiceFactory.SERVICE_WATCHER_VOLDRV, client=sr_installer.root_client)
             except Exception:
                 cls._logger.exception('StorageDriver {0} - {1} service deletion failed'.format(storagedriver.guid, ServiceFactory.SERVICE_WATCHER_VOLDRV))
 

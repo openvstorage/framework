@@ -21,7 +21,9 @@ Module for UpdateController
 import copy
 import time
 import inspect
+import logging
 from subprocess import CalledProcessError
+from ovs.constants.logging import UPDATE_LOGGER
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -30,7 +32,6 @@ from ovs.extensions.db.arakooninstaller import ArakoonInstaller
 from ovs_extensions.constants.config import ARAKOON_NAME
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.filemutex import file_mutex, NoLockAvailableException
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -50,11 +51,9 @@ class UpdateController(object):
     """
     This class contains all logic for updating an environment
     """
-    _logger = Logger(name='update', forced_target_type='file')
+    _logger = logging.getLogger(UPDATE_LOGGER)
     _update_file = '/etc/ready_for_upgrade'
     _update_ongoing_file = '/etc/update_ongoing'
-    _package_manager = PackageFactory.get_manager()
-    _service_manager = ServiceFactory.get_manager()
 
     #########
     # HOOKS #
@@ -141,9 +140,10 @@ class UpdateController(object):
         :return: None
         :rtype: NoneType
         """
+        package_manager = PackageFactory.get_manager()
         cls._logger.info('StorageRouter {0}: Refreshing update information'.format(client.ip))
         try:
-            binaries = cls._package_manager.get_binary_versions(client=client)
+            binaries = package_manager.get_binary_versions(client=client)
             storagerouter = StorageRouterList.get_by_ip(ip=client.ip)
             cls._logger.debug('StorageRouter {0}: Binary versions: {1}'.format(client.ip, binaries))
 
@@ -236,7 +236,7 @@ class UpdateController(object):
                     # Extension migration check
                     key = '/ovs/framework/hosts/{0}/versions'.format(System.get_my_machine_id(client=client))
                     old_version = Configuration.get(key, default={}).get(PackageFactory.COMP_MIGRATION_FWK)
-                    installed_version = str(cls._package_manager.get_installed_versions(client=client, package_names=[PackageFactory.PKG_OVS])[PackageFactory.PKG_OVS])
+                    installed_version = str(package_manager.get_installed_versions(client=client, package_names=[PackageFactory.PKG_OVS])[PackageFactory.PKG_OVS])
                     migrations_detected = False
                     if old_version is not None:
                         cls._logger.debug('StorageRouter {0}: Current running version for {1} extension migrations: {2}'.format(client.ip, PackageFactory.COMP_FWK, old_version))
@@ -754,13 +754,14 @@ class UpdateController(object):
         :return: True if all services their states have been succesfully changed
         :rtype: bool
         """
+        service_manager = ServiceFactory.get_manager()
         if action == 'start':
             services.reverse()  # Start services again in reverse order of stopping
         for service_name in services:
             for ssh_client in ssh_clients:
                 description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
                 try:
-                    if cls._service_manager.has_service(service_name, client=ssh_client):
+                    if service_manager.has_service(service_name, client=ssh_client):
                         ServiceFactory.change_service_state(client=ssh_client,
                                                             name=service_name,
                                                             state=action,

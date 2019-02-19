@@ -25,7 +25,7 @@ import copy
 import time
 import inspect
 import hashlib
-from ovs.extensions.generic.logger import Logger
+import logging
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 
@@ -35,7 +35,7 @@ class Descriptor(object):
     The descriptor class contains metadata to instantiate objects that can be serialized.
     It points towards the sourcefile, class name and class type
     """
-    _logger = Logger('dal')
+    _logger = logging.getLogger(__name__)
     object_cache = {}
     descriptor_cache = {}
 

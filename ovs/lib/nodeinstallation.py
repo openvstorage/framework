@@ -23,11 +23,13 @@ import sys
 import json
 import time
 import signal
+import logging
+from ovs.constants.logging import INSTALL_LOGGER
+from ovs.constants.ipython import CONFIG_FILE_NAME, COMMAND_PROFILE_CREATE, COMMAND_PROFILE_LOCATE, LOGGING_EXEC_LINES_CONFIG
 from ovs_extensions.constants.config import ARAKOON_NAME, CACC_LOCATION, CONFIG_STORE_LOCATION
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration, NotFoundException, ConnectionException
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.interactive import Interactive
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
@@ -45,10 +47,32 @@ class NodeInstallationController(object):
     """
     This class contains all logic for setting up an environment, installed with system-native packages
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(INSTALL_LOGGER)
 
     nodes = {}
     host_ips = set()
+
+    @staticmethod
+    def setup_ipython_logging(clients):
+        # type: (List[SSHClient]) -> None
+        """
+        Sets up ipython configuration files to enable logging
+        :param clients: SSHClients to setup ipython logging for
+        :return: None
+        """
+        for client in clients:  # type: SSHClient
+            ipython_config_dir = client.run(COMMAND_PROFILE_LOCATE)
+            ipython_config_file_path = os.path.join(ipython_config_dir, CONFIG_FILE_NAME)
+            if not client.file_exists(ipython_config_file_path):
+                client.run(COMMAND_PROFILE_CREATE)
+            file_content_lines = client.file_read(ipython_config_file_path).splitlines()
+            exec_lines = [line for line in file_content_lines if 'c.InteractiveShellApp.exec_lines' in line]
+            if len(exec_lines) == 1 and exec_lines[0].startswith('#'):
+                # User did not configure ipython yet. The config can be appended
+                file_content_lines.append(LOGGING_EXEC_LINES_CONFIG)
+            else:
+                raise NotImplementedError('Already generated ipython configs cannot be adjusted as of now')
+            client.file_write(ipython_config_file_path, '\n'.join(file_content_lines))
 
     @staticmethod
     def setup_node(node_type=None, execute_rollback=False):
@@ -519,6 +543,15 @@ class NodeInstallationController(object):
                                 raise
 
             root_client.file_delete(resume_config_file)
+
+            # Configure ipython locally
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up ipython config')
+            try:
+                local_clients = [SSHClient('127.0.0.1', username=user) for user in ['ovs', 'root']]
+                NodeInstallationController.setup_ipython_logging(local_clients)
+            except:
+                NodeInstallationController._logger.warning('Unable to setup ipython configuration')
+
             if enable_heartbeats is True:
                 Toolbox.log(logger=NodeInstallationController._logger, messages='')
                 Toolbox.log(logger=NodeInstallationController._logger,

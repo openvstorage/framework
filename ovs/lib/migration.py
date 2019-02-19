@@ -21,11 +21,11 @@ MigrationController module
 import os
 import copy
 import json
-from ovs.extensions.generic.logger import Logger
+import logging
+from ovs.constants.logging import UPDATE_LOGGER
 from ovs.extensions.storageserver.storagedriverconfig import AlbaConnectionConfig
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.toolbox import Schedule
-
 
 
 class MigrationController(object):
@@ -33,7 +33,7 @@ class MigrationController(object):
     This controller contains (part of the) migration code. It runs out-of-band with the updater so we reduce the risk of
     failures during the update
     """
-    _logger = Logger(name='update', forced_target_type='file')
+    _logger = logging.getLogger(UPDATE_LOGGER)
 
     @staticmethod
     @ovs_task(name='ovs.migration.migrate', schedule=Schedule(minute='0', hour='6'), ensure_single_info={'mode': 'DEFAULT'})
@@ -71,6 +71,7 @@ class MigrationController(object):
         from ovs.extensions.storage.volatilefactory import VolatileFactory
         from ovs.lib.helpers.storagedriver.installer import StorageDriverInstaller
         from ovs.lib.helpers.vpool.shared import VPoolShared
+        from ovs.lib.nodeinstallation import NodeInstallationController
 
         MigrationController._logger.info('Start out of band migrations...')
         service_manager = ServiceFactory.get_manager()
@@ -666,8 +667,6 @@ class MigrationController(object):
             if System.get_component_identifier() not in Configuration.get(registration_key, default=[]):
                 Configuration.register_usage(System.get_component_identifier(), registration_key)
 
-        MigrationController._logger.info('Finished out of band migrations')
-
         ####################################################
         # Deduplicate configs of proxies: now one config per remote alba-backend
         errors = []
@@ -752,5 +751,21 @@ class MigrationController(object):
             else:
                 MigrationController._logger.info('Finished migration of all proxies on environment')
 
+        ####################################################
+        # Introduce ipython profile for logging
+        errors = []
+        try:
+            for storagerouter_guid, client in sr_client_map.iteritems():
+                try:
+                    NodeInstallationController.setup_ipython_logging([client])
+                except Exception as ex:
+                    errors.append('Failed to configure Ipython profile for {0}: {1}'.format(storagerouter_guid, ex))
+        except Exception as ex:
+            errors.append('Unexpected exception occured while configuring ipython profile: {0}'.format(ex))
+        finally:
+            if errors:
+                MigrationController._logger.info('Failed to update migration of proxies: {0}'.format('\n'.join(errors)))
 
-
+            else:
+                MigrationController._logger.info('Finished migration of all proxies on environment')
+        MigrationController._logger.info('Finished out of band migrations')

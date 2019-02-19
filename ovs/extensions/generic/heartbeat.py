@@ -15,9 +15,10 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import time
+import logging
+from ovs.extensions.log import configure_logging
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.lib.storagerouter import StorageRouterController
@@ -31,7 +32,7 @@ class HeartBeat(object):
     """
     ARP_TIMEOUT = 30
 
-    logger = Logger('extensions-generic')
+    logger = logging.getLogger('ovs.heartbeat')
 
     @classmethod
     def pulse(cls):
@@ -87,4 +88,5 @@ class HeartBeat(object):
 
 
 if __name__ == '__main__':
+    configure_logging()
     HeartBeat.pulse()

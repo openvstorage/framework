@@ -17,17 +17,17 @@
 """
 Wrapper class for the storagedriver client of the voldrv team
 """
-import os
+
 import copy
+import logging
+from ovs_extensions.constants import is_unittest_mode
 from ovs.constants.storagedriver import VOLDRV_DTL_SYNC, VOLDRV_DTL_ASYNC, VOLDRV_DTL_TRANSPORT_TCP, VOLDRV_DTL_TRANSPORT_RSOCKET, \
     FRAMEWORK_DTL_SYNC, FRAMEWORK_DTL_ASYNC, FRAMEWORK_DTL_NO_SYNC, FRAMEWORK_DTL_TRANSPORT_TCP, FRAMEWORK_DTL_TRANSPORT_RSOCKET
 from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger as OVSLogger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.storageserver.storagedriverconfig import StorageDriverConfig
-from volumedriver.storagerouter import storagerouterclient
 
 # Import below classes so the rest of the framework can always import from this module:
 # * We can inject mocks easier without having to make changes everywhere
@@ -47,7 +47,7 @@ try:
 except ImportError:
     from ovs.extensions.storageserver.tests.mockups import VolumeRestartInProgressException
 
-if os.environ.get('RUNNING_UNITTESTS') == 'True':
+if is_unittest_mode():
     from ovs.extensions.storageserver.tests.mockups import \
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
         MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient, \
@@ -88,11 +88,6 @@ class StorageDriverClient(object):
     """
     Client to access storagedriver client
     """
-    _log_level = LOG_LEVEL_MAPPING[OVSLogger('extensions').getEffectiveLevel()]
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
 
     VDISK_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: DTLMode.SYNCHRONOUS,
                           FRAMEWORK_DTL_ASYNC: DTLMode.ASYNCHRONOUS,
@@ -176,7 +171,7 @@ class ObjectRegistryClient(object):
         Initializes the wrapper for a given vpool
         :param vpool: vPool for which the ObjectRegistryClient needs to be loaded
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             return ORClient(str(vpool.guid), None, None)
 
         key = vpool.identifier
@@ -195,12 +190,7 @@ class MetadataServerClient(object):
     """
     Builds a MDSClient
     """
-    _logger = OVSLogger('extensions')
-    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
+    _logger = logging.getLogger(__name__)
 
     MDS_ROLE = type('MDSRole', (), {'MASTER': Role.Master,
                                     'SLAVE': Role.Slave})
@@ -256,7 +246,7 @@ class ClusterRegistryClient(object):
         Initializes the wrapper for a given vpool
         :param vpool: vPool for which the ClusterRegistryClient needs to be loaded
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             return ClusterRegistry(str(vpool.guid), None, None)
 
         key = vpool.identifier
@@ -291,7 +281,7 @@ class FSMetaDataClient(object):
         if FileSystemMetaDataClient is None:
             raise FeatureNotAvailableException()
 
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+        if is_unittest_mode():
             return FileSystemMetaDataClient(str(vpool.guid), None, None)
 
         key = vpool.identifier
@@ -313,19 +303,15 @@ class StorageDriverConfiguration(object):
     CACHE_BLOCK = 'block_cache'
     CACHE_FRAGMENT = 'fragment_cache'
 
+    _logger = logging.getLogger(__name__)
+
     def __init__(self, vpool_guid, storagedriver_id):
         # type: (str, str) -> None
         """
         Initializes the class
         """
-        _log_level = LOG_LEVEL_MAPPING[OVSLogger('extensions').getEffectiveLevel()]
-        # noinspection PyCallByClass,PyTypeChecker
-        storagerouterclient.Logger.setupLogging(OVSLogger.load_path('storagerouterclient'), _log_level)
-        # noinspection PyArgumentList
-        storagerouterclient.Logger.enableLogging()
 
         self._key = HOSTS_CONFIG_PATH.format(vpool_guid, storagedriver_id)
-        self._logger = OVSLogger('extensions')
 
         self.remote_path = Configuration.get_configuration_path(self._key).strip('/')
         # Load configuration
@@ -392,6 +378,7 @@ class StorageDriverConfiguration(object):
         self.config_missing = False
         self._initial_config = exported_config
         return changes
+
 
 
 def is_connection_failure(exception):

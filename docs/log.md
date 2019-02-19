@@ -1,5 +1,33 @@
 # Logs
+## Enabling logging
+The Frameworks logger is disabled by default. The root logger used within the framework is `ovs`.
+When running celery/django, the framework logging behaviour will change depending on the content within `/ovs/framework/logging`.
 
+The default logging configuration looks like:
+```
+{'disable_existing_loggers': False,
+ 'formatters': {'ovs': {'()': 'ovs_extensions.log.LogFormatter',
+                        'format': '%(asctime)s - %(hostname)s - %(process)s/%(thread)d - %(name)s - %(funcName)s - %(sequence)s - %(levelname)s - %(message)s'},
+                'standard': {'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'}},
+ 'handlers': {'default': {'class': 'logging.StreamHandler',
+                          'formatter': 'ovs',
+                          'level': 'INFO'}},
+ 'loggers': {'api': {'handlers': ['default'],
+                     'level': 'INFO',
+                     'propagate': True},
+             'ovs': {'handlers': ['default'],
+                     'level': 'INFO',
+                     'propagate': True},
+             'ovs_extensions': {'handlers': ['default'],
+                                'level': 'INFO',
+                                'propagate': True},
+             'paramiko': {'level': 'WARNING'},
+             'requests': {'level': 'WARNING'},
+             'urllib3': {'level': 'WARNING'}},
+ 'version': 1}
+ ```
+
+## Redis
 The redis log endpoint can be configured using the configuration management
 ```json
 /ovs/framework/logging = {"type": "console|file|redis"}

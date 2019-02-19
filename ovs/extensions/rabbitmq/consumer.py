@@ -25,8 +25,8 @@ import sys
 import pika
 import inspect
 import logging
+from ovs.constants.logging import RABBITMQ_LOGGER
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.generic.system import System
 from ovs.extensions.rabbitmq.processor import process
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--durable', dest='queue_durable', action='store_const', default=False, const=True,
                         help='Declare queue as durable')
 
-    logger = Logger('extensions-rabbitmq')
+    logger = logging.getLogger(RABBITMQ_LOGGER)
 
     args = parser.parse_args()
     try:

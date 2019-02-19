@@ -24,11 +24,12 @@ import time
 import random
 import string
 import inspect
+import logging
 import threading
 from functools import wraps
 from contextlib import contextmanager
 from ovs.dal.lists.storagedriverlist import StorageDriverList
-from ovs.extensions.generic.logger import Logger
+from ovs_extensions.constants import is_unittest_mode
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -80,7 +81,7 @@ def log(event_type):
                 metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id']).guid}
             else:
                 metadata = {}
-            _logger = Logger(event_type.lower())
+            _logger = logging.getLogger(event_type.lower())
             _logger.info('[{0}.{1}] - {2} - {3} - {4}'.format(
                 f.__module__,
                 f.__name__,
@@ -404,7 +405,7 @@ class EnsureSingle(object):
         self.task_id, self.async_task = self.get_task_id_and_async(task)
 
         # Logging
-        self.logger = Logger('lib')
+        self.logger = logging.getLogger(__name__)
 
         # Runtime
         self.now = None
@@ -988,7 +989,7 @@ class EnsureSingle(object):
         """
         self.now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
         self.thread_name = threading.current_thread().getName()
-        self.unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
+        self.unittest_mode = is_unittest_mode()
         if self.unittest_mode:
             self.message = 'Ensure single {0} mode - ID {1} - {2} - {{0}}'.format(self.ensure_single_container.mode, self.now, self.thread_name)
         else:

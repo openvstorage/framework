@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import click
-from ovs_extensions.cli import OVSCommand
+from ..commands import OVSCommand
 
 
 @click.command('update', help='Update specified components on all nodes in cluster',

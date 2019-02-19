@@ -25,7 +25,6 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
 from ovs.extensions.generic.configuration import Configuration, NotFoundException
-from ovs.extensions.generic.logger import Logger
 from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration,\
     LocalStorageRouterClient
 from ovs.extensions.storageserver.storagedriverconfig import StorageDriverConfig
@@ -35,8 +34,6 @@ class VPool(DataObject):
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
     deploy vDisks. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
     """
-    _logger = Logger('hybrids')
-
     STATUSES = DataObject.enumerator('Status', [STATUS_RUNNING, STATUS_SHRINKING, STATUS_INSTALLING, STATUS_FAILURE, STATUS_DELETING, STATUS_EXTENDING])
     CACHES = DataObject.enumerator('Cache', {'BLOCK': 'block',
                                              'FRAGMENT': 'fragment'})

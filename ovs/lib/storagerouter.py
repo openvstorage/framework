@@ -19,6 +19,7 @@ StorageRouterController class used to make changes to existing StorageRouters
 """
 
 import os
+import logging
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
@@ -29,7 +30,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.constants.vpools import VPOOL_BASE_PATH, PROXY_CONFIG_MAIN
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -38,27 +38,17 @@ from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.os.osfactory import OSFactory
 from ovs.extensions.packages.packagefactory import PackageFactory
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import LOG_LEVEL_MAPPING
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.exceptions import RoleDuplicationException
-from volumedriver.storagerouter import storagerouterclient
 
 
 class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
-    _logger = Logger('lib')
-    _log_level = LOG_LEVEL_MAPPING[_logger.getEffectiveLevel()]
-    _os_manager = OSFactory.get_manager()
-    _service_manager = ServiceFactory.get_manager()
-
-    # noinspection PyCallByClass,PyTypeChecker
-    storagerouterclient.Logger.setupLogging(Logger.load_path('storagerouterclient'), _log_level)
-    # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
+    _logger = logging.getLogger(__name__)
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.ping')
@@ -100,8 +90,9 @@ class StorageRouterController(object):
         :return: List of IP addresses
         :rtype: list
         """
+        os_manager = OSFactory.get_manager()
         client = SSHClient(endpoint=StorageRouter(storagerouter_guid))
-        return StorageRouterController._os_manager.get_ip_addresses(client=client)
+        return os_manager.get_ip_addresses(client=client)
 
     @staticmethod
     def get_partition_info(storagerouter_guid):
@@ -280,6 +271,7 @@ class StorageRouterController(object):
         :return: None
         :rtype: NoneType
         """
+        service_manager = ServiceFactory.get_manager()
         ExtensionsToolbox.verify_required_params(actual_params=support_info,
                                                  required_params={'stats_monkey': (bool, None, False),
                                                                   'remote_access': (bool, None, False),
@@ -346,8 +338,8 @@ class StorageRouterController(object):
                     StorageRouterController._logger.info('Un-configuring remote access on StorageRouter {0}'.format(root_client.ip))
                     nid = storagerouter.machine_id.replace(r"'", r"'\''")
                     service_name = 'openvpn@ovs_{0}-{1}'.format(cid, nid)
-                    if StorageRouterController._service_manager.has_service(name=service_name, client=root_client):
-                        StorageRouterController._service_manager.stop_service(name=service_name, client=root_client)
+                    if service_manager.has_service(name=service_name, client=root_client):
+                        service_manager.stop_service(name=service_name, client=root_client)
                     root_client.file_delete(filenames=['/etc/openvpn/ovs_*'])
 
         # Configure support agent
@@ -357,14 +349,14 @@ class StorageRouterController(object):
             for root_client in root_clients.itervalues():
                 if support_agent_new is True:
                     StorageRouterController._logger.info('Configuring support agent on StorageRouter {0}'.format(root_client.ip))
-                    if StorageRouterController._service_manager.has_service(name=service_name, client=root_client) is False:
-                        StorageRouterController._service_manager.add_service(name=service_name, client=root_client)
-                    StorageRouterController._service_manager.restart_service(name=service_name, client=root_client)
+                    if service_manager.has_service(name=service_name, client=root_client) is False:
+                        service_manager.add_service(name=service_name, client=root_client)
+                    service_manager.restart_service(name=service_name, client=root_client)
                 else:
                     StorageRouterController._logger.info('Un-configuring support agent on StorageRouter {0}'.format(root_client.ip))
-                    if StorageRouterController._service_manager.has_service(name=service_name, client=root_client):
-                        StorageRouterController._service_manager.stop_service(name=service_name, client=root_client)
-                        StorageRouterController._service_manager.remove_service(name=service_name, client=root_client)
+                    if service_manager.has_service(name=service_name, client=root_client):
+                        service_manager.stop_service(name=service_name, client=root_client)
+                        service_manager.remove_service(name=service_name, client=root_client)
 
         # Configure stats monkey
         if stats_monkey_change is True:
@@ -401,7 +393,7 @@ class StorageRouterController(object):
             for storagerouter in StorageRouterList.get_masters():
                 root_client = root_clients[storagerouter]
                 StorageRouterController._logger.debug('Restarting ovs-scheduled-tasks service on node with IP {0}'.format(root_client.ip))
-                StorageRouterController._service_manager.restart_service(name=service_name, client=root_client)
+                service_manager.restart_service(name=service_name, client=root_client)
 
     @staticmethod
     @ovs_task(name='ovs.storagerouter.mountpoint_exists')

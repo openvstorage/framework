@@ -17,6 +17,7 @@
 """
 Django settings module
 """
+
 import os
 from subprocess import check_output
 from ovs.extensions.generic.system import System
@@ -153,6 +154,8 @@ CACHES = {
 }
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
+
+# OpenvStorage logging is setup when starting the gunicorn process
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -169,10 +172,16 @@ LOGGING = {
         },
     },
     'loggers': {
+        # Unsure if it's django as root logger or default
         'default': {
             'handlers': ['logfile'],
             'level': 'DEBUG',
-            'propogate': False
+            'propagate': False
         },
+        'django': {
+            'handlers': ['logfile'],
+            'level': 'DEBUG',
+            'propagate': False
+        }
     },
 }

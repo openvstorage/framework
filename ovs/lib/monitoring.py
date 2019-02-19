@@ -17,12 +17,13 @@
 """
 MonitoringController module
 """
+
+import logging
 from ovs.constants.storagedriver import CACHE_BLOCK, CACHE_FRAGMENT
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.client import OVSClient
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -34,7 +35,7 @@ class MonitoringController(object):
     """
     A controller that can execute various quality/monitoring checks
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     @staticmethod
     def test_ssh_connectivity():

@@ -18,6 +18,7 @@
 StorageDriverController class responsible for making changes to existing StorageDrivers
 """
 
+import logging
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service
@@ -31,7 +32,6 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs_extensions.constants.vpools import HOSTS_CONFIG_PATH, HOSTS_BASE_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.logger import Logger
 from ovs_extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import NotAuthenticatedException, SSHClient, UnableToConnectException
 from ovs.extensions.services.servicefactory import ServiceFactory
@@ -46,7 +46,7 @@ class StorageDriverController(object):
     """
     Contains all BLL related to Storage Drivers
     """
-    _logger = Logger('lib')
+    _logger = logging.getLogger(__name__)
 
     ################
     # CELERY TASKS #

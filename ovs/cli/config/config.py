@@ -18,7 +18,7 @@ import os
 import uuid
 import click
 import subprocess
-from ovs_extensions.cli import OVSCommand
+from ..commands import OVSCommand
 
 
 extra_options = {'command_parameter_help': '[some/key]', 'cls': OVSCommand}

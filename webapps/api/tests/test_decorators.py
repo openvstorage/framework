@@ -778,7 +778,6 @@ class Decorators(unittest.TestCase):
                                                 (data_holder.get_base_list_guids_default_sorted, True, True),
                                                 (data_holder.get_base_list_first_two, False, False),
                                                 (data_holder.get_base_list_guids_first_two, False, True)]:
-            print fct
             request.QUERY_PARAMS = {'page': 1,
                                     'page_size': 2}
             response = fct(2, request)
@@ -795,7 +794,6 @@ class Decorators(unittest.TestCase):
                 # Baselist
                 expected_items = [machine.guid for machine in data_list_machines][0:2]
             self.assertEqual(len(response.data['data']), len(expected_items))
-            print 'page1', response.data['data'], expected_items
             self.assertListEqual(response.data['data'], expected_items)
 
             request.QUERY_PARAMS = {'page': 2,
@@ -815,5 +813,4 @@ class Decorators(unittest.TestCase):
                 # Baselist
                 expected_items = [machine.guid for machine in data_list_machines][2:4]
             self.assertEqual(len(response.data['data']), len(expected_items))
-            print 'page2', response.data['data'], expected_items
             self.assertListEqual(response.data['data'], expected_items)
