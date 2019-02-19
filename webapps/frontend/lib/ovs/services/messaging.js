@@ -108,7 +108,7 @@ define([
                     self.wait();
                     return data
                 }, function(error) {
-                    throw "Last message id could not be loaded. ({0})".format([error]);
+                    throw "Last message id could not be loaded. ({0})".format(error);
                 })
         },
         /**
@@ -167,7 +167,7 @@ define([
                     }
                     return data
                 }, function(error) {
-                    console.warn('Error during longpolling messages ({0}). Restarting in 5 seconds.'.format([error]));
+                    console.warn('Error during longpolling messages ({0}). Restarting in 5 seconds.'.format(error));
                     // Restart within 5 seconds on failure
                     return $.when().then(function(){
                         if (!self.abort) {

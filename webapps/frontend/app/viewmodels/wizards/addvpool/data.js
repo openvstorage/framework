@@ -195,7 +195,7 @@ define(['jquery', 'knockout',
             if (connectionInfo === undefined || connectionInfo.isLocalBackend() === true) {
                 return 'local';
             }
-            return '{0}:{1}'.format([ko.utils.unwrapObservable(connectionInfo.host), ko.utils.unwrapObservable(connectionInfo.port)])
+            return '{0}:{1}'.format(ko.utils.unwrapObservable(connectionInfo.host), ko.utils.unwrapObservable(connectionInfo.port))
         };
         self.getBackend = function(backendGuid) {
             var currentList = self.backends();
