@@ -28,7 +28,7 @@ define(['jquery'
         }
     };
 
-    var genericID = 'generic_{0}'.format([Math.random()]);
+    var genericID = 'generic_{0}'.format(Math.random());
     function ViewCache() {
         var self = this;
         self.cache = {};

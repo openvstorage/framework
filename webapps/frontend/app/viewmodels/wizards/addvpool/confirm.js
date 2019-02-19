@@ -89,7 +89,7 @@ define([
                         alba_backend_guid: cachingData.backend_info.alba_backend_guid()
                     };
                     postData.call_parameters['connection_info_{0}'.format([cacheData.suffix])] = connectionInfo;
-                    postData.call_parameters['backend_info_{0}'.format([cacheData.suffix])] = backendInfo;
+                    postData.call_parameters['backend_info_{0}'.format(cacheData.suffix)] = backendInfo;
 
                 }
             });
