@@ -6,4 +6,5 @@ RUN apt-get update \
     && apt-get install -y --force-yes \
         rsyslog \
         sudo \
-        openssl
+        openssl \
+        acl
