@@ -17,7 +17,7 @@ Depends: acl, alba, aptdaemon, arakoon (>= 1.9.0), arakoon (<< 1.10), at,
  python-librabbitmq (>= 1.5.2), python-memcache (>= 1.47-2), python-paramiko,
  python-pika, python-protobuf, python-pyinotify, python-pyudev, python-redis,
  python-requests (>=2.9.1), python-rpyc, python-six, python-suds-jurko, python-ujson,
- rabbitmq-server (>= 3.2.4), python-yaml, redis-server, sshpass, sudo, volumedriver-no-dedup-server
+ rabbitmq-server (>= 3.2.4), python-typing, python-yaml, redis-server, sshpass, sudo, volumedriver-no-dedup-server
 Recommends: avahi-utils (>= 0.6.31), ntp, openvpn
 Description: OpenvStorage core
  Core components for the Open vStorage product
