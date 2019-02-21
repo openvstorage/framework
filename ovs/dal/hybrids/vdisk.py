@@ -338,44 +338,49 @@ class VDisk(DataObject):
         """
         statsdict = {}
         try:
-            pc = stats.performance_counters
-            for counter, info in {'backend_read_request_size': {'sum': 'backend_data_read',
-                                                                'events': 'backend_read_operations',
-                                                                'distribution': 'backend_read_operations_distribution'},
-                                  'backend_read_request_usecs': {'sum': 'backend_read_latency',
-                                                                 'distribution': 'backend_read_latency_distribution'},
-                                  'backend_write_request_size': {'sum': 'backend_data_written',
-                                                                 'events': 'backend_write_operations',
-                                                                 'distribution': 'backend_write_operations_distribution'},
-                                  'backend_write_request_usecs': {'sum': 'backend_write_latency',
-                                                                  'distribution': 'backend_write_latency_distribution'},
-                                  'sync_request_usecs': {'sum': 'sync_latency',
-                                                         'distribution': 'sync_latency_distribution'},
-                                  'read_request_size': {'sum': 'data_read',
-                                                        'events': 'read_operations',
-                                                        'distribution': 'read_operations_distribution'},
-                                  'read_request_usecs': {'sum': 'read_latency',
-                                                         'distribution': 'read_latency_distribution'},
-                                  'write_request_size': {'sum': 'data_written',
-                                                         'events': 'write_operations',
-                                                         'distribution': 'write_operations_distribution'},
-                                  'write_request_usecs': {'sum': 'write_latency',
-                                                          'distribution': 'write_latency_distribution'},
-                                  'unaligned_read_request_size': {'sum': 'unaligned_data_read',
-                                                                  'events': 'unaligned_read_operations',
-                                                                  'distribution': 'unaligned_read_operations_distribution'},
-                                  'unaligned_read_request_usecs': {'sum': 'unaligned_read_latency',
-                                                                   'distribution': 'unaligned_read_latency_distribution'},
-                                  'unaligned_write_request_size': {'sum': 'unaligned_data_written',
-                                                                   'events': 'unaligned_write_operations',
-                                                                   'distribution': 'unaligned_write_operations_distribution'},
-                                  'unaligned_write_request_usecs': {'sum': 'unaligned_write_latency',
-                                                                    'distribution': 'unaligned_write_latency_distribution'}}.iteritems():
-                if hasattr(pc, counter):
-                    counter_object = getattr(pc, counter)
+            performance_counters = stats.performance_counters
+            names_map = {'backend_read_request_size': {'sum': 'backend_data_read',
+                                                       'events': 'backend_read_operations',
+                                                       'distribution': 'backend_read_operations_distribution'},
+                         'backend_read_request_usecs': {'sum': 'backend_read_latency',
+                                                        'distribution': 'backend_read_latency_distribution'},
+                         'backend_write_request_size': {'sum': 'backend_data_written',
+                                                        'events': 'backend_write_operations',
+                                                        'distribution': 'backend_write_operations_distribution'},
+                         'backend_write_request_usecs': {'sum': 'backend_write_latency',
+                                                         'distribution': 'backend_write_latency_distribution'},
+                         'sync_request_usecs': {'sum': 'sync_latency',
+                                                'distribution': 'sync_latency_distribution'},
+                         'read_request_size': {'sum': 'data_read',
+                                               'events': 'read_operations',
+                                               'distribution': 'read_operations_distribution'},
+                         'read_request_usecs': {'sum': 'read_latency',
+                                                'distribution': 'read_latency_distribution'},
+                         'write_request_size': {'sum': 'data_written',
+                                                'events': 'write_operations',
+                                                'distribution': 'write_operations_distribution'},
+                         'write_request_usecs': {'sum': 'write_latency',
+                                                 'distribution': 'write_latency_distribution'},
+                         'unaligned_read_request_size': {'sum': 'unaligned_data_read',
+                                                         'events': 'unaligned_read_operations',
+                                                         'distribution': 'unaligned_read_operations_distribution'},
+                         'unaligned_read_request_usecs': {'sum': 'unaligned_read_latency',
+                                                          'distribution': 'unaligned_read_latency_distribution'},
+                         'unaligned_write_request_size': {'sum': 'unaligned_data_written',
+                                                          'events': 'unaligned_write_operations',
+                                                          'distribution': 'unaligned_write_operations_distribution'},
+                         'unaligned_write_request_usecs': {'sum': 'unaligned_write_latency',
+                                                           'distribution': 'unaligned_write_latency_distribution'}}
+            time_suffix = 'usecs'
+
+            for counter, info in names_map.iteritems():
+                if hasattr(performance_counters, counter):
+                    counter_object = getattr(performance_counters, counter)
                     for method, target in info.iteritems():
                         if hasattr(counter_object, method):
-                            statsdict[target] = getattr(counter_object, method)()
+                            if counter.endswith(time_suffix):
+                                statsdict['{0}_{1}'.format(target, time_suffix)] = getattr(counter_object, method)()
+                            statsdict[target] = getattr(counter_object, method)()  # Keep this too for backwards compatibility
 
             for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
                         'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored',
