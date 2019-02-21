@@ -371,16 +371,14 @@ class VDisk(DataObject):
                                                           'distribution': 'unaligned_write_operations_distribution'},
                          'unaligned_write_request_usecs': {'sum': 'unaligned_write_latency',
                                                            'distribution': 'unaligned_write_latency_distribution'}}
-            time_suffix = 'usecs'
 
-            for counter, info in names_map.iteritems():
-                if hasattr(performance_counters, counter):
-                    counter_object = getattr(performance_counters, counter)
-                    for method, target in info.iteritems():
-                        if hasattr(counter_object, method):
-                            if counter.endswith(time_suffix):
-                                statsdict['{0}_{1}'.format(target, time_suffix)] = getattr(counter_object, method)()
-                            statsdict[target] = getattr(counter_object, method)()  # Keep this too for backwards compatibility
+            for volumedriver_statistic, info in names_map.iteritems():
+                if hasattr(performance_counters, volumedriver_statistic):
+                    volumedriver_statistic_object = getattr(performance_counters, volumedriver_statistic)
+                    for method, renamed_statistic in info.iteritems():
+                        if hasattr(volumedriver_statistic_object, method):
+                            statsdict['{0}_{1}'.format(volumedriver_statistic, method)] = getattr(volumedriver_statistic_object, method)()
+                            statsdict[renamed_statistic] = getattr(volumedriver_statistic_object, method)()  # Keep this too for backwards compatibility
 
             for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
                         'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored',
