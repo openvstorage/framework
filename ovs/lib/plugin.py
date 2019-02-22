@@ -36,15 +36,8 @@ class PluginController(_PluginController):
 
     @classmethod
     def get_webapps(cls):
-        for c in cls._fetch_classes(API_VIEWS).itervalues():
-            if 'ViewSet' not in [base.__name__ for base in c[1].__bases__]:
-                #todo verwijder key uit dict, check of wel dict moet zijn!!
-                raise NotImplementedError
+        return [c for c in cls._fetch_classes(API_VIEWS) if 'ViewSet' in [base.__name__ for base in c.__bases__]]
 
     @classmethod
     def get_migration(cls):
-        for c in cls._fetch_classes(API_VIEWS).itervalues():
-            if 'object' in [base.__name__ for base in c[1].__bases__]:
-                #todo verwijder key uit dict, check of wel dict moet zijn!!
-                raise NotImplementedError
-
+        return [c for c in cls._fetch_classes(API_VIEWS) if 'object' in [base.__name__ for base in c.__bases__]]

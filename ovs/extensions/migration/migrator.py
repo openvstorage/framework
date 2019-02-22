@@ -17,11 +17,9 @@
 Migrator module
 """
 
-import os
-import imp
-import inspect
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
+from ovs.lib.plugin import PluginController
 
 
 class Migrator(object):
@@ -42,9 +40,8 @@ class Migrator(object):
         key = '/ovs/framework/hosts/{0}/versions'.format(machine_id)
         data = Configuration.get(key) if Configuration.exists(key) else {}
         migrators = []
-        from ovs.lib.plugin import PluginController
-        for member in PluginController.get_migration(): #todo check of nog dict of niet
-            migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
+        for member in PluginController.get_migration():
+            migrators.append((member.identifier, member.migrate, member.THIS_VERSION))
 
         for identifier, method, end_version in migrators:
             start_version = data.get(identifier, 0)

@@ -294,7 +294,7 @@ def build_router_urls():
     """
     routes = []
     from ovs.lib.plugin import PluginController
-    for member in PluginController.get_webapps(): # todo checken of nog dict en hoe itereren
+    for member in PluginController.get_webapps():
         routes.append({'prefix': member.prefix,
                        'viewset': member,
                        'base_name': member.base_name})
