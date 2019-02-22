@@ -17,12 +17,11 @@
 """
 APIConfiguration module
 """
-import os
-import imp
 import inspect
 import unittest
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.packages.packagefactory import PackageFactory
+from ovs.lib.plugin import PluginController
 
 
 class APIConfiguration(unittest.TestCase):
@@ -115,18 +114,14 @@ class APIConfiguration(unittest.TestCase):
     def _get_functions():
         funs = []
         return_exceptions = []
-        path = '/'.join([os.path.dirname(__file__), '..', 'backend', 'views'])
-        for filename in os.listdir(path):
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
-                        cls = member[1]
-                        if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
-                            continue
-                        if hasattr(cls, 'return_exceptions'):
-                            return_exceptions += cls.return_exceptions
-                        base_calls = ['list', 'retrieve', 'create', 'destroy', 'partial_update']
-                        funs += [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod) if fun[0] in base_calls or hasattr(fun[1], 'bind_to_methods')]
+        classes = PluginController.get_webapps()
+        for member in classes.itervalues():
+            if 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
+                cls = member[1]
+                if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
+                    continue
+                if hasattr(cls, 'return_exceptions'):
+                    return_exceptions += cls.return_exceptions
+                base_calls = ['list', 'retrieve', 'create', 'destroy', 'partial_update']
+                funs += [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod) if fun[0] in base_calls or hasattr(fun[1], 'bind_to_methods')]
         return funs, return_exceptions

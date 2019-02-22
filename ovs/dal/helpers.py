@@ -20,15 +20,16 @@ Module containing certain helper classes providing various logic
 
 import os
 import re
-import imp
 import copy
 import time
 import inspect
 import hashlib
 import logging
+import importlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-
+from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS, OVS_DAL_HYBRIDS_FILE, OVS_DAL_MIGRATION
+from ovs.lib.plugin import PluginController
 
 class Descriptor(object):
     """
@@ -57,7 +58,7 @@ class Descriptor(object):
 
             type_name = object_type.__name__
             module_name = object_type.__module__.split('.')[-1]
-            fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)  # Fully qualified module name
+            fqm_name = '{0}.{1}'.format(OVS_DAL_HYBRIDS, module_name)  # Fully qualified module name
             identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
             if identifier in Descriptor.descriptor_cache and cached is True:
                 self._descriptor = Descriptor.descriptor_cache[identifier]
@@ -163,11 +164,11 @@ class HybridRunner(object):
         base_hybrids = []
         inherit_table = {}
         translation_table = {}
-        path = '/'.join([os.path.dirname(__file__), 'hybrids'])
-        for filename in os.listdir(path):  # Query filesystem
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
+        major_mod = importlib.import_module(OVS_DAL_HYBRIDS)
+        for filename in os.listdir(major_mod.__path__[0]):
+            if filename.endswith('.py'):
+                name = OVS_DAL_HYBRIDS_FILE.format(filename.replace('.py', ''))
+                mod = importlib.import_module(name)
                 for member in inspect.getmembers(mod, predicate=inspect.isclass):
                     if member[1].__module__ == name:
                         current_class = member[1]
@@ -328,14 +329,8 @@ class Migration(object):
             data = {}
 
         migrators = []
-        path = '/'.join([os.path.dirname(__file__), 'migration'])
-        for filename in os.listdir(path):
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
+        for member in PluginController.get_migration(): #todo check of nog nodig als geen dict meer
+            migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
 
         for identifier, method, end_version in migrators:
             start_version = data.get(identifier, 0)

@@ -293,16 +293,11 @@ def build_router_urls():
     Creates a router instance to generate API urls for Customer and Internal API
     """
     routes = []
-    path = '/'.join([os.path.dirname(__file__), 'backend', 'views'])
-    for filename in os.listdir(path):
-        if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-            name = filename.replace('.py', '')
-            mod = imp.load_source(name, '/'.join([path, filename]))
-            for member_name, member in inspect.getmembers(mod, predicate=inspect.isclass):
-                if member.__module__ == name and 'ViewSet' in [base.__name__ for base in member.__bases__]:
-                    routes.append({'prefix': member.prefix,
-                                   'viewset': member,
-                                   'base_name': member.base_name})
+    from ovs.lib.plugin import PluginController
+    for member in PluginController.get_webapps(): # todo checken of nog dict en hoe itereren
+        routes.append({'prefix': member.prefix,
+                       'viewset': member,
+                       'base_name': member.base_name})
     router = OVSRouter()
     for route in routes:
         router.register(**route)
