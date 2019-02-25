@@ -347,9 +347,8 @@ class OpenAPIView(View):
 
         paths = data['paths']
         webapp_classes = PluginController.get_webapps()
-        for member in webapp_classes.itervalues():
-            if 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
-                cls = member[1]
+        for cls in webapp_classes:
+            if 'ViewSet' in [base.__name__ for base in cls.__bases__]:
                 if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
                     continue
                 base_calls = {'list': ['get', '/{0}/'],
@@ -364,14 +363,14 @@ class OpenAPIView(View):
                         parameters = load_parameters(fun)
                         return_code, schema = load_response(fun)
                         route = {route_data[0]: {'summary': docstring,
-                                                 'operationId': '{0}.{1}'.format(member[1].prefix, call),
+                                                 'operationId': '{0}.{1}'.format(cls.prefix, call),
                                                  'responses': {return_code: {'description': docstring},
                                                                'default': {'description': 'Error payload',
                                                                            'schema': {'$ref': '#/definitions/APIError'}}},
                                                  'parameters': parameters}}
                         if schema is not None:
                             route[route_data[0]]['responses'][return_code]['schema'] = schema
-                        current_path = route_data[1].format(member[1].prefix)
+                        current_path = route_data[1].format(cls.prefix)
                         if current_path not in paths:
                             paths[current_path] = {}
                         paths[current_path].update(route)
@@ -385,14 +384,14 @@ class OpenAPIView(View):
                         name = fun.__name__
                         for verb in fun.bind_to_methods:
                             routes[verb] = {'summary': docstring,
-                                            'operationId': '{0}.{1}_{2}'.format(member[1].prefix, verb, name),
+                                            'operationId': '{0}.{1}_{2}'.format(cls.prefix, verb, name),
                                             'responses': {return_code: {'description': docstring},
                                                           'default': {'description': 'Error payload',
                                                                       'schema': {'$ref': '#/definitions/APIError'}}},
                                             'parameters': parameters}
                             if schema is not None:
                                 routes[verb]['responses'][return_code]['schema'] = schema
-                        paths['/{0}/{{guid}}/{1}/'.format(member[1].prefix, name)] = routes
+                        paths['/{0}/{{guid}}/{1}/'.format(cls.prefix, name)] = routes
 
         # DataObject / hybrids
         def build_property(prop):

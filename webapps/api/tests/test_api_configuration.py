@@ -114,14 +114,11 @@ class APIConfiguration(unittest.TestCase):
     def _get_functions():
         funs = []
         return_exceptions = []
-        classes = PluginController.get_webapps()
-        for member in classes.itervalues():
-            if 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
-                cls = member[1]
-                if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
-                    continue
-                if hasattr(cls, 'return_exceptions'):
-                    return_exceptions += cls.return_exceptions
-                base_calls = ['list', 'retrieve', 'create', 'destroy', 'partial_update']
-                funs += [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod) if fun[0] in base_calls or hasattr(fun[1], 'bind_to_methods')]
+        for cls in PluginController.get_webapps():
+            if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
+                continue
+            if hasattr(cls, 'return_exceptions'):
+                return_exceptions += cls.return_exceptions
+            base_calls = ['list', 'retrieve', 'create', 'destroy', 'partial_update']
+            funs += [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod) if fun[0] in base_calls or hasattr(fun[1], 'bind_to_methods')]
         return funs, return_exceptions

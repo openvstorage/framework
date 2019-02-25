@@ -164,41 +164,34 @@ class HybridRunner(object):
         base_hybrids = []
         inherit_table = {}
         translation_table = {}
-        major_mod = importlib.import_module(OVS_DAL_HYBRIDS)
-        for filename in os.listdir(major_mod.__path__[0]):
-            if filename.endswith('.py'):
-                name = OVS_DAL_HYBRIDS_FILE.format(filename.replace('.py', ''))
-                mod = importlib.import_module(name)
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name:
-                        current_class = member[1]
-                        try:
-                            current_descriptor = Descriptor(current_class).descriptor
-                        except TypeError:
-                            continue
-                        current_identifier = current_descriptor['identifier']
-                        if current_identifier not in translation_table:
-                            translation_table[current_identifier] = current_descriptor
-                        if 'DataObject' in current_class.__base__.__name__:  # Further inheritance?
-                            if current_identifier not in base_hybrids:
-                                base_hybrids.append(current_identifier)
-                            else:
-                                raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
-                        elif 'DataObject' not in current_class.__name__:  # Further inheritance than dataobject
-                            structure = []
-                            this_class = None
-                            for this_class in current_class.__mro__:
-                                if 'DataObject' in this_class.__name__:
-                                    break
-                                try:
-                                    structure.append(Descriptor(this_class).descriptor['identifier'])
-                                except TypeError:
-                                    break  # This means we reached one of the built-in classes.
-                            if 'DataObject' in this_class.__name__:
-                                for index in reversed(range(1, len(structure))):
-                                    if structure[index] in inherit_table:
-                                        raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
-                                    inherit_table[structure[index]] = structure[index - 1]
+        for current_class in PluginController.get_hybrids():
+            try:
+                current_descriptor = Descriptor(current_class).descriptor
+            except TypeError:
+                continue
+            current_identifier = current_descriptor['identifier']
+            if current_identifier not in translation_table:
+                translation_table[current_identifier] = current_descriptor
+            if 'DataObject' in current_class.__base__.__name__:  # Further inheritance?
+                if current_identifier not in base_hybrids:
+                    base_hybrids.append(current_identifier)
+                else:
+                    raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
+            elif 'DataObject' not in current_class.__name__:  # Further inheritance than dataobject
+                structure = []
+                this_class = None
+                for this_class in current_class.__mro__:
+                    if 'DataObject' in this_class.__name__:
+                        break
+                    try:
+                        structure.append(Descriptor(this_class).descriptor['identifier'])
+                    except TypeError:
+                        break  # This means we reached one of the built-in classes.
+                if 'DataObject' in this_class.__name__:
+                    for index in reversed(range(1, len(structure))):
+                        if structure[index] in inherit_table:
+                            raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
+                        inherit_table[structure[index]] = structure[index - 1]
         items_replaced = True
         hybrids = {hybrid: None for hybrid in base_hybrids[:]}
         while items_replaced is True:
@@ -330,7 +323,7 @@ class Migration(object):
 
         migrators = []
         for member in PluginController.get_migration():
-            migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
+            migrators.append((member.identifier, member.migrate, member.THIS_VERSION))
 
         for identifier, method, end_version in migrators:
             start_version = data.get(identifier, 0)
