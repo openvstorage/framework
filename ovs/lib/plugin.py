@@ -27,6 +27,16 @@ class PluginController(_PluginController):
         pass
 
     @classmethod
+    def get_hybrids(cls):
+        # type: (Optional[str]) -> List[str]
+        """
+        Fetch the hybrids module in the wanted source folder. This is either ovs core or one of the plugins
+        :param source_folder: folder to fetch hybrids from. Defaults to ovs core
+        :return: list with hybrids
+        """
+        return [c for c in cls._fetch_classes(OVS_DAL_HYBRIDS) if 'Base' in c[1].__name__]
+
+    @classmethod
     def get_lib(cls):
         return cls._fetch_classes(OVS_LIB)
 
