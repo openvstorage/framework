@@ -329,7 +329,7 @@ class Migration(object):
             data = {}
 
         migrators = []
-        for member in PluginController.get_migration(): #todo check of nog nodig als geen dict meer
+        for member in PluginController.get_migration():
             migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
 
         for identifier, method, end_version in migrators:

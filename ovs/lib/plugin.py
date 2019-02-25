@@ -19,16 +19,12 @@ Plugincontroller parent class module
 """
 
 from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS, OVS_LIB, API_VIEWS
-from ovs_extensions.generic.plugin import _PluginController
+from ovs_extensions.generic.plugin import PluginController as _PluginController
 
 class PluginController(_PluginController):
 
     def get_tasks(self):
         pass
-
-    @classmethod
-    def get_hybrids(cls):
-        return cls._fetch_classes(OVS_DAL_HYBRIDS)
 
     @classmethod
     def get_lib(cls):
