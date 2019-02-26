@@ -17,9 +17,6 @@
 """
 Django URL module for main API
 """
-import os
-import imp
-import inspect
 import logging
 from inspect import getmembers
 from collections import namedtuple
@@ -30,7 +27,7 @@ from api.oauth2.tokenview import OAuth2TokenView
 from api.oauth2.redirectview import OAuth2RedirectView
 from api.openapi import OpenAPIView
 from api.view import MetadataView, relay
-
+from ovs.lib.plugin import PluginController
 
 logger = logging.getLogger(__name__)
 
@@ -293,7 +290,6 @@ def build_router_urls():
     Creates a router instance to generate API urls for Customer and Internal API
     """
     routes = []
-    from ovs.lib.plugin import PluginController
     for member in PluginController.get_webapps():
         routes.append({'prefix': member.prefix,
                        'viewset': member,

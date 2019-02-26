@@ -61,7 +61,7 @@ class PluginController(_PluginController):
         Fetch webapp viewsets
         :return: List with djano viewset objects
         """
-        return [ c for c in cls._fetch_classes(API_VIEWS)if 'ViewSet' in [base.__name__ for base in c.__bases__]]
+        return [c for c in cls._fetch_classes(API_VIEWS)if 'ViewSet' in [base.__name__ for base in c.__bases__]]
 
     @classmethod
     def get_migration(cls):
