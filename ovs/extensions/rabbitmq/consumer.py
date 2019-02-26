@@ -29,6 +29,7 @@ from ovs.constants.logging import RABBITMQ_LOGGER
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.rabbitmq.processor import process
+from ovs.lib.plugin import PluginController
 
 mapping = {}
 
@@ -69,18 +70,13 @@ if __name__ == '__main__':
         if run_event_consumer is True:
             # Load mapping
             mapping = {}
-            path = '/'.join([os.path.dirname(__file__), 'mappings'])
-            for filename in os.listdir(path):
-                if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                    name = filename.replace('.py', '')
-                    mod = imp.load_source(name, '/'.join([path, filename]))
-                    for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                        if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
-                            this_mapping = member[1].mapping
-                            for key in this_mapping.keys():
-                                if key not in mapping:
-                                    mapping[key] = []
-                                mapping[key] += this_mapping[key]
+
+            for member in PluginController.get_rabbitmq_mapping():
+                this_mapping = member.mapping
+                for key in this_mapping.keys():
+                    if key not in mapping:
+                        mapping[key] = []
+                    mapping[key] += this_mapping[key]
             logger.debug('Event map:')
             for key in mapping:
                 logger.debug('{0}: {1}'.format(key.name, [current_map['task'].__name__ for current_map in mapping[key]]))

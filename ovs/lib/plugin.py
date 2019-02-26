@@ -15,36 +15,68 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Plugincontroller parent class module
+Plugincontroller class module
 """
 
-from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS, OVS_LIB, API_VIEWS
+from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS, OVS_LIB, API_VIEWS, OVS_DAL_MIGRATION, OVS_LIB_HELPERS, RABBIT_MQ_MAPPINGS
 from ovs_extensions.generic.plugin import PluginController as _PluginController
 
-class PluginController(_PluginController):
 
-    def get_tasks(self):
-        pass
+class PluginController(_PluginController):
+    """
+    Plugincontroller to fetch ovs core classes
+    """
 
     @classmethod
-    def get_hybrids(cls, source_folder=None):
-        # type: (Optional[str]) -> List[str]
+    def get_hybrids(cls):
+        # type: () -> List[DataObject]
         """
-        Fetch the hybrids module in the wanted source folder. This is either ovs core or one of the plugins
-        :param source_folder: folder to fetch hybrids from. Defaults to ovs core
-        :return: list with hybrids
+        Fetch the hybrids module in the given folder.
+        :return: list with hybrid DAL DataObjects
         """
-        # return [c for c in cls._fetch_classes(OVS_DAL_HYBRIDS) if 'Base' in c[1].__name__]
-        return cls._fetch_classes(OVS_DAL_HYBRIDS)
+        from ovs.dal.dataobject import DataObject  # Circumvent circular dependencies
+        return cls._fetch_classes(OVS_DAL_HYBRIDS, filter_class=DataObject)
 
     @classmethod
     def get_lib(cls):
+        """
+        Fetch the controllers in the lib module
+        :return: List of controller objects
+        """
         return cls._fetch_classes(OVS_LIB)
 
     @classmethod
+    def get_lib_helpers(cls):
+        # type: () -> List[object]
+        """
+        Fetch lib helper objects
+        :return: List of these helper objects
+        """
+        return cls._fetch_classes(OVS_LIB_HELPERS)
+
+    @classmethod
     def get_webapps(cls):
-        return [c for c in cls._fetch_classes(API_VIEWS) if 'ViewSet' in [base.__name__ for base in c.__bases__]]
+        # type: () -> List[object]
+        """
+        Fetch webapp viewsets
+        :return: List with djano viewset objects
+        """
+        return [ c for c in cls._fetch_classes(API_VIEWS)if 'ViewSet' in [base.__name__ for base in c.__bases__]]
 
     @classmethod
     def get_migration(cls):
-        return [c for c in cls._fetch_classes(API_VIEWS) if 'object' in [base.__name__ for base in c.__bases__]]
+        # type: () -> List[object]
+        """
+        Fetch ovs migration objects
+        :return: List of these migration objects
+        """
+        return cls._fetch_classes(OVS_DAL_MIGRATION, filter_class=object)
+
+    @classmethod
+    def get_rabbitmq_mapping(cls):
+        # type: () -> List[object]
+        """
+        Fetch rabbitmq mapping objects
+        :return: List of these mapping objects
+        """
+        return cls._fetch_classes(RABBIT_MQ_MAPPINGS, filter_class=object)
