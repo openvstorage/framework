@@ -18,17 +18,15 @@
 Module containing certain helper classes providing various logic
 """
 
-import os
 import re
 import copy
 import time
 import inspect
 import hashlib
 import logging
-import importlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS, OVS_DAL_HYBRIDS_FILE, OVS_DAL_MIGRATION
+from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS
 from ovs.lib.plugin import PluginController
 
 class Descriptor(object):
@@ -153,6 +151,8 @@ class HybridRunner(object):
         """
         Yields all hybrid classes
         """
+        from ovs.dal.dataobject import DataObject  # Import here to prevent circular dependencies
+
         key = 'ovs_hybrid_structure'
         if key in HybridRunner.cache:  # Check local cache
             return HybridRunner.cache[key]
@@ -172,22 +172,22 @@ class HybridRunner(object):
             current_identifier = current_descriptor['identifier']
             if current_identifier not in translation_table:
                 translation_table[current_identifier] = current_descriptor
-            if 'DataObject' in current_class.__base__.__name__:  # Further inheritance?
+            if  DataObject in current_class.mro():  # Further inheritance?
                 if current_identifier not in base_hybrids:
                     base_hybrids.append(current_identifier)
                 else:
                     raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
-            elif 'DataObject' not in current_class.__name__:  # Further inheritance than dataobject
+            elif DataObject is not current_class:  # Further inheritance than dataobject
                 structure = []
                 this_class = None
-                for this_class in current_class.__mro__:
-                    if 'DataObject' in this_class.__name__:
+                for this_class in inspect.getmro(current_class):
+                    if this_class is DataObject:
                         break
                     try:
                         structure.append(Descriptor(this_class).descriptor['identifier'])
                     except TypeError:
                         break  # This means we reached one of the built-in classes.
-                if 'DataObject' in this_class.__name__:
+                if this_class is DataObject:
                     for index in reversed(range(1, len(structure))):
                         if structure[index] in inherit_table:
                             raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))

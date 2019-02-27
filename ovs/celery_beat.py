@@ -71,16 +71,15 @@ class DistributedScheduler(Scheduler):
     def _discover_schedule(self):
         schedules = {}
         self._schedule_info = {}
-        classes = PluginController.get_lib()
-        for member in classes.values():
-            for submember in inspect.getmembers(member[1]):
-                if hasattr(submember[1], 'schedule') and isinstance(submember[1].schedule, Schedule):
-                    schedule, source = submember[1].schedule.generate_schedule(submember[1].name)
+        for member in PluginController.get_lib():
+            for submember_name, submember in inspect.getmembers(member):
+                if hasattr(submember, 'schedule') and isinstance(submember.schedule, Schedule):
+                    schedule, source = submember.schedule.generate_schedule(submember.name)
                     if schedule is not None:
-                        schedules[submember[1].name] = {'task': submember[1].name,
-                                                        'schedule': schedule,
-                                                        'args': []}
-                    self._schedule_info[submember[1].name] = source
+                        schedules[submember.name] = {'task': submember.name,
+                                                     'schedule': schedule,
+                                                     'args': []}
+                    self._schedule_info[submember.name] = source
         return schedules
 
     def _load_schedule(self):

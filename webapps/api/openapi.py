@@ -31,6 +31,7 @@ from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.plugin import PluginController
 
 
@@ -372,24 +373,29 @@ class OpenAPIView(View):
                     if current_path not in paths:
                         paths[current_path] = {}
                     paths[current_path].update(route)
-            funs = [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod) if fun[0] not in base_calls.keys()]
+            funs = [func for func_name, func in inspect.getmembers(cls, predicate=inspect.ismethod) if func_name not in base_calls.keys()]
+            volatile = VolatileFactory.get_client()
             for fun in funs:
                 if hasattr(fun, 'bind_to_methods'):
                     routes = {}
-                    docstring = fun.__doc__.strip().split('\n')[0]
-                    parameters = load_parameters(fun)
-                    return_code, schema = load_response(fun)
                     name = fun.__name__
-                    for verb in fun.bind_to_methods:
-                        routes[verb] = {'summary': docstring,
-                                        'operationId': '{0}.{1}_{2}'.format(cls.prefix, verb, name),
-                                        'responses': {return_code: {'description': docstring},
-                                                      'default': {'description': 'Error payload',
-                                                                  'schema': {'$ref': '#/definitions/APIError'}}},
-                                        'parameters': parameters}
-                        if schema is not None:
-                            routes[verb]['responses'][return_code]['schema'] = schema
+                    cached_routes = volatile.get('openapi_{0}'.format(name), default={})
+                    if not cached_routes:
+                        docstring = fun.__doc__.strip().split('\n')[0]
+                        parameters = load_parameters(fun)
+                        return_code, schema = load_response(fun)
+                        for verb in fun.bind_to_methods:
+                            routes[verb] = {'summary': docstring,
+                                            'operationId': '{0}.{1}_{2}'.format(cls.prefix, verb, name),
+                                            'responses': {return_code: {'description': docstring},
+                                                          'default': {'description': 'Error payload',
+                                                                      'schema': {'$ref': '#/definitions/APIError'}}},
+                                            'parameters': parameters}
+                            if schema is not None:
+                                routes[verb]['responses'][return_code]['schema'] = schema
+                        volatile.set('openapi_{0}'.format(name), routes)
                     paths['/{0}/{{guid}}/{1}/'.format(cls.prefix, name)] = routes
+
 
         # DataObject / hybrids
         def build_property(prop):

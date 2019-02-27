@@ -27,9 +27,12 @@ class PluginController(_PluginController):
     Plugincontroller to fetch ovs core classes
     """
 
+    def __init__(self):
+        pass
+
     @classmethod
     def get_hybrids(cls):
-        # type: () -> List[DataObject]
+        # type: () -> List[ovs.dal.dataobject.MetaClass]
         """
         Fetch the hybrids module in the given folder.
         :return: list with hybrid DAL DataObjects
@@ -39,6 +42,7 @@ class PluginController(_PluginController):
 
     @classmethod
     def get_lib(cls):
+        # type: () -> List[type]
         """
         Fetch the controllers in the lib module
         :return: List of controller objects
@@ -47,7 +51,7 @@ class PluginController(_PluginController):
 
     @classmethod
     def get_lib_helpers(cls):
-        # type: () -> List[object]
+        # type: () -> List[type]
         """
         Fetch lib helper objects
         :return: List of these helper objects
@@ -56,16 +60,16 @@ class PluginController(_PluginController):
 
     @classmethod
     def get_webapps(cls):
-        # type: () -> List[object]
+        # type: () -> List[type]
         """
         Fetch webapp viewsets
         :return: List with djano viewset objects
         """
-        return [c for c in cls._fetch_classes(API_VIEWS)if 'ViewSet' in [base.__name__ for base in c.__bases__]]
+        return [c for c in cls._fetch_classes(API_VIEWS) if 'ViewSet' in [base.__name__ for base in c.__bases__]]
 
     @classmethod
     def get_migration(cls):
-        # type: () -> List[object]
+        # type: () -> List[type]
         """
         Fetch ovs migration objects
         :return: List of these migration objects
@@ -74,7 +78,7 @@ class PluginController(_PluginController):
 
     @classmethod
     def get_rabbitmq_mapping(cls):
-        # type: () -> List[object]
+        # type: () -> List[type]
         """
         Fetch rabbitmq mapping objects
         :return: List of these mapping objects
