@@ -42,6 +42,8 @@ class OpenAPIView(View):
     """
     _logger = logging.getLogger(__name__)
 
+    openapi_cache_key = '{0}.get'.format(__name__)
+
     @auto_response(beautify=True)
     @load()
     def get(self):
@@ -49,6 +51,11 @@ class OpenAPIView(View):
         returns OpenAPI specs
         """
         version = settings.VERSION[-1]
+        volatile = VolatileFactory.get_client()
+        data = volatile.get(self.openapi_cache_key, default={})
+        if data:
+            return data
+
         data = {'swagger': '2.0',
                 'info': {'title': 'Open vStorage',
                          'description': 'The Open vStorage API.',
@@ -374,26 +381,22 @@ class OpenAPIView(View):
                         paths[current_path] = {}
                     paths[current_path].update(route)
             funs = [func for func_name, func in inspect.getmembers(cls, predicate=inspect.ismethod) if func_name not in base_calls.keys()]
-            volatile = VolatileFactory.get_client()
             for fun in funs:
                 if hasattr(fun, 'bind_to_methods'):
                     routes = {}
                     name = fun.__name__
-                    cached_routes = volatile.get('openapi_{0}'.format(name), default={})
-                    if not cached_routes:
-                        docstring = fun.__doc__.strip().split('\n')[0]
-                        parameters = load_parameters(fun)
-                        return_code, schema = load_response(fun)
-                        for verb in fun.bind_to_methods:
-                            routes[verb] = {'summary': docstring,
-                                            'operationId': '{0}.{1}_{2}'.format(cls.prefix, verb, name),
-                                            'responses': {return_code: {'description': docstring},
-                                                          'default': {'description': 'Error payload',
-                                                                      'schema': {'$ref': '#/definitions/APIError'}}},
-                                            'parameters': parameters}
-                            if schema is not None:
-                                routes[verb]['responses'][return_code]['schema'] = schema
-                        volatile.set('openapi_{0}'.format(name), routes)
+                    docstring = fun.__doc__.strip().split('\n')[0]
+                    parameters = load_parameters(fun)
+                    return_code, schema = load_response(fun)
+                    for verb in fun.bind_to_methods:
+                        routes[verb] = {'summary': docstring,
+                                        'operationId': '{0}.{1}_{2}'.format(cls.prefix, verb, name),
+                                        'responses': {return_code: {'description': docstring},
+                                                      'default': {'description': 'Error payload',
+                                                                  'schema': {'$ref': '#/definitions/APIError'}}},
+                                        'parameters': parameters}
+                        if schema is not None:
+                            routes[verb]['responses'][return_code]['schema'] = schema
                     paths['/{0}/{{guid}}/{1}/'.format(cls.prefix, name)] = routes
 
 
@@ -523,7 +526,7 @@ class OpenAPIView(View):
                                                    {'type': 'object',
                                                     'properties': get_properties(cls),
                                                     'required': get_required_properties(cls)}]}
-
+        volatile.set(self.openapi_cache_key, data)
         return data
 
     @csrf_exempt

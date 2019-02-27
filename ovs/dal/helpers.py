@@ -172,15 +172,19 @@ class HybridRunner(object):
             current_identifier = current_descriptor['identifier']
             if current_identifier not in translation_table:
                 translation_table[current_identifier] = current_descriptor
-            if  DataObject in current_class.mro():  # Further inheritance?
+            mro_current_class = inspect.getmro(current_class)
+            if len(mro_current_class) < 2:
+                raise RuntimeError('Given class has no baseclass')
+            direct_parent = mro_current_class[1]
+            if DataObject == direct_parent:  # Check if direct child of DataObject
                 if current_identifier not in base_hybrids:
                     base_hybrids.append(current_identifier)
                 else:
                     raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
-            elif DataObject is not current_class:  # Further inheritance than dataobject
+            elif DataObject is not current_class:  # Check if indirect child of DataObject
                 structure = []
                 this_class = None
-                for this_class in inspect.getmro(current_class):
+                for this_class in mro_current_class:
                     if this_class is DataObject:
                         break
                     try:
