@@ -18,9 +18,7 @@
 Metadata views
 """
 
-import os
 import re
-import imp
 import inspect
 import logging
 from django.views.generic import View
@@ -33,6 +31,8 @@ from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.lib.plugin import PluginController
 
 
 # noinspection PyProtectedMember
@@ -42,6 +42,8 @@ class OpenAPIView(View):
     """
     _logger = logging.getLogger(__name__)
 
+    openapi_cache_key = '{0}.get'.format(__name__)
+
     @auto_response(beautify=True)
     @load()
     def get(self):
@@ -49,6 +51,11 @@ class OpenAPIView(View):
         returns OpenAPI specs
         """
         version = settings.VERSION[-1]
+        volatile = VolatileFactory.get_client()
+        data = volatile.get(self.openapi_cache_key, default={})
+        if data:
+            return data
+
         data = {'swagger': '2.0',
                 'info': {'title': 'Open vStorage',
                          'description': 'The Open vStorage API.',
@@ -347,57 +354,51 @@ class OpenAPIView(View):
             return response_code, response_schema
 
         paths = data['paths']
-        path = '/'.join([os.path.dirname(__file__), 'backend', 'views'])
-        for filename in os.listdir(path):
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
-                        cls = member[1]
-                        if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
-                            continue
-                        base_calls = {'list': ['get', '/{0}/'],
-                                      'retrieve': ['get', '/{0}/{{guid}}/'],
-                                      'create': ['post', '/{0}/'],
-                                      'destroy': ['delete', '/{0}/{{guid}}/'],
-                                      'partial_update': ['patch', '/{0}/{{guid}}/']}
-                        for call, route_data in base_calls.iteritems():
-                            if hasattr(cls, call):
-                                fun = getattr(cls, call)
-                                docstring = fun.__doc__.strip().split('\n')[0]
-                                parameters = load_parameters(fun)
-                                return_code, schema = load_response(fun)
-                                route = {route_data[0]: {'summary': docstring,
-                                                         'operationId': '{0}.{1}'.format(member[1].prefix, call),
-                                                         'responses': {return_code: {'description': docstring},
-                                                                       'default': {'description': 'Error payload',
-                                                                                   'schema': {'$ref': '#/definitions/APIError'}}},
-                                                         'parameters': parameters}}
-                                if schema is not None:
-                                    route[route_data[0]]['responses'][return_code]['schema'] = schema
-                                current_path = route_data[1].format(member[1].prefix)
-                                if current_path not in paths:
-                                    paths[current_path] = {}
-                                paths[current_path].update(route)
-                        funs = [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod) if fun[0] not in base_calls.keys()]
-                        for fun in funs:
-                            if hasattr(fun, 'bind_to_methods'):
-                                routes = {}
-                                docstring = fun.__doc__.strip().split('\n')[0]
-                                parameters = load_parameters(fun)
-                                return_code, schema = load_response(fun)
-                                name = fun.__name__
-                                for verb in fun.bind_to_methods:
-                                    routes[verb] = {'summary': docstring,
-                                                    'operationId': '{0}.{1}_{2}'.format(member[1].prefix, verb, name),
-                                                    'responses': {return_code: {'description': docstring},
-                                                                  'default': {'description': 'Error payload',
-                                                                              'schema': {'$ref': '#/definitions/APIError'}}},
-                                                    'parameters': parameters}
-                                    if schema is not None:
-                                        routes[verb]['responses'][return_code]['schema'] = schema
-                                paths['/{0}/{{guid}}/{1}/'.format(member[1].prefix, name)] = routes
+        for cls in PluginController.get_webapps():
+            if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
+                continue
+            base_calls = {'list': ['get', '/{0}/'],
+                          'retrieve': ['get', '/{0}/{{guid}}/'],
+                          'create': ['post', '/{0}/'],
+                          'destroy': ['delete', '/{0}/{{guid}}/'],
+                          'partial_update': ['patch', '/{0}/{{guid}}/']}
+            for call, route_data in base_calls.iteritems():
+                if hasattr(cls, call):
+                    fun = getattr(cls, call)
+                    docstring = fun.__doc__.strip().split('\n')[0]
+                    parameters = load_parameters(fun)
+                    return_code, schema = load_response(fun)
+                    route = {route_data[0]: {'summary': docstring,
+                                             'operationId': '{0}.{1}'.format(cls.prefix, call),
+                                             'responses': {return_code: {'description': docstring},
+                                                           'default': {'description': 'Error payload',
+                                                                       'schema': {'$ref': '#/definitions/APIError'}}},
+                                             'parameters': parameters}}
+                    if schema is not None:
+                        route[route_data[0]]['responses'][return_code]['schema'] = schema
+                    current_path = route_data[1].format(cls.prefix)
+                    if current_path not in paths:
+                        paths[current_path] = {}
+                    paths[current_path].update(route)
+            funs = [func for func_name, func in inspect.getmembers(cls, predicate=inspect.ismethod) if func_name not in base_calls.keys()]
+            for fun in funs:
+                if hasattr(fun, 'bind_to_methods'):
+                    routes = {}
+                    name = fun.__name__
+                    docstring = fun.__doc__.strip().split('\n')[0]
+                    parameters = load_parameters(fun)
+                    return_code, schema = load_response(fun)
+                    for verb in fun.bind_to_methods:
+                        routes[verb] = {'summary': docstring,
+                                        'operationId': '{0}.{1}_{2}'.format(cls.prefix, verb, name),
+                                        'responses': {return_code: {'description': docstring},
+                                                      'default': {'description': 'Error payload',
+                                                                  'schema': {'$ref': '#/definitions/APIError'}}},
+                                        'parameters': parameters}
+                        if schema is not None:
+                            routes[verb]['responses'][return_code]['schema'] = schema
+                    paths['/{0}/{{guid}}/{1}/'.format(cls.prefix, name)] = routes
+
 
         # DataObject / hybrids
         def build_property(prop):
@@ -525,7 +526,7 @@ class OpenAPIView(View):
                                                    {'type': 'object',
                                                     'properties': get_properties(cls),
                                                     'required': get_required_properties(cls)}]}
-
+        volatile.set(self.openapi_cache_key, data)
         return data
 
     @csrf_exempt

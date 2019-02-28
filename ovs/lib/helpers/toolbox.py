@@ -20,7 +20,6 @@ Module containing certain helper classes providing various logic
 
 import os
 import re
-import imp
 import time
 import random
 import string
@@ -32,6 +31,7 @@ from ovs_extensions.constants import is_unittest_mode
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.interactive import Interactive
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.lib.plugin import PluginController
 
 
 class Toolbox(object):
@@ -60,22 +60,15 @@ class Toolbox(object):
         """
         if is_unittest_mode():
             return Toolbox._function_pointers.get('{0}-{1}'.format(component, sub_component), [])
-
         functions = []
-        path = '{0}/../'.format(os.path.dirname(__file__))
-        for filename in os.listdir(path):
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        for submember in inspect.getmembers(member[1]):
-                            if hasattr(submember[1], 'hooks') \
-                                    and isinstance(submember[1].hooks, dict) \
-                                    and component in submember[1].hooks \
-                                    and isinstance(submember[1].hooks[component], list) \
-                                    and sub_component in submember[1].hooks[component]:
-                                functions.append(submember[1])
+        for member in PluginController.get_lib_helpers():
+            for submember_name, submember in inspect.getmembers(member):
+                if hasattr(submember, 'hooks') \
+                        and isinstance(submember.hooks, dict) \
+                        and component in submember.hooks \
+                        and isinstance(submember.hooks[component], list) \
+                        and sub_component in submember.hooks[component]:
+                    functions.append(submember)
         return functions
 
     @staticmethod

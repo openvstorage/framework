@@ -18,8 +18,6 @@
 Celery beat module
 """
 
-import os
-import imp
 import time
 import cPickle
 import inspect
@@ -32,6 +30,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.lib.plugin import PluginController
 from ovs.lib.helpers.toolbox import Schedule
 
 
@@ -72,21 +71,15 @@ class DistributedScheduler(Scheduler):
     def _discover_schedule(self):
         schedules = {}
         self._schedule_info = {}
-        path = '/'.join([os.path.dirname(__file__), 'lib'])
-        for filename in os.listdir(path):
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name:
-                        for submember in inspect.getmembers(member[1]):
-                            if hasattr(submember[1], 'schedule') and isinstance(submember[1].schedule, Schedule):
-                                schedule, source = submember[1].schedule.generate_schedule(submember[1].name)
-                                if schedule is not None:
-                                    schedules[submember[1].name] = {'task': submember[1].name,
-                                                                    'schedule': schedule,
-                                                                    'args': []}
-                                self._schedule_info[submember[1].name] = source
+        for member in PluginController.get_lib():
+            for submember_name, submember in inspect.getmembers(member):
+                if hasattr(submember, 'schedule') and isinstance(submember.schedule, Schedule):
+                    schedule, source = submember.schedule.generate_schedule(submember.name)
+                    if schedule is not None:
+                        schedules[submember.name] = {'task': submember.name,
+                                                     'schedule': schedule,
+                                                     'args': []}
+                    self._schedule_info[submember.name] = source
         return schedules
 
     def _load_schedule(self):

@@ -17,12 +17,12 @@
 """
 APIConfiguration module
 """
-import os
-import imp
 import inspect
 import unittest
+from ovs_extensions.constants.modules import API_VIEWS
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.packages.packagefactory import PackageFactory
+from ovs.lib.plugin import PluginController
 
 
 class APIConfiguration(unittest.TestCase):
@@ -43,7 +43,7 @@ class APIConfiguration(unittest.TestCase):
         functions, return_exceptions = APIConfiguration._get_functions()
         errors = []
         for fun in functions:
-            fun_id = '{0}.{1}'.format(fun.__module__, fun.__name__)
+            fun_id = self.retrieve_view_and_func_name('{0}.{1}'.format(fun.__module__, fun.__name__))
             if not hasattr(fun, 'ovs_metadata'):
                 errors.append('{0} - Missing metadata'.format(fun_id))
                 continue
@@ -78,7 +78,7 @@ class APIConfiguration(unittest.TestCase):
                     continue
                 if ':return:' not in fun.__doc__ or ':rtype:' not in fun.__doc__:
                     errors.append('{0} - Missing return docstring'.format(fun_id))
-        self.assertEqual(len(errors), 0, 'One or more errors are found:\n- {0}'.format('\n- '.join(errors)))
+        self.assertEqual(len(errors), 0, '{0} errors are found:\n- {1}'.format(len(errors), '\n- '.join(errors)))
 
     def test_load(self):
         """
@@ -109,24 +109,30 @@ class APIConfiguration(unittest.TestCase):
                     missing_params.append(parameter)
             if len(missing_params) > 0:
                 errors.append('{0} - Missing docstring for parameters {1}'.format(fun_id, ', '.join(missing_params)))
-        self.assertEqual(len(errors), 0, 'One or more errors are found:\n- {0}'.format('\n- '.join(errors)))
+        self.assertEqual(len(errors), 0, '{0} errors are found:\n- {1}'.format(len(errors), '\n- '.join(errors)))
 
     @staticmethod
     def _get_functions():
         funs = []
         return_exceptions = []
-        path = '/'.join([os.path.dirname(__file__), '..', 'backend', 'views'])
-        for filename in os.listdir(path):
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
-                        cls = member[1]
-                        if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
-                            continue
-                        if hasattr(cls, 'return_exceptions'):
-                            return_exceptions += cls.return_exceptions
-                        base_calls = ['list', 'retrieve', 'create', 'destroy', 'partial_update']
-                        funs += [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod) if fun[0] in base_calls or hasattr(fun[1], 'bind_to_methods')]
+        for cls in PluginController.get_webapps():
+            if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
+                continue
+            if hasattr(cls, 'return_exceptions'):
+                return_exceptions += cls.return_exceptions
+            base_calls = ['list', 'retrieve', 'create', 'destroy', 'partial_update']
+            funs += [func for func_name, func in inspect.getmembers(cls, predicate=inspect.ismethod)
+                     if func_name in base_calls or hasattr(func, 'bind_to_methods')]
         return funs, return_exceptions
+
+    @staticmethod
+    def retrieve_view_and_func_name(full_module_path):
+        # type: (str) -> str
+        """
+        Only retrieve the view and funcname instead of the fullpath
+        :param full_module_path: The complete module path eg api.views.backend.a_view.a_func
+        :type full_module_path: str
+        :return: The view_func path eg a_view.a_func
+        :rtype: str
+        """
+        return full_module_path.replace(API_VIEWS + '.', '')

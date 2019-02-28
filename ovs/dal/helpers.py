@@ -18,9 +18,7 @@
 Module containing certain helper classes providing various logic
 """
 
-import os
 import re
-import imp
 import copy
 import time
 import inspect
@@ -28,7 +26,8 @@ import hashlib
 import logging
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-
+from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS
+from ovs.lib.plugin import PluginController
 
 class Descriptor(object):
     """
@@ -57,7 +56,7 @@ class Descriptor(object):
 
             type_name = object_type.__name__
             module_name = object_type.__module__.split('.')[-1]
-            fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)  # Fully qualified module name
+            fqm_name = '{0}.{1}'.format(OVS_DAL_HYBRIDS, module_name)  # Fully qualified module name
             identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
             if identifier in Descriptor.descriptor_cache and cached is True:
                 self._descriptor = Descriptor.descriptor_cache[identifier]
@@ -152,6 +151,8 @@ class HybridRunner(object):
         """
         Yields all hybrid classes
         """
+        from ovs.dal.dataobject import DataObject  # Import here to prevent circular dependencies
+
         key = 'ovs_hybrid_structure'
         if key in HybridRunner.cache:  # Check local cache
             return HybridRunner.cache[key]
@@ -163,41 +164,38 @@ class HybridRunner(object):
         base_hybrids = []
         inherit_table = {}
         translation_table = {}
-        path = '/'.join([os.path.dirname(__file__), 'hybrids'])
-        for filename in os.listdir(path):  # Query filesystem
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name:
-                        current_class = member[1]
-                        try:
-                            current_descriptor = Descriptor(current_class).descriptor
-                        except TypeError:
-                            continue
-                        current_identifier = current_descriptor['identifier']
-                        if current_identifier not in translation_table:
-                            translation_table[current_identifier] = current_descriptor
-                        if 'DataObject' in current_class.__base__.__name__:  # Further inheritance?
-                            if current_identifier not in base_hybrids:
-                                base_hybrids.append(current_identifier)
-                            else:
-                                raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
-                        elif 'DataObject' not in current_class.__name__:  # Further inheritance than dataobject
-                            structure = []
-                            this_class = None
-                            for this_class in current_class.__mro__:
-                                if 'DataObject' in this_class.__name__:
-                                    break
-                                try:
-                                    structure.append(Descriptor(this_class).descriptor['identifier'])
-                                except TypeError:
-                                    break  # This means we reached one of the built-in classes.
-                            if 'DataObject' in this_class.__name__:
-                                for index in reversed(range(1, len(structure))):
-                                    if structure[index] in inherit_table:
-                                        raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
-                                    inherit_table[structure[index]] = structure[index - 1]
+        for current_class in PluginController.get_hybrids():
+            try:
+                current_descriptor = Descriptor(current_class).descriptor
+            except TypeError:
+                continue
+            current_identifier = current_descriptor['identifier']
+            if current_identifier not in translation_table:
+                translation_table[current_identifier] = current_descriptor
+            mro_current_class = inspect.getmro(current_class)
+            if len(mro_current_class) < 2:
+                raise RuntimeError('Given class has no baseclass')
+            direct_parent = mro_current_class[1]
+            if DataObject == direct_parent:  # Check if direct child of DataObject
+                if current_identifier not in base_hybrids:
+                    base_hybrids.append(current_identifier)
+                else:
+                    raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
+            elif DataObject is not current_class:  # Check if indirect child of DataObject
+                structure = []
+                this_class = None
+                for this_class in mro_current_class:
+                    if this_class is DataObject:
+                        break
+                    try:
+                        structure.append(Descriptor(this_class).descriptor['identifier'])
+                    except TypeError:
+                        break  # This means we reached one of the built-in classes.
+                if this_class is DataObject:
+                    for index in reversed(range(1, len(structure))):
+                        if structure[index] in inherit_table:
+                            raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
+                        inherit_table[structure[index]] = structure[index - 1]
         items_replaced = True
         hybrids = {hybrid: None for hybrid in base_hybrids[:]}
         while items_replaced is True:
@@ -328,14 +326,8 @@ class Migration(object):
             data = {}
 
         migrators = []
-        path = '/'.join([os.path.dirname(__file__), 'migration'])
-        for filename in os.listdir(path):
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
+        for member in PluginController.get_migration():
+            migrators.append((member.identifier, member.migrate, member.THIS_VERSION))
 
         for identifier, method, end_version in migrators:
             start_version = data.get(identifier, 0)

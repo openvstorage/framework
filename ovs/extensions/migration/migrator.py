@@ -17,11 +17,9 @@
 Migrator module
 """
 
-import os
-import imp
-import inspect
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
+from ovs.lib.plugin import PluginController
 
 
 class Migrator(object):
@@ -42,14 +40,8 @@ class Migrator(object):
         key = '/ovs/framework/hosts/{0}/versions'.format(machine_id)
         data = Configuration.get(key) if Configuration.exists(key) else {}
         migrators = []
-        path = '/'.join([os.path.dirname(__file__), 'migration'])
-        for filename in os.listdir(path):
-            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                mod = imp.load_source(name, '/'.join([path, filename]))
-                for member in inspect.getmembers(mod, predicate=inspect.isclass):
-                    if member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        migrators.append((member[1].identifier, member[1].migrate, member[1].THIS_VERSION))
+        for member in PluginController.get_migration():
+            migrators.append((member.identifier, member.migrate, member.THIS_VERSION))
 
         for identifier, method, end_version in migrators:
             start_version = data.get(identifier, 0)
