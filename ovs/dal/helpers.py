@@ -326,7 +326,7 @@ class Migration(object):
             data = {}
 
         migrators = []
-        for member in PluginController.get_migration():
+        for member in PluginController.get_dal_migrators():
             migrators.append((member.identifier, member.migrate, member.THIS_VERSION))
 
         for identifier, method, end_version in migrators:

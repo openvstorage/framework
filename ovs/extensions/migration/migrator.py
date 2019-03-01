@@ -40,7 +40,7 @@ class Migrator(object):
         key = '/ovs/framework/hosts/{0}/versions'.format(machine_id)
         data = Configuration.get(key) if Configuration.exists(key) else {}
         migrators = []
-        for member in PluginController.get_migration():
+        for member in PluginController.get_extensions_migrators():
             migrators.append((member.identifier, member.migrate, member.THIS_VERSION))
 
         for identifier, method, end_version in migrators:
