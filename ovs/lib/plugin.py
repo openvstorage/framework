@@ -18,7 +18,7 @@
 Plugincontroller class module
 """
 
-from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS, OVS_LIB, API_VIEWS, OVS_DAL_MIGRATION, OVS_LIB_HELPERS, RABBIT_MQ_MAPPINGS
+from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS, OVS_LIB, API_VIEWS, OVS_LIB_HELPERS, RABBIT_MQ_MAPPINGS
 from ovs_extensions.generic.plugin import PluginController as _PluginController
 
 
@@ -68,13 +68,24 @@ class PluginController(_PluginController):
         return [c for c in cls._fetch_classes(API_VIEWS) if 'ViewSet' in [base.__name__ for base in c.__bases__]]
 
     @classmethod
-    def get_migration(cls):
-        # type: () -> List[type]
+    def get_dal_migrators(cls):
+        # type: () -> List[Type[object]]
         """
-        Fetch ovs migration objects
-        :return: List of these migration objects
+        Fetch the DAL migrator objects
+        :rtype: List[Type[object]]
         """
-        return cls._fetch_classes(OVS_DAL_MIGRATION, filter_class=object)
+        from ovs.dal import migration
+        return cls._fetch_classes(migration.__name__, filter_class=object)
+
+    @classmethod
+    def get_extensions_migrators(cls):
+        # type: () -> List[Type[object]]
+        """
+        Fetch the extensions migrator objects
+        :rtype: List[Type[object]]
+        """
+        from ovs.extensions.migration import migration
+        return cls._fetch_classes(migration.__name__, filter_class=object)
 
     @classmethod
     def get_rabbitmq_mapping(cls):
