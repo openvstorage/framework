@@ -29,6 +29,7 @@ from api.oauth2.decorators import auto_response
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
+from ovs_extensions.constants.framework import PLUGINS_INSTALLED
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -147,7 +148,7 @@ class OpenAPIView(View):
                 if backend_type.code not in plugins:
                     plugins[backend_type.code] = []
                 plugins[backend_type.code] += ['backend', 'gui']
-        generic_plugins = Configuration.get('/ovs/framework/plugins/installed|generic')
+        generic_plugins = Configuration.get('{0}|generic'.format(PLUGINS_INSTALLED))
         for plugin_name in generic_plugins:
             if plugin_name not in plugins:
                 plugins[plugin_name] = []

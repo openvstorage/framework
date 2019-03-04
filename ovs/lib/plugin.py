@@ -50,21 +50,13 @@ class PluginController(_PluginController):
         return cls._fetch_classes(OVS_LIB)
 
     @classmethod
-    def get_lib_helpers(cls):
-        # type: () -> List[type]
-        """
-        Fetch lib helper objects
-        :return: List of these helper objects
-        """
-        return cls._fetch_classes(OVS_LIB_HELPERS)
-
-    @classmethod
     def get_webapps(cls):
         # type: () -> List[type]
         """
         Fetch webapp viewsets
         :return: List with djano viewset objects
         """
+        # Namechecking is necesarry here because import from django from viewset is not allowed
         return [c for c in cls._fetch_classes(API_VIEWS) if 'ViewSet' in [base.__name__ for base in c.__bases__]]
 
     @classmethod

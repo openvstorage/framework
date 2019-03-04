@@ -61,7 +61,7 @@ class Toolbox(object):
         if is_unittest_mode():
             return Toolbox._function_pointers.get('{0}-{1}'.format(component, sub_component), [])
         functions = []
-        for member in PluginController.get_lib_helpers():
+        for member in PluginController.get_lib():
             for submember_name, submember in inspect.getmembers(member):
                 if hasattr(submember, 'hooks') \
                         and isinstance(submember.hooks, dict) \
