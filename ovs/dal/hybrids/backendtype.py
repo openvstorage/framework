@@ -19,6 +19,7 @@ BackendType module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Dynamic
+from ovs_extensions.constants.framework import PLUGINS_INSTALLED
 from ovs.extensions.generic.configuration import Configuration
 
 
@@ -37,6 +38,6 @@ class BackendType(DataObject):
         Checks whether this BackendType has a plugin installed
         """
         try:
-            return self.code in Configuration.get('/ovs/framework/plugins/installed|backends')
+            return self.code in Configuration.get('{0}|backends'.format(PLUGINS_INSTALLED))
         except:
             return False

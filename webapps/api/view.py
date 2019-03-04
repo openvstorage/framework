@@ -32,6 +32,7 @@ from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs_extensions.api.client import OVSClient
+from ovs_extensions.constants.framework import PLUGINS_INSTALLED
 from ovs_extensions.api.exceptions import HttpMethodNotAllowedException
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
@@ -79,7 +80,7 @@ class MetadataView(View):
                         plugins[backend_type.code] = []
                     plugins[backend_type.code] += ['backend', 'gui']
             # - Generic plugins, as added to the configuration file(s)
-            generic_plugins = Configuration.get('/ovs/framework/plugins/installed|generic')
+            generic_plugins = Configuration.get('{0}|generic'.format(PLUGINS_INSTALLED))
             for plugin_name in generic_plugins:
                 if plugin_name not in plugins:
                     plugins[plugin_name] = []

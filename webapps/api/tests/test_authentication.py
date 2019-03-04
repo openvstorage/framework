@@ -35,6 +35,7 @@ from ovs.dal.hybrids.user import User
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.tests.helpers import DalHelper
 from ovs_extensions.api.exceptions import HttpBadRequestException, HttpTooManyRequestsException, HttpUnauthorizedException
+from ovs_extensions.constants.framework import PLUGINS_INSTALLED
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 
@@ -150,8 +151,8 @@ class Authentication(unittest.TestCase):
         from django.test import RequestFactory
         cls.factory = RequestFactory()
 
-        Configuration.set('/ovs/framework/plugins/installed', {'generic': [],
-                                                               'backends': []})
+        Configuration.set(PLUGINS_INSTALLED, {'generic': [],
+                                              'backends': []})
         Configuration.set('/ovs/framework/cluster_id', 'cluster_id')
         System._machine_id = {'none': '1'}
 
