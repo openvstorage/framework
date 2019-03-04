@@ -29,6 +29,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS
 from ovs.lib.plugin import PluginController
 
+
 class Descriptor(object):
     """
     The descriptor class contains metadata to instantiate objects that can be serialized.

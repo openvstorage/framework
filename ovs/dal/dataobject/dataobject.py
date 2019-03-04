@@ -24,7 +24,9 @@ import json
 import logging
 import inspect
 import hashlib
+from typing import Union
 from random import randint
+from .meta import MetaClass
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
                                 VolatileObjectException, UniqueConstraintViolationException)
@@ -36,75 +38,6 @@ from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-
-
-class MetaClass(type):
-    """
-    This metaclass provides dynamic __doc__ generation feeding doc generators
-    """
-
-    # noinspection PyInitNewSignature
-    def __new__(mcs, name, bases, dct):
-        """
-        Overrides instance creation of all DataObject instances
-        """
-        if name != 'DataObject':
-            # Property instantiation
-            for internal in ['_properties', '_relations', '_dynamics']:
-                data = set()
-                for base in bases:  # Extend properties for deeper inheritance
-                    if hasattr(base, internal):  # if the base already ran the metaclass: append to current class
-                        data.update(getattr(base, internal))
-                if '_{0}_{1}'.format(name, internal) in dct:  # instance._Testobject__properties. __properties cannot get overruled by inheritance
-                    data.update(dct.pop('_{0}_{1}'.format(name, internal)))
-                dct[internal] = list(data)
-            # Doc generation - properties
-            for prop in dct['_properties']:
-                docstring = prop.docstring
-                if isinstance(prop.property_type, type):
-                    itemtype = prop.property_type.__name__
-                    extra_info = ''
-                else:
-                    itemtype = 'Enum({0})'.format(prop.property_type[0].__class__.__name__)
-                    extra_info = '(enum values: {0})'.format(', '.join(prop.property_type))
-                dct[prop.name] = property(
-                    doc='[persistent] {0} {1}\n@type: {2}'.format(docstring, extra_info, itemtype)
-                )
-            # Doc generation - relations
-            for relation in dct['_relations']:
-                itemtype = relation.foreign_type.__name__ if relation.foreign_type is not None else name
-                dct[relation.name] = property(
-                    doc='[relation] one-to-{0} relation with {1}.{2}\n@type: {3}'.format(
-                        'one' if relation.onetoone else 'many',
-                        itemtype,
-                        relation.foreign_key,
-                        itemtype
-                    )
-                )
-            # Doc generation - dynamics
-            for dynamic in dct['_dynamics']:
-                if bases[0].__name__ == 'DataObject':
-                    if '_{0}'.format(dynamic.name) not in dct:
-                        raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(dynamic.name, name))
-                    method = dct['_{0}'.format(dynamic.name)]
-                else:
-                    methods = [getattr(base, '_{0}'.format(dynamic.name)) for base in bases if hasattr(base, '_{0}'.format(dynamic.name))]
-                    if len(methods) == 0:
-                        raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(dynamic.name, name))
-                    method = methods[0]
-                docstring = method.__doc__.strip()
-                if isinstance(dynamic.return_type, type):
-                    itemtype = dynamic.return_type.__name__
-                    extra_info = ''
-                else:
-                    itemtype = 'Enum({0})'.format(dynamic.return_type[0].__class__.__name__)
-                    extra_info = '(enum values: {0})'.format(', '.join(dynamic.return_type))
-                dct[dynamic.name] = property(
-                    fget=method,
-                    doc='[dynamic] ({0}s) {1} {2}\n@rtype: {3}'.format(dynamic.timeout, docstring, extra_info, itemtype)
-                )
-
-        return super(MetaClass, mcs).__new__(mcs, name, bases, dct)
 
 
 class DataObjectAttributeEncoder(json.JSONEncoder):
@@ -176,7 +109,6 @@ class DataObject(object):
         ** False: when saving, all changed data will be saved, regardless of external updates
         ** None: in case changed field were also changed externally, an error will be raised
         """
-
         # Initialize super class
         super(DataObject, self).__init__()
 
@@ -198,13 +130,8 @@ class DataObject(object):
         self._classname = self.__class__.__name__.lower()
 
         # Rebuild _relation types
-        hybrid_structure = HybridRunner.get_hybrids()
-        for relation in self._relations:
-            if relation.foreign_type is not None:  # If none -> points to itself
-                identifier = Descriptor(relation.foreign_type).descriptor['identifier']
-                if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
-                    # Point to relations of the original object when object got extended
-                    relation.foreign_type = Descriptor().load(hybrid_structure[identifier]).get_object()
+        self._build_relation_types()
+
         # Init guid
         self._new = False
         if guid is None:
@@ -215,31 +142,91 @@ class DataObject(object):
 
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(DataObject.NAMESPACE, self._classname, self._guid)
-
         # Worker mutexes
         self._mutex_version = volatile_mutex('ovs_dataversion_{0}_{1}'.format(self._classname, self._guid))
 
         # Load data from cache or persistent backend where appropriate
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
-        self._metadata['cache'] = None
-        if not self._new:
-            if data is not None:
-                self._data = copy.deepcopy(data)
-                self._metadata['cache'] = None
-            else:
-                self._data = self._volatile.get(self._key)
-                if self._data is None:
-                    self._metadata['cache'] = False
-                    try:
-                        self._data = self._persistent.get(self._key)
-                    except KeyNotFoundException:
-                        raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
-                            self.__class__.__name__, self._guid
-                        ))
-                else:
-                    self._metadata['cache'] = True
+        self._load_data(data)
 
+        # Build attributes
+        self._build_attributes()
+        # Cache the current data if required
+        self._cache_current_data(_hook)
+        # Freeze property creation
+        self._frozen = True
+        # Optionally, initialize some fields
+        self._initialize_fields(data)
+        # Store original data
+        self._original = copy.deepcopy(self._data)
+
+    def _initialize_fields(self, provided_data):
+        # type: (Union[None, dict]) -> None
+        """
+        Initialize the current properties after loading
+        :rtype: None
+        """
+        # @todo unsure if this is required because of the _data being initialized with the provided data
+        if provided_data is not None:
+            for prop in self._properties:
+                if prop.name in provided_data:
+                    setattr(self, prop.name, provided_data[prop.name])
+
+    def _cache_current_data(self, hooks):
+        # type: (Union[None, dict]) -> None
+        """
+        Cache the current data if required
+        :param hooks: Provided hooks for testing purposes
+        Will execute the 'during_cache' hook when present
+        :type hooks: dict
+        :rtype: None
+        """
+        if hooks is not None and 'before_cache' in hooks:
+            hooks['before_cache']()
+
+        if self._new:
+            # A new object is useless as it has no practical properties
+            return
+        # Re-cache the object, if required
+        if self._metadata['cache'] is False:
+            # The data wasn't loaded from the cache, so caching is required now
+            try:
+                self._mutex_version.acquire(30)
+                this_version = self._data['_version']
+                if hooks is not None and 'during_cache' in hooks:
+                    hooks['during_cache']()
+                store_version = self._persistent.get(self._key)['_version']
+                if this_version == store_version:
+                    self._volatile.set(self._key, self._data)
+            except KeyNotFoundException:
+                raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(self.__class__.__name__, self._guid))
+            except NoLockAvailableException:
+                pass
+            finally:
+                self._mutex_version.release()
+
+    def _build_relation_types(self):
+        """
+        Build all relation types
+        :return: None
+        :rtype: NoneType
+        """
+        hybrid_structure = HybridRunner.get_hybrids()
+        for relation in self._relations:
+            if relation.foreign_type is not None:  # If none -> points to itself
+                identifier = Descriptor(relation.foreign_type).descriptor['identifier']
+                if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
+                    # Point to relations of the original object when object got extended
+                    relation.foreign_type = Descriptor().load(hybrid_structure[identifier]).get_object()
+
+    def _build_attributes_old_style(self):
+        """
+        # DEPRECATED. USE ATTRIBUTES INSTEAD
+        Dynamically allocate all attributes
+        :return: None
+        :rtype: NoneType
+        """
         # Set default values on new fields
         for prop in self._properties:
             if prop.name not in self._data:
@@ -268,41 +255,41 @@ class DataObject(object):
                                       'data': None}
                 self._add_list_property(key, info['list'])
 
-        if _hook is not None and 'before_cache' in _hook:
-            _hook['before_cache']()
+    def _build_attributes(self):
+        # type: () -> None
+        # @todo review if still necessary (could just call the old style one)
+        """
+        Build attributes on the object. Not sure if still needed
+        Still supports dynamically allocation all attributes through _properties, _relation and _dynamic
+        :rtype: None
+        """
+        # Backwards compatibility
+        self._build_attributes_old_style()
 
-        if not self._new:  # A new object is useless as it has no practical properties
-            # Re-cache the object, if required
-            if self._metadata['cache'] is False:
-                # The data wasn't loaded from the cache, so caching is required now
-                try:
-                    self._mutex_version.acquire(30)
-                    this_version = self._data['_version']
-                    if _hook is not None and 'during_cache' in _hook:
-                        _hook['during_cache']()
-                    store_version = self._persistent.get(self._key)['_version']
-                    if this_version == store_version:
-                        self._volatile.set(self._key, self._data)
-                except KeyNotFoundException:
-                    raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
-                        self.__class__.__name__, self._guid
-                    ))
-                except NoLockAvailableException:
-                    pass
-                finally:
-                    self._mutex_version.release()
-
-        # Freeze property creation
-        self._frozen = True
-
-        # Optionally, initialize some fields
-        if data is not None:
-            for prop in self._properties:
-                if prop.name in data:
-                    setattr(self, prop.name, data[prop.name])
-
-        # Store original data
-        self._original = copy.deepcopy(self._data)
+    def _load_data(self, provided_data):
+        # type: (Union[dict, None]) -> None
+        """
+        Load data
+        Will attempt to retrieve from the cache first
+        :param provided_data: Data to base values of
+        :type provided_data: dict
+        :rtype: None
+        """
+        self._metadata['cache'] = None
+        if not self._new:
+            if provided_data is not None:
+                self._data = copy.deepcopy(provided_data)
+                self._metadata['cache'] = None
+            else:
+                self._data = self._volatile.get(self._key)
+                if self._data is None:
+                    self._metadata['cache'] = False
+                    try:
+                        self._data = self._persistent.get(self._key)
+                    except KeyNotFoundException:
+                        raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(self.__class__.__name__, self._guid))
+                else:
+                    self._metadata['cache'] = True
 
     ##################################################
     # Helper methods for dynamic getting and setting #
