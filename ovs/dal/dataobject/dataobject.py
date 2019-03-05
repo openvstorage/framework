@@ -26,6 +26,7 @@ import inspect
 import hashlib
 from typing import Union
 from random import randint
+from itertools import chain
 from .meta import MetaClass
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
@@ -71,7 +72,8 @@ class DataObject(object):
         - Recursive save
     """
     __metaclass__ = MetaClass
-
+    __slots__ = ('_frozen', '_datastore_wins', '_guid', '_original', '_metadata', '_data', '_objects', '_dynamic_timings',
+                 'dirty', 'volatile', '_classname', '_new', '_mutex_version', '_key', '_volatile', '_persistent')
     ##############
     # Attributes #
     ##############
@@ -220,7 +222,7 @@ class DataObject(object):
                     # Point to relations of the original object when object got extended
                     relation.foreign_type = Descriptor().load(hybrid_structure[identifier]).get_object()
 
-    def _build_attributes_old_style(self):
+    def _build_attributes(self):
         """
         # DEPRECATED. USE ATTRIBUTES INSTEAD
         Dynamically allocate all attributes
@@ -254,17 +256,6 @@ class DataObject(object):
                 self._objects[key] = {'info': info,
                                       'data': None}
                 self._add_list_property(key, info['list'])
-
-    def _build_attributes(self):
-        # type: () -> None
-        # @todo review if still necessary (could just call the old style one)
-        """
-        Build attributes on the object. Not sure if still needed
-        Still supports dynamically allocation all attributes through _properties, _relation and _dynamic
-        :rtype: None
-        """
-        # Backwards compatibility
-        self._build_attributes_old_style()
 
     def _load_data(self, provided_data):
         # type: (Union[dict, None]) -> None
@@ -445,7 +436,17 @@ class DataObject(object):
         """
         __setattr__ hook that will block creating on the fly new properties, except
         the predefined ones
+        DEPRECATED as __slots__ takes care of the dynamic allocation block
         """
+        if self.__slots__:
+            # New style
+            return super(DataObject, self).__setattr__(key, value)
+        # Might be the property of the DataObject itself being set while the inheritor did not define slots. Check for that
+        slot_overview = set(chain.from_iterable(getattr(cls, '__slots__', tuple()) for cls in inspect.getmro(self.__class__)))
+        print slot_overview
+        if key in slot_overview:
+            return super(DataObject, self).__setattr__(key, value)
+        # Old style
         if not hasattr(self, '_frozen') or not self._frozen:
             allowed = True
         else:
@@ -1074,7 +1075,6 @@ class DataObject(object):
         :param dynamics: dynamics to benchmark
         :return:
         """
-        import time
         begin = time.time()
         stats = {}
         totals = []

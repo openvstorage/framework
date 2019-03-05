@@ -18,24 +18,30 @@
 Backend module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property, Relation, Dynamic
+from ovs.dal.structures import Relation
 from ovs.dal.hybrids.backendtype import BackendType
+from ovs.dal.dataobject.attributes import Property, Dynamic
 
 
 class Backend(DataObject):
     """
     A Backend represents an instance of the supported backend types that has been setup with the OVS GUI
     """
+    __slots__ = ('STATUSES', 'name', 'status',
+                 'linked_guid', 'available', 'regular_domains', 'access_rights', 'live_status',
+                 'backend_type', 'backend_type_guid', 'backends', 'backends_guids')
     STATUSES = DataObject.enumerator('Status', ['INSTALLING', 'RUNNING', 'FAILURE', 'WARNING', 'DELETING'])
-    
-    __properties = [Property('name', str, unique=True, doc='Name of the Backend.'),
-                    Property('status', STATUSES.keys(), default='INSTALLING', doc='State of the backend')]
+
+    name = Property(str, unique=True, doc='Name of the backend')
+    status = Property(STATUSES.keys(), default='INSTALLING', doc='State of the backend')
+
+    linked_guid = Dynamic(str, 3600)
+    available = Dynamic(bool, 60)
+    regular_domains = Dynamic(list, 60)
+    access_rights = Dynamic(dict, 3600)
+    live_status = Dynamic(str, 30)
+
     __relations = [Relation('backend_type', BackendType, 'backends', doc='Type of the backend.')]
-    __dynamics = [Dynamic('linked_guid', str, 3600),
-                  Dynamic('available', bool, 60),
-                  Dynamic('regular_domains', list, 60),
-                  Dynamic('access_rights', dict, 3600),
-                  Dynamic('live_status', str, 30)]
 
     def _linked_guid(self):
         """
