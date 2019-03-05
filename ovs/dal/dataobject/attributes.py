@@ -37,15 +37,19 @@ These attributes are descriptors
 
 import time
 import inspect
-from enum import Enum
 from typing import Union, Type, List, Tuple, Optional
 from ..helpers import DalToolbox, Descriptor, HybridRunner
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
+                                MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
+                                VolatileObjectException, UniqueConstraintViolationException)
+
 # Typing import
 # noinspection PyUnreachableCode
 if False:
     from .dataobject import DataObject
+    from ..datalist import DataList
 
 
 class BaseAttribute(object):
@@ -88,7 +92,7 @@ class Property(BaseAttribute):
     __slots__ = ('property_type', 'default', 'mandatory', 'unique', 'indexed')
 
     def __init__(self, property_type, mandatory=True, default=None, unique=False, indexed=False, doc=None):
-        # type: (Type[type], bool, any, bool, bool, Optional[str]) -> None
+        # type: (type, bool, any, bool, bool, Optional[str]) -> None
         """
         Initializes a property. Requires _data(dict) and dirty(bool) to be declared on the instance
         """
@@ -128,7 +132,7 @@ class Property(BaseAttribute):
         return instance._data[name]
 
 
-class RelationTypes(Enum):
+class RelationTypes(object):
     ONETOMANY = 'onetomany'
     ONETOONE = 'onetoone'
     MANYTOONE = 'manytoone'
@@ -139,21 +143,30 @@ class Relation(BaseAttribute):
     """
     Relation
     """
-    __slots__ = ('foreign_type', 'foreign_key', 'mandatory', 'relation_type')
+    __slots__ = ('foreign_type', 'foreign_type_class', 'foreign_type_class_loaded', 'foreign_key', 'mandatory', 'relation_type')
 
-    def __init__(self, foreign_type, foreign_key, mandatory=True, relation_type=RelationTypes.ONETOMANY, doc=None):
-        # type: (DataObject, str, bool, str, Optional[str]) -> None
+    def __init__(self, foreign_type, mandatory=True, relation_type=RelationTypes.ONETOMANY, doc=None):
+        # type: (str, bool, str, Optional[str]) -> None
         """
         Initializes a relation. Requires _objects(dict), _data(dict), _dirty(bool) to be declared on the instance
+        :param foreign_type: Foreign DataObject subclass type name
+        :type foreign_type: str
+        :param mandatory: Mandatory relation
+        :type mandatory: bool
+        :param relation_type: Type of the relation
+        :type relation_type: str
+        :param doc: Docstring
+        :type doc: str
         """
         super(Relation, self).__init__(doc=doc)
 
         self.foreign_type = foreign_type
-        self.foreign_key = foreign_key
+        # Defer setting this value when the property gets accessed to avoid circular importing
+        self.foreign_type_class = None
+        self.foreign_type_class_loaded = False
+
         self.mandatory = mandatory
         self.relation_type = relation_type
-
-        self._build_relation_identifier()
 
     def __get__(self, instance, owner):
         # type: (DataObject, Type[DataObject]) -> Union[Relation, DataObject]
@@ -162,11 +175,59 @@ class Relation(BaseAttribute):
         """
         if instance is None:
             return self
+
+        name = self.get_name(instance)
+        # Ensure that the relation exists on the object
+        if name not in instance._data:
+            if not self.foreign_type_class_loaded:
+                foreign_type_class = self._build_relation_identifier()
+            else:
+                foreign_type_class = self.foreign_type_class
+            if self.foreign_type_class is None:
+                cls = instance.__class__
+            else:
+                cls = foreign_type_class
+            instance._data[name] = Descriptor(cls).descriptor
+
+        if self.relation_type in (RelationTypes.ONETOONE, RelationTypes.ONETOMANY):
+            return self._get_one_to_many(instance)
+        else:
+            return self._get_many_to_one(instance)
+
+    def _get_one_to_many(self, instance):
+        # type: (DataObject) -> DataObject
+        """
+        Retrieve the object mapped to the relation
+        """
         name = self.get_name(instance)
         if name not in instance._objects:
             descriptor = Descriptor().load(instance._data[name])
             instance._objects[name] = descriptor.get_object(instantiate=True)
         return instance._objects[name]
+
+    def _get_many_to_one(self, instance):
+        # type: (DataObject) -> DataList
+        """
+        Retrieve the objects mapped to the relation
+        """
+        name = self.get_name(instance)
+        if not name in instance._objects:
+            raise NotImplementedError('')
+        info = instance._objects[name]['info']
+        remote_class = Descriptor().load(info['class']).get_object()
+        remote_key = info['key']  # Foreign = remote
+        datalist = DataList.get_relation_set(remote_class, remote_key, self.__class__, name, instance.guid)
+        if instance._objects[name]['data'] is None:
+            instance._objects[name]['data'] = datalist
+        else:
+            instance._objects[name]['data'].update(datalist)
+        if info['list'] is True:
+            return instance._objects[name]['data']
+        else:
+            data = instance._objects[name]['data']
+            if len(data) > 1:
+                raise InvalidRelationException('More than one element found in {0}'.format(name))
+            return data[0] if len(data) == 1 else None
 
     def __set__(self, instance, value):
         # type: (DataObject, DataObject) -> Union[Relation, None]
@@ -175,6 +236,10 @@ class Relation(BaseAttribute):
         """
         if instance is None:
             return self
+
+        if self.relation_type not in (RelationTypes.ONETOONE, RelationTypes.ONETOMANY):
+            raise AttributeError('Setting many to one not allowed')
+
         instance.dirty = True
         name = self.get_name(instance)
         if value is None:
@@ -190,12 +255,32 @@ class Relation(BaseAttribute):
             instance._data[name]['guid'] = value.guid
 
     def _build_relation_identifier(self):
+        # type: () -> Union[None, DataObject]
+        """
+        Build the relation identifier
+        :return: Object instance
+        :rtype: DataObject
+        """
+        # @todo might have changed logic as we go through the hybrid structure for the name now
+        # hybrid_structure = HybridRunner.get_hybrids()
+        # if foreign_type is None:  # If none -> points to the DataObject
+        #     identifier = Descriptor(self.foreign_type).descriptor['identifier']
+        #     if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
+        #         # Point to relations of the original object when object got extended
+        #         self.foreign_type = Descriptor().load(hybrid_structure[identifier]).get_object()
+        if self.foreign_type_class_loaded:
+            return self.foreign_type_class
+        if self.foreign_type is None:
+            # If none -> points to the DataObject
+            self.foreign_type_class_loaded = True
+            return None
         hybrid_structure = HybridRunner.get_hybrids()
-        if self.foreign_type is not None:  # If none -> points to the DataObject
-            identifier = Descriptor(self.foreign_type).descriptor['identifier']
-            if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
-                # Point to relations of the original object when object got extended
-                self.foreign_type = Descriptor().load(hybrid_structure[identifier]).get_object()
+        for identifer, descriptor_data in hybrid_structure.iteritems():
+            if descriptor_data['type'] == self.foreign_type:
+                self.foreign_type_class = Descriptor().load(descriptor_data).get_object()
+                self.foreign_type_class_loaded = True
+                return self.foreign_type_class
+        raise ValueError('No associated object found for {}'.format(self.foreign_type))
 
 
 class RelationGuid(BaseAttribute):
@@ -218,18 +303,26 @@ class RelationGuid(BaseAttribute):
         raise AttributeError('Setting a relational guid is prohibited. Use the relational set instead')
 
     def __get__(self, instance, owner):
-        # type: (DataObject, Type[DataObject]) -> Union[List[str], str]
+        # type: (DataObject, Type[DataObject]) -> Union[RelationGuid, List[str], str]
         """
         Retrieve the guid(s) of the mapped relational object(s)
         Multiple guids are given if the relational type is many to one
         :return: The guid(s) of the mapped object(s)
         :rtype: Union[List[str], str]
         """
+        if instance is None:  # Accessed as class attribute
+            return self
+
+        relation_name = self.relation.get_name(instance)
         if self.relation.relation_type in (RelationTypes.ONETOMANY, RelationTypes.ONETOONE):
-            relation_name = self.relation.get_name(instance)
             return instance._data[relation_name]['guid']
         else:
-            raise NotImplementedError('Many to one not supported yet')
+            list_or_item = getattr(self, relation_name)
+            if list_or_item is None:
+                return None
+            if hasattr(list_or_item, '_guids'):
+                return list_or_item._guids
+            return list_or_item.guid
 
 
 class Dynamic(BaseAttribute):
@@ -239,8 +332,15 @@ class Dynamic(BaseAttribute):
     __slots__ = ('return_type', 'timeout', 'locked', 'timing')
 
     def __init__(self, return_type, timeout, locked=False):
+        # type: (type, float, bool) -> None
         """
         Initializes a dynamic property
+        :param return_type: Type of the return value of the dynamic
+        :type return_type: type
+        :param timeout: Timeout for the dynamic caching
+        :type timeout: float
+        :param locked: Calculate the dynamic in a locked context
+        :type locked: bool
         """
         super(Dynamic, self).__init__()
 
@@ -250,7 +350,7 @@ class Dynamic(BaseAttribute):
         self.timing = -1
 
     def __get__(self, instance, owner):
-        # type: (DataObject, any) -> any
+        # type: (DataObject, Type[DataObject]) -> any
         """
         Return the value of the dynamic.
         Note: the value of the cached data changed from {'data': <value_to_cache>} to <value_to_cache> from 2.13.5

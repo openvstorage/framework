@@ -18,9 +18,11 @@
 Backend module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Relation
-from ovs.dal.hybrids.backendtype import BackendType
-from ovs.dal.dataobject.attributes import Property, Dynamic
+from ovs.dal.dataobject.attributes import Property, Dynamic, Relation, RelationGuid, RelationTypes
+# Typing import
+# noinspection PyUnreachableCode
+if False:
+    from ovs.dal.hybrids.backendtype import BackendType
 
 
 class Backend(DataObject):
@@ -41,7 +43,11 @@ class Backend(DataObject):
     access_rights = Dynamic(dict, 3600)
     live_status = Dynamic(str, 30)
 
-    __relations = [Relation('backend_type', BackendType, 'backends', doc='Type of the backend.')]
+    backend_type = Relation('BackendType', doc='Type of the backend')
+    backend_type_guid = RelationGuid(backend_type)
+
+    domains = Relation('BackendDomain', relation_type=RelationTypes.MANYTOONE, doc='Associated domains')
+    domains_guids = RelationGuid(domains)
 
     def _linked_guid(self):
         """
@@ -49,17 +55,19 @@ class Backend(DataObject):
         This requires that the backlink from that object to this object is named <backend_type>_backend and is a
         one-to-one relation
         """
-        if self.backend_type.has_plugin is False:
+        backend_type = self.backend_type  # type: BackendType
+        if not backend_type.has_plugin:
             return None
-        return getattr(self, '{0}_backend_guid'.format(self.backend_type.code))
+        return getattr(self, '{0}_backend_guid'.format(backend_type.code))
 
     def _available(self):
         """
         Returns True if the backend can be used
         """
-        if self.backend_type.has_plugin is False:
+        backend_type = self.backend_type  # type: BackendType
+        if backend_type.has_plugin is False:
             return False
-        linked_backend = getattr(self, '{0}_backend'.format(self.backend_type.code))
+        linked_backend = getattr(self, '{0}_backend'.format(backend_type.code))
         if linked_backend is not None:
             return linked_backend.available
         return False

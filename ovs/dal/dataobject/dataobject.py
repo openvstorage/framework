@@ -55,6 +55,7 @@ class DataObjectAttributeEncoder(json.JSONEncoder):
 
 
 # noinspection PyProtectedMember
+# @todo dataObject has to load in all hybrids to resolve possible plugin involvements
 class DataObject(object):
     """
     This base class contains all logic to support our multiple backends and the caching
@@ -224,7 +225,8 @@ class DataObject(object):
 
     def _build_attributes(self):
         """
-        # DEPRECATED. USE ATTRIBUTES INSTEAD
+        # @todo Instead of calling this, generate attribute descriptors in __new__
+        # DEPRECATED. USE ATTRIBUTE DESCRIPTORS INSTEAD
         Dynamically allocate all attributes
         :return: None
         :rtype: NoneType

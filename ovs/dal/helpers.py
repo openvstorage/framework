@@ -24,10 +24,15 @@ import time
 import inspect
 import hashlib
 import logging
+from typing import Optional, Type
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.constants.modules import OVS_DAL_HYBRIDS
 from ovs.lib.plugin import PluginController
+# Typing import
+# noinspection PyUnreachableCode
+if False:
+    from .dataobject import DataObject
 
 
 class Descriptor(object):
@@ -40,11 +45,15 @@ class Descriptor(object):
     descriptor_cache = {}
 
     def __init__(self, object_type=None, guid=None, cached=True):
+        # type: (Optional[Type[DataObject]], Optional[str], Optional[bool]) -> None
         """
         Initializes a descriptor for a given type. Optionally already providing a guid for the instance
         :param object_type: type of the object eg. VDisk
+        :type object_type: Type[DataObject]
         :param guid: guid of object
+        :type guid: str
         :param cached: cache the identifiers
+        :type cached: bool
         """
 
         # Initialize super class
