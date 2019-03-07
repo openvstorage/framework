@@ -42,6 +42,7 @@ class Backend(DataObject):
     regular_domains = Dynamic(list, 60)
     access_rights = Dynamic(dict, 3600)
     live_status = Dynamic(str, 30)
+    a_test = Dynamic(str, 1)
 
     backend_type = Relation('BackendType', doc='Type of the backend')
     backend_type_guid = RelationGuid(backend_type)
@@ -49,6 +50,7 @@ class Backend(DataObject):
     domains = Relation('BackendDomain', relation_type=RelationTypes.MANYTOONE, doc='Associated domains')
     domains_guids = RelationGuid(domains)
 
+    @linked_guid.associate_function
     def _linked_guid(self):
         """
         Returns the GUID of the detail object that's linked to this particular backend. This depends on the backend type.
@@ -60,6 +62,7 @@ class Backend(DataObject):
             return None
         return getattr(self, '{0}_backend_guid'.format(backend_type.code))
 
+    @available.associate_function
     def _available(self):
         """
         Returns True if the backend can be used
@@ -72,6 +75,7 @@ class Backend(DataObject):
             return linked_backend.available
         return False
 
+    @regular_domains.associate_function
     def _regular_domains(self):
         """
         Returns a list of domain guids
@@ -79,6 +83,7 @@ class Backend(DataObject):
         """
         return [junction.domain_guid for junction in self.domains]
 
+    @access_rights.associate_function
     def _access_rights(self):
         """
         A condensed extract from the user_rights and client_rights
@@ -92,6 +97,7 @@ class Backend(DataObject):
             data['clients'][client_right.client_guid] = client_right.grant
         return data
 
+    @live_status.associate_function
     def _live_status(self):
         """
         Retrieve the actual status from the Backend

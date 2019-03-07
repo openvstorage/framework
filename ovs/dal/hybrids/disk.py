@@ -20,6 +20,7 @@ Disk module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.dataobject.attributes import Dynamic
 
 
 class Disk(DataObject):
@@ -37,4 +38,15 @@ class Disk(DataObject):
                     Property('size', int, doc='Size of the disk, in bytes'),
                     Property('is_ssd', bool, doc='The type of the disk')]
     __relations = [Relation('storagerouter', StorageRouter, 'disks')]
-    __dynamics = []
+
+    a_test = Dynamic(str, 1)
+    a_test_implicit = Dynamic(str, 1)
+
+    @a_test.associate_function
+    def test_function(self, dynamic):
+        print dynamic.func
+        return self.name
+
+    def _a_test_implicit(self, dynamic):
+        print dynamic.func
+        return self.name

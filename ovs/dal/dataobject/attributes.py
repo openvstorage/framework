@@ -41,6 +41,7 @@ from typing import Union, Type, List, Tuple, Optional
 from ..helpers import DalToolbox, Descriptor, HybridRunner
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.dal.datalist import DataList
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
                                 VolatileObjectException, UniqueConstraintViolationException)
@@ -49,7 +50,6 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 # noinspection PyUnreachableCode
 if False:
     from .dataobject import DataObject
-    from ..datalist import DataList
 
 
 class BaseAttribute(object):
@@ -164,9 +164,19 @@ class Relation(BaseAttribute):
         # Defer setting this value when the property gets accessed to avoid circular importing
         self.foreign_type_class = None
         self.foreign_type_class_loaded = False
-
+        # Mandatory relation cannot be enforced when the type is MANYTOONE
         self.mandatory = mandatory
         self.relation_type = relation_type
+
+    def get_foreign_class(self):
+        """
+        Load the foreign class
+        """
+        if not self.foreign_type_class_loaded:
+            foreign_type_class = self._build_relation_identifier()
+        else:
+            foreign_type_class = self.foreign_type_class
+        return foreign_type_class
 
     def __get__(self, instance, owner):
         # type: (DataObject, Type[DataObject]) -> Union[Relation, DataObject]
@@ -184,9 +194,8 @@ class Relation(BaseAttribute):
             else:
                 foreign_type_class = self.foreign_type_class
             if self.foreign_type_class is None:
-                cls = instance.__class__
-            else:
-                cls = foreign_type_class
+                raise LookupError('Foreign class {} not found'.format(self.foreign_type))
+            cls = foreign_type_class
             instance._data[name] = Descriptor(cls).descriptor
 
         if self.relation_type in (RelationTypes.ONETOONE, RelationTypes.ONETOMANY):
@@ -205,14 +214,49 @@ class Relation(BaseAttribute):
             instance._objects[name] = descriptor.get_object(instantiate=True)
         return instance._objects[name]
 
+    def _get_many_to_one_associate_info(self, instance):
+        # type: (DataObject) -> dict
+        """
+        Retrieve the associated Relation descriptor on the remote class
+        :param instance: Instance of the object
+        :type instance: DataObject
+        :return: The associated relation info
+        :rtype: dict
+        """
+        hybrid_structure = HybridRunner.get_hybrids()
+        for identifer, descriptor_data in hybrid_structure.iteritems():
+            if descriptor_data['type'] != self.foreign_type:
+                continue
+            descriptor = Descriptor().load(descriptor_data)
+            remote_class = descriptor.get_object()
+            for name, attribute in get_attributes_of_class(remote_class):
+                if not isinstance(attribute, Relation):
+                    continue
+                foreign_class_other = attribute.get_foreign_class()
+                if foreign_class_other != instance.__class__:
+                    continue
+                return {'class': Descriptor(remote_class).descriptor,
+                        'key': name,
+                        'list': attribute.relation_type == RelationTypes.ONETOONE}
+        # @todo possibly generate here?
+        raise LookupError('Unable to associated the relation with another')
+
     def _get_many_to_one(self, instance):
         # type: (DataObject) -> DataList
         """
         Retrieve the objects mapped to the relation
         """
         name = self.get_name(instance)
-        if not name in instance._objects:
-            raise NotImplementedError('')
+        if name not in instance._objects:
+            # Retrieve the information of the remote class
+            instance._objects[name] = {'info': self._get_many_to_one_associate_info(instance),
+                                       'data': None}
+            # relations = RelationMapper.load_foreign_relations(self.__class__)  # To many side of things
+            # if relations is not None:
+            #     for key, info in relations.iteritems():
+            #         self._objects[key] = {'info': info,
+            #                               'data': None}
+            #         self._add_list_property(key, info['list'])
         info = instance._objects[name]['info']
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key = info['key']  # Foreign = remote
@@ -221,7 +265,7 @@ class Relation(BaseAttribute):
             instance._objects[name]['data'] = datalist
         else:
             instance._objects[name]['data'].update(datalist)
-        if info['list'] is True:
+        if info['list']:
             return instance._objects[name]['data']
         else:
             data = instance._objects[name]['data']
@@ -247,12 +291,10 @@ class Relation(BaseAttribute):
             instance._data[name]['guid'] = None
         else:
             descriptor = Descriptor(value.__class__).descriptor
-            if descriptor['identifier'] != instance._data[name]['identifier']:
-                if descriptor['type'] == instance._data[name]['type']:
-                    DataObject._logger.error('Corrupt descriptors: {0} vs {1}'.format(descriptor, instance._data[name]))
-                raise TypeError('An invalid type was given: {0} instead of {1}'.format(descriptor['type'], instance._data[name]['type']))
+            if descriptor['type'] != self.foreign_type:
+                raise TypeError('An invalid type was given: {0} instead of {1}'.format(descriptor['type'], self.foreign_type))
             instance._objects[name] = value
-            instance._data[name]['guid'] = value.guid
+            instance._data[name] = {'guid': value.guid}
 
     def _build_relation_identifier(self):
         # type: () -> Union[None, DataObject]
@@ -317,7 +359,7 @@ class RelationGuid(BaseAttribute):
         if self.relation.relation_type in (RelationTypes.ONETOMANY, RelationTypes.ONETOONE):
             return instance._data[relation_name]['guid']
         else:
-            list_or_item = getattr(self, relation_name)
+            list_or_item = getattr(instance, relation_name)
             if list_or_item is None:
                 return None
             if hasattr(list_or_item, '_guids'):
@@ -329,7 +371,9 @@ class Dynamic(BaseAttribute):
     """
     Dynamic property
     """
-    __slots__ = ('return_type', 'timeout', 'locked', 'timing')
+    DYNAMIC_KEYWORD = 'dynamic'
+
+    __slots__ = ('return_type', 'timeout', 'locked', 'timing', 'func', 'bound_func', 'pass_self', 'pass_instance')
 
     def __init__(self, return_type, timeout, locked=False):
         # type: (type, float, bool) -> None
@@ -348,6 +392,11 @@ class Dynamic(BaseAttribute):
         self.timeout = timeout
         self.locked = locked
         self.timing = -1
+        # Functional related
+        self.func = None
+        self.bound_func = None
+        self.pass_instance = True
+        self.pass_self = False
 
     def __get__(self, instance, owner):
         # type: (DataObject, Type[DataObject]) -> any
@@ -365,7 +414,6 @@ class Dynamic(BaseAttribute):
         volatile = VolatileFactory.get_client()
         cache_key = '{0}_{1}'.format(instance._key, name)
         mutex = volatile_mutex(cache_key)
-        associated_dynamic_function = getattr(instance, '_{0}'.format(name))
         try:
             dynamic_data = volatile.get(cache_key)
             if dynamic_data is None:
@@ -374,12 +422,8 @@ class Dynamic(BaseAttribute):
                     # Might have reloaded after the lock expires on a different node
                     dynamic_data = volatile.get(cache_key)
                 if dynamic_data is None:
-                    function_info = inspect.getargspec(associated_dynamic_function)
                     start = time.time()
-                    if 'dynamic' in function_info.args:
-                        dynamic_data = associated_dynamic_function(dynamic=self)  # Load data from backend
-                    else:
-                        dynamic_data = associated_dynamic_function()
+                    dynamic_data = self._execute_associated_func(instance)
                     self.timing = time.time() - start
                     correct, allowed_types, given_type = DalToolbox.check_type(dynamic_data, self.return_type)
                     if not correct:
@@ -391,6 +435,51 @@ class Dynamic(BaseAttribute):
             return DalToolbox.convert_unicode_to_string(dynamic_data)
         finally:
             mutex.release()
+
+    def _execute_associated_func(self, instance):
+        # type: (DataObject) -> any
+        """
+        Run the associate function with this dynamic
+        :param instance: The DataObject instance with the dynamic
+        :type instance: DataObject
+        :return: The result of the function
+        :rtype: any
+        """
+        name = self.get_name(instance)
+        if not self.func:
+            # Store the pointer of the unbound method. The implementation is the same for every instance of the class
+            # Binding the instance makes it a different function though
+            self.associate_function(getattr(instance.__class__, '_{0}'.format(name)))
+        args = (instance,)
+        kwargs = {}
+        if self.pass_self:
+            kwargs[self.DYNAMIC_KEYWORD] = self
+        return self.func(*args, **kwargs)
+
+    def associate_function(self, func):
+        # type: (callable) -> callable
+        """
+        Attach the function to run to create the dynamic property
+        Used as a decorator
+        :param func: The function to run with this dynamic
+        :type func: callable
+        :return: The given func
+        :rtype: callable
+        """
+        self.func = func
+        self.pass_self = self.should_pass_self(func)
+
+        return func
+
+    @classmethod
+    def should_pass_self(cls, func):
+        # type: (callable) -> bool
+        """
+        Determine if this dynamic should be passed to the function
+        :rtype: bool
+        """
+        function_info = inspect.getargspec(func)
+        return cls.DYNAMIC_KEYWORD in function_info.args
 
     def __set__(self, instance, value):
         raise AttributeError("can't set a Dynamic attribute")
