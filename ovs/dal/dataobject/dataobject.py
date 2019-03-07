@@ -24,10 +24,11 @@ import json
 import logging
 import inspect
 import hashlib
-from typing import Union
+from typing import Union, List, Tuple
 from random import randint
 from itertools import chain
 from .meta import MetaClass
+from .attributes import Relation, Property, get_attributes_of_object
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
                                 VolatileObjectException, UniqueConstraintViolationException)
@@ -466,6 +467,102 @@ class DataObject(object):
     ###############
     # Saving data #
     ###############
+    def _validate_mandatory_properties(self):
+        # type: () -> None
+        """
+        Validate the current fields
+        :raises: MissingMandatoryFieldsException if any mandatory fields have been missed
+        """
+        invalid_fields = []
+        for prop in self._properties:
+            if prop.mandatory is True and self._data[prop.name] is None:
+                invalid_fields.append(prop.name)
+        for relation in self._relations:
+            if relation.mandatory is True and self._data[relation.name]['guid'] is None:
+                invalid_fields.append(relation.name)
+
+        # Descriptors
+        for prop_name, prop in get_attributes_of_object(self):
+            if isinstance(prop, (Property, Relation)):
+                if prop.mandatory and prop.__get__(self, self.__class__) is None:
+                    invalid_fields.append(prop_name)
+
+        if len(invalid_fields) > 0:
+            raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._classname, ', '.join(invalid_fields)))
+
+    def _validate_relations_exist(self):
+        """
+        Validate that the relations being set actually exist
+        """
+        validation_keys = []
+        for relation in self._relations:
+            if self._data[relation.name]['guid'] is not None:
+                if relation.foreign_type is None:
+                    cls = self.__class__
+                else:
+                    cls = relation.foreign_type
+                validation_keys.append(
+                    '{0}_{1}_{2}'.format(DataObject.NAMESPACE, cls.__name__.lower(), self._data[relation.name]['guid']))
+        try:
+            [_ for _ in self._persistent.get_multi(validation_keys)]
+        except KeyNotFoundException:
+            raise ObjectNotFoundException('One of the relations specified in {0} with guid \'{1}\' was not found'.format(self.__class__.__name__, self._guid))
+
+    def _save_relations_recursively(self, relation_to_skip):
+        # type: (str) -> None
+        """
+        Save all relational objects together with this object
+        :param relation_to_skip: Names of relations to skip
+        :type relation_to_skip: str
+        """
+        # Save objects that point to us (e.g. disk.vmachine - if this is disk)
+        for relation in self._relations:
+            if relation.name != relation_to_skip:  # disks will be skipped
+                item = getattr(self, relation.name)
+                if item is not None:
+                    item.save(recursive=True, skip=relation.foreign_key)
+
+        # Save object we point at (e.g. machine.vdisks - if this is machine)
+        # @todo should be within the same transaction to avoid errors
+        relations = RelationMapper.load_foreign_relations(self.__class__)
+        if relations is not None:
+            for key, info in relations.iteritems():
+                if key != relation_to_skip:  # machine will be skipped
+                    if info['list'] is True:
+                        for item in getattr(self, key).iterloaded():
+                            item.save(recursive=True, skip=info['key'])
+                    else:
+                        item = getattr(self, key)
+                        if item is not None:
+                            item.save(recursive=True, skip=info['key'])
+        # @todo save descriptor relations
+
+    def _get_save_data(self, optimistic, transaction):
+        # type: (bool, str) -> Tuple[dict, dict]
+        """
+        Retrieve the data to save of the current object
+        :param optimistic: Retrieve the optimisic data. Bases on the original data saved on the current object
+        instead of retrieving the latest data on the datastore
+        :type optimistic: bool
+        :param transaction: Transaction ID to start the save from. Used to assert data to start off on
+        :type transaction: str
+        """
+        if self._new:
+            data = {'_version': 0}
+            store_data = {'_version': 0}
+        elif optimistic is True:
+            self._persistent.assert_value(self._key, self._original, transaction=transaction)
+            data = copy.deepcopy(self._original)
+            store_data = copy.deepcopy(self._original)
+        else:
+            try:
+                current_data = self._persistent.get(self._key)
+            except KeyNotFoundException:
+                raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(self.__class__.__name__, self._guid))
+            self._persistent.assert_value(self._key, current_data, transaction=transaction)
+            data = copy.deepcopy(current_data)
+            store_data = copy.deepcopy(current_data)
+        return data, store_data
 
     def save(self, recursive=False, skip=None, _hook=None):
         """
@@ -490,71 +587,16 @@ class DataObject(object):
                 DataObject._logger.error('Raising RaceConditionException. Last AssertException: {0}'.format(last_assert))
                 raise RaceConditionException()
 
-            invalid_fields = []
-            for prop in self._properties:
-                if prop.mandatory is True and self._data[prop.name] is None:
-                    invalid_fields.append(prop.name)
-            for relation in self._relations:
-                if relation.mandatory is True and self._data[relation.name]['guid'] is None:
-                    invalid_fields.append(relation.name)
-            if len(invalid_fields) > 0:
-                raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._classname, ', '.join(invalid_fields)))
+            self._validate_mandatory_properties()
 
             if recursive:
-                # Save objects that point to us (e.g. disk.vmachine - if this is disk)
-                for relation in self._relations:
-                    if relation.name != skip:  # disks will be skipped
-                        item = getattr(self, relation.name)
-                        if item is not None:
-                            item.save(recursive=True, skip=relation.foreign_key)
+                self._save_relations_recursively(skip)
 
-                # Save object we point at (e.g. machine.vdisks - if this is machine)
-                # @todo should be within the same transaction to avoid errors
-                relations = RelationMapper.load_foreign_relations(self.__class__)
-                if relations is not None:
-                    for key, info in relations.iteritems():
-                        if key != skip:  # machine will be skipped
-                            if info['list'] is True:
-                                for item in getattr(self, key).iterloaded():
-                                    item.save(recursive=True, skip=info['key'])
-                            else:
-                                item = getattr(self, key)
-                                if item is not None:
-                                    item.save(recursive=True, skip=info['key'])
+            self._validate_relations_exist()
 
-            validation_keys = []
-            for relation in self._relations:
-                if self._data[relation.name]['guid'] is not None:
-                    if relation.foreign_type is None:
-                        cls = self.__class__
-                    else:
-                        cls = relation.foreign_type
-                    validation_keys.append('{0}_{1}_{2}'.format(DataObject.NAMESPACE, cls.__name__.lower(), self._data[relation.name]['guid']))
-            try:
-                [_ for _ in self._persistent.get_multi(validation_keys)]
-            except KeyNotFoundException:
-                raise ObjectNotFoundException('One of the relations specified in {0} with guid \'{1}\' was not found'.format(
-                    self.__class__.__name__, self._guid
-                ))
-
+            # Start the save
             transaction = self._persistent.begin_transaction()
-            if self._new is True:
-                data = {'_version': 0}
-                store_data = {'_version': 0}
-            elif optimistic is True:
-                self._persistent.assert_value(self._key, self._original, transaction=transaction)
-                data = copy.deepcopy(self._original)
-                store_data = copy.deepcopy(self._original)
-            else:
-                try:
-                    current_data = self._persistent.get(self._key)
-                except KeyNotFoundException:
-                    raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
-                        self.__class__.__name__, self._guid
-                    ))
-                self._persistent.assert_value(self._key, current_data, transaction=transaction)
-                data = copy.deepcopy(current_data)
-                store_data = copy.deepcopy(current_data)
+            data, store_data = self._get_save_data(optimistic, transaction)
 
             changed_fields = []
             data_conflicts = []

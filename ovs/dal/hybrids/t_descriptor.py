@@ -32,10 +32,10 @@ class TestDescriptor(DataObject):
     test_dynamic = Dynamic(str, 1)
     test_dynamic_implicit = Dynamic(str, 1)
 
-    test_descriptor_relation = Relation('TestDescriptorRelation', RelationTypes.ONETOMANY)
+    test_descriptor_relation = Relation('TestDescriptorRelation', relation_type=RelationTypes.ONETOMANY)
     test_descriptor_relation_guid = RelationGuid(test_descriptor_relation)
 
-    test_descriptor_relation_many = Relation('TestDescriptorRelationMany', RelationTypes.ONETOMANY)
+    test_descriptor_relation_many = Relation('TestDescriptorRelationMany', relation_type=RelationTypes.ONETOMANY)
     test_descriptor_relation_many_guid = RelationGuid(test_descriptor_relation_many)
 
     @test_dynamic.associate_function

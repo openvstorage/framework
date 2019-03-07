@@ -29,6 +29,8 @@ class DescriptorsTest(unittest.TestCase):
         test.test_prop = test_prop
         self.assertEqual(test.test_prop, test_prop)
 
+        test.save()
+
     def test_dynamic(self):
         test = TestDescriptor()
         # Upon definition: the function is already bound to the descriptor

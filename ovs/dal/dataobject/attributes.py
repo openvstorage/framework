@@ -105,6 +105,18 @@ class Property(BaseAttribute):
         self.unique = unique
         self.indexed = indexed
 
+        if indexed:
+            self.validate_indexing(property_type)
+
+    @staticmethod
+    def validate_indexing(property_type):
+        # type: (Type[any]) -> None
+        """
+        Validate if indexing is possible
+        """
+        if property_type not in [str, int, float, long, bool]:
+            raise RuntimeError('An index can only be set on field of type str, int, float, long, or bool')
+
     def __set__(self, instance, value):
         # type: (DataObject, any) -> Union[None, BaseAttribute]
         """
@@ -143,7 +155,7 @@ class Relation(BaseAttribute):
     """
     Relation
     """
-    __slots__ = ('foreign_type', 'foreign_type_class', 'foreign_type_class_loaded', 'foreign_key', 'mandatory', 'relation_type')
+    __slots__ = ('foreign_type', 'foreign_type_class', 'foreign_type_class_loaded', 'foreign_key', '_mandatory', 'relation_type')
 
     def __init__(self, foreign_type, mandatory=True, relation_type=RelationTypes.ONETOMANY, doc=None):
         # type: (str, bool, str, Optional[str]) -> None
@@ -164,9 +176,17 @@ class Relation(BaseAttribute):
         # Defer setting this value when the property gets accessed to avoid circular importing
         self.foreign_type_class = None
         self.foreign_type_class_loaded = False
-        # Mandatory relation cannot be enforced when the type is MANYTOONE
-        self.mandatory = mandatory
+        self._mandatory = mandatory
         self.relation_type = relation_type
+
+    @property
+    def mandatory(self):
+        # type: () -> bool
+        """
+        Mandatory relation cannot be enforced when the type is MANYTOONE as the key is not set from this side
+        :rtype: bool
+        """
+        return self._mandatory and self.relation_type in (RelationTypes.ONETOONE, RelationTypes.ONETOMANY)
 
     def get_foreign_class(self):
         """
