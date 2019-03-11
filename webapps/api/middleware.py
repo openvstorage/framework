@@ -40,6 +40,7 @@ class OVSMiddleware(object):
         Logs information about the given error
         """
         _ = self, request
+        self.logger.exception('An unhandled exception occurred: {0}'.format(exception))
         if OVSMiddleware.is_own_httpexception(exception):
             return HttpResponse(exception.data,
                                 status=exception.status_code,
@@ -49,7 +50,6 @@ class OVSMiddleware(object):
                                             'error_description': exception.message}),
                                 status=400,
                                 content_type='application/json')
-        self.logger.exception('An unhandled exception occurred: {0}'.format(exception))
         return HttpResponse(
             json.dumps({'error': 'internal_server',
                         'error_description': exception.message}),
