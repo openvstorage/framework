@@ -118,6 +118,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         return VDiskController.restart.delay(vdisk_guid=vdisk.guid, force=force)
 
+    @log()
     @action()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
@@ -153,6 +154,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         return vdisk.child_vdisks_guids
 
+    @log()
     @link()
     @required_roles(['read'])
     @return_task()
