@@ -187,7 +187,10 @@ class StorageRouterInstaller(object):
 
             for part in part_info:
                 mount_point = part['mountpoint']
-                if mount_point == DiskPartition.VIRTUAL_STORAGE_LOCATION:
-                    continue
-                if self.root_client.is_mounted(path=mount_point) is False:
-                    raise RuntimeError('Mount point {0} is not mounted'.format(mount_point))
+                if not mount_point:
+                    raise RuntimeError('Mountpoint of partition with guid {0} of StorageRouter with guid {1} is invalid: found {2}'.format(part['guid'], part['storagerouter_guid'], mount_point))
+                else:
+                    if mount_point == DiskPartition.VIRTUAL_STORAGE_LOCATION:
+                        continue
+                    if self.root_client.is_mounted(path=mount_point) is False:
+                        raise RuntimeError('Mount point {0} is not mounted'.format(mount_point))
