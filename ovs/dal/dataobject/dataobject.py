@@ -501,8 +501,7 @@ class DataObject(object):
                     cls = self.__class__
                 else:
                     cls = relation.foreign_type
-                validation_keys.append(
-                    '{0}_{1}_{2}'.format(DataObject.NAMESPACE, cls.__name__.lower(), self._data[relation.name]['guid']))
+                validation_keys.append('{0}_{1}_{2}'.format(DataObject.NAMESPACE, cls.__name__.lower(), self._data[relation.name]['guid']))
         try:
             [_ for _ in self._persistent.get_multi(validation_keys)]
         except KeyNotFoundException:
@@ -523,7 +522,6 @@ class DataObject(object):
                     item.save(recursive=True, skip=relation.foreign_key)
 
         # Save object we point at (e.g. machine.vdisks - if this is machine)
-        # @todo should be within the same transaction to avoid errors
         relations = RelationMapper.load_foreign_relations(self.__class__)
         if relations is not None:
             for key, info in relations.iteritems():
@@ -537,22 +535,22 @@ class DataObject(object):
                             item.save(recursive=True, skip=info['key'])
         # @todo save descriptor relations
 
-    def _get_save_data(self, optimistic, transaction):
-        # type: (bool, str) -> Tuple[dict, dict]
+    def _get_store_data(self, optimistic, transaction):
+        # type: (bool, str) -> dict
         """
         Retrieve the data to save of the current object
-        :param optimistic: Retrieve the optimisic data. Bases on the original data saved on the current object
-        instead of retrieving the latest data on the datastore
+        :param optimistic: Use current data instead of the data on the backend to do the compares.
+        Saves a lookup and works in most cases.
         :type optimistic: bool
         :param transaction: Transaction ID to start the save from. Used to assert data to start off on
         :type transaction: str
+        :return: Both the current data and the data on the backend
+        :rtype: dict
         """
         if self._new:
-            data = {'_version': 0}
             store_data = {'_version': 0}
         elif optimistic is True:
             self._persistent.assert_value(self._key, self._original, transaction=transaction)
-            data = copy.deepcopy(self._original)
             store_data = copy.deepcopy(self._original)
         else:
             try:
@@ -560,9 +558,157 @@ class DataObject(object):
             except KeyNotFoundException:
                 raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(self.__class__.__name__, self._guid))
             self._persistent.assert_value(self._key, current_data, transaction=transaction)
-            data = copy.deepcopy(current_data)
             store_data = copy.deepcopy(current_data)
-        return data, store_data
+        return store_data
+
+    def _get_save_data(self, store_data):
+        # type: (dict) -> Tuple[dict, List[str]]
+        """
+        Get the data to save on the datastore
+        :param store_data: Data on the datastore
+        :type store_data: dict
+        :return: The data to save and the fields that were changed
+        :rtype: Tuple[dict, List[str]]
+        """
+        start_data = copy.deepcopy(store_data)
+        changed_fields = []
+        data_conflicts = []
+        for attribute in self._data.keys():
+            if attribute == '_version':
+                continue
+            if self._data[attribute] != self._original[attribute]:
+                # We changed this value
+                changed_fields.append(attribute)
+                if attribute in start_data and self._original[attribute] != start_data[attribute]:
+                    # Some other process also wrote to the database
+                    if self._datastore_wins is None:
+                        # In case we didn't set a policy, we raise the conflicts
+                        data_conflicts.append(attribute)
+                    elif self._datastore_wins is False:
+                        # If the data-store should not win, we just overwrite the data
+                        start_data[attribute] = self._data[attribute]
+                    # If the data-store should win, we discard/ignore our change
+                else:
+                    # Normal scenario, saving data
+                    start_data[attribute] = self._data[attribute]
+            elif attribute not in start_data:
+                start_data[attribute] = self._data[attribute]
+        for attribute in start_data.keys():
+            if attribute == '_version':
+                continue
+            if attribute not in self._data:
+                del start_data[attribute]
+        if data_conflicts:
+            raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(self._classname, ', '.join(data_conflicts)))
+        return start_data, changed_fields
+
+    def _update_indexes(self, changed_fields, transaction):
+        # type: (List[str], str) -> None
+        """
+        Update index pointers
+        :param changed_fields: Fields that have changed
+        :type changed_fields: List[str]
+        :param transaction: ID of the transaction
+        :type transaction: str
+        :return:
+        """
+        base_index_key = 'ovs_index_{0}|{1}|{2}'
+        for prop in self._properties:
+            if prop.indexed is True:
+                if prop.property_type not in [str, int, float, long, bool]:
+                    raise RuntimeError('An index can only be set on field of type str, int, float, long, or bool')
+                classname = self.__class__.__name__.lower()
+                key = prop.name
+                if self._new is False and key in changed_fields:
+                    original_value = self._original[key]
+                    index_key = base_index_key.format(classname, key, hashlib.sha1(str(original_value)).hexdigest())
+                    indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
+                    if indexed_keys is None:
+                        self._persistent.assert_value(index_key, None, transaction=transaction)
+                    elif self._key in indexed_keys:
+                        self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
+                        indexed_keys.remove(self._key)
+                        if len(indexed_keys) == 0:
+                            self._persistent.delete(index_key, transaction=transaction)
+                        else:
+                            self._persistent.set(index_key, indexed_keys, transaction=transaction)
+                if self._new is True or key in changed_fields:
+                    new_value = self._data[key]
+                    index_key = base_index_key.format(classname, key, hashlib.sha1(str(new_value)).hexdigest())
+                    indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
+                    if indexed_keys is None:
+                        self._persistent.assert_value(index_key, None, transaction=transaction)
+                        self._persistent.set(index_key, [self._key], transaction=transaction)
+                    elif self._key not in indexed_keys:
+                        self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
+                        indexed_keys.append(self._key)
+                        self._persistent.set(index_key, indexed_keys, transaction=transaction)
+
+        base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'
+        for relation in self._relations:
+            key = relation.name
+            original_guid = self._original[key]['guid']
+            new_guid = self._data[key]['guid']
+            if original_guid != new_guid:
+                if relation.foreign_type is None:
+                    classname = self.__class__.__name__.lower()
+                else:
+                    classname = relation.foreign_type.__name__.lower()
+                if original_guid is not None:
+                    reverse_key = base_reverse_key.format(classname, original_guid, relation.foreign_key, self.guid)
+                    self._persistent.delete(reverse_key, must_exist=False, transaction=transaction)
+                if new_guid is not None:
+                    reverse_key = base_reverse_key.format(classname, new_guid, relation.foreign_key, self.guid)
+                    self._persistent.assert_exists('{0}_{1}_{2}'.format(DataObject.NAMESPACE, classname, new_guid))
+                    self._persistent.set(reverse_key, 0, transaction=transaction)
+
+    def _invalidate_property_lists(self, changed_fields, transaction):
+        # type: (List[str], str) -> None
+        """
+        All lists that are cached with the changed fields in the query have to be invalidated
+        :param changed_fields: Fields that have changed
+        :type changed_fields: List[str]
+        :param transaction: ID of the transaction
+        :type transaction: str
+        """
+        persistent_cache_key = DataList.generate_persistent_cache_key(self._classname)
+        cache_keys = set()
+        for key in list(self._persistent.prefix(persistent_cache_key)):
+            _, field, cache_key = DataList.get_key_parts(key)
+            if field in changed_fields or self._new is True:
+                cache_keys.add(cache_key)
+        for cache_key in cache_keys:
+            self._volatile.delete(cache_key)
+        if self._new:
+            # New item. All lists need to be removed
+            self._persistent.delete_prefix(persistent_cache_key, transaction=transaction)
+        else:
+            for field in changed_fields:
+                self._persistent.delete_prefix(DataList.generate_persistent_cache_key(self._classname, field), transaction=transaction)
+
+    def _validate_unique_constraints(self, store_data, changed_fields, transaction):
+        # type: (dict, List[str], str) -> None
+        """
+        :param store_data: Data on the backend
+        :type store_data: dict
+        :param changed_fields: Fields that have changed
+        :type changed_fields: List[str]
+        :param transaction: ID of the transaction
+        :type transaction: str
+        """
+        unique_key = 'ovs_unique_{0}_{{0}}_{{1}}'.format(self._classname)
+        for prop in self._properties:
+            if prop.unique is True:
+                if prop.property_type not in [str, int, float, long]:
+                    raise RuntimeError('A unique constraint can only be set on field of type str, int, float, or long')
+                if self._new is False and prop.name in changed_fields:
+                    key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
+                    self._persistent.assert_value(key, self._key, transaction=transaction)
+                    self._persistent.delete(key, transaction=transaction)
+                key = unique_key.format(prop.name, hashlib.sha1(str(self._data[prop.name])).hexdigest())
+                if self._new is True or prop.name in changed_fields:
+                    self._persistent.assert_value(key, None, transaction=transaction)
+                self._persistent.set(key, self._key, transaction=transaction)
 
     def save(self, recursive=False, skip=None, _hook=None):
         """
@@ -590,131 +736,21 @@ class DataObject(object):
             self._validate_mandatory_properties()
 
             if recursive:
+                # @todo should be within the same transaction to avoid errors
                 self._save_relations_recursively(skip)
 
             self._validate_relations_exist()
 
             # Start the save
             transaction = self._persistent.begin_transaction()
-            data, store_data = self._get_save_data(optimistic, transaction)
-
-            changed_fields = []
-            data_conflicts = []
-            for attribute in self._data.keys():
-                if attribute == '_version':
-                    continue
-                if self._data[attribute] != self._original[attribute]:
-                    # We changed this value
-                    changed_fields.append(attribute)
-                    if attribute in data and self._original[attribute] != data[attribute]:
-                        # Some other process also wrote to the database
-                        if self._datastore_wins is None:
-                            # In case we didn't set a policy, we raise the conflicts
-                            data_conflicts.append(attribute)
-                        elif self._datastore_wins is False:
-                            # If the data-store should not win, we just overwrite the data
-                            data[attribute] = self._data[attribute]
-                        # If the data-store should win, we discard/ignore our change
-                    else:
-                        # Normal scenario, saving data
-                        data[attribute] = self._data[attribute]
-                elif attribute not in data:
-                    data[attribute] = self._data[attribute]
-            for attribute in data.keys():
-                if attribute == '_version':
-                    continue
-                if attribute not in self._data:
-                    del data[attribute]
-            if data_conflicts:
-                raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
-                    self._classname, ', '.join(data_conflicts)
-                ))
+            store_data = self._get_store_data(optimistic, transaction)
+            data, changed_fields = self._get_save_data(store_data)
 
             # Refresh internal data structure
             self._data = copy.deepcopy(data)
-
-            # Update indexes
-            base_index_key = 'ovs_index_{0}|{1}|{2}'
-            for prop in self._properties:
-                if prop.indexed is True:
-                    if prop.property_type not in [str, int, float, long, bool]:
-                        raise RuntimeError('An index can only be set on field of type str, int, float, long, or bool')
-                    classname = self.__class__.__name__.lower()
-                    key = prop.name
-                    if self._new is False and key in changed_fields:
-                        original_value = self._original[key]
-                        index_key = base_index_key.format(classname, key, hashlib.sha1(str(original_value)).hexdigest())
-                        indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
-                        if indexed_keys is None:
-                            self._persistent.assert_value(index_key, None, transaction=transaction)
-                        elif self._key in indexed_keys:
-                            self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
-                            indexed_keys.remove(self._key)
-                            if len(indexed_keys) == 0:
-                                self._persistent.delete(index_key, transaction=transaction)
-                            else:
-                                self._persistent.set(index_key, indexed_keys, transaction=transaction)
-                    if self._new is True or key in changed_fields:
-                        new_value = self._data[key]
-                        index_key = base_index_key.format(classname, key, hashlib.sha1(str(new_value)).hexdigest())
-                        indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
-                        if indexed_keys is None:
-                            self._persistent.assert_value(index_key, None, transaction=transaction)
-                            self._persistent.set(index_key, [self._key], transaction=transaction)
-                        elif self._key not in indexed_keys:
-                            self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
-                            indexed_keys.append(self._key)
-                            self._persistent.set(index_key, indexed_keys, transaction=transaction)
-
-            # Update reverse index
-            base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'
-            for relation in self._relations:
-                key = relation.name
-                original_guid = self._original[key]['guid']
-                new_guid = self._data[key]['guid']
-                if original_guid != new_guid:
-                    if relation.foreign_type is None:
-                        classname = self.__class__.__name__.lower()
-                    else:
-                        classname = relation.foreign_type.__name__.lower()
-                    if original_guid is not None:
-                        reverse_key = base_reverse_key.format(classname, original_guid, relation.foreign_key, self.guid)
-                        self._persistent.delete(reverse_key, must_exist=False, transaction=transaction)
-                    if new_guid is not None:
-                        reverse_key = base_reverse_key.format(classname, new_guid, relation.foreign_key, self.guid)
-                        self._persistent.assert_exists('{0}_{1}_{2}'.format(DataObject.NAMESPACE, classname, new_guid))
-                        self._persistent.set(reverse_key, 0, transaction=transaction)
-
-            # Invalidate property lists
-            persistent_cache_key = DataList.generate_persistent_cache_key(self._classname)
-            cache_keys = set()
-            for key in list(self._persistent.prefix(persistent_cache_key)):
-                _, field, cache_key = DataList.get_key_parts(key)
-                if field in changed_fields or self._new is True:
-                    cache_keys.add(cache_key)
-            for cache_key in cache_keys:
-                self._volatile.delete(cache_key)
-            if self._new:
-                # New item. All lists need to be removed
-                self._persistent.delete_prefix(persistent_cache_key, transaction=transaction)
-            else:
-                for field in changed_fields:
-                    self._persistent.delete_prefix(DataList.generate_persistent_cache_key(self._classname, field), transaction=transaction)
-
-            # Validate unique constraints
-            unique_key = 'ovs_unique_{0}_{{0}}_{{1}}'.format(self._classname)
-            for prop in self._properties:
-                if prop.unique is True:
-                    if prop.property_type not in [str, int, float, long]:
-                        raise RuntimeError('A unique constraint can only be set on field of type str, int, float, or long')
-                    if self._new is False and prop.name in changed_fields:
-                        key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
-                        self._persistent.assert_value(key, self._key, transaction=transaction)
-                        self._persistent.delete(key, transaction=transaction)
-                    key = unique_key.format(prop.name, hashlib.sha1(str(self._data[prop.name])).hexdigest())
-                    if self._new is True or prop.name in changed_fields:
-                        self._persistent.assert_value(key, None, transaction=transaction)
-                    self._persistent.set(key, self._key, transaction=transaction)
+            self._update_indexes(changed_fields, transaction)
+            self._invalidate_property_lists(changed_fields, transaction)
+            self._validate_unique_constraints(store_data, changed_fields, transaction)
 
             if _hook is not None:
                 _hook()
@@ -733,15 +769,11 @@ class DataObject(object):
                 elif ex.message != self._key:
                     raise
                 else:
-                    raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
-                        self.__class__.__name__, self._guid
-                    ))
+                    raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(self.__class__.__name__, self._guid))
             except AssertException as ex:
                 if 'ovs_unique' in str(ex.message):
                     field = str(ex.message).split('_', 3)[-1].rsplit('_', 1)[0]
-                    raise UniqueConstraintViolationException('The unique constraint on {0}.{1} was violated'.format(
-                        self.__class__.__name__, field
-                    ))
+                    raise UniqueConstraintViolationException('The unique constraint on {0}.{1} was violated'.format(self.__class__.__name__, field))
                 last_assert = ex
                 optimistic = False
                 self._mutex_version.release()  # Make sure it's released before a sleep
