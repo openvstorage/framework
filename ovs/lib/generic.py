@@ -92,6 +92,20 @@ class GenericController(object):
         day = timedelta(1)
         week = day * 7
 
+        class Snapshot(object):
+            def __init__(self, timestamp, snapshot_id, vdisk_guid, is_consistent):
+                self.timestamp = timestamp
+                self.snapshot_id = snapshot_id
+                self.vdisk_guid = vdisk_guid
+                self.consistent = is_consistent
+
+        class Bucket(object):
+            def __init__(self, start, end, type):
+                self.start = start
+                self.end = end
+                self.type = type
+                self.snapshots = []
+
         def make_timestamp(offset):
             """
             Create an integer based timestamp
@@ -107,20 +121,17 @@ class GenericController(object):
         buckets = []
         # Buckets first 7 days: [0-1[, [1-2[, [2-3[, [3-4[, [4-5[, [5-6[, [6-7[
         for i in xrange(0, 7):
-            buckets.append({'start': make_timestamp(day * i),
-                            'end': make_timestamp(day * (i + 1)),
-                            'type': '1d',
-                            'snapshots': []})
+            buckets.append(Bucket(start=make_timestamp(day * i),
+                                  end=make_timestamp(day * (i + 1)),
+                                  type='1d'))
         # Week buckets next 3 weeks: [7-14[, [14-21[, [21-28[
         for i in xrange(1, 4):
-            buckets.append({'start': make_timestamp(week * i),
-                            'end': make_timestamp(week * (i + 1)),
-                            'type': '1w',
-                            'snapshots': []})
-        buckets.append({'start': make_timestamp(week * 4),
-                        'end': 0,
-                        'type': 'rest',
-                        'snapshots': []})
+            buckets.append(Bucket(start=make_timestamp(week * i),
+                                  end=make_timestamp(week * (i + 1)),
+                                  type='1w'))
+        buckets.append(Bucket(start=make_timestamp(week * 4),
+                              end=0,
+                              type='rest'))
 
         # Get a list of all snapshots that are used as parents for clones
         parent_snapshots = set([vd.parentsnapshot for vd in VDiskList.get_with_parent_snaphots()])
@@ -134,19 +145,16 @@ class GenericController(object):
 
             if vdisk.info['object_type'] in ['BASE']:
                 bucket_chain = copy.deepcopy(buckets)
-                for snapshot in vdisk.snapshots:
-                    if snapshot.get('is_sticky') is True:
+                for vdisk_snapshot in vdisk.snapshots:
+                    if vdisk_snapshot.get('is_sticky') is True:
                         continue
-                    if snapshot['guid'] in parent_snapshots:
-                        GenericController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot['guid']))
+                    if vdisk_snapshot['guid'] in parent_snapshots:
+                        GenericController._logger.info('Not deleting snapshot {0} because it has clones'.format(vdisk_snapshot['guid']))
                         continue
-                    timestamp = int(snapshot['timestamp'])
+                    timestamp = int(vdisk_snapshot['timestamp'])
                     for bucket in bucket_chain:
-                        if bucket['start'] >= timestamp > bucket['end']:
-                            bucket['snapshots'].append({'timestamp': timestamp,
-                                                        'snapshot_id': snapshot['guid'],
-                                                        'vdisk_guid': vdisk.guid,
-                                                        'is_consistent': snapshot['is_consistent']})
+                        if bucket.start >= timestamp > bucket.end:
+                            bucket.snapshots.append(Snapshot(timestamp, vdisk_snapshot['guid'], vdisk.guid, vdisk_snapshot.['is_consistent']))
                 bucket_chains.append(bucket_chain)
 
         # Clean out the snapshot bucket_chains, we delete the snapshots we want to keep
@@ -156,37 +164,39 @@ class GenericController(object):
             for bucket in bucket_chain:
                 if first is True:
                     best = None
-                    for snapshot in bucket['snapshots']:
+                    for snapshot in bucket.snapshots:
                         if best is None:
                             best = snapshot
                         # Consistent is better than inconsistent
-                        elif snapshot['is_consistent'] and not best['is_consistent']:
+                        elif snapshot.consistent and not best.consistent:
                             best = snapshot
                         # Newer (larger timestamp) is better than older snapshots
-                        elif snapshot['is_consistent'] == best['is_consistent'] and \
-                                snapshot['timestamp'] > best['timestamp']:
+                        elif snapshot.consistent == best.consistent and \
+                                snapshot.timestamp > best.timestamp:
                             best = snapshot
-                    bucket['snapshots'] = [s for s in bucket['snapshots'] if
-                                           s['timestamp'] != best['timestamp']]
+                    bucket.snapshots = [s for s in bucket.snapshots if
+                                           s.timestamp != best.timestamp]
                     first = False
-                elif bucket['end'] > 0:
+                elif bucket.end > 0:
                     oldest = None
-                    for snapshot in bucket['snapshots']:
+                    for snapshot in bucket.snapshots:
                         if oldest is None:
                             oldest = snapshot
                         # Older (smaller timestamp) is the one we want to keep
-                        elif snapshot['timestamp'] < oldest['timestamp']:
+                        elif snapshot.timestamp < oldest.timestamp:
                             oldest = snapshot
-                    bucket['snapshots'] = [s for s in bucket['snapshots'] if
-                                           s['timestamp'] != oldest['timestamp']]
+                    bucket.snapshots = [s for s in bucket.snapshots if
+                                           s.timestamp != oldest.timestamp]
 
         # Delete obsolete snapshots
         for bucket_chain in bucket_chains:
             for bucket in bucket_chain:
-                for snapshot in bucket['snapshots']:
-                    VDiskController.delete_snapshot(vdisk_guid=snapshot['vdisk_guid'],
-                                                    snapshot_id=snapshot['snapshot_id'])
+                for snapshot in bucket.snapshots:
+                    VDiskController.delete_snapshot(vdisk_guid=snapshot.vdisk_guid,
+                                                    snapshot_id=snapshot.snapshot_id)
         GenericController._logger.info('Delete snapshots finished')
+
+
 
     @staticmethod
     @ovs_task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), ensure_single_info={'mode': 'DEDUPED'})
