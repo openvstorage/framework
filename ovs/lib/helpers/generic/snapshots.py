@@ -279,6 +279,9 @@ class SnapshotManager(object):
         for vdisk in VDiskList.get_vdisks():
             if not self.is_vdisk_running(vdisk):
                 continue
+            vdisk.invalidate_dynamics('being_scrubbed')
+            if vdisk.being_scrubbed:
+                continue
 
             bucket_chain = self._get_snapshot_buckets(start_time, self.get_policy_to_enforce(vdisk))
             for vdisk_snapshot in vdisk.snapshots:
