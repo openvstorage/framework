@@ -35,6 +35,7 @@ from ovs.lib.helpers.generic.scrubber import Scrubber
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
+from ovs.lib.helpers.generic.snapshots import SnapshotManager
 
 
 class GenericController(object):
@@ -85,140 +86,11 @@ class GenericController(object):
 
         :param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
         :type timestamp: float
-
         :return: None
         """
         GenericController._logger.info('Delete snapshots started')
-        day_timedelta = timedelta(1)
-
-        class Snapshot(object):
-            def __init__(self, timestamp, snapshot_id, vdisk_guid, is_consistent):
-                self.timestamp = timestamp
-                self.snapshot_id = snapshot_id
-                self.vdisk_guid = vdisk_guid
-                self.consistent = is_consistent
-
-            def __str__(self):
-                return 'Snapshot for vDisk {0}'.format(self.vdisk_guid)
-
-        class Bucket(object):
-            def __init__(self, start, end, type=None):
-                self.start = start
-                self.end = end
-                self.type = type or ''
-                self.snapshots = []
-
-            def __str__(self):
-                return 'Bucket (start: {0}, end: {1}, type: {2}) with {3}'.format(self.start, self.end, self.type, self.snapshots)
-
-        def make_timestamp(offset):
-            """
-            Create an integer based timestamp
-            :param offset: Offset in days
-            :return: Timestamp
-            """
-            return int(mktime((base - offset).timetuple()))
-
-        def _calculate_bucket_structure_for_vdisk(vdisk_path):
-            """
-            Path in configuration management where the config is located for deleting snapshots of given vdisk path.
-            Located in ovs/framework/scheduling/retention_policy/{0}.format(vdisk_guid).
-            Should look like this:
-            [{'nr_of_snapshots': 24, 'nr_of_days': 1},
-            {'nr_of_snapshots': 6,  'nr_of_days': 6},
-            {'nr_of_snapshots': 3,  'nr_of_days': 21}])
-            More periods in time can be given.
-            The passed number of snapshots is an absolute number of snapshots and is evenly distributed across the number of days passed in the interval.
-            This way, this config will result in storing
-            one snapshot per hour the first day
-            one snapshot per day the rest of the week
-            one snapshot per week the rest of the month
-            one older snapshot snapshot will always be stored for an interval older then the longest interval passed in the config
-            :param vdisk_path: ovs/framework/scheduling/retention_policy/{0}.format(vdisk_guid)
-            :return:
-            """
-            buckets = []
-            policies = Configuration.get(vdisk_path, default=[{'nr_of_snapshots': 24, 'nr_of_days': 1},    # One per hour
-                                                              {'nr_of_snapshots': 6,  'nr_of_days': 6},    # one per day for rest of the week
-                                                              {'nr_of_snapshots': 3,  'nr_of_days': 21}])  # one per week for the rest of the month
-
-            total_length = 0
-            offset = total_length * day_timedelta
-            for policy in policies:
-                number_of_days = policy.get('nr_of_days', 1)
-                number_of_snapshots = policy.get('nr_of_snapshots', number_of_days * 24)
-                snapshot_timedelta = number_of_days * day_timedelta / number_of_snapshots
-                for i in xrange(0, number_of_snapshots):
-                    buckets.append(Bucket(start=make_timestamp(offset + snapshot_timedelta * i), end=make_timestamp(offset + snapshot_timedelta * (i + 1))))
-                total_length += number_of_days
-                offset = total_length * day_timedelta
-            buckets.append(Bucket(start=make_timestamp(total_length * day_timedelta), end=0, type='rest'))
-            return buckets
-
-        if timestamp is None:
-            timestamp = time.time()
-        base = datetime.fromtimestamp(timestamp).date() - day_timedelta
-
-        # Get a list of all snapshots that are used as parents for clones
-        parent_snapshots = set([vd.parentsnapshot for vd in VDiskList.get_with_parent_snaphots()])
-
-        # Place all snapshots in bucket_chains
-        bucket_chains = []
-        for vdisk in VDiskList.get_vdisks():
-            path = 'ovs/framework/scheduling/retention_policy/{0}'.format(vdisk.guid)
-            buckets = _calculate_bucket_structure_for_vdisk(path)
-
-            if vdisk.info['object_type'] in ['BASE']:
-                bucket_chain = copy.deepcopy(buckets)
-                for vdisk_snapshot in vdisk.snapshots:  # type: Dict
-                    if vdisk_snapshot.get('is_sticky'):
-                        continue
-                    if vdisk_snapshot['guid'] in parent_snapshots:
-                        GenericController._logger.info('Not deleting snapshot {0} because it has clones'.format(vdisk_snapshot['guid']))
-                        continue
-                    timestamp = int(vdisk_snapshot['timestamp'])
-                    for bucket in bucket_chain:
-                        if bucket.start >= timestamp > bucket.end:
-                            bucket.snapshots.append(Snapshot(timestamp, vdisk_snapshot['guid'], vdisk.guid, vdisk_snapshot['is_consistent']))
-                bucket_chains.append(bucket_chain)
-
-        # Clean out the snapshot bucket_chains, we delete the snapshots we want to keep
-        # And we'll remove all snapshots that remain in the buckets
-        for bucket_chain in bucket_chains:
-            first = True
-            for bucket in bucket_chain:
-                if first is True:
-                    best = None
-                    for snapshot in bucket.snapshots:
-                        if best is None:
-                            best = snapshot
-                        # Consistent is better than inconsistent
-                        elif snapshot.consistent and not best.consistent:
-                            best = snapshot
-                        # Newer (larger timestamp) is better than older snapshots
-                        elif snapshot.consistent == best.consistent and snapshot.timestamp > best.timestamp:
-                            best = snapshot
-                    bucket.snapshots = [s for s in bucket.snapshots if s.timestamp != best.timestamp]
-                    first = False
-                elif bucket.end > 0:
-                    oldest = None
-                    for snapshot in bucket.snapshots:
-                        if oldest is None:
-                            oldest = snapshot
-                        # Older (smaller timestamp) is the one we want to keep
-                        elif snapshot.timestamp < oldest.timestamp:
-                            oldest = snapshot
-                    bucket.snapshots = [s for s in bucket.snapshots if s.timestamp != oldest.timestamp]
-
-        # Delete obsolete snapshots
-        for bucket_chain in bucket_chains:
-            for bucket in bucket_chain:
-                for snapshot in bucket.snapshots:
-                    VDiskController.delete_snapshot(vdisk_guid=snapshot.vdisk_guid,
-                                                    snapshot_id=snapshot.snapshot_id)
-        GenericController._logger.info('Delete snapshots finished')
-
-
+        snapshot_manager = SnapshotManager()
+        snapshot_manager.delete_snapshots(timestamp)
 
     @staticmethod
     @ovs_task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), ensure_single_info={'mode': 'DEDUPED'})
