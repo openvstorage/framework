@@ -59,22 +59,22 @@ class RetentionPolicy(object):
 
 
 class Snapshot(object):
-    def __init__(self, timestamp, snapshot_id, vdisk_guid, is_consistent, is_sticky=False, *args, **kwargs):
+
+    def __init__(self, guid, timestamp, label, is_consistent, is_automatic, is_sticky, in_backend, stored, vdisk_guid=None, *args, **kwargs):
         """
         Initialize a snapshot object
-        :param timestamp:
-        :param snapshot_id:
-        :param vdisk_guid:
-        :param is_consistent:
-        :param is_sticky:
-        :param args:
-        :param kwargs:
         """
+        if not vdisk_guid:
+            raise ValueError('Add the guid of the vdisk to the constructor')
+        self.guid = guid
         self.timestamp = int(timestamp)
-        self.snapshot_id = snapshot_id
-        self.vdisk_guid = vdisk_guid
+        self.label = label
+        self.is_automatic = is_automatic
         self.consistent = is_consistent
         self.is_sticky = is_sticky
+        self.in_backend = in_backend
+        self.stored = stored
+        self.vdisk_guid = vdisk_guid
 
     def __str__(self):
         return 'Snapshot for vDisk {0}'.format(self.vdisk_guid)
@@ -285,7 +285,7 @@ class SnapshotManager(object):
 
             bucket_chain = self._get_snapshot_buckets(start_time, self.get_policy_to_enforce(vdisk))
             for vdisk_snapshot in vdisk.snapshots:
-                snapshot = Snapshot(**vdisk_snapshot)
+                snapshot = Snapshot(vdisk_guid=vdisk.guid, **vdisk_snapshot)
                 if snapshot.is_sticky:
                     continue
                 if snapshot.vdisk_guid in parent_snapshots:
@@ -303,4 +303,4 @@ class SnapshotManager(object):
             for bucket in bucket_chain:
                 obsolete_snapshots = bucket.get_obsolete_snapshots(consistency_first)
                 for snapshot in obsolete_snapshots:
-                    VDiskController.delete_snapshot(vdisk_guid=snapshot.vdisk_guid, snapshot_id=snapshot.snapshot_id)
+                    VDiskController.delete_snapshot(vdisk_guid=snapshot.vdisk_guid, snapshot_id=snapshot.guid)
