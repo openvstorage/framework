@@ -66,15 +66,14 @@ class StorageDriver(DataObject):
         Fetches the Status of the Storage Driver.
         """
         vpool_status = self.vpool.status
-        if vpool_status in [self.STATUSES.STATUS_INSTALLING, self.STATUSES.STATUS_DELETING]:
+        if vpool_status in [self.STATUSES.INSTALLING, self.STATUSES.DELETING]:
             return vpool_status
         try:
             std_config = StorageDriverConfiguration(self.guid, self.storagedriver_id)
             LocalStorageRouterClient(std_config.remote_path).server_revision()
-            return self.STATUSES.STATUS_RUNNING
+            return self.STATUSES.RUNNING
         except Exception:
             return self.STATUSES.STATUS_FAILURE
-        return 'UNKNOWN'
 
 
     def _statistics(self, dynamic):
