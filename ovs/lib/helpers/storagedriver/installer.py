@@ -240,7 +240,6 @@ class StorageDriverInstaller(object):
             storagedriver.description = storagedriver.name
             storagedriver.storagerouter = storagerouter
             storagedriver.storagedriver_id = vrouter_id
-            storagedriver.status = storagedriver.STATUSES.INSTALLING
             storagedriver.save()
 
             # ALBA Proxies
