@@ -27,9 +27,11 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.constants.storagedriver import CACHE_FRAGMENT, CACHE_BLOCK
+from ovs.constants.statuses import STATUS_RUNNING, STATUS_INSTALLING, STATUS_DELETING, STATUS_FAILURE
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.servicefactory import ServiceFactory
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
+from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
 
 
 class StorageDriver(DataObject):
@@ -38,6 +40,7 @@ class StorageDriver(DataObject):
     on a Storage Router to which the vDisks connect. The Storage Driver is the gateway to the Storage Backend.
     """
     DISTANCES = DataObject.enumerator('Distance', {'NEAR': 0, 'FAR': 10000, 'INFINITE': 20000})
+    STATUSES = DataObject.enumerator('Status', [STATUS_RUNNING, STATUS_INSTALLING, STATUS_DELETING, STATUS_FAILURE])
 
     __properties = [Property('name', str, doc='Name of the Storage Driver.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Driver.'),
@@ -62,8 +65,17 @@ class StorageDriver(DataObject):
         """
         Fetches the Status of the Storage Driver.
         """
-        _ = self
-        return None
+        vpool_status = self.vpool.status
+        if vpool_status in [self.STATUSES.STATUS_INSTALLING, self.STATUSES.STATUS_DELETING]:
+            return vpool_status
+        try:
+            std_config = StorageDriverConfiguration(self.guid, self.storagedriver_id)
+            LocalStorageRouterClient(std_config.remote_path).server_revision()
+            return self.STATUSES.STATUS_RUNNING
+        except Exception:
+            return self.STATUSES.STATUS_FAILURE
+        return 'UNKNOWN'
+
 
     def _statistics(self, dynamic):
         """

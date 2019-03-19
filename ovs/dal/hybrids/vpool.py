@@ -19,8 +19,8 @@ VPool module
 """
 
 import time
+from ovs.constants.statuses import STATUS_DELETING, STATUS_EXTENDING, STATUS_FAILURE, STATUS_INSTALLING, STATUS_RUNNING, STATUS_SHRINKING
 from ovs.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_ASYNC
-from ovs.constants.vpool import STATUS_DELETING, STATUS_EXTENDING, STATUS_FAILURE, STATUS_INSTALLING, STATUS_RUNNING, STATUS_SHRINKING
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs_extensions.constants.vpools import MDS_CONFIG_PATH
