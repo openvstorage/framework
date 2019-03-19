@@ -25,17 +25,26 @@ from ovs.log.log_handler import LogHandler
 
 
 class RetentionPolicy(object):
-    def __init__(self, nr_of_snapshots, nr_of_days):
-        # type: (int, int) -> None
+    def __init__(self, nr_of_snapshots, nr_of_days, consistency_first=False, consistency_first_on=None):
+        # type: (int, int, bool, List[int]) -> None
         """
         Initialize a retention policy
         :param nr_of_snapshots: Number of snapshots to keep over the configured number of days
         :type nr_of_snapshots: int
         :param nr_of_days: Number of days to account the number of snapshots for
         :type nr_of_days: int
+        :param consistency_first: Consistency of the snapshot is prioritized above the age
+        :type consistency_first: bool
+        :param consistency_first_on: Apply the consistency first on the snapsnot numbers given
+        :type consistency_first_on: List[int]
         """
+        if consistency_first_on is None:
+            consistency_first_on = []
+
         self.nr_of_snapshots = nr_of_snapshots
         self.nr_of_days = nr_of_days
+        self.consistency_first = consistency_first
+        self.consistency_first_on = consistency_first_on
 
     @classmethod
     def from_configuration(cls, configuration):
@@ -81,10 +90,11 @@ class Snapshot(object):
 
 
 class Bucket(object):
-    def __init__(self, start, end):
+    def __init__(self, start, end, retention_policy=None):
         self.start = start
         self.end = end
         self.snapshots = []
+        self.retention_policy = retention_policy
 
     def is_snapshot_in_interval(self, snapshot):
         # type: (Snapshot) -> bool
@@ -94,31 +104,37 @@ class Bucket(object):
         if self.is_snapshot_in_interval(snapshot):
             self.snapshots.append(snapshot)
 
-    def get_obsolete_snapshots(self, consistency_first=False):
-        # type: (bool) -> List[Snapshot]
+    def get_obsolete_snapshots(self, consistency_first=False, bucket_count=0):
+        # type: (bool, int) -> List[Snapshot]
         """
         Retrieve all snapshots which are no longer within this interval
-        :param consistency_first: Consistency of the snapshot is priortized above the age
+        :param consistency_first: Consistency of the snapshot is prioritized above the age
         :type consistency_first: bool
+        :param bucket_count: Number of the bucket in the chain. Used to determine if the current snapshot must be consistent
+        :type bucket_count: int
         :return: List with Snapshots
         :rtype: List[Snapshot]
         """
+        _ = consistency_first
+
         if not self.end:
             # No end date for the interval, every snapshot is obsolete
             return self.snapshots
 
-        if consistency_first:
-            best = None
-            for snapshot in self.snapshots:
-                if best is None:
-                    best = snapshot
-                # Consistent is better than inconsistent
-                elif snapshot.consistent and not best.consistent:
-                    best = snapshot
-                # Newer (larger timestamp) is better than older snapshots
-                elif snapshot.consistent == best.consistent and snapshot.timestamp > best.timestamp:
-                    best = snapshot
-            return [s for s in self.snapshots if s.timestamp != best.timestamp]
+        if self.retention_policy.consistency_first:
+            # Using + 1 as snapshot provided in the consistency_first_on are > 0
+            if self.retention_policy.consistency_first_on and bucket_count + 1 in self.retention_policy.consistency_first_on:
+                best = None
+                for snapshot in self.snapshots:
+                    if best is None:
+                        best = snapshot
+                    # Consistent is better than inconsistent
+                    elif snapshot.consistent and not best.consistent:
+                        best = snapshot
+                    # Newer (larger timestamp) is better than older snapshots
+                    elif snapshot.consistent == best.consistent and snapshot.timestamp > best.timestamp:
+                        best = snapshot
+                return [s for s in self.snapshots if s.timestamp != best.timestamp]
         # First the oldest snapshot and remove all younger ones
         oldest = None
         for snapshot in self.snapshots:
@@ -161,9 +177,13 @@ class SnapshotManager(object):
         Retrieve the globally configured retention policy
         """
         # @todo retrieve the config path
-        return RetentionPolicy.from_configuration([{'nr_of_snapshots': 24, 'nr_of_days': 1},  # One per hour
-                                                   {'nr_of_snapshots': 6, 'nr_of_days': 6},  # one per day for rest of the week
-                                                   {'nr_of_snapshots': 3, 'nr_of_days': 21}])  # One per week for the rest of the week
+        return RetentionPolicy.from_configuration([
+            # One per hour
+            {'nr_of_snapshots': 24, 'nr_of_days': 1},
+            # one per day for rest of the week and opt for a consistent snapshot for the first day
+            {'nr_of_snapshots': 6, 'nr_of_days': 6, 'consistency_first': True, 'consistency_first_on': [1]},
+            # One per week for the rest of the week
+            {'nr_of_snapshots': 3, 'nr_of_days': 21}])
 
     @classmethod
     def get_retention_policies_for_vpools(cls):
@@ -234,7 +254,8 @@ class SnapshotManager(object):
             snapshot_timedelta = number_of_days * day_delta / number_of_snapshots
             for i in xrange(0, number_of_snapshots):
                 buckets.append(Bucket(start=cls.make_timestamp(start_time, offset + snapshot_timedelta * i),
-                                      end=cls.make_timestamp(start_time, offset + snapshot_timedelta * (i + 1))))
+                                      end=cls.make_timestamp(start_time, offset + snapshot_timedelta * (i + 1)),
+                                      retention_policy=policy))
             processed_retention_days += number_of_days
             offset = processed_retention_days * day_delta
         # Always add a bucket which falls out of the configured retention
@@ -299,8 +320,8 @@ class SnapshotManager(object):
         for index, bucket_chain in enumerate(bucket_chains):
             # @todo this consistency first behaviour changed with the new implementation
             # There are now buckets based on hourly intervals which means the consistency of the first day is not guaranteed (unless the config is specified that way)
-            consistency_first = index == 0
+            # consistency_first = index == 0
             for bucket in bucket_chain:
-                obsolete_snapshots = bucket.get_obsolete_snapshots(consistency_first)
+                obsolete_snapshots = bucket.get_obsolete_snapshots(index)
                 for snapshot in obsolete_snapshots:
                     VDiskController.delete_snapshot(vdisk_guid=snapshot.vdisk_guid, snapshot_id=snapshot.guid)
