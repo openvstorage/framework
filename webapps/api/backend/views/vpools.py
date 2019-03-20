@@ -23,6 +23,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, load, return_list, return_object, return_task, return_simple, log
+from ovs.constants.statuses import STATUS_RUNNING
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vdisklist import VDiskList
@@ -77,6 +78,19 @@ class VPoolViewSet(viewsets.ViewSet):
         :type vpool: VPool
         """
         return [storagedriver.storagerouter_guid for storagedriver in vpool.storagedrivers]
+
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_list(StorageRouter)
+    @load(VPool)
+    def available_storagerouters(self, vpool):
+        """
+        Overview Storagerouters that have an available storagerouter for deploying vdisks
+        :param vpool: vPool to retrieve the storagerouter information for
+        :type vpool: VPool
+        """
+        return [storagedriver.storagerouter_guid for storagedriver in vpool.storagedrivers if storagedriver.status == STATUS_RUNNING]
 
     @action()
     @log()
