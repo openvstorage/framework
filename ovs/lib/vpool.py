@@ -139,7 +139,6 @@ class VPoolController(object):
             # MODEL STORAGEDRIVER AND PARTITION JUNCTIONS
             sd_installer.create()
             sd_installer.create_partitions()
-            sd_installer.storagedriver.save()
             partitions_mutex.release()
 
             vp_installer.refresh_metadata()
