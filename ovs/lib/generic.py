@@ -20,15 +20,13 @@ GenericTaskController module
 import os
 import copy
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from threading import Thread
-from time import mktime
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
-from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.lib.helpers.decorators import ovs_task
 from ovs.lib.helpers.generic.scrubber import Scrubber
@@ -75,22 +73,29 @@ class GenericController(object):
     @staticmethod
     @ovs_task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'), ensure_single_info={'mode': 'DEFAULT'})
     def delete_snapshots(timestamp=None):
+        # type: (float) -> Dict[str, List[str]]
         """
         Delete snapshots & scrubbing policy
 
-        Implemented delete snapshot policy:
+        Implemented default delete snapshot policy:
         < 1d | 1d bucket | 1 | best of bucket   | 1d
         < 1w | 1d bucket | 6 | oldest of bucket | 7d = 1w
         < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
         > 1m | delete
-
-        :param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
+        The configured policy can differ from this one.
+        :param timestamp: Timestamp to determine whether snapshots should be kept or not,
+        if none provided, the current timestamp - 1 day is used.
+        The scheduled task will not remove snapshots of the current day this way!
         :type timestamp: float
-        :return: None
+                :return: Dict with vdisk guid as key, deleted snapshot ids as value
+        :rtype: dict
         """
+        if timestamp is None:
+            timestamp = time.time() - timedelta(1).total_seconds()
+
         GenericController._logger.info('Delete snapshots started')
         snapshot_manager = SnapshotManager()
-        snapshot_manager.delete_snapshots(timestamp)
+        return snapshot_manager.delete_snapshots(timestamp)
 
     @staticmethod
     @ovs_task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), ensure_single_info={'mode': 'DEDUPED'})

@@ -16,12 +16,15 @@
 
 import time
 from datetime import datetime, timedelta
+from ovs.constants.vdisk import SNAPSHOT_POLICY_DEFAULT
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
+
+_logger = LogHandler.get('lib', name='generic tasks')
 
 
 class RetentionPolicy(object):
@@ -69,12 +72,10 @@ class RetentionPolicy(object):
 
 class Snapshot(object):
 
-    def __init__(self, guid, timestamp, label, is_consistent, is_automatic, is_sticky, in_backend, stored, vdisk_guid=None, *args, **kwargs):
+    def __init__(self, guid, timestamp, label, is_consistent, is_automatic, is_sticky, in_backend, stored, vdisk_guid, *args, **kwargs):
         """
         Initialize a snapshot object
         """
-        if not vdisk_guid:
-            raise ValueError('Add the guid of the vdisk to the constructor')
         self.guid = guid
         self.timestamp = int(timestamp)
         self.label = label
@@ -86,7 +87,9 @@ class Snapshot(object):
         self.vdisk_guid = vdisk_guid
 
     def __str__(self):
-        return 'Snapshot for vDisk {0}'.format(self.vdisk_guid)
+        prop_strings = ['{}: {}'.format(prop, val) for prop, val in vars(self).iteritems()]
+        prop_strings.append('humanized timestamp: {}'.format(datetime.fromtimestamp(self.timestamp).strftime('%Y-%m-%d %H:%M')))
+        return 'Snapshot for vDisk {0} ({1})'.format(self.vdisk_guid, ', '.join(prop_strings))
 
 
 class Bucket(object):
@@ -117,43 +120,51 @@ class Bucket(object):
         """
         _ = consistency_first
 
-        if not self.end:
-            # No end date for the interval, every snapshot is obsolete
-            return self.snapshots
-
-        if self.retention_policy.consistency_first:
-            # Using + 1 as snapshot provided in the consistency_first_on are > 0
-            if self.retention_policy.consistency_first_on and bucket_count + 1 in self.retention_policy.consistency_first_on:
-                best = None
+        obsolete_snapshots = None
+        if self.end:
+            snapshot_to_keep = None
+            if self.retention_policy.consistency_first:
+                # Using + 1 as snapshot provided in the consistency_first_on are > 0
+                if self.retention_policy.consistency_first_on and bucket_count + 1 in self.retention_policy.consistency_first_on:
+                    best = None
+                    for snapshot in self.snapshots:
+                        if best is None:
+                            best = snapshot
+                        # Consistent is better than inconsistent
+                        elif snapshot.consistent and not best.consistent:
+                            best = snapshot
+                        # Newer (larger timestamp) is better than older snapshots
+                        elif snapshot.consistent == best.consistent and snapshot.timestamp > best.timestamp:
+                            best = snapshot
+                    snapshot_to_keep = best
+            if not snapshot_to_keep:
+                # First the oldest snapshot and remove all younger ones
+                oldest = None
                 for snapshot in self.snapshots:
-                    if best is None:
-                        best = snapshot
-                    # Consistent is better than inconsistent
-                    elif snapshot.consistent and not best.consistent:
-                        best = snapshot
-                    # Newer (larger timestamp) is better than older snapshots
-                    elif snapshot.consistent == best.consistent and snapshot.timestamp > best.timestamp:
-                        best = snapshot
-                return [s for s in self.snapshots if s.timestamp != best.timestamp]
-        # First the oldest snapshot and remove all younger ones
-        oldest = None
-        for snapshot in self.snapshots:
-            if oldest is None:
-                oldest = snapshot
-            # Older (smaller timestamp) is the one we want to keep
-            elif snapshot.timestamp < oldest.timestamp:
-                oldest = snapshot
-        return [s for s in self.snapshots if s.timestamp != oldest.timestamp]
+                    if oldest is None:
+                        oldest = snapshot
+                    # Older (smaller timestamp) is the one we want to keep
+                    elif snapshot.timestamp < oldest.timestamp:
+                        oldest = snapshot
+                snapshot_to_keep = oldest
+            _logger.info('Elected {} as the snapshot to keep within {}.'.format(snapshot_to_keep, self))
+            obsolete_snapshots = [s for s in self.snapshots if s.timestamp != snapshot_to_keep.timestamp]
+        else:
+            # No end date for the interval, every snapshot is obsolete
+            obsolete_snapshots = self.snapshots
+        _logger.info('Marking {} as obsolete within {} ({} in total)'.format(', '.join([str(s) for s in obsolete_snapshots]), self, len(obsolete_snapshots)))
+        return obsolete_snapshots
 
     def __str__(self):
-        return 'Bucket (start: {0}, end: {1}) with {2}'.format(self.start, self.end, self.snapshots)
+        humanized_start = datetime.fromtimestamp(self.start).strftime('%Y-%m-%d %H:%M')
+        humanized_end = datetime.fromtimestamp(self.end).strftime('%Y-%m-%d %H:%M') if self.end else self.end
+        return 'Bucket (start: {0}, end: {1}) with {2}'.format(humanized_start, humanized_end, self.snapshots)
 
 
 class SnapshotManager(object):
     """
     Manages snapshots of all vdisks
     """
-    _logger = LogHandler.get('lib', name='generic tasks')
 
     def __init__(self):
         self.global_policy = self.get_retention_policy()
@@ -177,13 +188,7 @@ class SnapshotManager(object):
         Retrieve the globally configured retention policy
         """
         # @todo retrieve the config path
-        return RetentionPolicy.from_configuration([
-            # One per hour
-            {'nr_of_snapshots': 24, 'nr_of_days': 1},
-            # one per day for rest of the week and opt for a consistent snapshot for the first day
-            {'nr_of_snapshots': 6, 'nr_of_days': 6, 'consistency_first': True, 'consistency_first_on': [1]},
-            # One per week for the rest of the week
-            {'nr_of_snapshots': 3, 'nr_of_days': 21}])
+        return RetentionPolicy.from_configuration(SNAPSHOT_POLICY_DEFAULT)
 
     @classmethod
     def get_retention_policies_for_vpools(cls):
@@ -272,23 +277,22 @@ class SnapshotManager(object):
         """
         return vdisk.info['object_type'] in ['BASE']
 
-    def delete_snapshots(self, timestamp=None):
+    def delete_snapshots(self, timestamp):
+        # type: (float) -> Dict[str, List[str]]
         """
         Delete snapshots & scrubbing policy
 
-        Implemented delete snapshot policy:
+        Implemented default delete snapshot policy:
         < 1d | 1d bucket | 1 | best of bucket   | 1d
         < 1w | 1d bucket | 6 | oldest of bucket | 7d = 1w
         < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
         > 1m | delete
 
-        :param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
+        :param timestamp: Timestamp to determine whether snapshots should be kept or not
         :type timestamp: float
-        :return: None
+        :return: Dict with vdisk guid as key, deleted snapshot ids as value
+        :rtype: dict
         """
-        if timestamp is None:
-            timestamp = time.time()
-
         # @todo think about backwards compatibility. The previous code would not account for the first day
         start_time = datetime.fromtimestamp(timestamp)
 
@@ -310,18 +314,23 @@ class SnapshotManager(object):
                 if snapshot.is_sticky:
                     continue
                 if snapshot.vdisk_guid in parent_snapshots:
-                    self._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot.vdisk_guid))
+                    _logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot.vdisk_guid))
                     continue
                 for bucket in bucket_chain:
                     bucket.try_add_snapshot(snapshot)
             bucket_chains.append(bucket_chain)
 
         # Delete obsolete snapshots
+        removed_snapshot_map = {}
         for index, bucket_chain in enumerate(bucket_chains):
             # @todo this consistency first behaviour changed with the new implementation
             # There are now buckets based on hourly intervals which means the consistency of the first day is not guaranteed (unless the config is specified that way)
             # consistency_first = index == 0
             for bucket in bucket_chain:
-                obsolete_snapshots = bucket.get_obsolete_snapshots(index)
+                obsolete_snapshots = bucket.get_obsolete_snapshots(False, index)
                 for snapshot in obsolete_snapshots:
+                    deleted_snapshots = removed_snapshot_map.get(snapshot.vdisk_guid, [])
                     VDiskController.delete_snapshot(vdisk_guid=snapshot.vdisk_guid, snapshot_id=snapshot.guid)
+                    deleted_snapshots.append(snapshot.guid)
+                    removed_snapshot_map[snapshot.vdisk_guid] = deleted_snapshots
+        return removed_snapshot_map
