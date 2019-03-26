@@ -313,7 +313,7 @@ class SnapshotManager(object):
                 snapshot = Snapshot(vdisk_guid=vdisk.guid, **vdisk_snapshot)
                 if snapshot.is_sticky:
                     continue
-                if snapshot.vdisk_guid in parent_snapshots:
+                if snapshot.guid in parent_snapshots:
                     _logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot.vdisk_guid))
                     continue
                 for bucket in bucket_chain:
