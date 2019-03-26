@@ -21,7 +21,7 @@ VPoolController class responsible for making changes to existing vPools
 import time
 import logging
 from ovs.constants.storagedriver import CACHE_BLOCK, CACHE_FRAGMENT
-from ovs.constants.vpool import STATUS_SHRINKING, STATUS_DELETING, STATUS_RUNNING
+from ovs.constants.statuses import STATUS_SHRINKING, STATUS_DELETING, STATUS_RUNNING
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
