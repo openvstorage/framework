@@ -26,8 +26,7 @@ SCRUB_VDISK_LOCK = '{0}_{{0}}'.format(LOCK_NAMESPACE)  # Second format is the vd
 
 # Snapshot related
 # Note: the scheduled task will always skip the first 24 hours before enforcing the policy
-SNAPSHOT_POLICY_DEFAULT = [{'nr_of_snapshots': 24, 'nr_of_days': 1},  # One per hour
-                           # one per day for rest of the week and opt for a consistent snapshot for the first day
-                           {'nr_of_snapshots': 6, 'nr_of_days': 6, 'consistency_first': True, 'consistency_first_on': [1]},
+SNAPSHOT_POLICY_DEFAULT = [# one per day for rest of the week and opt for a consistent snapshot for the first day
+                           {'nr_of_snapshots': 7, 'nr_of_days': 7, 'consistency_first': True, 'consistency_first_on': [1]},
                            # One per week for the rest of the month
                            {'nr_of_snapshots': 3, 'nr_of_days': 21}]

@@ -147,18 +147,18 @@ class Bucket(object):
                     elif snapshot.timestamp < oldest.timestamp:
                         oldest = snapshot
                 snapshot_to_keep = oldest
-            _logger.info('Elected {} as the snapshot to keep within {}.'.format(snapshot_to_keep, self))
+            _logger.debug('Elected {} as the snapshot to keep within {}.'.format(snapshot_to_keep, self))
             obsolete_snapshots = [s for s in self.snapshots if s.timestamp != snapshot_to_keep.timestamp]
         else:
             # No end date for the interval, every snapshot is obsolete
             obsolete_snapshots = self.snapshots
-        _logger.info('Marking {} as obsolete within {} ({} in total)'.format(', '.join([str(s) for s in obsolete_snapshots]), self, len(obsolete_snapshots)))
+        _logger.debug('Marking {} as obsolete within {} ({} in total)'.format(', '.join([str(s) for s in obsolete_snapshots]), self, len(obsolete_snapshots)))
         return obsolete_snapshots
 
     def __str__(self):
         humanized_start = datetime.fromtimestamp(self.start).strftime('%Y-%m-%d %H:%M')
         humanized_end = datetime.fromtimestamp(self.end).strftime('%Y-%m-%d %H:%M') if self.end else self.end
-        return 'Bucket (start: {0}, end: {1}) with {2}'.format(humanized_start, humanized_end, self.snapshots)
+        return 'Bucket (start: {0}, end: {1}) with [{2}]'.format(humanized_start, humanized_end, ','.join(str(s) for s in self.snapshots))
 
 
 class SnapshotManager(object):

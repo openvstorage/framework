@@ -9,8 +9,7 @@ This automatic task will:
 - Enforce the retention policy
 
 The default retention policy is:
-- an hourly snapshot is kept for yesterday
-- a single snapshot is kept for the 6 days after that
+- a single snapshot is kept for the first 7 days after that
     - Prioritizes consistent snapshots over older ones for the first day in the policy
      (which is 2 days back, starting from now)
 - A single snapshot is kept for the 2nd, 3rd and 4th week to have a single snapshot of the week for the first month
@@ -39,10 +38,8 @@ This options takes in a list of day numbers.
 
 If we were to write out the default retention policy, it would look like:
 ```
-[# One per hour
- {'nr_of_snapshots': 24, 'nr_of_days': 1},  
- # one per day for rest of the week and opt for a consistent snapshot for the first day
- {'nr_of_snapshots': 6, 'nr_of_days': 6, 'consistency_first': True, 'consistency_first_on': [1]},
+[# one per day for the week and opt for a consistent snapshot for the first day
+ {'nr_of_snapshots': 7, 'nr_of_days': 7, 'consistency_first': True, 'consistency_first_on': [1]},
  # One per week for the rest of the month
  {'nr_of_snapshots': 3, 'nr_of_days': 21}]
 ```
@@ -52,7 +49,12 @@ Configuring it on different levels can be done using the API:
 - vPool level: <>
 - vDisk level: <>
 
-Example:
+##### Examples:
+# @todo more examples
+The examples assume that a snapshot was taken each hour.
+
+I wish to keep hourly snapshots from the first week
 ```
-Insert
+[{'nr_of_days': 7,  # A week spans 7 days
+  'nr_of_snapshots': 168}]  # Keep 24 snapshot for every day for 7 days: 7 * 24
 ```

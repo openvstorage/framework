@@ -84,12 +84,13 @@ class GenericController(object):
         > 1m | delete
         The configured policy can differ from this one.
         :param timestamp: Timestamp to determine whether snapshots should be kept or not,
-        if none provided, the current timestamp - 1 day is used.
+        if none provided, the current timestamp - 1 day is used. Used in unittesting only!
         The scheduled task will not remove snapshots of the current day this way!
         :type timestamp: float
-                :return: Dict with vdisk guid as key, deleted snapshot ids as value
+        :return: Dict with vdisk guid as key, deleted snapshot ids as value
         :rtype: dict
         """
+        assert os.environ.get('RUNNING_UNITTESTS') == 'True' and timestamp is not None, 'Providing a timestamp is only possible during unittests'
         if timestamp is None:
             timestamp = time.time() - timedelta(1).total_seconds()
 

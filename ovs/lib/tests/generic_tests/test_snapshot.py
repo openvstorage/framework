@@ -17,7 +17,6 @@
 """
 Generic test module
 """
-import os
 import time
 import datetime
 import unittest
@@ -41,7 +40,6 @@ class SnapshotTestCase(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
-        # self.debug = True
         self.volatile, self.persistent = DalHelper.setup()
 
     def tearDown(self):
@@ -264,7 +262,7 @@ class SnapshotTestCase(unittest.TestCase):
                                         snapshot_time_offset=MINUTE * 30,  # Extra time to add to the hourly timestamps
                                         automatic_snapshots=False)
 
-    def test_happypath(self):
+    def test_happy_path(self):
         """
         Validates the happy path; Hourly snapshots are taken with a few manual consistent
         every now and then. The delete policy is executed every day
@@ -273,9 +271,6 @@ class SnapshotTestCase(unittest.TestCase):
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
-        travis = 'TRAVIS' in os.environ and os.environ['TRAVIS'] == 'true'
-        if travis is True:
-            self._print_message('Running in Travis, reducing output.')
         base = datetime.datetime.now().date()
         consistent_hours = [6, 12, 18]
         inconsistent_hours = xrange(2, 23)
@@ -287,7 +282,7 @@ class SnapshotTestCase(unittest.TestCase):
 
             # At the start of the day, delete snapshot policy runs at 00:30
             self._print_message('- Deleting snapshots')
-            GenericController.delete_snapshots(timestamp=base_timestamp + (MINUTE * 30))
+            GenericController.delete_snapshots(timestamp=base_timestamp + (MINUTE * 30) - DAY.total_seconds())
 
             # Validate snapshots
             self._print_message('- Validating snapshots')
@@ -304,16 +299,17 @@ class SnapshotTestCase(unittest.TestCase):
             self._print_message('- Creating snapshots')
             for h in inconsistent_hours:
                 timestamp = base_timestamp + (HOUR * h)
-                VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
-                                                metadata={'label': 'ss_i_{0}:00'.format(str(h)),
-                                                          'is_consistent': False,
-                                                          'timestamp': str(timestamp)})
+                snapshot_id = VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
+                                                              metadata={'label': 'ss_i_{0}:00'.format(str(h)),
+                                                                        'is_consistent': False,
+                                                                        'timestamp': str(timestamp)})
+                self._print_message('- Created inconsistent snapshot {} for vDisk {} on hour {}'.format(snapshot_id, vdisk_1.guid, h))
                 if h in consistent_hours:
                     ts = (timestamp + (MINUTE * 30))
-                    VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
-                                                    metadata={'label': 'ss_c_{0}:30'.format(str(h)),
-                                                              'is_consistent': True,
-                                                              'timestamp': str(ts)})
+                    snapshot_id = VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid, metadata={'label': 'ss_c_{0}:30'.format(str(h)),
+                                                                                                     'is_consistent': True,
+                                                                                                     'timestamp': str(ts)})
+                    self._print_message('- Created consistent snapshot {} for vDisk {} on hour {}'.format(snapshot_id, vdisk_1.guid, h))
 
     ##################
     # HELPER METHODS #
@@ -323,7 +319,7 @@ class SnapshotTestCase(unittest.TestCase):
             print message
 
     def _visualise_snapshots(self, vdisk, current_day, start_time):
-        # type: (VDisk, int, datetime.datetime) -> None
+        # type: (VDisk, int, datetime.date) -> None
         """
         Visualize the snapshots of the VDisk
         :param vdisk: VDisk object
@@ -416,10 +412,10 @@ class SnapshotTestCase(unittest.TestCase):
                          second=amount_sticky,
                          msg='Wrong amount of sticky snapshots: {0} vs expected {1}'.format(len(sticky), amount_sticky))
         if not sticky:
-            self.assertEqual(first=len(consistent), second=amount_consistent,
-                             msg='Wrong amount of consistent snapshots: {0} vs expected {1}'.format(len(consistent), amount_consistent))
-            self.assertEqual(first=len(inconsistent), second=amount_inconsistent,
-                             msg='Wrong amount of inconsistent snapshots: {0} vs expected {1}'.format(len(inconsistent), amount_inconsistent))
+            self.assertEqual(first=amount_consistent, second=len(consistent),
+                             msg='Wrong amount of consistent snapshots')
+            self.assertEqual(first=amount_inconsistent, second=len(inconsistent),
+                             msg='Wrong amount of inconsistent snapshots')
 
         # Check of the correctness of the snapshot timestamp
         if consistent_hours:
