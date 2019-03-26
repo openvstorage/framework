@@ -22,6 +22,8 @@ import yaml
 import logging
 from celery.backends.base import KeyValueStoreBackend
 from ovs.constants.logging import CELERY_LOGGER
+from ovs.dal.dataobject import DataObject
+from ovs.dal.helpers import Descriptor
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.storage.exceptions import KeyNotFoundException
 
@@ -107,16 +109,23 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         :param data: Data to extract data from
         :return: Extract data or full data
         """
+        return_value = None
         if key is None and data is None:
-            return None  # Could be that the supplied data is None when a mget wants to do an unwrapping
+            return return_value  # Could be that the supplied data is None when a mget wants to do an unwrapping
         if data is None:
             try:
                 data = self._client.get(key)
             except KeyNotFoundException:
                 data = None
-        if isinstance(data, dict) and 'data' in data:
-            return data['data']
-        return data
+        if isinstance(data, dict):
+            if 'data' in data:
+                return_value = data['data']
+            if 'descriptor' in data:
+                descriptor = Descriptor(data['object_type'], data['guid'])
+                return_value = descriptor.get_object(instantiate=True)
+        if not return_value:
+            raise RuntimeError('Something went wrong during data extraction of key {0}'.format(key))
+        return return_value
 
     def _extract_data_multi(self, keys):
         return (self._extract_data(data=data) for data in self._client.get_multi(keys, must_exist=False))
@@ -128,8 +137,11 @@ class ArakoonResultBackend(KeyValueStoreBackend):
         :param value: Value to store
         :return: True if successful, false if not
         """
-        # @Todo allow DataObjects to be stored and retrieved
-        return self._client.set(key, {'data': value, 'time_set': time.time()})
+        set_value = {'data': value, 'time_set': time.time()}
+        if isinstance(value, DataObject):
+            descriptor = Descriptor(type(value), value.guid)
+            set_value['descriptor'] = descriptor.descriptor
+        return self._client.set(key, set_value)
 
     def get_key_for_task(self, *args, **kwargs):
         """
