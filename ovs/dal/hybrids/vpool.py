@@ -46,7 +46,8 @@ class VPool(DataObject):
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backends, as used by the Storage Drivers.'),
                     Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
                     Property('status', STATUSES.keys(), doc='Status of the vPool'),
-                    Property('metadata_store_bits', int, mandatory=False, doc='StorageDrivers deployed for this vPool will make use of this amount of metadata store bits')]
+                    Property('metadata_store_bits', int, mandatory=False, doc='StorageDrivers deployed for this vPool will make use of this amount of metadata store bits'),
+                    Property('snapshot_retention_policy', list, mandatory=False, doc='Snapshot retention policy configuration')]
     __relations = []
     __dynamics = [Dynamic('configuration', dict, 3600),
                   Dynamic('statistics', dict, 4),

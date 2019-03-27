@@ -20,10 +20,14 @@ Generic test module
 import time
 import datetime
 import unittest
+from ovs.constants.vdisk import SNAPSHOT_POLICY_LOCATION
 from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.tests.helpers import DalHelper
+from ovs.extensions.generic.configuration import Configuration
 from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.helpers.generic.snapshots import SnapshotManager, RetentionPolicy
 
 MINUTE = 60
 HOUR = MINUTE * 60
@@ -150,7 +154,6 @@ class SnapshotTestCase(unittest.TestCase):
         """
         Create and validate snapshot creation and deletion sequence
         This is suitable to enforce the default policy which is:
-        > 1d | day 1 bucket | 24 | oldest of bucket | 24h
         < 1d | 1d bucket | 1 | best of bucket   | 1d
         < 1w | 1d bucket | 6 | oldest of bucket | 7d = 1w
         < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
@@ -364,7 +367,6 @@ class SnapshotTestCase(unittest.TestCase):
         """
 
         # Implemented policy:
-        # > 1d | day 1 bucket | 24 | oldest of bucket | 24h
         # < 1d | 1d bucket | 1 | best of bucket   | 1d
         # < 1w | 1d bucket | 6 | oldest of bucket | 7d = 1w
         # < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
@@ -449,6 +451,46 @@ class SnapshotTestCase(unittest.TestCase):
                 timestamp = self._make_timestamp(start_time, DAY * day) + time_diff
                 self.assertIn(member=timestamp, container=container,
                               msg='Expected weekly {0} snapshot for {1} at {2}'.format(sn_type, vdisk.name, self._from_timestamp(timestamp)))
+
+    def test_retention_policy_configurability(self):
+        """
+        Test the different retention policy settings
+        :return:
+        """
+        global_config = [{'nr_of_days': 30, 'nr_of_snapshots': 30}]
+        vpool_config = [{'nr_of_days': 7, 'nr_of_snapshots': 7}]
+        vdisk_config = [{'nr_of_days': 1, 'nr_of_snapshots': 1}]
+
+        Configuration.set(SNAPSHOT_POLICY_LOCATION, global_config)
+        vdisk_1 = self._build_get_built_vdisk()
+        vpool_1 = VPoolList.get_vpools()[0]
+
+        # Global configuration
+        snapshot_manager = SnapshotManager()
+
+        policy_check = RetentionPolicy.from_configuration(global_config)[0]
+        policy = snapshot_manager.get_policy_to_enforce(vdisk_1)[0]
+        self.assertEqual(policy_check, policy)
+
+        # VPool configuration
+        vpool_1.snapshot_retention_policy = vpool_config
+        vpool_1.save()
+
+        snapshot_manager = SnapshotManager()
+
+        policy_check = RetentionPolicy.from_configuration(vpool_config)[0]
+        policy = snapshot_manager.get_policy_to_enforce(vdisk_1)[0]
+        self.assertEqual(policy_check, policy)
+
+        # VDisk Configuration
+        snapshot_manager = SnapshotManager()
+
+        vdisk_1.snapshot_retention_policy = vdisk_config
+        vdisk_1.save()
+
+        policy_check = RetentionPolicy.from_configuration(vdisk_config)[0]
+        policy = snapshot_manager.get_policy_to_enforce(vdisk_1)[0]
+        self.assertEqual(policy_check, policy)
 
     @staticmethod
     def _make_timestamp(base, offset):

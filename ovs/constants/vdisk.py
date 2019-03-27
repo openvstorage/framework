@@ -17,6 +17,7 @@
 """
 VDisk Constants module. Contains constants related to vdisks
 """
+import os
 
 # General
 LOCK_NAMESPACE = 'ovs_locks'
@@ -30,3 +31,4 @@ SNAPSHOT_POLICY_DEFAULT = [# one per day for rest of the week and opt for a cons
                            {'nr_of_snapshots': 7, 'nr_of_days': 7, 'consistency_first': True, 'consistency_first_on': [1]},
                            # One per week for the rest of the month
                            {'nr_of_snapshots': 3, 'nr_of_days': 21}]
+SNAPSHOT_POLICY_LOCATION = os.path.join(os.path.sep, 'ovs', 'cluster', 'snapshot_retention_policy')

@@ -51,7 +51,8 @@ class VDisk(DataObject):
                     Property('pagecache_ratio', float, default=1.0, doc='Ratio of the volume\'s metadata pages that needs to be cached'),
                     Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)'),
                     Property('cache_quota', dict, mandatory=False, doc='Maximum caching space(s) this volume can consume (in Bytes) per cache type. If not None, the caching(s) for this volume has been set manually'),
-                    Property('scrubbing_information', dict, mandatory=False, doc='Scrubbing metadata set by scrubber with an expiration date')]
+                    Property('scrubbing_information', dict, mandatory=False, doc='Scrubbing metadata set by scrubber with an expiration date'),
+                    Property('snapshot_retention_policy', list, mandatory=False, doc='Snapshot retention policy configuration')]
     __relations = [Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),

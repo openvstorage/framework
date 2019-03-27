@@ -16,11 +16,12 @@
 
 import time
 from datetime import datetime, timedelta
-from ovs.constants.vdisk import SNAPSHOT_POLICY_DEFAULT
+from ovs.constants.vdisk import SNAPSHOT_POLICY_DEFAULT, SNAPSHOT_POLICY_LOCATION
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.extensions.generic.configuration import Configuration
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
 
@@ -68,6 +69,19 @@ class RetentionPolicy(object):
         :return: List[RetentionPolicy]
         """
         return [cls(**c) for c in configuration]
+
+    def __eq__(self, other):
+        # type: (RetentionPolicy) -> bool
+        """
+        Equality operator
+        :param other: Other instance
+        :type other: RetentionPolicy
+        :return: True if equal else False
+        :rtype: bool
+        """
+        if not isinstance(other, RetentionPolicy):
+            return NotImplemented('Comparing to other types is not implemented')
+        return vars(self) == vars(other)
 
 
 class Snapshot(object):
@@ -187,8 +201,7 @@ class SnapshotManager(object):
         """
         Retrieve the globally configured retention policy
         """
-        # @todo retrieve the config path
-        return RetentionPolicy.from_configuration(SNAPSHOT_POLICY_DEFAULT)
+        return RetentionPolicy.from_configuration(Configuration.get(SNAPSHOT_POLICY_LOCATION, default=SNAPSHOT_POLICY_DEFAULT))
 
     @classmethod
     def get_retention_policies_for_vpools(cls):
@@ -202,7 +215,7 @@ class SnapshotManager(object):
         for vpool in VPoolList.get_vpools():
             policies_config = cls.get_retention_policy_vpool(vpool)
             if policies_config:
-                vpool_policies[vpool] = RetentionPolicy.from_configuration(policies_config)
+                vpool_policies[vpool] = policies_config
         return vpool_policies
 
     @staticmethod
@@ -211,7 +224,9 @@ class SnapshotManager(object):
         """
         Retrieve the retention policy for the VPool (if any)
         """
-        # @todo Retrieve config key
+        snapshot_retention_policy = vpool.snapshot_retention_policy
+        if snapshot_retention_policy:
+            return RetentionPolicy.from_configuration(vpool.snapshot_retention_policy)
         return None
 
     @staticmethod
@@ -220,7 +235,9 @@ class SnapshotManager(object):
         """
         Retrieve the retention policy for the VDisk (if any)
         """
-        # @todo retrieve config key
+        snapshot_retention_policy = vdisk.snapshot_retention_policy
+        if snapshot_retention_policy:
+            return RetentionPolicy.from_configuration(vdisk.snapshot_retention_policy)
         return None
 
     @staticmethod
