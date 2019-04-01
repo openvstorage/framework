@@ -15,8 +15,4 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 
-DB = 'DB'
-DTL = 'DTL'
-SCRUB = 'SCRUB'
-WRITE = 'WRITE'
-BACKEND = 'BACKEND'
+RABBIT_MQ_PACKAGE_NAME = 'rabbitmq-server'
