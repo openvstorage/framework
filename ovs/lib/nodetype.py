@@ -24,6 +24,7 @@ import sys
 import json
 import time
 import logging
+from ovs.constants.packages import RABBIT_MQ_PACKAGE_NAME
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs_extensions.constants.vpools import HOSTS_BASE_PATH
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig, ArakoonInstaller
@@ -296,7 +297,7 @@ class NodeTypeController(object):
             target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
             target_client.file_write(rabbitmq_cookie_file, contents)
             target_client.file_chmod(rabbitmq_cookie_file, mode=0400)
-            target_client.run(['rabbitmq-server', '-detached'])
+            target_client.run([RABBIT_MQ_PACKAGE_NAME, '-detached'])
             time.sleep(5)
             target_client.run(['rabbitmqctl', 'stop_app'])
             time.sleep(5)
@@ -306,13 +307,13 @@ class NodeTypeController(object):
             time.sleep(5)
 
             # Enable HA for the rabbitMQ queues
-            ServiceFactory.change_service_state(target_client, 'rabbitmq-server', 'start', NodeTypeController._logger)
+            ServiceFactory.change_service_state(target_client, RABBIT_MQ_PACKAGE_NAME, 'start', NodeTypeController._logger)
             NodeTypeController.check_rabbitmq_and_enable_ha_mode(client=target_client, logger=NodeTypeController._logger)
 
         NodeTypeController._configure_amqp_to_volumedriver()
 
         Toolbox.log(logger=NodeTypeController._logger, messages='Starting services')
-        services = ['memcached', 'arakoon-ovsdb', 'rabbitmq-server']
+        services = ['memcached', 'arakoon-ovsdb', RABBIT_MQ_PACKAGE_NAME]
         if arakoon_metadata['internal'] is True:
             services.remove('arakoon-ovsdb')
         for service in services:
@@ -437,9 +438,9 @@ class NodeTypeController(object):
             if unconfigure_rabbitmq is True:
                 Toolbox.log(logger=NodeTypeController._logger, messages='Removing/unconfiguring RabbitMQ')
                 try:
-                    if service_manager.has_service('rabbitmq-server', client=target_client):
-                        ServiceFactory.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeTypeController._logger)
-                        target_client.run(['rabbitmq-server', '-detached'])
+                    if service_manager.has_service(RABBIT_MQ_PACKAGE_NAME, client=target_client):
+                        ServiceFactory.change_service_state(target_client, RABBIT_MQ_PACKAGE_NAME, 'stop', NodeTypeController._logger)
+                        target_client.run([RABBIT_MQ_PACKAGE_NAME, '-detached'])
                         time.sleep(5)
                         target_client.run(['rabbitmqctl', 'stop_app'])
                         time.sleep(5)
@@ -448,14 +449,14 @@ class NodeTypeController(object):
                         target_client.run(['rabbitmqctl', 'stop'])
                         time.sleep(5)
                         target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
-                        ServiceFactory.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeTypeController._logger)  # To be sure
+                        ServiceFactory.change_service_state(target_client, RABBIT_MQ_PACKAGE_NAME, 'stop', NodeTypeController._logger)  # To be sure
                 except Exception as ex:
                     Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to remove/unconfigure RabbitMQ', ex], loglevel='exception')
 
             Toolbox.log(logger=NodeTypeController._logger, messages='Stopping services')
-            services = ['memcached', 'rabbitmq-server']
+            services = ['memcached', RABBIT_MQ_PACKAGE_NAME]
             if unconfigure_rabbitmq is False:
-                services.remove('rabbitmq-server')
+                services.remove(RABBIT_MQ_PACKAGE_NAME)
             if unconfigure_memcached is False:
                 services.remove('memcached')
             for service in services:
@@ -598,9 +599,9 @@ class NodeTypeController(object):
             if 'ovs' in users:
                 Toolbox.log(logger=logger, messages='Already configured RabbitMQ')
                 return
-            ServiceFactory.change_service_state(client, 'rabbitmq-server', 'stop', logger)
+            ServiceFactory.change_service_state(client, RABBIT_MQ_PACKAGE_NAME, 'stop', logger)
 
-        client.run(['rabbitmq-server', '-detached'])
+        client.run([RABBIT_MQ_PACKAGE_NAME, '-detached'])
         time.sleep(5)
 
         # Sometimes/At random the rabbitmq server takes longer than 5 seconds to start,
@@ -639,11 +640,11 @@ class NodeTypeController(object):
         :return: None
         """
         service_manager = ServiceFactory.get_manager()
-        if not service_manager.has_service('rabbitmq-server', client):
+        if not service_manager.has_service(RABBIT_MQ_PACKAGE_NAME, client):
             raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
         rabbitmq_running, same_process = service_manager.is_rabbitmq_running(client=client)
         if rabbitmq_running is False or same_process is False:
-            ServiceFactory.change_service_state(client, 'rabbitmq-server', 'restart', logger)
+            ServiceFactory.change_service_state(client, RABBIT_MQ_PACKAGE_NAME, 'restart', logger)
 
         time.sleep(5)
         client.run(['rabbitmqctl', 'set_policy', 'ha-all', '^(volumerouter|ovs_.*)$', '{"ha-mode":"all"}'])
@@ -740,7 +741,7 @@ class NodeTypeController(object):
         if node_type == 'master':
             worker_queue += ',ovs_masters'
             services.update({'memcached': {'MEMCACHE_NODE_IP': client.ip, 'WORKER_QUEUE': worker_queue},
-                             'rabbitmq-server': {'MEMCACHE_NODE_IP': client.ip, 'WORKER_QUEUE': worker_queue},
+                             RABBIT_MQ_PACKAGE_NAME: {'MEMCACHE_NODE_IP': client.ip, 'WORKER_QUEUE': worker_queue},
                              'scheduled-tasks': {},
                              'webapp-api': {},
                              'volumerouter-consumer': {}})

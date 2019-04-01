@@ -22,6 +22,7 @@ import os
 import re
 import sys
 import logging
+from ovs.constants.packages import RABBIT_MQ_PACKAGE_NAME
 from ovs_extensions.constants.config import CACC_LOCATION, CONFIG_STORE_LOCATION
 from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.generic.interactive import Interactive
@@ -298,12 +299,12 @@ class NodeRemovalController(object):
         """
         Toolbox.log(logger=logger, messages='Removing services')
         service_manager = ServiceFactory.get_manager()
-        stop_only = ['rabbitmq-server', 'memcached']
+        stop_only = [RABBIT_MQ_PACKAGE_NAME, 'memcached']
         services = ['workers', 'support-agent', 'watcher-framework']
         if node_type == 'master':
             services += ['scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
             if Toolbox.is_service_internally_managed(service='rabbitmq') is True:
-                services.append('rabbitmq-server')
+                services.append(RABBIT_MQ_PACKAGE_NAME)
             if Toolbox.is_service_internally_managed(service='memcached') is True:
                 services.append('memcached')
 
