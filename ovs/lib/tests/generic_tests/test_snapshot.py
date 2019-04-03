@@ -494,7 +494,8 @@ class SnapshotTestCase(unittest.TestCase):
         Test the application of the retention policy settings with overlapping timespans
         """
         global_config = [{'nr_of_days': 1, 'nr_of_snapshots': 1},
-                         {'nr_of_days': 2, 'nr_of_snapshots': 1, 'consistent_first': True}]
+                         {'nr_of_days': 2, 'nr_of_snapshots': 1, 'consistency_first': True}]
+        # The first theory (invalid one, but good to write down nonetheless:
         # Day 1 will have 1 consistent and 1 inconsistent snapshot. Inconsistent is older
         # Day 2 will have 2 inconsistent snapshots
         # The goal is to have both buckets still retain their snapshots
@@ -504,10 +505,24 @@ class SnapshotTestCase(unittest.TestCase):
         # Bucket 1 will choose the oldest, discarding the consistent one when removing
         # Bucket 2 will choose the consistent one above all else
         # In the end, bucket 2 won't have a snapshot
+
+        # After reviewing the code: no overlap is possible as it increments the days that are processed.
+        # It doesn't review every period by itself, which would be a nightmare on it's own
         Configuration.set(SNAPSHOT_POLICY_LOCATION, global_config)
         vdisk_1 = self._build_vdisk()
-
-        raise NotImplementedError()
+        start_time = datetime.datetime.now().date()
+        snapshots = []
+        for day, snapshot_consistencies in {1: [True, False],
+                                            2: [False, False]}.iteritems():
+            day_timestamp = self._make_timestamp(start_time, day * DAY * -1)
+            for index, consistency in enumerate(snapshot_consistencies):
+                snapshot_timestamp = day_timestamp + (HOUR * index)
+                snapshots.append(VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
+                                                                 metadata={'label': 'snapshot_{0}:30'.format(str(index)),
+                                                                           'is_consistent': consistency,
+                                                                           'timestamp': str(snapshot_timestamp)}))
+        GenericController.delete_snapshots()
+        self.assertEqual(2, len(vdisk_1._snapshot_ids()))
 
     @staticmethod
     def _make_timestamp(base, offset):

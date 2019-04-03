@@ -90,7 +90,9 @@ class GenericController(object):
         :return: Dict with vdisk guid as key, deleted snapshot ids as value
         :rtype: dict
         """
-        assert os.environ.get('RUNNING_UNITTESTS') == 'True' and timestamp is not None, 'Providing a timestamp is only possible during unittests'
+        if os.environ.get('RUNNING_UNITTESTS') == 'False':
+            assert timestamp is None, 'Providing a timestamp is only possible during unittests'
+
         if timestamp is None:
             timestamp = time.time() - timedelta(1).total_seconds()
 

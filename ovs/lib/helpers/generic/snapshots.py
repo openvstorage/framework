@@ -258,6 +258,8 @@ class SnapshotManager(object):
         # type: (datetime, List[RetentionPolicy]) -> List[Bucket]
         """
         Retrieve the bucket distribution based on the policies
+        There is no overlapping period possible.
+        Eg [{'nr_of_days': 1, 'nr_of_snapshots': 1}, {'nr_of_days': 2, 'nr_of_snapshots': 1}] spans three days, not two
         There is always an additional bucket to keep track of older snapshots
         :param start_time: Datetime to start counting from
         :type start_time: datetime
