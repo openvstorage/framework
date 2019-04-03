@@ -132,7 +132,7 @@ class SnapshotTestCase(unittest.TestCase):
         self.assertIn(base_snapshot_guid, vdisk_1.snapshot_ids, 'Snapshot was deleted while there are still clones of it')
     
     @staticmethod
-    def _build_get_built_vdisk():
+    def _build_vdisk():
         # type: () -> VDisk
         """
         Build the DAL structure and retrieve the vdisk
@@ -209,7 +209,7 @@ class SnapshotTestCase(unittest.TestCase):
         """
         is_automatic: True, is_consistent: True --> Automatically created consistent snapshots should be deleted
         """
-        self._create_validate_snapshots(vdisk=self._build_get_built_vdisk(),
+        self._create_validate_snapshots(vdisk=self._build_vdisk(),
                                         start_time=datetime.datetime.now().date(),
                                         sticky_hours=[],
                                         consistent_hours=[2],
@@ -221,7 +221,7 @@ class SnapshotTestCase(unittest.TestCase):
         """
         is_automatic: True, is_consistent: False --> Automatically created non-consistent snapshots should be deleted
         """
-        self._create_validate_snapshots(vdisk=self._build_get_built_vdisk(),
+        self._create_validate_snapshots(vdisk=self._build_vdisk(),
                                         start_time=datetime.datetime.now().date(),
                                         sticky_hours=[],
                                         consistent_hours=[],
@@ -233,7 +233,7 @@ class SnapshotTestCase(unittest.TestCase):
         """
         is_automatic: False, is_consistent: True --> Manually created consistent snapshots should be deleted
         """
-        self._create_validate_snapshots(vdisk=self._build_get_built_vdisk(),
+        self._create_validate_snapshots(vdisk=self._build_vdisk(),
                                         start_time=datetime.datetime.now().date(),
                                         sticky_hours=[],
                                         consistent_hours=[2],
@@ -245,7 +245,7 @@ class SnapshotTestCase(unittest.TestCase):
         """
         is_automatic: False, is_consistent: False --> Manually created non-consistent snapshots should be deleted
         """
-        self._create_validate_snapshots(vdisk=self._build_get_built_vdisk(),
+        self._create_validate_snapshots(vdisk=self._build_vdisk(),
                                         start_time=datetime.datetime.now().date(),
                                         sticky_hours=[],
                                         consistent_hours=[],
@@ -257,7 +257,7 @@ class SnapshotTestCase(unittest.TestCase):
         """
         is_sticky: True --> Sticky snapshots of any kind should never be deleted (Only possible to delete manually)
         """
-        self._create_validate_snapshots(vdisk=self._build_get_built_vdisk(),
+        self._create_validate_snapshots(vdisk=self._build_vdisk(),
                                         start_time=datetime.datetime.now().date(),
                                         sticky_hours=[2],
                                         consistent_hours=[2],
@@ -270,7 +270,7 @@ class SnapshotTestCase(unittest.TestCase):
         Validates the happy path; Hourly snapshots are taken with a few manual consistent
         every now and then. The delete policy is executed every day
         """
-        vdisk_1 = self._build_get_built_vdisk()
+        vdisk_1 = self._build_vdisk()
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
@@ -365,20 +365,16 @@ class SnapshotTestCase(unittest.TestCase):
         :param inconsistent_hours: Hours that the inconsistent snapshots were made on
         :type inconsistent_hours: List[int]
         """
-
         # Implemented policy:
         # < 1d | 1d bucket | 1 | best of bucket   | 1d
         # < 1w | 1d bucket | 6 | oldest of bucket | 7d = 1w
         # < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
         # > 1m | delete
 
-        minute = 60
-        hour = minute * 60
-
         self._print_message('\t- VDisk {0}'.format(vdisk.name))
 
         # Visualisation
-        if self.debug is True:
+        if self.debug:
             self._visualise_snapshots(vdisk, current_day, start_time)
 
         sticky = [int(s['timestamp']) for s in vdisk.snapshots if s['is_sticky']]
@@ -391,11 +387,12 @@ class SnapshotTestCase(unittest.TestCase):
         amount_consistent = 0
         amount_inconsistent = 0
         processed_days = 0
-        # First 24h period
+        # First 24h period which are skipped so all taken snapshots are kept
         if processed_days < current_day:
             amount_consistent += len(consistent_hours)
             amount_inconsistent += len(inconsistent_hours)
             processed_days += 1
+
         # One consistent snapshot per day
         while processed_days < current_day and processed_days <= 7:
             if len(consistent_hours) > 0:
@@ -423,24 +420,24 @@ class SnapshotTestCase(unittest.TestCase):
         if consistent_hours:
             sn_type = 'consistent'
             container = consistent
-            time_diff = (hour * consistent_hours[-1]) + (minute * 30)
+            time_diff = (HOUR * consistent_hours[-1]) + (MINUTE * 30)
         else:
             sn_type = 'inconsistent'
             container = inconsistent
-            time_diff = (hour * inconsistent_hours[-1])
+            time_diff = (HOUR * inconsistent_hours[-1])
 
         for day in xrange(0, current_day):
             for h in sticky_hours:
-                timestamp = self._make_timestamp(start_time, DAY * day) + (hour * h) + (minute * 30)
+                timestamp = self._make_timestamp(start_time, DAY * day) + (HOUR * h) + (MINUTE * 30)
                 self.assertIn(member=timestamp, container=sticky,
                               msg='Expected sticky snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
             if day == (current_day - 1):
                 for h in inconsistent_hours:
-                    timestamp = self._make_timestamp(start_time, DAY * day) + (hour * h)
+                    timestamp = self._make_timestamp(start_time, DAY * day) + (HOUR * h)
                     self.assertIn(member=timestamp, container=inconsistent,
                                   msg='Expected hourly inconsistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
                 for h in consistent_hours:
-                    timestamp = self._make_timestamp(start_time, DAY * day) + (hour * h) + (minute * 30)
+                    timestamp = self._make_timestamp(start_time, DAY * day) + (HOUR * h) + (MINUTE * 30)
                     self.assertIn(member=timestamp, container=consistent,
                                   msg='Expected random consistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
             elif day > (current_day - 7):
@@ -452,7 +449,7 @@ class SnapshotTestCase(unittest.TestCase):
                 self.assertIn(member=timestamp, container=container,
                               msg='Expected weekly {0} snapshot for {1} at {2}'.format(sn_type, vdisk.name, self._from_timestamp(timestamp)))
 
-    def test_retention_policy_configurability(self):
+    def test_retention_policy_configuration_levels(self):
         """
         Test the different retention policy settings
         :return:
@@ -462,7 +459,7 @@ class SnapshotTestCase(unittest.TestCase):
         vdisk_config = [{'nr_of_days': 1, 'nr_of_snapshots': 1}]
 
         Configuration.set(SNAPSHOT_POLICY_LOCATION, global_config)
-        vdisk_1 = self._build_get_built_vdisk()
+        vdisk_1 = self._build_vdisk()
         vpool_1 = VPoolList.get_vpools()[0]
 
         # Global configuration
@@ -491,6 +488,26 @@ class SnapshotTestCase(unittest.TestCase):
         policy_check = RetentionPolicy.from_configuration(vdisk_config)[0]
         policy = snapshot_manager.get_policy_to_enforce(vdisk_1)[0]
         self.assertEqual(policy_check, policy)
+
+    def test_retention_policy_overlap(self):
+        """
+        Test the application of the retention policy settings with overlapping timespans
+        """
+        global_config = [{'nr_of_days': 1, 'nr_of_snapshots': 1},
+                         {'nr_of_days': 2, 'nr_of_snapshots': 1, 'consistent_first': True}]
+        # Day 1 will have 1 consistent and 1 inconsistent snapshot. Inconsistent is older
+        # Day 2 will have 2 inconsistent snapshots
+        # The goal is to have both buckets still retain their snapshots
+        # The bucket logic will distribute all snapshots to buckets that can fit them. Both buckets have the same start day
+        # Bucket 1 (1 day) will have the consistent and inconsistent one
+        # Bucket 2 (2 days) will have all the snapshots
+        # Bucket 1 will choose the oldest, discarding the consistent one when removing
+        # Bucket 2 will choose the consistent one above all else
+        # In the end, bucket 2 won't have a snapshot
+        Configuration.set(SNAPSHOT_POLICY_LOCATION, global_config)
+        vdisk_1 = self._build_vdisk()
+
+        raise NotImplementedError()
 
     @staticmethod
     def _make_timestamp(base, offset):

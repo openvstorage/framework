@@ -26,6 +26,7 @@ from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
 
 _logger = LogHandler.get('lib', name='generic tasks')
+DAY = timedelta(1)
 
 
 class RetentionPolicy(object):
@@ -134,7 +135,6 @@ class Bucket(object):
         """
         _ = consistency_first
 
-        obsolete_snapshots = None
         if self.end:
             snapshot_to_keep = None
             if self.retention_policy.consistency_first:
@@ -265,23 +265,21 @@ class SnapshotManager(object):
         :type policies: RetentionPolicies
         :return:
         """
-        day_delta = timedelta(1)  # Convert to number of seconds in calculations
         buckets = []
         processed_retention_days = 0
-        offset = processed_retention_days * day_delta
 
         for policy in policies:  # type: RetentionPolicy
+            offset = processed_retention_days * DAY
             number_of_days = policy.nr_of_days
             number_of_snapshots = policy.nr_of_snapshots
-            snapshot_timedelta = number_of_days * day_delta / number_of_snapshots
+            snapshot_timedelta = number_of_days * DAY / number_of_snapshots
             for i in xrange(0, number_of_snapshots):
                 buckets.append(Bucket(start=cls.make_timestamp(start_time, offset + snapshot_timedelta * i),
                                       end=cls.make_timestamp(start_time, offset + snapshot_timedelta * (i + 1)),
                                       retention_policy=policy))
             processed_retention_days += number_of_days
-            offset = processed_retention_days * day_delta
         # Always add a bucket which falls out of the configured retention
-        buckets.append(Bucket(start=cls.make_timestamp(start_time, processed_retention_days * day_delta), end=0))
+        buckets.append(Bucket(start=cls.make_timestamp(start_time, processed_retention_days * DAY), end=0))
         return buckets
 
     @staticmethod
@@ -310,7 +308,6 @@ class SnapshotManager(object):
         :return: Dict with vdisk guid as key, deleted snapshot ids as value
         :rtype: dict
         """
-        # @todo think about backwards compatibility. The previous code would not account for the first day
         start_time = datetime.fromtimestamp(timestamp)
 
         # Get a list of all snapshots that are used as parents for clones
