@@ -21,7 +21,7 @@ import time
 from rest_framework import viewsets
 from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
-from api.backend.decorators import load, log, required_roles, return_list, return_object, return_task
+from api.backend.decorators import load, log, required_roles, return_list, return_object, return_task, return_simple
 from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -32,6 +32,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.helpers.generic.snapshots import RetentionPolicy
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -519,3 +520,24 @@ class VDiskViewSet(viewsets.ViewSet):
         :rtype: celery.result.AsyncResult
         """
         return GenericController.execute_scrub.delay(vdisk_guids=[vdisk.guid], storagerouter_guid=storagerouter_guid, manual=True)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_simple()
+    @load(VPool)
+    def snapshot_retention_policy(self, vdisk, policy):
+        """
+        Set the snapshot retention policy on the vDisk level
+        :param vdisk: the vDisk to scrub
+        :type vdisk: VDisk
+        :param policy: Retention policy to set
+        :type policy: List[Dict[str, int]]
+        :return: None
+        """
+        try:
+            RetentionPolicy.from_configuration(policy)
+        except:
+            raise ValueError('Policy is not properly formatted')
+        vdisk.snapshot_retention_policy = policy
+        vdisk.save()

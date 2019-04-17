@@ -25,11 +25,13 @@ from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
 from api.backend.exceptions import HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
+from ovs.constants.vdisk import SNAPSHOT_POLICY_LOCATION, SNAPSHOT_POLICY_DEFAULT
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
@@ -38,6 +40,7 @@ from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.update import UpdateController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.helpers.generic.snapshots import RetentionPolicy
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -651,3 +654,40 @@ class StorageRouterViewSet(viewsets.ViewSet):
             - prerequisites that have not been met
         """
         return UpdateController.get_update_information_all.delay()
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_simple()
+    @load(StorageRouter)
+    def snapshot_retention_policy(self, storagerouter, policy):
+        """
+        Set the snapshot retention policy on the vDisk level
+        :param storagerouter: The given Storagerouter. Not used but necessary because of the lack of generic routes
+        :type storagerouter: StorageRouter
+        :param policy: Retention policy to set
+        :type policy: List[Dict[str, int]]
+        :return: None
+        """
+        _ = storagerouter
+        try:
+            RetentionPolicy.from_configuration(policy)
+        except:
+            raise ValueError('Policy is not properly formatted')
+        Configuration.set(SNAPSHOT_POLICY_LOCATION, policy)
+
+    @link()
+    @log()
+    @required_roles(['read', 'manage'])
+    @return_simple()
+    @load(StorageRouter)
+    def global_snapshot_retention_policy(self, storagerouter):
+        """
+        Get the snapshot retention policy on the vDisk level
+        :param storagerouter: The given Storagerouter. Not used but necessary because of the lack of generic routes
+        :type storagerouter: StorageRouter
+        :return: The snapshot policy
+        :rtype: List[Dict[str, int]]
+        """
+        _ = storagerouter
+        return Configuration.get(SNAPSHOT_POLICY_LOCATION, default=SNAPSHOT_POLICY_DEFAULT)

@@ -64,7 +64,6 @@ class RetentionPolicy(object):
         one snapshot per hour the first day
         one snapshot per day the rest of the week
         one snapshot per week the rest of the month
-        one older snapshot snapshot will always be stored for an interval older then the longest interval passed in the config
         :param configuration: Configuration to use
         :type configuration: List[Dict[str, int]]
         :return: List[RetentionPolicy]
@@ -88,8 +87,21 @@ class RetentionPolicy(object):
 class Snapshot(object):
 
     def __init__(self, guid, timestamp, label, is_consistent, is_automatic, is_sticky, in_backend, stored, vdisk_guid, *args, **kwargs):
+        # type: (str, int, str, bool, bool, bool, bool, int, str, *any, **any) -> None
         """
         Initialize a snapshot object
+        :param guid: ID of the snapshot
+        :type guid: str
+        :param timestamp: Timestamp of the snapshot
+        :type timestamp: int
+        :param label: Snapshot label
+        :type label: str
+        :param is_consistent: Indicator that the snapshot is consistent
+        :type is_consistent: bool
+        :param is_automatic: Indicator that the snapshot is created automatically
+        :type is_automatic: bool
+        :param is_sticky: Indicator that the snapshot is a sticky one
+        :type 
         """
         self.guid = guid
         self.timestamp = int(timestamp)
@@ -102,13 +114,29 @@ class Snapshot(object):
         self.vdisk_guid = vdisk_guid
 
     def __str__(self):
+        """
+        String representation
+        """
         prop_strings = ['{}: {}'.format(prop, val) for prop, val in vars(self).iteritems()]
         prop_strings.append('humanized timestamp: {}'.format(datetime.fromtimestamp(self.timestamp).strftime('%Y-%m-%d %H:%M')))
         return 'Snapshot for vDisk {0} ({1})'.format(self.vdisk_guid, ', '.join(prop_strings))
 
 
 class Bucket(object):
+    """
+    Represents a bucket that holds items within a time frame
+    """
     def __init__(self, start, end, retention_policy=None):
+        # type: (int, int, RetentionPolicy) -> None
+        """
+        Initialize a bucket
+        :param start: Start timestamp
+        :type start: int
+        :param end: End timestamp. 0 indicates that it has no end
+        :type end: int
+        :param retention_policy: Optional: associated retention policy. Used to determine the obsolete snapshots within the bucket
+        :type retention_policy: RetentionPolicy
+        """
         self.start = start
         self.end = end
         self.snapshots = []
@@ -116,11 +144,27 @@ class Bucket(object):
 
     def is_snapshot_in_interval(self, snapshot):
         # type: (Snapshot) -> bool
+        """
+        Determine if a snapshot fits within the current time interval
+        :param snapshot: Snapshot to check
+        :type snapshot: Snapshot
+        :return: True if the snapshot fits else False
+        :rtype: bool
+        """
         return self.start >= snapshot.timestamp > self.end
 
     def try_add_snapshot(self, snapshot):
+        # type: (Snapshot) -> bool
+        """
+        Try to add the snapshot to the bucket
+        :param snapshot: Snapshot to try
+        :return: True if the snapshot could be added else False
+        :rtype: bool
+        """
         if self.is_snapshot_in_interval(snapshot):
             self.snapshots.append(snapshot)
+            return True
+        return False
 
     def get_obsolete_snapshots(self, consistency_first=False, bucket_count=0):
         # type: (bool, int) -> List[Snapshot]
@@ -162,7 +206,7 @@ class Bucket(object):
                         oldest = snapshot
                 snapshot_to_keep = oldest
             _logger.debug('Elected {} as the snapshot to keep within {}.'.format(snapshot_to_keep, self))
-            obsolete_snapshots = [s for s in self.snapshots if s.timestamp != snapshot_to_keep.timestamp]
+            obsolete_snapshots = [s for s in self.snapshots if s != snapshot_to_keep]
         else:
             # No end date for the interval, every snapshot is obsolete
             obsolete_snapshots = self.snapshots
@@ -170,6 +214,9 @@ class Bucket(object):
         return obsolete_snapshots
 
     def __str__(self):
+        """
+        Stringified representation
+        """
         humanized_start = datetime.fromtimestamp(self.start).strftime('%Y-%m-%d %H:%M')
         humanized_end = datetime.fromtimestamp(self.end).strftime('%Y-%m-%d %H:%M') if self.end else self.end
         return 'Bucket (start: {0}, end: {1}) with [{2}]'.format(humanized_start, humanized_end, ','.join(str(s) for s in self.snapshots))
@@ -263,7 +310,7 @@ class SnapshotManager(object):
         There is always an additional bucket to keep track of older snapshots
         :param start_time: Datetime to start counting from
         :type start_time: datetime
-        :param policies
+        :param policies: Retention policies to enforce
         :type policies: RetentionPolicies
         :return:
         """

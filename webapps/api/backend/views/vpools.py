@@ -31,6 +31,7 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.lib.generic import GenericController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.helpers.generic.snapshots import RetentionPolicy
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -228,3 +229,24 @@ class VPoolViewSet(viewsets.ViewSet):
         :rtype: celery.result.AsyncResult
         """
         return GenericController.execute_scrub.delay(vpool_guids=[vpool.guid], manual=True)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_simple()
+    @load(VPool)
+    def snapshot_retention_policy(self, vpool, policy):
+        """
+        Set the snapshot retention policy on the vpool level
+        :param vpool: The GUID of the vPool for which all vDisks need to be scrubbed
+        :type vpool: ovs.dal.hybrids.vpool.VPool
+        :param policy: Retention policy to set
+        :type policy: List[Dict[str, int]]
+        :return: None
+        """
+        try:
+            RetentionPolicy.from_configuration(policy)
+        except:
+            raise ValueError('Policy is not properly formatted')
+        vpool.snapshot_retention_policy = policy
+        vpool.save()
