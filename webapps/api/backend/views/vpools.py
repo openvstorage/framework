@@ -243,6 +243,7 @@ class VPoolViewSet(viewsets.ViewSet):
         :param policy: Retention policy to set
         :type policy: List[Dict[str, int]]
         :return: None
+        :rtype: None
         """
         try:
             RetentionPolicy.from_configuration(policy)
