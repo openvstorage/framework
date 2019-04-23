@@ -21,6 +21,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -30,6 +31,12 @@ DAY = timedelta(1)
 
 
 class RetentionPolicy(object):
+
+    PARAMS = {'nr_of_snapshots': (int, {'min': 1}, True),
+              'nr_of_days': (int, {'min': 1}, True),
+              'consistency_first': (bool, None, True),
+              'consistency_first_on': (list, int, True)}
+
     def __init__(self, nr_of_snapshots, nr_of_days, consistency_first=False, consistency_first_on=None):
         # type: (int, int, bool, List[int]) -> None
         """
@@ -46,6 +53,7 @@ class RetentionPolicy(object):
         if consistency_first_on is None:
             consistency_first_on = []
 
+        ExtensionsToolbox.verify_required_params(actual_params=locals(), required_params=self.PARAMS)
         self.nr_of_snapshots = nr_of_snapshots
         self.nr_of_days = nr_of_days
         self.consistency_first = consistency_first
