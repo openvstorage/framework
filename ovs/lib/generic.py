@@ -302,8 +302,9 @@ class GenericController(object):
         # This also validates whether all required packages have been installed
         GenericController._logger.debug('Retrieving package information for the cluster')
         threads = []
+        fetch_hooks = Toolbox.fetch_hooks(component='update', sub_component='get_package_update_info_cluster')
         for storagerouter, client in client_map.iteritems():
-            for fct in Toolbox.fetch_hooks(component='update', sub_component='get_package_update_info_cluster'):
+            for fct in fetch_hooks:
                 thread = Thread(target=fct, args=(client, package_info_cluster))
                 thread.start()
                 threads.append(thread)
