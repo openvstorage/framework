@@ -23,6 +23,7 @@ import time
 from datetime import datetime, timedelta
 from threading import Thread
 from time import mktime
+from ovs.constants.vdisk import SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -180,12 +181,27 @@ class GenericController(object):
                     bucket['snapshots'] = [s for s in bucket['snapshots'] if
                                            s['timestamp'] != oldest['timestamp']]
 
+        exceptions = []
         # Delete obsolete snapshots
         for bucket_chain in bucket_chains:
-            for bucket in bucket_chain:
-                for snapshot in bucket['snapshots']:
-                    VDiskController.delete_snapshot(vdisk_guid=snapshot['vdisk_guid'],
-                                                    snapshot_id=snapshot['snapshot_id'])
+            # Each bucket chain represents one vdisk's snapshots
+            try:
+                for bucket in bucket_chain:
+                    for snapshot in bucket['snapshots']:
+                        VDiskController.delete_snapshot(vdisk_guid=snapshot['vdisk_guid'],
+                                                        snapshot_id=snapshot['snapshot_id'])
+            except RuntimeError as ex:
+                vdisk_guid = next((snapshot['vdisk_guid'] for bucket in bucket_chain for snapshot in bucket['snapshots']), '')
+                vdisk_id_log = ''
+                if vdisk_guid:
+                    vdisk_id_log = ' for VDisk with guid {}'.format(vdisk_guid)
+                if SCRUB_VDISK_EXCEPTION_MESSAGE in ex.message:
+                    GenericController._logger.warning('Being scrubbed exception occurred while deleting snapshots{}'.format(vdisk_id_log))
+                else:
+                    GenericController._logger.exception('Exception occurred while deleting snapshots{}'.format(vdisk_id_log))
+                    exceptions.append(ex)
+        if exceptions:
+            raise RuntimeError('Exceptions occurred while deleting snapshots: \n- {}'.format('\n- '.join((str(ex) for ex in exceptions))))
         GenericController._logger.info('Delete snapshots finished')
 
     @staticmethod
