@@ -23,3 +23,4 @@ LOCK_NAMESPACE = 'ovs_locks'
 
 # Scrub related
 SCRUB_VDISK_LOCK = '{0}_{{0}}'.format(LOCK_NAMESPACE)  # Second format is the vdisk guid
+SCRUB_VDISK_EXCEPTION_MESSAGE = 'VDisk is being scrubbed. Unable to remove snapshots at this time'
