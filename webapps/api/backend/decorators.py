@@ -32,6 +32,7 @@ from rest_framework.request import Request
 from api.backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
 from api.backend.toolbox import ApiToolbox
 from api.helpers import OVSResponse
+from ovs.dal.dataobject import DataObject
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -93,12 +94,189 @@ def required_roles(roles):
 
 
 def load(object_type=None, min_version=settings.VERSION[0], max_version=settings.VERSION[-1], validator=None):
+    # type: (Type[DataObject], int, int, callable) -> callable
     """
     Parameter discovery decorator
+    Able to inject a couple of keywords into the decorated function:
+    - Instance of the passed object type. The name of the keyword is the object_type.lower()
+    - version: The parsed API version of the client
+    - raw_version: The unparsed API version of the client
+    - request: The Request object (WSGIRequest or Request)
+    - local_storagerouter: The storagerouter where the API request came in
+    :param object_type: Type of object to load
+    :type object_type: Type[DataObject]
+    :param min_version: Minimum api version required to access this call
+    :type min_version: int
+    :param max_version: Maximum api version required to access this call
+    :type max_version: int
+    :param validator: Extra validation function to be executed
+    :type validator: callable
+    :return: The wrapped function
+    :rtype: callable
     """
     regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
-    def wrap(f):
+    if validator is not None:
+        f_info = inspect.getargspec(validator)
+        if f_info.defaults is None:
+            validation_mandatory_vars = f_info.args[1:]
+            validation_optional_vars = []
+        else:
+            validation_mandatory_vars = f_info.args[1:-len(f_info.defaults)]
+            validation_optional_vars = f_info.args[len(validation_mandatory_vars) + 1:]
+    else:
+        validation_mandatory_vars = []
+        validation_optional_vars = []
+
+    def validate_get_version(request):
+        # type: (Union[WSGIRequest, Request]) -> Tuple[int, str]
+        """
+        Validate the version and return the parsed and non parsed version passed in the request
+        :param request: API request object
+        :type Request: Union[WSGIRequest, Request]
+        :return: The parsed and non parsed request
+        :rtype: Tuple[int, str]
+        :exception: HttpNotAcceptableException when the version is not within the supported versions of the api
+        """
+        version_match = regex.match(request.META['HTTP_ACCEPT'])
+        if version_match is not None:
+            version = version_match.groupdict()['version']
+        else:
+            version = settings.VERSION[-1]
+        raw_version = version
+        versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
+        if version == '*':  # If accepting all versions, it defaults to the highest one
+            version = versions[1]
+        version = int(version)
+        if version < versions[0] or version > versions[1]:
+            raise HttpNotAcceptableException(
+                error_description='API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0],
+                                                                                                      versions[1],
+                                                                                                      version),
+                error='invalid_version')
+        return version, raw_version
+
+    def build_new_kwargs(original_function, request, instance, version, raw_version, passed_kwargs):
+        # type: (callable, Union[WSGIRequest, Request], Generic[object_type], int, str, **any) -> Tuple[dict, dict]
+        """
+        Convert all positional arguments to keyword arguments
+        :param original_function: The orignally decorated function
+        :type original_function: callable
+        :param request: API request object
+        :type request: Union[WSGIRequest, Request]
+        :param instance: Generic[object_type]
+        :param version: Parsed API version
+        :type version: int
+        :param raw_version: Unparsed API version
+        :type raw_version: str
+        :param passed_args: Args passed to the original function
+        :type passed_args: tuple
+        :param passed_kwargs: Kwargs passed to the original function
+        :type passed_kwargs: dict
+        :return: The kwargs for the original function and the kwargs for the validator
+        :rtype: Tuple[dict, dict]
+        """
+        function_metadata = original_function.ovs_metadata
+        kwargs = {}
+        validator_kwargs = {}
+        for mandatory_vars, optional_vars, new_kwargs in [(function_metadata['load']['mandatory'][:], function_metadata['load']['optional'][:], kwargs),
+                                                          (validation_mandatory_vars[:], validation_optional_vars[:], validator_kwargs)]:
+            # Special reserved keywords
+            if 'version' in mandatory_vars:
+                new_kwargs['version'] = version
+                mandatory_vars.remove('version')
+            if 'raw_version' in mandatory_vars:
+                new_kwargs['raw_version'] = raw_version
+                mandatory_vars.remove('raw_version')
+            if 'request' in mandatory_vars:
+                new_kwargs['request'] = request
+                mandatory_vars.remove('request')
+            if instance is not None:
+                typename = object_type.__name__.lower()
+                if typename in mandatory_vars:
+                    new_kwargs[typename] = instance
+                    mandatory_vars.remove(typename)
+            if 'local_storagerouter' in mandatory_vars:
+                storagerouter = StorageRouterList.get_by_machine_id(settings.UNIQUE_ID)
+                new_kwargs['local_storagerouter'] = storagerouter
+                mandatory_vars.remove('local_storagerouter')
+
+            # The rest of the parameters
+            post_data = request.DATA if hasattr(request, 'DATA') else request.POST
+            query_params = request.QUERY_PARAMS if hasattr(request, 'QUERY_PARAMS') else request.GET
+            # Used to detect if anything was passed. Can't use None as the value passed might be None
+            empty = object()
+            data_containers = [passed_kwargs, post_data, query_params]
+            for parameters, mandatory in ((mandatory_vars, True), (optional_vars, False)):
+                for name in parameters:
+                    val = empty
+                    for container in data_containers:
+                        val = container.get(name, empty)
+                        if val != empty:
+                            break
+                    if val != empty:
+                        # @todo evaluate the try_parse missing for other options
+                        # Embrace our design flaw. The query shouldn't be json dumped separately.
+                        if name == 'query':
+                            val = _try_parse(val)
+                        new_kwargs[name] = _try_convert_bool(val)
+                    elif mandatory:
+                        raise HttpNotAcceptableException(error_description='Invalid data passed: {0} is missing'.format(name),
+                                                         error='invalid_data')
+        return kwargs, validator_kwargs
+
+    def _try_convert_bool(value):
+        # type: (any) -> Union[bool, Type[value]]
+        """
+        Convert strings to boolean
+        No idea why we'd ever do this but I'd prefer to keep everything running at the moment
+        :param value: Value to be parsed
+        :type value: any
+        :return: Bool if parsable else the value
+        :rtype: Union[bool, value]
+        """
+        if value == 'true' or value == 'True':
+            return True
+        if value == 'false' or value == 'False':
+            return False
+        return value
+
+    def _try_parse(value):
+        # type: (any) -> Union[bool, Type[value]]
+        """
+        Tries to parse a value to a pythonic value
+        :param value: Value to be parsed
+        :type value: any
+        :return: Dict if parsable else the value
+        :rtype: Union[dict, value]
+        """
+        if isinstance(value, basestring):
+            try:
+                return json.loads(value)
+            except ValueError:
+                pass
+        return value
+
+    def load_dataobject_instance(passed_kwargs):
+        # type: (Dict[str, any]) -> Union[DataObject, None]
+        """
+        Load the dataobject instance (if need be)
+        :param passed_kwargs: Key word arguments passed to the original function
+        :type passed_kwargs: Dict[str, any]
+        :return: The loaded instance (if any)
+        :rtype: Union[DataObject, None]
+        :exception HttpNotFoundException if the requested object could not be found
+        """
+        instance = None
+        if 'pk' in passed_kwargs and object_type is not None:
+            try:
+                instance = object_type(passed_kwargs['pk'])
+            except ObjectNotFoundException:
+                raise HttpNotFoundException(error_description='The requested object could not be found',
+                                            error='object_not_found')
+        return instance
+
+    def load_wrapper(f):
         """
         Wrapper function
         """
@@ -116,108 +294,17 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                             'object_type': object_type}
         f.ovs_metadata = metadata
 
-        def _try_parse(value):
-            """
-            Tries to parse a value to a pythonic value
-            """
-            if value == 'true' or value == 'True':
-                return True
-            if value == 'false' or value == 'False':
-                return False
-            if isinstance(value, basestring):
-                try:
-                    return json.loads(value)
-                except ValueError:
-                    pass
-            return value
-
         @wraps(f)
-        def new_function(*args, **kwargs):
+        def load_inner(*args, **kwargs):
             """
             Wrapped function
             """
             request = _find_request(args)
             start = time.time()
-            new_kwargs = {}
-            validation_new_kwargs = {}
-            # Find out the arguments of the decorated function
-            if validator is not None:
-                f_info = inspect.getargspec(validator)
-                if f_info.defaults is None:
-                    validation_mandatory_vars = f_info.args[1:]
-                    validation_optional_vars = []
-                else:
-                    validation_mandatory_vars = f_info.args[1:-len(f_info.defaults)]
-                    validation_optional_vars = f_info.args[len(validation_mandatory_vars) + 1:]
-            else:
-                validation_mandatory_vars = []
-                validation_optional_vars = []
-            # Check versioning
-            version_match = regex.match(request.META['HTTP_ACCEPT'])
-            if version_match is not None:
-                version = version_match.groupdict()['version']
-            else:
-                version = settings.VERSION[-1]
-            raw_version = version
-            versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
-            if version == '*':  # If accepting all versions, it defaults to the highest one
-                version = versions[1]
-            version = int(version)
-            if version < versions[0] or version > versions[1]:
-                raise HttpNotAcceptableException(error_description='API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version),
-                                                 error='invalid_version')
-            # Load some information
-            instance = None
-            if 'pk' in kwargs and object_type is not None:
-                try:
-                    instance = object_type(kwargs['pk'])
-                except ObjectNotFoundException:
-                    raise HttpNotFoundException(error_description='The requested object could not be found',
-                                                error='object_not_found')
+            version, raw_version = validate_get_version(request)
+            instance = load_dataobject_instance(kwargs)
+            new_kwargs, validation_new_kwargs = build_new_kwargs(f, request, instance, version, raw_version, kwargs)
             # Build new kwargs
-            for _mandatory_vars, _optional_vars, _new_kwargs in [(f.ovs_metadata['load']['mandatory'][:], f.ovs_metadata['load']['optional'][:], new_kwargs),
-                                                                 (validation_mandatory_vars, validation_optional_vars, validation_new_kwargs)]:
-                if 'version' in _mandatory_vars:
-                    _new_kwargs['version'] = version
-                    _mandatory_vars.remove('version')
-                if 'raw_version' in _mandatory_vars:
-                    _new_kwargs['raw_version'] = raw_version
-                    _mandatory_vars.remove('raw_version')
-                if 'request' in _mandatory_vars:
-                    _new_kwargs['request'] = request
-                    _mandatory_vars.remove('request')
-                if instance is not None:
-                    typename = object_type.__name__.lower()
-                    if typename in _mandatory_vars:
-                        _new_kwargs[typename] = instance
-                        _mandatory_vars.remove(typename)
-                if 'local_storagerouter' in _mandatory_vars:
-                    storagerouter = StorageRouterList.get_by_machine_id(settings.UNIQUE_ID)
-                    _new_kwargs['local_storagerouter'] = storagerouter
-                    _mandatory_vars.remove('local_storagerouter')
-                # The rest of the mandatory parameters
-                post_data = request.DATA if hasattr(request, 'DATA') else request.POST
-                get_data = request.QUERY_PARAMS if hasattr(request, 'QUERY_PARAMS') else request.GET
-                for name in _mandatory_vars:
-                    if name in kwargs:
-                        _new_kwargs[name] = kwargs[name]
-                    else:
-                        if name not in post_data:
-                            if name not in get_data:
-                                raise HttpNotAcceptableException(error_description='Invalid data passed: {0} is missing'.format(name),
-                                                                 error='invalid_data')
-                            _new_kwargs[name] = _try_parse(get_data[name])
-                        else:
-                            _new_kwargs[name] = _try_parse(post_data[name])
-                # Try to fill optional parameters
-                for name in _optional_vars:
-                    if name in kwargs:
-                        _new_kwargs[name] = kwargs[name]
-                    else:
-                        if name in post_data:
-                            _new_kwargs[name] = _try_parse(post_data[name])
-                        elif name in get_data:
-                            _new_kwargs[name] = _try_parse(get_data[name])
             # Execute validator
             if validator is not None:
                 validator(args[0], **validation_new_kwargs)
@@ -228,8 +315,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 result.timings['parsing'] = [duration, 'Request parsing']
             return result
 
-        return new_function
-    return wrap
+        return load_inner
+    return load_wrapper
 
 
 def return_list(object_type, default_sort=None):
