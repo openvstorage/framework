@@ -179,33 +179,26 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         function_metadata = original_function.ovs_metadata
         kwargs = {}
         validator_kwargs = {}
+        empty = object()
+        # Special reserved keywords
+        reserved = {'version': version,
+                    'raw_version': raw_version,
+                    'request': request,
+                    'local_storagerouter': StorageRouterList.get_by_machine_id(settings.UNIQUE_ID)}
+        if instance is not None:
+            reserved[object_type.__name__.lower()] = instance
+
         for mandatory_vars, optional_vars, new_kwargs in [(function_metadata['load']['mandatory'][:], function_metadata['load']['optional'][:], kwargs),
                                                           (validation_mandatory_vars[:], validation_optional_vars[:], validator_kwargs)]:
-            # Special reserved keywords
-            if 'version' in mandatory_vars:
-                new_kwargs['version'] = version
-                mandatory_vars.remove('version')
-            if 'raw_version' in mandatory_vars:
-                new_kwargs['raw_version'] = raw_version
-                mandatory_vars.remove('raw_version')
-            if 'request' in mandatory_vars:
-                new_kwargs['request'] = request
-                mandatory_vars.remove('request')
-            if instance is not None:
-                typename = object_type.__name__.lower()
-                if typename in mandatory_vars:
-                    new_kwargs[typename] = instance
-                    mandatory_vars.remove(typename)
-            if 'local_storagerouter' in mandatory_vars:
-                storagerouter = StorageRouterList.get_by_machine_id(settings.UNIQUE_ID)
-                new_kwargs['local_storagerouter'] = storagerouter
-                mandatory_vars.remove('local_storagerouter')
+            for keyword, value in reserved.iteritems():
+                if keyword in mandatory_vars:
+                    new_kwargs[keyword] = value
+                    mandatory_vars.remove(keyword)
 
             # The rest of the parameters
             post_data = request.DATA if hasattr(request, 'DATA') else request.POST
             query_params = request.QUERY_PARAMS if hasattr(request, 'QUERY_PARAMS') else request.GET
             # Used to detect if anything was passed. Can't use None as the value passed might be None
-            empty = object()
             data_containers = [passed_kwargs, post_data, query_params]
             for parameters, mandatory in ((mandatory_vars, True), (optional_vars, False)):
                 for name in parameters:
@@ -215,7 +208,6 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                         if val != empty:
                             break
                     if val != empty:
-                        # @todo evaluate the try_parse missing for other options
                         # Embrace our design flaw. The query shouldn't be json dumped separately.
                         if name == 'query':
                             val = _try_parse(val)
