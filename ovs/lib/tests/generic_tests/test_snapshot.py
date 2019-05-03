@@ -20,11 +20,12 @@ Generic test module
 import time
 import datetime
 import unittest
-from ovs.constants.vdisk import SNAPSHOT_POLICY_LOCATION
+from ovs.constants.vdisk import SNAPSHOT_POLICY_LOCATION, SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.tests.helpers import DalHelper
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.helpers.generic.snapshots import SnapshotManager, RetentionPolicy
@@ -44,6 +45,7 @@ class SnapshotTestCase(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
+        StorageRouterClient.delete_snapshot_callbacks = {}
         self.volatile, self.persistent = DalHelper.setup()
 
     def tearDown(self):
@@ -130,7 +132,7 @@ class SnapshotTestCase(unittest.TestCase):
             base_timestamp = self._make_timestamp(base, DAY * 2)
             GenericController.delete_snapshots(timestamp=base_timestamp + (MINUTE * 30))
         self.assertIn(base_snapshot_guid, vdisk_1.snapshot_ids, 'Snapshot was deleted while there are still clones of it')
-    
+
     @staticmethod
     def _build_vdisk():
         # type: () -> VDisk
@@ -314,6 +316,66 @@ class SnapshotTestCase(unittest.TestCase):
                                                                                                      'timestamp': str(ts)})
                     self._print_message('- Created consistent snapshot {} for vDisk {} on hour {}'.format(snapshot_id, vdisk_1.guid, h))
 
+    def test_exception_handling(self):
+        """
+        Test if the scheduled job can handle exceptions
+        """
+        def raise_an_exception(*args, **kwargs):
+            raise RuntimeError('Emulated snapshot delete error')
+
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+
+        vdisk_1, vdisk_2 = structure['vdisks'].values()
+        vdisks = [vdisk_1, vdisk_2]
+
+        for vdisk in vdisks:
+            [dynamic for dynamic in vdisk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
+            for i in xrange(0, 2):
+                metadata = {'label': str(i),
+                            'is_consistent': False,
+                            'is_sticky': False,
+                            'timestamp': str((int(time.time() - datetime.timedelta(2).total_seconds() - i)))}
+                snapshot_id = VDiskController.create_snapshot(vdisk.guid, metadata)
+                if vdisk == vdisk_1:
+                    StorageRouterClient.delete_snapshot_callbacks[vdisk.volume_id] = {snapshot_id: raise_an_exception}
+        with self.assertRaises(RuntimeError):
+            GenericController.delete_snapshots()
+        self.assertEqual(1, len(vdisk_2.snapshot_ids), 'One snapshot should be removed for vdisk 2')
+        self.assertEqual(2, len(vdisk_1.snapshot_ids), 'No snapshots should be removed for vdisk 1')
+
+    def test_scrubbing_exception_handling(self):
+        """
+        Test if the scheduled job can handle scrub related exceptions
+        """
+        def raise_an_exception(*args, **kwargs):
+            raise RuntimeError(SCRUB_VDISK_EXCEPTION_MESSAGE)
+
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        vdisk_1 = structure['vdisks'][1]
+        [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
+
+        for i in xrange(0, 2):
+            metadata = {'label': str(i),
+                        'is_consistent': False,
+                        'is_sticky': False,
+                        'timestamp': str((int(time.time() - datetime.timedelta(2).total_seconds() - i)))}
+            snapshot_id = VDiskController.create_snapshot(vdisk_1.guid, metadata)
+            StorageRouterClient.delete_snapshot_callbacks[vdisk_1.volume_id] = {snapshot_id: raise_an_exception}
+
+        GenericController.delete_snapshots()
+
     ##################
     # HELPER METHODS #
     ##################
@@ -328,10 +390,10 @@ class SnapshotTestCase(unittest.TestCase):
         :param vdisk: VDisk object
         :type vdisk: VDisk
         :param current_day: Number of the current day
-        :type current_day: int 
+        :type current_day: int
         :param start_time: Time when snapshots started to be made
         :type start_time: datetime.datetime
-        :return: 
+        :return:
         """
         snapshots = {}
         for snapshot in vdisk.snapshots:

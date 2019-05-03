@@ -22,6 +22,7 @@ import copy
 import time
 from datetime import timedelta
 from threading import Thread
+from ovs.constants.vdisk import SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
