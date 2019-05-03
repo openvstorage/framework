@@ -375,6 +375,7 @@ class SnapshotTestCase(unittest.TestCase):
             StorageRouterClient.delete_snapshot_callbacks[vdisk_1.volume_id] = {snapshot_id: raise_an_exception}
 
         GenericController.delete_snapshots()
+        self.assertEqual(2, len(vdisk_1.snapshot_ids), "No snapshots should be removed for vdisk 1")
 
     ##################
     # HELPER METHODS #

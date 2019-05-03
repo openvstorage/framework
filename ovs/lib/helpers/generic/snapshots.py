@@ -16,7 +16,7 @@
 
 import time
 from datetime import datetime, timedelta
-from ovs.constants.vdisk import SNAPSHOT_POLICY_DEFAULT, SNAPSHOT_POLICY_LOCATION
+from ovs.constants.vdisk import SNAPSHOT_POLICY_DEFAULT, SNAPSHOT_POLICY_LOCATION, SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
@@ -364,6 +364,7 @@ class SnapshotManager(object):
         :type timestamp: float
         :return: Dict with vdisk guid as key, deleted snapshot ids as value
         :rtype: dict
+        :raises: RuntimeError if any exception occurred during the snapshot deletion
         """
         start_time = datetime.fromtimestamp(timestamp)
 
@@ -389,19 +390,33 @@ class SnapshotManager(object):
                     continue
                 for bucket in bucket_chain:
                     bucket.try_add_snapshot(snapshot)
-            bucket_chains.append(bucket_chain)
+            bucket_chains.append((vdisk, bucket_chain))
 
         # Delete obsolete snapshots
+        exceptions = []
         removed_snapshot_map = {}
-        for index, bucket_chain in enumerate(bucket_chains):
+        for index, vdisk_bucket_chain in enumerate(bucket_chains):
+            vdisk, bucket_chain = vdisk_bucket_chain
             # @todo this consistency first behaviour changed with the new implementation
             # There are now buckets based on hourly intervals which means the consistency of the first day is not guaranteed (unless the config is specified that way)
             # consistency_first = index == 0
-            for bucket in bucket_chain:
-                obsolete_snapshots = bucket.get_obsolete_snapshots(False, index)
-                for snapshot in obsolete_snapshots:
-                    deleted_snapshots = removed_snapshot_map.get(snapshot.vdisk_guid, [])
-                    VDiskController.delete_snapshot(vdisk_guid=snapshot.vdisk_guid, snapshot_id=snapshot.guid)
-                    deleted_snapshots.append(snapshot.guid)
-                    removed_snapshot_map[snapshot.vdisk_guid] = deleted_snapshots
+            try:
+                for bucket in bucket_chain:
+                    obsolete_snapshots = bucket.get_obsolete_snapshots(False, index)
+                    for snapshot in obsolete_snapshots:
+                        deleted_snapshots = removed_snapshot_map.get(snapshot.vdisk_guid, [])
+                        VDiskController.delete_snapshot(vdisk_guid=snapshot.vdisk_guid, snapshot_id=snapshot.guid)
+                        deleted_snapshots.append(snapshot.guid)
+                        removed_snapshot_map[snapshot.vdisk_guid] = deleted_snapshots
+            except RuntimeError as ex:
+                vdisk_log = ' for VDisk with guid {}'.format(vdisk.guid)
+                if SCRUB_VDISK_EXCEPTION_MESSAGE in ex.message:
+                    _logger.warning('Being scrubbed exception occurred while deleting snapshots{}'.format(vdisk_log))
+                else:
+                    _logger.exception('Exception occurred while deleting snapshots{}'.format(vdisk_log))
+                    exceptions.append(ex)
+
+        if exceptions:
+            raise RuntimeError('Exceptions occurred while deleting snapshots: \n- {}'.format('\n- '.join((str(ex) for ex in exceptions))))
+
         return removed_snapshot_map

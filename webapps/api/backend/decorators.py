@@ -136,7 +136,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         :type Request: Union[WSGIRequest, Request]
         :return: The parsed and non parsed request
         :rtype: Tuple[int, str]
-        :exception: HttpNotAcceptableException when the version is not within the supported versions of the api
+        :raises: HttpNotAcceptableException when the version is not within the supported versions of the api
         """
         version_match = regex.match(request.META['HTTP_ACCEPT'])
         if version_match is not None:
@@ -257,7 +257,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         :type passed_kwargs: Dict[str, any]
         :return: The loaded instance (if any)
         :rtype: Union[DataObject, None]
-        :exception HttpNotFoundException if the requested object could not be found
+        :raises HttpNotFoundException if the requested object could not be found
         """
         instance = None
         if 'pk' in passed_kwargs and object_type is not None:
