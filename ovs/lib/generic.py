@@ -96,7 +96,7 @@ class GenericController(object):
                      for storagedriver in StorageDriverList.get_storagedrivers()).apply_async(task_id=group_id)
 
     @staticmethod
-    @ovs_task(name='ovs.generic.delete_snapshots_storagedriver', ensure_single_info={'mode': 'DEFAULT'})
+    @ovs_task(name='ovs.generic.delete_snapshots_storagedriver', ensure_single_info={'mode': 'DEDUPED'})
     def delete_snapshots_storagedriver(storagedriver_guid, timestamp=None, group_id=None):
         """
         Delete snapshots per storagedriver & scrubbing policy
