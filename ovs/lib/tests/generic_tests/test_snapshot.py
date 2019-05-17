@@ -95,6 +95,7 @@ class SnapshotTestCase(unittest.TestCase):
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         base = datetime.datetime.now().date()
@@ -124,7 +125,8 @@ class SnapshotTestCase(unittest.TestCase):
                                                           'is_consistent': True,
                                                           'timestamp': str(timestamp)})
             base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * 2)
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
         self.assertIn(base_snapshot_guid, vdisk_1.snapshot_ids, 'Snapshot was deleted while there are still clones of it')
 
     def test_snapshot_automatic_consistent(self):
@@ -142,6 +144,7 @@ class SnapshotTestCase(unittest.TestCase):
         )
         base = datetime.datetime.now().date()
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
 
         label = 'c'
         # Extra time to add to the hourly timestamps
@@ -161,7 +164,8 @@ class SnapshotTestCase(unittest.TestCase):
             self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
 
             self._print_message('- Deleting snapshots')
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
 
             self._validate(vdisk=vdisk_1,
                            current_day=day,
@@ -195,6 +199,7 @@ class SnapshotTestCase(unittest.TestCase):
         )
         base = datetime.datetime.now().date()
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
 
         label = 'i'
         # Extra time to add to the hourly timestamps
@@ -214,7 +219,8 @@ class SnapshotTestCase(unittest.TestCase):
             self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
 
             self._print_message('- Deleting snapshots')
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
 
             self._validate(vdisk=vdisk_1,
                            current_day=day,
@@ -248,6 +254,7 @@ class SnapshotTestCase(unittest.TestCase):
         )
         base = datetime.datetime.now().date()
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
 
         label = 'c'
         # Extra time to add to the hourly timestamps
@@ -267,7 +274,8 @@ class SnapshotTestCase(unittest.TestCase):
             self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
 
             self._print_message('- Deleting snapshots')
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
 
             self._validate(vdisk=vdisk_1,
                            current_day=day,
@@ -301,6 +309,7 @@ class SnapshotTestCase(unittest.TestCase):
         )
         base = datetime.datetime.now().date()
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
 
         label = 'i'
         # Extra time to add to the hourly timestamps
@@ -320,7 +329,8 @@ class SnapshotTestCase(unittest.TestCase):
             self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
 
             self._print_message('- Deleting snapshots')
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
 
             self._validate(vdisk=vdisk_1,
                            current_day=day,
@@ -354,6 +364,7 @@ class SnapshotTestCase(unittest.TestCase):
         )
         base = datetime.datetime.now().date()
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
 
         label = 'c'
         # Extra time to add to the hourly timestamps
@@ -373,7 +384,8 @@ class SnapshotTestCase(unittest.TestCase):
             self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
 
             self._print_message('- Deleting snapshots')
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
 
             self._validate(vdisk=vdisk_1,
                            current_day=day,
@@ -405,6 +417,7 @@ class SnapshotTestCase(unittest.TestCase):
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
@@ -424,7 +437,8 @@ class SnapshotTestCase(unittest.TestCase):
 
             # At the start of the day, delete snapshot policy runs at 00:30
             self._print_message('- Deleting snapshots')
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
 
             # Validate snapshots
             self._print_message('- Validating snapshots')
@@ -468,6 +482,8 @@ class SnapshotTestCase(unittest.TestCase):
         )
 
         vdisk_1, vdisk_2 = structure['vdisks'].values()
+        storagedriver_1 = structure['storagedrivers'][1]
+
         vdisks = [vdisk_1, vdisk_2]
 
         for vdisk in vdisks:
@@ -481,7 +497,7 @@ class SnapshotTestCase(unittest.TestCase):
                 if vdisk == vdisk_1:
                     StorageRouterClient.delete_snapshot_callbacks[vdisk.volume_id] = {snapshot_id: raise_an_exception}
         with self.assertRaises(RuntimeError):
-            GenericController.delete_snapshots()
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid)
         self.assertEqual(1, len(vdisk_2.snapshot_ids), 'One snapshot should be removed for vdisk 2')
         self.assertEqual(2, len(vdisk_1.snapshot_ids), 'No snapshots should be removed for vdisk 1')
 
@@ -500,6 +516,8 @@ class SnapshotTestCase(unittest.TestCase):
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
+
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         for i in xrange(0, 2):
@@ -510,7 +528,8 @@ class SnapshotTestCase(unittest.TestCase):
             snapshot_id = VDiskController.create_snapshot(vdisk_1.guid, metadata)
             StorageRouterClient.delete_snapshot_callbacks[vdisk_1.volume_id] = {snapshot_id: raise_an_exception}
 
-        GenericController.delete_snapshots()
+        GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid)
+        self.assertEqual(2, len(vdisk_1.snapshot_ids), 'No snapshots should be removed for vdisk 1')
 
     ##################
     # HELPER METHODS #
