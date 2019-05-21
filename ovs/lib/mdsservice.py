@@ -29,6 +29,7 @@ from threading import Thread
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -367,8 +368,32 @@ class MDSServiceController(MDSShared):
 
     # noinspection PyUnresolvedReferences
     @staticmethod
-    @ovs_task(name='ovs.mds.ensure_safety', ensure_single_info={'mode': 'CHAINED'})
-    def ensure_safety(vdisk_guid, excluded_storagerouter_guids=None):
+    @ovs_task(name='ovs.mds.ensure_safety_vpool', ensure_single_info={'mode': 'DEDUPED', 'ignore_arguments': ['vdisk_guid', 'excluded_storagerouter_guids']})
+    def _ensure_safety_vpool(vpool_guid, vdisk_guid, excluded_storagerouter_guids=None):
+        """
+        Ensures safety for a single vdisk of a vpool
+        Allows multiple ensure safeties to run at the same time for different vpool
+        Used internally
+        :param vpool_guid: Guid of the VPool associated with the vDisk
+        :type vpool_guid: str
+        :param vdisk_guid: Guid of the vDisk to the safety off
+        :type vdisk_guid: str
+        :param excluded_storagerouter_guids: GUIDs of StorageRouters to leave out of calculation (Eg: When 1 is down or unavailable)
+        :type excluded_storagerouter_guids: list[str]
+        :return: None
+        :rtype: NoneType
+        """
+        _ = vpool_guid
+
+        if excluded_storagerouter_guids is None:
+            excluded_storagerouter_guids = []
+
+        safety_ensurer = SafetyEnsurer(vdisk_guid, excluded_storagerouter_guids)
+        safety_ensurer.ensure_safety()
+
+    @staticmethod
+    @ovs_task(name='ovs.mds.ensure_safety')
+    def ensure_safety(vdisk_guid, excluded_storagerouter_guids=None, **kwargs):
         """
         Ensures (or tries to ensure) the safety of a given vDisk.
         Assumptions:
@@ -398,11 +423,8 @@ class MDSServiceController(MDSShared):
         :return: None
         :rtype: NoneType
         """
-        if excluded_storagerouter_guids is None:
-            excluded_storagerouter_guids = []
-
-        safety_ensurer = SafetyEnsurer(vdisk_guid, excluded_storagerouter_guids)
-        safety_ensurer.ensure_safety()
+        vdisk = VDisk(vdisk_guid)
+        return MDSServiceController._ensure_safety_vpool(vdisk.vpool_guid, vdisk.guid, excluded_storagerouter_guids, **kwargs)
 
     @staticmethod
     def get_preferred_mds(storagerouter, vpool):
