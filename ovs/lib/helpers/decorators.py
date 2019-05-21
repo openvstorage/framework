@@ -729,7 +729,7 @@ class EnsureSingle(object):
 
         # Update kwargs with args
         kwargs_dict = self._filter_ignorable_arguments(kwargs)
-        params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
+        params_info = 'with params {0} (all passed arguments: {1}'.format(kwargs_dict, kwargs) if kwargs_dict else 'with default params'
         task_log_format = 'task {0} {1}'
         task_log_name = task_log_format.format(self.ensure_single_container.task_name, params_info)
         task_log_id = task_log_format.format(self.task_id, params_info)
@@ -801,7 +801,7 @@ class EnsureSingle(object):
         self.validate_no_extra_names()
 
         kwargs_dict = self._filter_ignorable_arguments(kwargs)
-        params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
+        params_info = 'with params {0} (all passed arguments: {1}'.format(kwargs_dict, kwargs) if kwargs_dict else 'with default params'
         task_log_format = 'task {0} {1}'
         task_log_name = task_log_format.format(self.ensure_single_container.task_name, params_info)
         task_log_id = task_log_format.format(self.task_id, params_info)
