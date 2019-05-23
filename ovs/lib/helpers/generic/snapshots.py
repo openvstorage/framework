@@ -17,6 +17,7 @@
 import time
 from datetime import datetime, timedelta
 from ovs.constants.vdisk import SNAPSHOT_POLICY_DEFAULT, SNAPSHOT_POLICY_LOCATION, SCRUB_VDISK_EXCEPTION_MESSAGE
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
@@ -232,12 +233,23 @@ class Bucket(object):
 
 class SnapshotManager(object):
     """
-    Manages snapshots of all vdisks
+    Manages snapshots of all vdisks on the storagedriver
     """
 
-    def __init__(self):
+    def __init__(self, storagedriver, group_id=None):
+        # type: (StorageDriver, str) -> None
+        """
+        :param storagedriver: StorageDriver to remove snapshots on
+        :type storagedriver: StorageDriver
+        :param group_id: ID of the group task. Used to identify which snapshot deletes were called during the scheduled task
+        :type group_id: str
+        """
+
+        self.storagedriver = storagedriver
+        self.group_id = group_id
+        self.log_id = 'Group job {} - '.format(group_id) if group_id else ''
         self.global_policy = self.get_retention_policy()
-        self.vpool_policies = self.get_retention_policies_for_vpools()
+        self.vpool_policy = self.get_retention_policy_vpool(storagedriver.vpool)
 
     def get_policy_to_enforce(self, vdisk):
         # type: (VDisk) -> List[RetentionPolicy]
@@ -248,7 +260,7 @@ class SnapshotManager(object):
         :return: Policy to enforce
         :rtype: List[RetentionPolicy]
         """
-        return self.get_retention_policy_vdisk(vdisk) or self.vpool_policies.get(vdisk.vpool) or self.global_policy
+        return self.get_retention_policy_vdisk(vdisk) or self.vpool_policy or self.global_policy
 
     @staticmethod
     def get_retention_policy():
@@ -349,6 +361,17 @@ class SnapshotManager(object):
         """
         return vdisk.info['object_type'] in ['BASE']
 
+    def group_format_log(self, message):
+        # type: (str) -> str
+        """
+        Adds group information to the log message
+        :param message: Message to log
+        :type message: str
+        :return: The formatted message
+        :rtype: str
+        """
+        return '{}{}'.format(self.log_id, message)
+
     def delete_snapshots(self, timestamp):
         # type: (float) -> Dict[str, List[str]]
         """
@@ -373,27 +396,31 @@ class SnapshotManager(object):
 
         # Distribute all snapshots into buckets. These buckets specify an interval and are ordered young to old
         bucket_chains = []
-        for vdisk in VDiskList.get_vdisks():
-            if not self.is_vdisk_running(vdisk):
-                continue
-            vdisk.invalidate_dynamics('being_scrubbed')
-            if vdisk.being_scrubbed:
-                continue
+        exceptions = []
+        for vdisk_guid in self.storagedriver.vdisks_guids:
+            try:
+                vdisk = VDisk(vdisk_guid)
+                if not self.is_vdisk_running(vdisk):
+                    continue
+                vdisk.invalidate_dynamics('being_scrubbed')
+                if vdisk.being_scrubbed:
+                    continue
 
-            bucket_chain = self._get_snapshot_buckets(start_time, self.get_policy_to_enforce(vdisk))
-            for vdisk_snapshot in vdisk.snapshots:
-                snapshot = Snapshot(vdisk_guid=vdisk.guid, **vdisk_snapshot)
-                if snapshot.is_sticky:
-                    continue
-                if snapshot.guid in parent_snapshots:
-                    _logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot.vdisk_guid))
-                    continue
-                for bucket in bucket_chain:
-                    bucket.try_add_snapshot(snapshot)
-            bucket_chains.append((vdisk, bucket_chain))
+                bucket_chain = self._get_snapshot_buckets(start_time, self.get_policy_to_enforce(vdisk))
+                for vdisk_snapshot in vdisk.snapshots:
+                    snapshot = Snapshot(vdisk_guid=vdisk.guid, **vdisk_snapshot)
+                    if snapshot.is_sticky:
+                        continue
+                    if snapshot.guid in parent_snapshots:
+                        _logger.info(self.group_format_log('Not deleting snapshot {0} because it has clones'.format(snapshot.vdisk_guid)))
+                        continue
+                    for bucket in bucket_chain:
+                        bucket.try_add_snapshot(snapshot)
+                bucket_chains.append((vdisk, bucket_chain))
+            except Exception as ex:
+                exceptions.append(ex)
 
         # Delete obsolete snapshots
-        exceptions = []
         removed_snapshot_map = {}
         for index, vdisk_bucket_chain in enumerate(bucket_chains):
             vdisk, bucket_chain = vdisk_bucket_chain
@@ -411,9 +438,9 @@ class SnapshotManager(object):
             except RuntimeError as ex:
                 vdisk_log = ' for VDisk with guid {}'.format(vdisk.guid)
                 if SCRUB_VDISK_EXCEPTION_MESSAGE in ex.message:
-                    _logger.warning('Being scrubbed exception occurred while deleting snapshots{}'.format(vdisk_log))
+                    _logger.warning(self.group_format_log('Being scrubbed exception occurred while deleting snapshots{}'.format(vdisk_log)))
                 else:
-                    _logger.exception('Exception occurred while deleting snapshots{}'.format(vdisk_log))
+                    _logger.exception(self.group_format_log('Exception occurred while deleting snapshots{}'.format(vdisk_log)))
                     exceptions.append(ex)
 
         if exceptions:

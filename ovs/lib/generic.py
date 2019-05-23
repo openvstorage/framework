@@ -20,11 +20,15 @@ GenericTaskController module
 import os
 import copy
 import time
+from celery import group
+from celery.utils import uuid
+from celery.result import GroupResult
 from datetime import timedelta
 from threading import Thread
-from ovs.constants.vdisk import SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.lists.servicelist import ServiceList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
@@ -74,7 +78,28 @@ class GenericController(object):
     @staticmethod
     @ovs_task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'), ensure_single_info={'mode': 'DEFAULT'})
     def delete_snapshots(timestamp=None):
-        # type: (float) -> Dict[str, List[str]]
+        # type: (float) -> GroupResult
+        """
+        Delete snapshots based on the retention policy
+        Offloads concurrency to celery
+        Returns a GroupResult. Waiting for the result can be done using result.get()
+        :param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
+        :type timestamp: float
+        :return: The GroupResult
+        :rtype: GroupResult
+        """
+        if os.environ.get('RUNNING_UNITTESTS') == 'False':
+            assert timestamp is None, 'Providing a timestamp is only possible during unittests'
+
+        # The result cannot be fetched in this task
+        group_id = uuid()
+        return group(GenericController.delete_snapshots_storagedriver.s(storagedriver.guid, timestamp, group_id)
+                     for storagedriver in StorageDriverList.get_storagedrivers()).apply_async(task_id=group_id)
+
+    @staticmethod
+    @ovs_task(name='ovs.generic.delete_snapshots_storagedriver', ensure_single_info={'mode': 'DEDUPED', 'ignore_arguments': ['timestamp', 'group_id']})
+    def delete_snapshots_storagedriver(storagedriver_guid, timestamp=None, group_id=None):
+        # type: (str, float, str) -> Dict[str, List[str]]
         """
         Delete snapshots & scrubbing policy
 
@@ -84,10 +109,14 @@ class GenericController(object):
         < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
         > 1m | delete
         The configured policy can differ from this one.
+        :param storagedriver_guid: Guid of the StorageDriver to remove snapshots on
+        :type storagedriver_guid: str
         :param timestamp: Timestamp to determine whether snapshots should be kept or not,
         if none provided, the current timestamp - 1 day is used. Used in unittesting only!
         The scheduled task will not remove snapshots of the current day this way!
         :type timestamp: float
+        :param group_id: ID of the group task. Used to identify which snapshot deletes were called during the scheduled task
+        :type group_id: str
         :return: Dict with vdisk guid as key, deleted snapshot ids as value
         :rtype: dict
         """
@@ -98,7 +127,8 @@ class GenericController(object):
             timestamp = time.time() - timedelta(1).total_seconds()
 
         GenericController._logger.info('Delete snapshots started')
-        snapshot_manager = SnapshotManager()
+        storagedriver = StorageDriver(storagedriver_guid)
+        snapshot_manager = SnapshotManager(storagedriver, group_id)
         return snapshot_manager.delete_snapshots(timestamp)
 
     @staticmethod
