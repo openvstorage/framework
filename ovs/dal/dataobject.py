@@ -899,7 +899,7 @@ class DataObject(object):
         """
         return dict((prop.name, self._data[prop.name]) for prop in self._properties)
 
-    def serialize(self, depth=0):
+    def serialize(self, depth=0, contents=None):
         """
         Serializes the internal data, getting rid of certain metadata like descriptors
         :param depth: Depth of relations to serialize
@@ -917,8 +917,9 @@ class DataObject(object):
                     data[key] = None
         for prop in self._properties:
             data[prop.name] = self._data[prop.name]
-        for dynamic in self._dynamics:
-            data[dynamic.name] = getattr(self, dynamic.name)
+        if '_dynamics' in contents:
+            for dynamic in self._dynamics:
+                data[dynamic.name] = getattr(self, dynamic.name)
         return data
 
     def copy(self, other_object, include=None, exclude=None, include_relations=False):
