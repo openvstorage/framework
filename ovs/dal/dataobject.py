@@ -31,6 +31,7 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 from ovs.dal.helpers import Descriptor, DalToolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
+from ovs_extensions.generic.toolbox import ExtensionsToolbox
 from ovs_extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs_extensions.storage.exceptions import KeyNotFoundException, AssertException
@@ -905,6 +906,9 @@ class DataObject(object):
         :param depth: Depth of relations to serialize
         """
         data = {'guid': self.guid}
+        hybrid = type(self)
+        if not isinstance(contents, ContentOptions):
+            contents = ContentOptions(contents)
         for relation in self._relations:
             key = relation.name
             if depth == 0:
@@ -917,9 +921,36 @@ class DataObject(object):
                     data[key] = None
         for prop in self._properties:
             data[prop.name] = self._data[prop.name]
-        if '_dynamics' in contents:
+        if '_dynamics' in contents:  #hier dynamics geskipt, mag weg?
             for dynamic in self._dynamics:
                 data[dynamic.name] = getattr(self, dynamic.name)
+        foreign_relations = RelationMapper.load_foreign_relations(hybrid)  # To many side of things, items pointing towards this object
+        if contents.has_content is False or (foreign_relations is None and len(hybrid._relations) == 0) or depth == 0:
+                    return
+        # Foreign relations is a dict, relations is a relation object, need to differentiate
+        relation_contents = contents.get_option('_relations_contents')
+        relation_contents_options = copy.deepcopy(contents) if relation_contents == 're-use' else ContentOptions(relation_contents)
+        relations_data = {'foreign': foreign_relations or {}, 'own': hybrid._relations}
+        for relation_type, relations in relations_data.iteritems():
+            for relation in relations:
+                relation_key = relation.name if relation_type == 'own' else relation
+                relation_hybrid = relation.foreign_type if relation_type == 'own' else Descriptor().load(relations[relation]['class']).get_object()
+                # Possible extra content supplied for a relation
+                relation_content = contents.get_option('_relation_contents_{0}'.format(relation_key))
+                if relation_content is None and relation_contents == 're-use':
+                    relation_content_options = relation_contents_options
+                else:
+                    relation_content_options = ContentOptions(relation_content)
+                # Use the depth given by the contents when it's the first item to serialize
+                relation_depth = contents.get_option('_relations_depth', 1 if relation_content_options.has_content else 0) if depth is None else depth
+                if relation_depth is None:  # Can be None when no value is give to _relations_depth
+                    relation_depth = 0
+                if relation_depth == 0:
+                    continue
+                # # @Todo prevent the same one-to-one relations from being serialized multiple times? Not sure if helpful though
+                # todo fix recursive serializations
+                # self.fields[relation_key] = FullSerializer(relation_hybrid, contents=relation_content_options, depth=relation_depth - 1)
+
         return data
 
     def copy(self, other_object, include=None, exclude=None, include_relations=False):
@@ -1143,3 +1174,143 @@ class DataObject(object):
         for item in enumerator:
             setattr(enumerator, item, enumerator[item])
         return enumerator
+
+class UnsupportContentException(ValueError):
+    """
+    Exception raised when an unsupported content string has been given
+    """
+    pass
+
+class ContentOptions(object):
+    """
+    Content options to give to the serializer
+    """
+    OPTION_TYPES = {'_relations_depth': (int, None, False),
+                    '_relations_content': (str, None, False)}
+    OPTION_STARTS = {'_relation_contents_': (str, None, False)}
+
+    def __init__(self, contents=None):
+        """
+        Initializes a ContentOptions object based on a string representing the contents
+        :param contents: Comma separated string or list of contents to serialize
+        When contents is given, all non-dynamic properties would be serialized
+        Further options are:
+        - _dynamics: Include all dynamic properties
+        - _relations: Include foreign keys and lists of primary keys of linked objects
+        - _relations_contents: Apply the contents to the relations. The relation contents can be a bool or a new contents item
+          - If the relations_contents=re-use: the current contents are also applied to the relation object
+          - If the relations_contents=contents list: That item is subjected to the same rules as other contents
+        - _relation_contents_RELATION_NAME: Apply the contents the the given relation. Same rules as _relation_contents apply here
+        _ _relations_depth: Depth of relational serialization. Defaults to 0.
+        Specifying a form of _relations_contents change the depth to 1 (if depth was 0) as the relation is to be serialized
+        Specifying it 2 with _relations_contents given will serialize the relations of the fetched relation. This causes a chain of serializations
+        - dynamic_property_1,dynamic_property_2 (results in static properties plus 2 dynamic properties)
+        Properties can also be excluded by prefixing the field with '-':
+        - contents=_dynamic,-dynamic_property_2,_relations (static properties, all dynamic properties except for dynamic_property_2 plus all relations)
+        Relation serialization can be done by asking for it:
+        - contents=_relations,_relations_contents=re-use
+        :type contents: list or str
+        :raises UnsupportedContentException: If a content string is passed which is not valid
+        """
+        super(ContentOptions, self).__init__()
+
+        verify_params = copy.deepcopy(self.OPTION_TYPES)
+        self.content_options = {}
+        self.has_content = False
+        if contents is not None:
+            if isinstance(contents, basestring):
+                contents_list = contents.split(',')
+            elif isinstance(contents, list):
+                contents_list = contents
+            else:
+                raise UnsupportContentException('Contents should be a comma-separated list instead of \'{0}\''.format(contents))
+        else:
+            return
+        self.has_content = True
+        errors = []
+        for option in contents_list:
+            if not isinstance(option, basestring):
+                errors.append('Provided option \'{0}\' is not a string but \'{1}\''.format(option, type(option)))
+                continue
+            split_options = option.split('=')
+            if len(split_options) > 2:  # Unsupported format
+                errors.append('Found \'=\' multiple times for entry {0}'.format(split_options[0]))
+                continue
+            starts = [v for k, v in self.OPTION_STARTS.iteritems() if option.startswith(k)]
+            if len(starts) == 1:
+                verify_params[option] = starts[0]
+            # Convert to some work-able types
+            value = split_options[1] if len(split_options) == 2 else None
+            if isinstance(value, str) and value.isdigit():
+                value = int(value)
+            self.content_options[split_options[0]] = value
+        errors.extend(ExtensionsToolbox.verify_required_params(verify_params, self.content_options, return_errors=True))
+        if len(errors) > 0:
+            raise UnsupportContentException('Contents is using an unsupported format: \n - {0}'.format('\n - '.join(errors)))
+
+    def __contains__(self, item):  # In operator
+        return self.has_option(item)
+
+    def has_option(self, option):
+        """
+        Returns True if the contentOption has the given option
+        :param option: Option to search for
+        :type option: str
+        :return: bool
+        """
+        return option in self.content_options
+
+    def get_option(self, option, default=None):
+        """
+        Returns the value of the given option
+        :param option: Option to retrieve the value for
+        :type option: str
+        :param default: Default value when the key does not exist
+        :type default: any
+        :return: None if the value is not found else the value specified
+        :rtype: NoneType or any
+        """
+        return self.content_options.get(option, default)
+
+    def set_option(self, option, value, must_exist=True):
+        """
+        Sets an options value
+        :param option: Option to set the value for
+        :type option: str
+        :param value: Value of the option
+        :type value: any
+        :param must_exist: The option must already exist before setting the option
+        :type must_exist: bool
+        :return: The given value (None if the key does not exist)
+        :rtype: NoneType or any
+        """
+        if must_exist is True and self.has_option(option) is False:
+            return None
+        self.content_options[option] = value
+        return value
+
+    def increment_option(self, option):
+        """
+        Increments the value for the given option. If the option is not present or no value passed, this won't do anything
+        :param option: Option to increment the value for
+        :type option: str
+        :return: The new value or None if they key is not found or not an integer
+        :rtype: int or NoneType
+        """
+        value = self.get_option(option)
+        if isinstance(value, int):
+            return self.set_option(option, value + 1, must_exist=True)
+        return None  # For readability
+
+    def decrement_options(self, option):
+        """
+        Decrements the value for the given option. If the option is not present or no value passed, this won't do anything
+        :param option: Option to increment the value for
+        :type option: str
+        :return: The new value or None if they key is not found or not an integer
+        :rtype: int or NoneType
+        """
+        value = self.get_option(option)
+        if isinstance(value, int):
+            return self.set_option(option, value - 1, must_exist=True)
+        return None  # For readability

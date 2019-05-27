@@ -1,4 +1,3 @@
-from api_flask.decorators import load
 from api.backend.serializers.serializers import FullSerializer
 from celery.task.control import revoke
 from flask import Blueprint
@@ -39,17 +38,16 @@ def list():
 #todo return StorageRouter type
 #todo load storagerouter
 
-@load(StorageRouter)
 @storagerouter_view.route('/<storagerouter>')
 def retrieve(storagerouter):
     """
     Load information about a given StorageRouter
-    :param storagerouter: StorageRouter to return
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter: StorageRouterguid
+    :type storagerouter: str
     :return: The StorageRouter requested
     :rtype: ovs.dal.hybrids.storagerouter.StorageRouter
     """
-    return storagerouter
+    return StorageRouter(storagerouter)
 
 # 
 # @required_roles(['read', 'write', 'manage'])

@@ -38,5 +38,13 @@ class StorageRouterTest(FlaskTestCase):
         structure = self._build_structure_easy()
         sr = structure['storagerouters'][1]
 
+        rv = json.loads(self.app.get('/storagerouters/{0}'.format(sr.guid)).data)
+        print rv
+
+    def test_retrieve_dynamics(self):
+        structure = self._build_structure_easy()
+        sr = structure['storagerouters'][1]
+
         rv = json.loads(self.app.get('/storagerouters/{0}?contents=_dynamics'.format(sr.guid)).data)
+
         print rv
