@@ -1,4 +1,4 @@
-# Copyright (C) 2016 iNuron NV
+# Copyright (C) 2019 iNuron NV
 #
 # This file is part of Open vStorage Open Source Edition (OSE),
 # as available from
@@ -17,26 +17,26 @@
 """
 This module contains generic hybrid serializers
 """
-from flask import Response, current_app, request, json
+from flask import current_app, request, json
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObject
+from ovs.dal.dataobject import DataObject, ContentOptions
 
 
 def to_json(content, *args, **kwargs):
     """
     Converts content to json while respecting config options.
     """
-    # @todo parse options regarding extra params
-
+    _ = args, kwargs
     indent = None
     separators = (',', ':')
+    contents = ContentOptions(request.args.get('contents', None))
     if isinstance(content, DataList):
-        base_response = {u'data': [u'{0}'.format(o.serialize(**kwargs)['guid']) for o in content]}
+        base_response = {u'data': [u'{0}'.format(o.serialize_contents(contents)['guid']) for o in content]}
         out = base_response
     elif isinstance(content, DataObject):
-        out = content.serialize(**kwargs)
+        out = content.serialize_contents(contents)
     else:
-        raise RuntimeError('proper warning') #todo check for other types
+        raise RuntimeError('This function can only JSONify Datalists or DataObjects, {0} was passed.'.format(type(content)))
     if (current_app.config['JSONIFY_PRETTYPRINT_REGULAR'] and not request.is_xhr):
         indent = 2
         separators = (', ', ': ')

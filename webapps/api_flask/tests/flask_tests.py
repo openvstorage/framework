@@ -1,7 +1,5 @@
-import os
 import sys
 import unittest
-import tempfile
 
 sys.path.append('/opt/OpenvStorage/webapps')
 import api_flask

@@ -34,7 +34,7 @@ from ovs.lib.plugin import PluginController
 
 
 # noinspection PyProtectedMember
-class OpenAPIView(View):
+class OpenAPIView():
     """
     Implements retrieval of generic metadata about the services
     """

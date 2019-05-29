@@ -187,24 +187,7 @@ class FullSerializer(serializers.Serializer):
         Initializes the serializer, mapping field types
         :param hybrid: Hybrid object to serialize
         :type hybrid: any (ovs.dal.hybrids.X.X)
-        :param contents: Contents to serialize. Without contents, only the GUID is serialized
-        When contents is given, all non-dynamic properties are serialized
-        Further options are:
-        - _dynamics: Include all dynamic properties
-        - _relations: Include foreign keys and lists of primary keys of linked objects
-        - _relations_contents: Apply the contents to the relations. The relation contents can be a bool or a new contents item
-          - If the relations_contents=re-use: the current contents are also applied to the relation object
-          - If the relations_contents=contents list: That item is subjected to the same rules as other contents
-        - _relation_contents_RELATION_NAME: Apply the contents the the given relation. Same rules as _relation_contents apply here
-        _ _relations_depth: Depth of relational serialization. Defaults to 1 when relation_contents were specified.
-        Specifying a form of _relations_contents change the depth to 1 (if depth was 0) as the relation is to be serialized
-        Specifying it 2 with _relations_contents given will serialize the relations of the fetched relation. This causes a chain of serializations
-        - dynamic_property_1,dynamic_property_2 (results in static properties plus 2 dynamic properties)
-        Properties can also be excluded by prefixing the field with '-':
-        - contents=_dynamic,-dynamic_property_2,_relations (static properties, all dynamic properties except for dynamic_property_2 plus all relations)
-        Relation serialization can be done by asking for it:
-        - contents=_relations,_relations_contents=re-use
-        All relational serialization can only be used to get data. This data will be not be set-able when deserializing
+
         :type contents: list or none
         :param depth: Current depth of serializing, used to serialize relations
         :type depth: int

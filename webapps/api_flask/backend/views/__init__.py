@@ -1,1 +1,2 @@
-from .storagerouters import storagerouter_view
+from .storagerouters import view as storagerouter_view
+from .vdisks import view as vdisks_view

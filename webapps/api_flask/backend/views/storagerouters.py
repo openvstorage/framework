@@ -16,14 +16,14 @@ from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.update import UpdateController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vpool import VPoolController
-
+from api_flask.decorators import log
 
 url_prefix = '/storagerouters'
 
-storagerouter_view = Blueprint(url_prefix, __name__, url_prefix=url_prefix)
+view = Blueprint(url_prefix, __name__, url_prefix=url_prefix)
 
 
-@storagerouter_view.route('/'.format(url_prefix))
+@view.route('/')
 def list():
     """
     Overview of all StorageRouters
@@ -33,31 +33,26 @@ def list():
     return StorageRouterList.get_storagerouters()
 
 
-#todo @log
 #todo fix userroles(['read', 'manage'])
-#todo return StorageRouter type
-#todo load storagerouter
-
-@storagerouter_view.route('/<storagerouter>')
-def retrieve(storagerouter):
+@log()
+@view.route('/<storagerouter_guid>')
+def retrieve(storagerouter_guid):
     """
     Load information about a given StorageRouter
-    :param storagerouter: StorageRouterguid
-    :type storagerouter: str
+    :param storagerouter_guid: StorageRouter guid
+    :type storagerouter_guid: str
     :return: The StorageRouter requested
     :rtype: ovs.dal.hybrids.storagerouter.StorageRouter
     """
-    return StorageRouter(storagerouter)
+    return StorageRouter(storagerouter_guid)
 
-# 
-# @required_roles(['read', 'write', 'manage'])
-# @return_object(StorageRouter, mode='accepted')
-# @load(StorageRouter)
-def partial_update(self, storagerouter, request, contents=None):
+@log()
+@view.route('/<storagerouter_guid>/partial_update/') #todo fix
+def partial_update(storagerouter_guid, request, contents=None):
     """
     Update a StorageRouter
-    :param storagerouter: StorageRouter to update
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter_guid: StorageRouter to update
+    :type storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
     :param request: The raw Request
     :type request: Request
     :param contents: Contents to be updated/returned
@@ -66,100 +61,84 @@ def partial_update(self, storagerouter, request, contents=None):
     :rtype: ovs.dal.hybrids.storagerouter.StorageRouter
     """
     contents = None if contents is None else contents.split(',')
-    serializer = FullSerializer(StorageRouter, contents=contents, instance=storagerouter, data=request.DATA)
+    sr = StorageRouter(storagerouter_guid)
+    serializer = FullSerializer(StorageRouter, contents=contents, instance=sr, data=request.DATA) #todo fix
     storagerouter = serializer.deserialize()
     storagerouter.save()
     return storagerouter
 
-# 
-# 
-# @required_roles(['read', 'write', 'manage'])
-# @return_task()
-# @load(StorageRouter)
-def mark_offline(self, storagerouter):
+@log
+@view.route('/<storagerouter_guid>/mark_offline/')
+def mark_offline(storagerouter_guid):
     """
     Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
-    :param storagerouter: StorageRouter to mark offline
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter_guid: StorageRouter to mark offline
+    :type storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
-    return StorageDriverController.mark_offline.delay(storagerouter.guid)
+    return StorageDriverController.mark_offline.delay(storagerouter_guid)
 
-# 
-# 
-# @required_roles(['read'])
-# @return_task()
-# @load(StorageRouter)
-def get_metadata(self, storagerouter):
+@log
+@view.route('/<storagerouter_guid>/get_metadata/')
+def get_metadata(storagerouter_guid):
     """
     Returns a list of mount points on the given StorageRouter
-    :param storagerouter: StorageRouter to get the metadata from
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter_guid: StorageRouter to get the metadata from
+    :type storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
-    return StorageRouterController.get_metadata.delay(storagerouter.guid)
+    return StorageRouterController.get_metadata.delay(storagerouter_guid)
 
-# 
-# 
-# @required_roles(['read'])
-# @return_task()
-# @load(StorageRouter)
-def get_version_info(self, storagerouter):
+@log
+@view.route('/<storagerouter_guid>/version_info/')
+def get_version_info(storagerouter_guid):
     """
     DEPRECATED API CALL
     Gets version information of a given StorageRouter
-    :param storagerouter: StorageRouter to get the versions from
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter_guid: StorageRouter to get the versions from
+    :type storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
-    return StorageRouterController.get_version_info.delay(storagerouter.guid)
+    return StorageRouterController.get_version_info.delay(storagerouter_guid)
 
-# 
-# 
-# @required_roles(['read'])
-# @return_task()
-# @load(StorageRouter)
-def get_support_info(self):
+@log
+@view.route('/<storagerouter_guid>/version_info/')
+def get_support_info(storagerouter_guid):
     """
     Returns support information for the entire cluster
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
+    _ = storagerouter_guid
     return StorageRouterController.get_support_info.delay()
 
-# 
-# 
-# @required_roles(['read', 'manage'])
-# @return_task()
-# @load(StorageRouter)
-def get_proxy_config(self, storagerouter, vpool_guid):
+@log
+@view.route('/<storagerouter_guid>/get_proxy_config/<vpool_guid>')
+def get_proxy_config(storagerouter_guid, vpool_guid):
     """
     Gets the ALBA proxy for a given StorageRouter and vPool
-    :param storagerouter: StorageRouter on which the ALBA proxy is configured
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter_guid: StorageRouter on which the ALBA proxy is configured
+    :type storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
     :param vpool_guid: Guid of the vPool for which the proxy is configured
     :type vpool_guid: str
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
     return StorageRouterController.get_proxy_config.delay(vpool_guid=vpool_guid,
-                                                          storagerouter_guid=storagerouter.guid)
+                                                          storagerouter_guid=storagerouter_guid)
 
-# 
-# 
-# @required_roles(['read', 'manage'])
-# @return_task()
-# @load(StorageRouter)
-def create_hprm_config_files(self, local_storagerouter, storagerouter, parameters):
+@log
+@view.route('/<storagerouter_guid>/create_hprm_config_files/<parameters>')
+def create_hprm_config_files(storagerouter_guid, storagerouter, parameters):
     """
     DEPRECATED API CALL - USE /vpool/vpool_guid/create_hprm_config_files instead
     Create the required configuration files to be able to make use of HPRM (aka PRACC)
     These configuration will be zipped and made available for download
-    :param local_storagerouter: StorageRouter this call is executed on
-    :type local_storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter_guid: StorageRouter this call is executed on
+    :type storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
     :param storagerouter: The StorageRouter for which a HPRM manager needs to be deployed
     :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
     :param parameters: Additional information required for the HPRM configuration files
@@ -171,31 +150,25 @@ def create_hprm_config_files(self, local_storagerouter, storagerouter, parameter
     ExtensionsToolbox.verify_required_params(actual_params=parameters, required_params={'vpool_guid': (str, ExtensionsToolbox.regex_guid)})
     return VPoolController.create_hprm_config_files.delay(parameters=parameters,
                                                           vpool_guid=parameters['vpool_guid'],
-                                                          local_storagerouter_guid=local_storagerouter.guid)
+                                                          local_storagerouter_guid=storagerouter_guid)
 
-# 
-# 
-# @required_roles(['read'])
-# @return_task()
-# @load(StorageRouter)
-def get_support_metadata(self, storagerouter):
+@log
+@view.route('/<storagerouter_guid>/get_support_metadata/')
+def get_support_metadata(storagerouter_guid):
     """
     Gets support metadata of a given StorageRouter
-    :param storagerouter: StorageRouter to get the support metadata from
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter_guid: StorageRouter to get the support metadata from
+    :type storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
     return StorageRouterController.get_support_metadata.apply_async(
-        routing_key='sr.{0}'.format(storagerouter.machine_id)
+        routing_key='sr.{0}'.format(StorageRouter(storagerouter_guid).machine_id)
     )
 
-# 
-# 
-# @required_roles(['read', 'write', 'manage'])
-# @return_task()
-# @load(StorageRouter)
-def configure_support(self, support_info):
+@log
+@view.route('/<storagerouter_guid>/configure_support/<support_info>')
+def configure_support(storagerouter_guid, support_info):
     """
     Configures support on all StorageRouters
     :param support_info: Information about which components should be configured
@@ -207,33 +180,29 @@ def configure_support(self, support_info):
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
+    _ = storagerouter_guid
     return StorageRouterController.configure_support.delay(support_info=support_info)
 
-# 
-# 
-# @required_roles(['read', 'manage'])
-# @return_task()
-# @load(StorageRouter)
-def get_logfiles(self, local_storagerouter, storagerouter):
+@log
+@view.route('/<storagerouter_guid>/get_logfiles/<target_storagerouter_guid>')
+def get_logfiles(storagerouter_guid, target_storagerouter_guid):
     """
     Collects logs, moves them to a web-accessible location and returns log TGZs filename
-    :param local_storagerouter: StorageRouter this call is executed on (to store the log files on)
-    :type local_storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
-    :param storagerouter: The StorageRouter to collect the logs from
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param storagerouter_guid: StorageRouter this call is executed on (to store the log files on)
+    :type storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
+    :param target_storagerouter_guid: The StorageRouter to collect the logs from
+    :type target_storagerouter_guid: ovs.dal.hybrids.storagerouter.StorageRouter
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
-    return StorageRouterController.get_logfiles.s(local_storagerouter.guid).apply_async(
-        routing_key='sr.{0}'.format(storagerouter.machine_id)
+
+    return StorageRouterController.get_logfiles.s(storagerouter_guid).apply_async(
+        routing_key='sr.{0}'.format(StorageRouter(target_storagerouter_guid).machine_id)
     )
 
-# 
-# 
-# @required_roles(['read'])
-# @return_task()
-# @load(StorageRouter)
-def check_mtpt(self, storagerouter, name):
+@log
+@view.route('/<storagerouter_guid>/check_mtpt/<name>')
+def check_mtpt(storagerouter_guid, name):
     """
     Validates whether the mount point for a vPool is available
     :param storagerouter: The StorageRouter to validate the mount point on
@@ -243,14 +212,11 @@ def check_mtpt(self, storagerouter, name):
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
-    return StorageRouterController.mountpoint_exists.delay(name=str(name), storagerouter_guid=storagerouter.guid)
+    return StorageRouterController.mountpoint_exists.delay(name=str(name), storagerouter_guid=storagerouter_guid)
 
-# 
-# 
-# @required_roles(['read', 'write', 'manage'])
-# @return_task()
-# @load(StorageRouter)
-def add_vpool(self, call_parameters, local_storagerouter, request):
+@log
+@view.route('/<storagerouter_guid>/add_vpool/<name>')
+def add_vpool(self, call_parameters, storagerouter_guid, request):
     """
     Adds a vPool to a given StorageRouter
     :param call_parameters: A complex (JSON encoded) dictionary containing all various parameters to create the vPool
@@ -276,6 +242,8 @@ def add_vpool(self, call_parameters, local_storagerouter, request):
         _connection_info['local'] = True
         return _connection_info
 
+    local_storagerouter = StorageRouter(storagerouter_guid)
+
     # API backwards compatibility
     if 'backend_connection_info' in call_parameters:
         raise HttpNotAcceptableException(error='invalid_data',
@@ -298,7 +266,7 @@ def add_vpool(self, call_parameters, local_storagerouter, request):
     if lacks_connection_info(connection_info) or lacks_connection_info(connection_info_fc, True) or lacks_connection_info(connection_info_bc, True):
         client = None
         for _client in request.client.user.clients:
-            if _client.ovs_type == 'INTERNAL' and _client.grant_type == 'CLIENT_CREDENTIALS':
+            if _client.ovs_type == 'INTERNAL' and _client.grant_type == 'CLIENT_CREDENTIALS':  #todo fix
                 client = _client
         if client is None:
             raise HttpNotAcceptableException(error='invalid_data',
@@ -329,62 +297,9 @@ def add_vpool(self, call_parameters, local_storagerouter, request):
     # Finally, launching the add_vpool task
     return VPoolController.add_vpool.delay(VPoolController, call_parameters)
 
-# 
-# 
-# @required_roles(['read', 'write', 'manage'])
-# @return_task()
-# @load(StorageRouter, max_version=6)
-def get_update_status(self, storagerouter):
-    """
-    Return available updates for framework, volumedriver, ...
-    DEPRECATED API call
-    :param storagerouter: StorageRouter to get the update information from
-    :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
-    :return: Asynchronous result of a CeleryTask
-    :rtype: celery.result.AsyncResult
-    """
-    update_info = UpdateController.get_update_information_core({})
-    framework_info = update_info.pop('framework', None)
-    storagedriver_info = update_info.pop('storagedriver', None)
-
-    return_value = {'upgrade_ongoing': UpdateController.get_update_metadata(storagerouter_ip=storagerouter.ip)['update_ongoing']}
-    if framework_info is not None and framework_info['packages']:
-        return_value['framework'] = []
-        for pkg_name, pkg_info in framework_info['packages'].iteritems():
-            return_value['framework'].append({'to': pkg_info['candidate'],
-                                              'name': pkg_name,
-                                              'gui_down': True,
-                                              'downtime': framework_info['downtime'],
-                                              'namespace': 'ovs',
-                                              'prerequisites': framework_info['prerequisites']})
-    if storagedriver_info is not None and storagedriver_info['packages']:
-        return_value['storagedriver'] = []
-        for pkg_name, pkg_info in storagedriver_info['packages'].iteritems():
-            return_value['storagedriver'].append({'to': pkg_info['candidate'],
-                                                  'name': pkg_name,
-                                                  'gui_down': False,
-                                                  'downtime': storagedriver_info['downtime'],
-                                                  'namespace': 'ovs',
-                                                  'prerequisites': storagedriver_info['prerequisites']})
-
-    for plugin_name, info in update_info.iteritems():
-        if info['packages']:
-            return_value[plugin_name] = []
-            for pkg_name, pkg_info in info['packages'].iteritems():
-                return_value[plugin_name].append({'to': pkg_info['candidate'],
-                                                  'name': pkg_name,
-                                                  'gui_down': False,
-                                                  'downtime': info['downtime'],
-                                                  'namespace': plugin_name,
-                                                  'prerequisites': info['prerequisites']})
-    return return_value
-
-# 
-# 
-# @required_roles(['read', 'write', 'manage'])
-# @return_task()
-# @load(StorageRouter)
-def get_update_metadata(self, storagerouter):
+@log
+@view.route('/<storagerouter_guid>/get_update_metadata/')
+def get_update_metadata(storagerouter_guid):
     """
     Returns metadata required for updating
       - Checks if 'at' can be used properly
@@ -394,7 +309,7 @@ def get_update_metadata(self, storagerouter):
     :return: Asynchronous result of a CeleryTask
     :rtype: celery.result.AsyncResult
     """
-    return UpdateController.get_update_metadata.delay(storagerouter.ip)
+    return UpdateController.get_update_metadata.delay(StorageRouter(storagerouter_guid).ip)
 
 # 
 # 
