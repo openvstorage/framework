@@ -17,20 +17,16 @@
 import json
 import time
 import logging
-from flask import Request
-from functools import wraps
+from api.backend.toolbox import ApiToolbox
 from api_flask.response import ResponseOVS
+from flask import request
+from functools import wraps
+from ovs.dal.lists.userlist import UserList
+from ovs_extensions.api.exceptions import HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException,\
+    HttpTooManyRequestsException, HttpUnauthorizedException, HttpUpgradeNeededException
+
 
 logger = logging.getLogger(__name__)
-
-
-def _find_request(args):
-    """
-    Finds the "request" object in args
-    """
-    for item in args:
-        if isinstance(item, Request):
-            return item
 
 
 def log(log_slow=True):
@@ -49,15 +45,14 @@ def log(log_slow=True):
             """
             Wrapped function
             """
-            request = _find_request(args)
             logging_start = time.time()
 
             method_args = list(args)[:]
             method_args = method_args[method_args.index(request) + 1:]
 
             # Log the call
-            metadata = {'request': Request.get_json,
-                        'cookies': Request.cookies}
+            metadata = {'request': request.get_json,
+                        'cookies': request.cookies}
             # Stripping password traces
             for mtype in metadata:
                 for key in metadata[mtype]:  #todo check this
@@ -80,9 +75,45 @@ def log(log_slow=True):
             if duration > 5 and log_slow is True:
                 logger.warning('API call {0}.{1} took {2}s'.format(f.__module__, f.__name__, round(duration, 2)))
             if isinstance(return_value, ResponseOVS):
-                return_value.timings['logging'] = [logging_duration, 'Logging']
+                return_value['timings']['logging'] = [logging_duration, 'Logging']
             return return_value
 
         return new_function
 
+    return wrap
+
+
+
+def required_roles(roles):
+    """
+    Role validation decorator
+    """
+    def wrap(f):
+        """
+        Wrapper function
+        """
+
+        @wraps(f)
+        def new_function(*args, **kw):
+            """
+            Wrapped function
+            """
+            start = time.time()
+            if not hasattr(request, 'user') or not hasattr(request, 'client'):
+                raise HttpUnauthorizedException(error='not_authenticated',
+                                                error_description='Not authenticated')
+            user = UserList.get_user_by_username(request.authorization.username)
+            if user is None:
+                raise HttpUnauthorizedException(error='not_authenticated',
+                                                error_description='Not authenticated')
+            if not ApiToolbox.is_token_in_roles(request.authorization.token, roles):
+                raise HttpForbiddenException(error='invalid_roles',
+                                             error_description='This call requires roles: {0}'.format(', '.join(roles)))
+            duration = time.time() - start
+            result = f(*args, **kw)
+            if isinstance(result, ResponseOVS):
+                result.timings['security'] = [duration, 'Security']
+            return result
+
+        return new_function
     return wrap

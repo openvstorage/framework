@@ -1042,7 +1042,7 @@ class DataObject(object):
                 if relation_depth == 0:
                     continue
                 # @Todo prevent the same one-to-one relations from being serialized multiple times? Not sure if helpful though
-                #todo fix this, make backwards compatible
+                # todo fix this, make backwards compatible
                 # self.data[relation_key] = FullSerializer(relation_hybrid, contents=relation_content_options, depth=relation_depth - 1)
 
         return data
