@@ -608,6 +608,33 @@ class VDiskController(object):
                     results[vdisk_guid] = [False, msg]
                 continue
 
+            VDiskController._delete_multiple_snapshots(vdisk, snapshot_ids, results)
+
+            vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
+            if backwards_compat is True:
+                results[vdisk_guid] = results[vdisk_guid]['results'][snapshot_ids[0]]
+        return results
+
+    @staticmethod
+    def delete_snapshots_concurrent(vdisk, snapshots=None, skip_used_snapshots=True):
+        """
+        Delete vDisk snapshots in a range, making use of the volumedriver concurrent call
+        :param vdisk: vdisk to delete snapshots from via the storagedriver client
+        :param snapshots: list of snapshot ids to remove
+        :param skip_used_snapshots:
+        :return: Information about the deleted snapshots, whether they succeeded or not
+        :rtype: dict
+        """
+        if not snapshots:
+            snapshots = vdisk.snapshot_ids
+        vdisk.storagedriver_client.delete_snapshots(snapshots=snapshots,
+                                                    skip_used_snapshots=skip_used_snapshots)
+
+    @staticmethod
+    def _delete_multiple_snapshots(vdisk, snapshot_ids, results):
+        if getattr(vdisk.storagedriver_client, 'delete_snapshots', None):
+            VDiskController.delete_snapshots(vdisk, snapshots=snapshot_ids)
+        else:
             for snapshot_id in set(snapshot_ids):
                 try:
                     if snapshot_id not in VDiskController.list_snapshot_ids(vdisk=vdisk):
@@ -624,14 +651,10 @@ class VDiskController(object):
                     result = [True, snapshot_id]
                 except Exception as ex:
                     result = [False, ex.message]
-                results[vdisk_guid]['results'][snapshot_id] = result
+                results[vdisk.guid]['results'][snapshot_id] = result
                 if result[0] is False:
-                    results[vdisk_guid].update({'success': False,
+                    results[vdisk.guid].update({'success': False,
                                                 'error': 'One or more snapshots could not be removed'})
-            vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
-            if backwards_compat is True:
-                results[vdisk_guid] = results[vdisk_guid]['results'][snapshot_ids[0]]
-        return results
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.set_as_template')
