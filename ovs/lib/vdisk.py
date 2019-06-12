@@ -633,7 +633,7 @@ class VDiskController(object):
         return vdisk.storagedriver_client.delete_snapshots(volume_id=str(vdisk.volume_id),
                                                            snapshots=snapshots,
                                                            skip_used_snapshots=skip_used_snapshots)
-        #todo this does not output anything. should be fixed after volumedriver call is fetched and make the output uniformous with _delete_multiple_snapshots
+        #todo this does not output anything. should be fixed after volumedriver-ee/issues/222 is fixed and make the output uniformous with _delete_multiple_snapshots
 
     @staticmethod
     def _delete_multiple_snapshots(vdisk, snapshot_ids, results):
