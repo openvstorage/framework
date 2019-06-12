@@ -620,20 +620,25 @@ class VDiskController(object):
         """
         Delete vDisk snapshots in a range, making use of the volumedriver concurrent call
         :param vdisk: vdisk to delete snapshots from via the storagedriver client
+        :type vdisk: ovs.dal.hybrids.vdisk
         :param snapshots: list of snapshot ids to remove
-        :param skip_used_snapshots:
-        :return: Information about the deleted snapshots, whether they succeeded or not
-        :rtype: dict
+        :type snapshots: list
+        :param skip_used_snapshots: skip deletion of snapshots if they are in use
+        :type skip_used_snapshots: bool
+        :return: the volumedriver std_client output value
+        :rtype: any
         """
         if not snapshots:
             snapshots = vdisk.snapshot_ids
-        vdisk.storagedriver_client.delete_snapshots(snapshots=snapshots,
-                                                    skip_used_snapshots=skip_used_snapshots)
+        return vdisk.storagedriver_client.delete_snapshots(volume_id=str(vdisk.volume_id),
+                                                           snapshots=snapshots,
+                                                           skip_used_snapshots=skip_used_snapshots)
+        #todo this does not output anything. should be fixed after volumedriver call is fetched and make the output uniformous with _delete_multiple_snapshots
 
     @staticmethod
     def _delete_multiple_snapshots(vdisk, snapshot_ids, results):
         if getattr(vdisk.storagedriver_client, 'delete_snapshots', None):
-            VDiskController.delete_snapshots(vdisk, snapshots=snapshot_ids)
+            results[vdisk.guid] = VDiskController.delete_snapshots(vdisk, snapshots=snapshot_ids)
         else:
             for snapshot_id in set(snapshot_ids):
                 try:
