@@ -608,7 +608,7 @@ class VDiskController(object):
                     results[vdisk_guid] = [False, msg]
                 continue
 
-            VDiskController._delete_multiple_snapshots(vdisk, snapshot_ids, results)
+            results.update(VDiskController._delete_multiple_snapshots(vdisk, snapshot_ids))
 
             vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
             if backwards_compat is True:
@@ -636,7 +636,8 @@ class VDiskController(object):
         #todo this does not output anything. should be fixed after volumedriver-ee/issues/222 is fixed and make the output uniformous with _delete_multiple_snapshots
 
     @staticmethod
-    def _delete_multiple_snapshots(vdisk, snapshot_ids, results):
+    def _delete_multiple_snapshots(vdisk, snapshot_ids):
+        results = {}
         if getattr(vdisk.storagedriver_client, 'delete_snapshots', None):
             results[vdisk.guid] = VDiskController.delete_snapshots(vdisk, snapshots=snapshot_ids)
         else:
