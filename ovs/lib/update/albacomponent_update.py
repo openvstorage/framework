@@ -1,18 +1,13 @@
 from abc import abstractmethod
-from ovs_extensions.update.albacomponent_update import AlbaComponentUpdater as _albacomponent_updater
-from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.system import System
-from ovs.extensions.services.servicefactory import ServiceFactory
-
-logger = logging.getLogger(__name__)
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs_extensions.update.alba_component_update import AlbaComponentUpdater as _albacomponent_updater
 
 
 class AlbaComponentUpdater(_albacomponent_updater):
     """
     Implementation of abstract class to update alba
     """
-
-    SERVICE_MANAGER = ServiceFactory.get_manager()
 
     @staticmethod
     @abstractmethod
@@ -26,8 +21,9 @@ class AlbaComponentUpdater(_albacomponent_updater):
 
     @classmethod
     def get_node_id(cls):
+        # type: () -> str
+        """
+        use a factory to provide the machine id
+        :return:
+        """
         return System.get_my_machine_id()
-
-
-if __name__ == '__main__':
-    print AlbaComponentUpdater.restart_services()
