@@ -13,15 +13,19 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
+
+import os
+import time
 from celery import chain, group
+from ovs.constants.vpool import VPOOL_UPDATE_KEY
+from ovs.extensions.generic.configuration import Configuration
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.extensions.generic.system import System
 from ovs_extensions.update.base import ComponentUpdater
 from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer, VDiskBalance
-from ovs_extensions.log.logger import Logger
+from ovs.lib.storagedriver import StorageDriverController
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.mdsservice import MDSServiceController
 # noinspection PyUnreachableCode
@@ -35,6 +39,8 @@ class VolumeDriverUpdater(ComponentUpdater):
     Responsible for updating the volumedriver of a single node
     """
 
+    COMPONENT = None
+    BINARIES = []  # List with tuples. [(package_name, binary_name, binary_location, [service_prefix_0]]
     LOCAL_SR = System.get_my_storagerouter()
     EDGE_SYNC_TIME = 5 * 60
 
@@ -49,7 +55,7 @@ class VolumeDriverUpdater(ComponentUpdater):
         # Plan to execute migrate. Avoid the VPool from being an HA target
         cls.mark_storagerouter_unreachable_for_ha(cls.LOCAL_SR)
         try:
-            # @todo Go concurrently?
+            # @todo currency?
             for vpool, balances in balances_by_vpool.iteritems():
                 cls.migrate_away(balances, cls.LOCAL_SR)
             cls.migrate_master_mds(cls.LOCAL_SR)
@@ -99,17 +105,16 @@ class VolumeDriverUpdater(ComponentUpdater):
         :return: None
         :rtype: NoneType
         """
-        # Mark the storagerouter as excluded for any checkups
-        # @todo implement
-        pass
-        # Checkup to adjust the node distance map
-        # todo
-        pass
-        # Wait for a period of time to let all clients sync up
-        # @todo
+        # Set the value used in the storagedriver cluster node config path
+        # This holds for all mentioned paths in the docstrings
+        Configuration.set(os.path.join(VPOOL_UPDATE_KEY, storagerouter.guid), 0)
+        # Trigger a complete reload of node distance maps
+        StorageDriverController.cluster_registry_checkup()
+        # Wait a few moment for the edge to catch up all the configs
+        time.sleep(2 * cls.EDGE_SYNC_TIME)
 
-    @staticmethod
-    def mark_storagerouter_reachable_for_ha(storagerouter):
+    @classmethod
+    def mark_storagerouter_reachable_for_ha(cls, storagerouter):
         # type: (StorageRouter) -> None
         """
         Update the node distance map to add the storagerouter back into the HA pool
@@ -117,6 +122,11 @@ class VolumeDriverUpdater(ComponentUpdater):
         :type storagerouter: StorageRouter
         :return: None
         """
+        Configuration.delete(os.path.join(VPOOL_UPDATE_KEY, storagerouter.guid))
+        # Trigger a complete reload of node distance maps
+        StorageDriverController.cluster_registry_checkup()
+        # Wait a few moment for the edge to catch up all the configs
+        time.sleep(2 * cls.EDGE_SYNC_TIME)
 
     @staticmethod
     def migrate_away(balances, storagerouter):
@@ -132,6 +142,7 @@ class VolumeDriverUpdater(ComponentUpdater):
         evacuate_srs = [storagerouter.guid]
         for balance in balances:  # type: VDiskBalance
             if balance.storagedriver.storagerouter_guid in evacuate_srs:
+                # @todo abort on failed moves? The user should know but when...?
                 successfull_moves, failed_moves = balance.execute_balance_change_through_overflow(balances,
                                                                                                   user_input=False,
                                                                                                   abort_on_error=False)

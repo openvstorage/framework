@@ -19,11 +19,13 @@ StorageDriver module
 """
 
 import time
+from ovs.constants.vpool import VPOOL_UPDATE_KEY
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.log_handler import LogHandler
 
@@ -187,10 +189,15 @@ class StorageDriver(DataObject):
                 primary_domains.append(junction.domain_guid)
             else:
                 secondary_domains.append(junction.domain_guid)
+        # @todo implement more race-conditions guarantees. Current guarantee is the single update invalidating the value
+        # through cluster_registry_checkup
+        storagerouters_marked_for_update = Configuration.list(VPOOL_UPDATE_KEY)
         for sd in self.vpool.storagedrivers:
             if sd.guid == self.guid:
                 continue
-            if len(primary_domains) == 0:
+            if sd.storagerouter_guid in storagerouters_marked_for_update:
+                distance_map[str(sd.storagedriver_id)] = StorageDriver.DISTANCES.FAR
+            elif len(primary_domains) == 0:
                 distance_map[str(sd.storagedriver_id)] = StorageDriver.DISTANCES.NEAR
             else:
                 distance = StorageDriver.DISTANCES.INFINITE
