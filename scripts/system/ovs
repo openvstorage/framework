@@ -275,14 +275,6 @@ if Configuration.exists('$3', raw=True):
     else
         show_help
     fi
-elif [ "$#" -ge 1 ] ; then
-    module=${1}
-    if [ -f /opt/OpenvStorage/scripts/${module}.sh ] ; then
-        shift
-        /opt/OpenvStorage/scripts/${module}.sh $@
-    else
-        show_help
-    fi
 elif [ "$1" = "local_update" ] ; then
     if [ "$2" = "alba" ] ; then
             python -c """
@@ -290,6 +282,14 @@ from ovs.lib.update.albacomponent_update import AlbaComponentUpdater
 from ovs.extensions.generic.system import System
 AlbaComponentUpdater.do_update(System.get_my_machine_id())
 """
+    else
+        show_help
+    fi
+elif [ "$#" -ge 1 ] ; then
+    module=${1}
+    if [ -f /opt/OpenvStorage/scripts/${module}.sh ] ; then
+        shift
+        /opt/OpenvStorage/scripts/${module}.sh $@
     else
         show_help
     fi
