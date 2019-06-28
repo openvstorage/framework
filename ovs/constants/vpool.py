@@ -18,5 +18,10 @@ import os
 
 VPOOL_UPDATE_KEY = os.path.join(os.path.sep, 'ovs', 'volumedriver', 'update', 'storagerouter')
 
+STORAGEDRIVER_SERVICE_BASE = 'ovs-volumedriver'
+
 PACKAGES_OSE = ['volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']
 PACKAGES_EE = ['volumedriver-ee-base', 'volumedriver-ee-server']
+
+VOLUMEDRIVER_BIN_PATH = os.path.join(os.path.sep, 'usr', 'bin', 'volumedriver_fs.sh')
+VOLUMEDRIVER_CMD_NAME = 'volumedriver_fs'

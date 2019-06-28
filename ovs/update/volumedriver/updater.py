@@ -16,8 +16,9 @@
 
 import os
 import time
+import itertools
 from celery import chain, group
-from ovs.constants.vpool import VPOOL_UPDATE_KEY
+from ovs.constants.vpool import VPOOL_UPDATE_KEY, STORAGEDRIVER_SERVICE_BASE, VOLUMEDRIVER_BIN_PATH, VOLUMEDRIVER_CMD_NAME, PACKAGES_EE
 from ovs.extensions.generic.configuration import Configuration
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vdisk import VDisk
@@ -28,9 +29,24 @@ from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer, VDiskBalance
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.log.log_handler import LogHandler
 # noinspection PyUnreachableCode
 if False:
-    from typing import List, Dict
+    from typing import List, Dict, Tuple
+
+
+class FailedToMigrateException(EnvironmentError):
+    """
+    Thrown when not all volumes would be able to move away
+    """
+    exit_code = 21
+
+
+class FailureDuringMigrateException(EnvironmentError):
+    """
+    Thrown when certain volumes failed to move away
+    """
+    exit_code = 22
 
 
 class VolumeDriverUpdater(ComponentUpdater):
@@ -39,17 +55,22 @@ class VolumeDriverUpdater(ComponentUpdater):
     Responsible for updating the volumedriver of a single node
     """
 
-    COMPONENT = None
-    BINARIES = []  # List with tuples. [(package_name, binary_name, binary_location, [service_prefix_0]]
+    logger = LogHandler.get('update', 'volumedriver')
+
+    COMPONENT = 'volumedriver'
+    # List with tuples. [(package_name, binary_name, binary_location, [service_prefix_0]]
+    BINARIES = [(PACKAGES_EE, VOLUMEDRIVER_CMD_NAME, VOLUMEDRIVER_BIN_PATH, [STORAGEDRIVER_SERVICE_BASE])] # type: List[Tuple[List[str], str, str, List[str]]]
     LOCAL_SR = System.get_my_storagerouter()
-    EDGE_SYNC_TIME = 5 * 60
+    # @todo revert
+    # EDGE_SYNC_TIME = 5 * 60
+    EDGE_SYNC_TIME = 1
 
     @classmethod
     def restart_services(cls):
         """
         Override the service restart. The volumedrivers should be prepared for shutdown
-        :return:
         """
+        cls.logger.info("Restarting all related services")
         # Get the migration plans for every volume on this host. If there are no plans for certain volumes, it will raise
         balances_by_vpool = cls.get_vpool_balances_for_evacuating_storagerouter(cls.LOCAL_SR)
         # Plan to execute migrate. Avoid the VPool from being an HA target
@@ -59,6 +80,8 @@ class VolumeDriverUpdater(ComponentUpdater):
             for vpool, balances in balances_by_vpool.iteritems():
                 cls.migrate_away(balances, cls.LOCAL_SR)
             cls.migrate_master_mds(cls.LOCAL_SR)
+            all_prefixes = tuple(itertools.chain.from_iterable(b[3] for b in cls.BINARIES))
+            return cls.restart_services_by_prefixes(all_prefixes)
         finally:
             cls.mark_storagerouter_reachable_for_ha(cls.LOCAL_SR)
 
@@ -71,7 +94,7 @@ class VolumeDriverUpdater(ComponentUpdater):
         :type storagerouter: StorageRouter
         :return: Dict with vpool and balances
         :rtype: Dict[VPool, VDiskBalance]
-        :raises RuntimeError if not all vdisks would be able to move out
+        :raises FailedToMigrateException if not all vdisks would be able to move out
         """
         errors = []
         evacuate_srs = [storagerouter.guid]
@@ -91,7 +114,7 @@ class VolumeDriverUpdater(ComponentUpdater):
                 errors.append((vpool, ex))
         if errors:
             formatted_errors = '\n - {0}'.format('\n - '.join('VPool {0}: {1}'.format(vpool.name, error) for vpool, error in errors))
-            raise RuntimeError('Unable to migrate all volumes away from this machine: {}'.format(formatted_errors))
+            raise FailedToMigrateException('Unable to migrate all volumes away from this machine: {}'.format(formatted_errors))
         return balances_by_vpool
 
     @classmethod
@@ -105,13 +128,16 @@ class VolumeDriverUpdater(ComponentUpdater):
         :return: None
         :rtype: NoneType
         """
+        cls.logger.info("Marking Storagerouter {} as unavailable for HA".format(storagerouter.name))
         # Set the value used in the storagedriver cluster node config path
         # This holds for all mentioned paths in the docstrings
         Configuration.set(os.path.join(VPOOL_UPDATE_KEY, storagerouter.guid), 0)
         # Trigger a complete reload of node distance maps
         StorageDriverController.cluster_registry_checkup()
         # Wait a few moment for the edge to catch up all the configs
-        time.sleep(2 * cls.EDGE_SYNC_TIME)
+        sleep_time = cls.get_edge_sync_time()
+        cls.logger.info("Waiting {} to sync up all edge clients".format(sleep_time))
+        time.sleep(sleep_time)
 
     @classmethod
     def mark_storagerouter_reachable_for_ha(cls, storagerouter):
@@ -122,11 +148,14 @@ class VolumeDriverUpdater(ComponentUpdater):
         :type storagerouter: StorageRouter
         :return: None
         """
+        cls.logger.info("Marking Storagerouter {} as available for HA".format(storagerouter.name))
         Configuration.delete(os.path.join(VPOOL_UPDATE_KEY, storagerouter.guid))
         # Trigger a complete reload of node distance maps
         StorageDriverController.cluster_registry_checkup()
         # Wait a few moment for the edge to catch up all the configs
-        time.sleep(2 * cls.EDGE_SYNC_TIME)
+        sleep_time = cls.get_edge_sync_time()
+        cls.logger.info("Waiting {} to sync up all edge clients".format(sleep_time))
+        time.sleep(sleep_time)
 
     @staticmethod
     def migrate_away(balances, storagerouter):
@@ -138,36 +167,54 @@ class VolumeDriverUpdater(ComponentUpdater):
         :param storagerouter: Storagerouter to move away from
         :type storagerouter: StorageRouter
         :return: None
+        :raises: FailureDuringMigrateException if any volumes failed to move
         """
         evacuate_srs = [storagerouter.guid]
         for balance in balances:  # type: VDiskBalance
             if balance.storagedriver.storagerouter_guid in evacuate_srs:
-                # @todo abort on failed moves? The user should know but when...?
                 successfull_moves, failed_moves = balance.execute_balance_change_through_overflow(balances,
                                                                                                   user_input=False,
                                                                                                   abort_on_error=False)
+                if failed_moves:
+                    raise FailureDuringMigrateException('Could not move volumes {} away'.format(', '.join(failed_moves)))
 
     @classmethod
-    def migrate_master_mds(cls, storagerouter):
+    def migrate_master_mds(cls, storagerouter, max_chain_size=100):
         """
         Migrate away all master mds from the given storagerouter
         :param storagerouter: Storagerouter to migrate away from
         :type storagerouter: StorageRouter
+        :param max_chain_size: Maximum number of tasks within a chain. Set because https://github.com/celery/celery/issues/1078
+        :type max_chain_size: int
         :return: None
         :rtype: NoneType
         """
-        all_masters_gone = False
-        while not all_masters_gone:
+        cls.logger.info("Starting MDS migrations")
+        while True:
             vpool_mds_master_vdisks = cls.get_vdisks_mds_masters_on_storagerouter(storagerouter)
             all_masters_gone = sum(len(vds) for vds in vpool_mds_master_vdisks.values()) == 0
+            if all_masters_gone:
+                break
             chains = []
-            for vpool, vdisks in vpool_mds_master_vdisks.iteritems():
-                chains.append(chain(MDSServiceController.ensure_safety.si(vdisk.guid) for vdisk in vdisks))
+            for vpool_guid, vdisk_guids in vpool_mds_master_vdisks.iteritems():
+                signatures = []
+                tasks = []
+                for vdisk_guid in vdisk_guids[0:max_chain_size]:
+                    cls.logger.info('Ensuring safety for {}'.format(vdisk_guid))
+                    signature = MDSServiceController.ensure_safety.si(vdisk_guid)
+                    # Freeze freezes the task into its final form. This will net the async result object we'd normally get from delaying it
+                    tasks.append(signature.freeze())
+                    signatures.append(signature)
+                if signatures:
+                    cls.logger.info('Adding chain for VPool {} with tasks {}'.format(vpool_guid, ', '.join(t.id for t in tasks)))
+                    chains.append(chain(signatures))
             # Add all chain signatures to a group for parallel execution
-            task_group = group(c.s() for c in chains)
+            task_group = group(chains)
             # Wait for the group result
-            result = task_group().get()
-            print result
+            async_result = task_group.apply_async()
+            cls.logger.info('Waiting for all tasks of group {}'.format(async_result.id))
+            _ = async_result.get()
+        cls.logger.info("MDS migration finished")
 
     @staticmethod
     def get_vdisks_mds_masters_on_storagerouter(storagerouter):
@@ -194,3 +241,13 @@ class VolumeDriverUpdater(ComponentUpdater):
     @staticmethod
     def get_persistent_client():
         return PersistentFactory.get_client()
+
+    @classmethod
+    def get_edge_sync_time(cls):
+        # type: () -> int
+        """
+        Get the time required for all edge clients to do a complete sync
+        :return: Time for a complete edge sync
+        :rtype: int
+        """
+        return 2 * cls.EDGE_SYNC_TIME
