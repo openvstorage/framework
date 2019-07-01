@@ -54,6 +54,9 @@ from ovs.lib.mdsservice import MDSServiceController
 from volumedriver.storagerouter import VolumeDriverEvents_pb2
 
 
+if False:
+    from typing import Dict, List
+
 class VDiskController(object):
     """
     Contains all BLL regarding VDisks
@@ -616,7 +619,8 @@ class VDiskController(object):
         return results
 
     @staticmethod
-    def delete_snapshots_concurrent(vdisk, snapshots=None, skip_used_snapshots=True):
+    def delete_snapshots_concurrent(vdisk, snapshots=None, skip_used_snapshots=True, timeout=10):
+        # type: (ovs.dal.hybrids.vdisk, List[str], bool, int) -> Dict[str, List[str, str]]
         """
         Delete vDisk snapshots in a range, making use of the volumedriver concurrent call
         :param vdisk: vdisk to delete snapshots from via the storagedriver client
@@ -625,21 +629,40 @@ class VDiskController(object):
         :type snapshots: list
         :param skip_used_snapshots: skip deletion of snapshots if they are in use
         :type skip_used_snapshots: bool
+        :param timeout: time before storagedriverclient delete_snapshots call should timeout.
         :return: the volumedriver std_client output value
-        :rtype: any
+        :rtype: Dict
         """
+        error_message = 'Something went wrong during deletion of this snapshot. Try removing it manually please.'
+        sleep_time = 2
         if not snapshots:
             snapshots = vdisk.snapshot_ids
-        return vdisk.storagedriver_client.delete_snapshots(volume_id=str(vdisk.volume_id),
-                                                           snapshots=snapshots,
-                                                           skip_used_snapshots=skip_used_snapshots)
-        #todo this does not output anything. should be fixed after volumedriver-ee/issues/222 is fixed and make the output uniformous with _delete_multiple_snapshots
+
+        std_client_output = vdisk.storagedriver_client.delete_snapshots(volume_id=str(vdisk.volume_id),
+                                                                        snapshots=snapshots,
+                                                                        skip_used_snapshots=skip_used_snapshots,
+                                                                        ignore_unknown_snapshots=True,
+                                                                        req_timeout_secs=timeout)
+
+        retry = 0
+        processed_snapshots = std_client_output.removed_ones() + std_client_output.unknown_ones()
+        missing_snapshots = set(snapshots) - set(processed_snapshots)
+        while  processed_snapshots < snapshots:
+            if sleep_time * retry > timeout:
+                raise RuntimeError('Not all snapshots are marked as unknown or removed. Following '
+                                   'snapshots were not processed: {0}'.format(','.join(list(missing_snapshots))))
+            time.sleep(sleep_time)
+            retry += 1
+        results = dict([(i, [True, i]) for i in std_client_output.removed_ones()])
+        results.update(dict([(i, [False, error_message]) for i in std_client_output.unknown_ones()]))
+        return results
 
     @staticmethod
     def _delete_multiple_snapshots(vdisk, snapshot_ids):
+        # type: (ovs.dal.hybrids.vdisk, List[str]) -> Dict[str, Dict[str, Dict[str, List[str, str]]]]
         results = {}
         if getattr(vdisk.storagedriver_client, 'delete_snapshots', None):
-            results[vdisk.guid] = VDiskController.delete_snapshots(vdisk, snapshots=snapshot_ids)
+            results[vdisk.guid]['results'] = VDiskController.delete_snapshots_concurrent(vdisk, snapshots=snapshot_ids)
         else:
             for snapshot_id in set(snapshot_ids):
                 try:
@@ -661,6 +684,7 @@ class VDiskController(object):
                 if result[0] is False:
                     results[vdisk.guid].update({'success': False,
                                                 'error': 'One or more snapshots could not be removed'})
+        return results
 
     @staticmethod
     @ovs_task(name='ovs.vdisk.set_as_template')
