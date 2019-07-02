@@ -24,7 +24,7 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.system import System
-from ovs_extensions.update.base import ComponentUpdater
+from ovs_extensions.update.base import ComponentUpdater, UpdateException
 from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer, VDiskBalance
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -35,14 +35,14 @@ if False:
     from typing import List, Dict, Tuple
 
 
-class FailedToMigrateException(EnvironmentError):
+class FailedToMigrateException(UpdateException):
     """
     Thrown when not all volumes would be able to move away
     """
     exit_code = 21
 
 
-class FailureDuringMigrateException(EnvironmentError):
+class FailureDuringMigrateException(UpdateException):
     """
     Thrown when certain volumes failed to move away
     """
