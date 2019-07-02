@@ -647,10 +647,11 @@ class VDiskController(object):
         retry = 0
         processed_snapshots = std_client_output.removed_ones() + std_client_output.unknown_ones()
         missing_snapshots = set(snapshots) - set(processed_snapshots)
-        while  processed_snapshots < snapshots:
+        while len(processed_snapshots) < len(snapshots):
+            VDiskController._logger.info('Retrying. Still processing snapshots for deletion: {0}.'.format(','.join(std_client_output.unknown_ones())))
             if sleep_time * retry > timeout:
                 raise RuntimeError('Not all snapshots are marked as unknown or removed. Following '
-                                   'snapshots were not processed: {0}'.format(','.join(list(missing_snapshots))))
+                                   'snapshots were not processed: {0}.'.format(','.join(list(missing_snapshots))))
             time.sleep(sleep_time)
             retry += 1
         results = dict([(i, [True, i]) for i in std_client_output.removed_ones()])
