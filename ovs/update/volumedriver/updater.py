@@ -61,9 +61,7 @@ class VolumeDriverUpdater(ComponentUpdater):
     # List with tuples. [(package_name, binary_name, binary_location, [service_prefix_0]]
     BINARIES = [(PACKAGES_EE, VOLUMEDRIVER_CMD_NAME, VOLUMEDRIVER_BIN_PATH, [STORAGEDRIVER_SERVICE_BASE])] # type: List[Tuple[List[str], str, str, List[str]]]
     LOCAL_SR = System.get_my_storagerouter()
-    # @todo revert
-    # EDGE_SYNC_TIME = 5 * 60
-    EDGE_SYNC_TIME = 1
+    EDGE_SYNC_TIME = 5 * 60
 
     @classmethod
     def restart_services(cls):

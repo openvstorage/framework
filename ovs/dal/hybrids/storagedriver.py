@@ -25,7 +25,6 @@ from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.log_handler import LogHandler
 
@@ -179,7 +178,7 @@ class StorageDriver(DataObject):
         """
         Prepares a ClusterNodeConfig dict for the StorageDriver process
         """
-        from ovs.extensions.generic.configuration import Configuration
+        from ovs.extensions.generic.configuration import Configuration, NotFoundException
         rdma = Configuration.get('/ovs/framework/rdma')
         distance_map = {}
         primary_domains = []
@@ -191,7 +190,10 @@ class StorageDriver(DataObject):
                 secondary_domains.append(junction.domain_guid)
         # @todo implement more race-conditions guarantees. Current guarantee is the single update invalidating the value
         # through cluster_registry_checkup
-        storagerouters_marked_for_update = Configuration.list(VPOOL_UPDATE_KEY)
+        try:
+            storagerouters_marked_for_update = list(Configuration.list(VPOOL_UPDATE_KEY))
+        except NotFoundException:
+            storagerouters_marked_for_update = []
         for sd in self.vpool.storagedrivers:
             if sd.guid == self.guid:
                 continue
