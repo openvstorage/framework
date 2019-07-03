@@ -584,6 +584,37 @@ class VDiskController(object):
         :return: Information about the deleted snapshots, whether they succeeded or not
         :rtype: dict
         """
+
+        def _delete_multiple_snapshots(vdisk, snapshot_ids):
+            # type: (ovs.dal.hybrids.vdisk, List[str]) -> Dict[str, Dict[str, Dict[str, List[str, str]]]]
+            if getattr(vdisk.storagedriver_client, 'delete_snapshots', None):
+                results[vdisk.guid]['results'] = VDiskController.delete_snapshots_concurrent(vdisk, snapshots=snapshot_ids)
+            else:
+                for snapshot_id in set(snapshot_ids):
+                    try:
+                        if snapshot_id not in VDiskController.list_snapshot_ids(vdisk=vdisk):
+                            raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
+
+                        nr_clones = len(VDiskList.get_by_parentsnapshot(snapshot_id))
+                        if nr_clones > 0:
+                            raise RuntimeError('Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(snapshot_id, nr_clones, '' if nr_clones == 1 else 's'))
+
+                        VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
+                        vdisk.storagedriver_client.delete_snapshot(volume_id=str(vdisk.volume_id),
+                                                                   snapshot_id=str(snapshot_id),
+                                                                   req_timeout_secs=10)
+                        result = [True, snapshot_id]
+                    except Exception as ex:
+                        result = [False, ex.message]
+                    results[vdisk.guid]['results'][snapshot_id] = result
+                    if result[0] is False:
+                        results[vdisk.guid].update({'success': False,
+                                                    'error': 'One or more snapshots could not be removed'})
+                vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
+                if backwards_compat is True:
+                    results[vdisk.guid] = results[vdisk.guid]['results'][snapshot_ids[0]]
+            return results
+
         results = {}
         for vdisk_guid, snapshot_ids in snapshot_mapping.iteritems():
             backwards_compat = False  # Snapshot_mapping and return value of this function used to be different in older versions
@@ -611,11 +642,8 @@ class VDiskController(object):
                     results[vdisk_guid] = [False, msg]
                 continue
 
-            results.update(VDiskController._delete_multiple_snapshots(vdisk, snapshot_ids))
+            results.update(_delete_multiple_snapshots(vdisk, snapshot_ids))
 
-            vdisk.invalidate_dynamics(['snapshots', 'snapshot_ids'])
-            if backwards_compat is True:
-                results[vdisk_guid] = results[vdisk_guid]['results'][snapshot_ids[0]]
         return results
 
     @staticmethod
@@ -637,9 +665,9 @@ class VDiskController(object):
         sleep_time = 2
         if not snapshots:
             snapshots = vdisk.snapshot_ids
-
+        to_remove = [i for i in snapshots if len(VDiskList.get_by_parentsnapshot(i)) == 0]
         std_client_output = vdisk.storagedriver_client.delete_snapshots(volume_id=str(vdisk.volume_id),
-                                                                        snapshots=snapshots,
+                                                                        snapshots=to_remove,
                                                                         skip_used_snapshots=skip_used_snapshots,
                                                                         ignore_unknown_snapshots=True,
                                                                         req_timeout_secs=timeout)
@@ -650,41 +678,12 @@ class VDiskController(object):
         while len(processed_snapshots) < len(snapshots):
             VDiskController._logger.info('Retrying. Still processing snapshots for deletion: {0}.'.format(','.join(std_client_output.unknown_ones())))
             if sleep_time * retry > timeout:
-                raise RuntimeError('Not all snapshots are marked as unknown or removed. Following '
-                                   'snapshots were not processed: {0}.'.format(','.join(list(missing_snapshots))))
+                raise RuntimeError('Not all snapshots are marked as unknown or removed. Following {0} '
+                                   'snapshots were not processed: {1}.'.format(len(missing_snapshots), ','.join(list(missing_snapshots))))
             time.sleep(sleep_time)
             retry += 1
         results = dict([(i, [True, i]) for i in std_client_output.removed_ones()])
         results.update(dict([(i, [False, error_message]) for i in std_client_output.unknown_ones()]))
-        return results
-
-    @staticmethod
-    def _delete_multiple_snapshots(vdisk, snapshot_ids):
-        # type: (ovs.dal.hybrids.vdisk, List[str]) -> Dict[str, Dict[str, Dict[str, List[str, str]]]]
-        results = {}
-        if getattr(vdisk.storagedriver_client, 'delete_snapshots', None):
-            results[vdisk.guid]['results'] = VDiskController.delete_snapshots_concurrent(vdisk, snapshots=snapshot_ids)
-        else:
-            for snapshot_id in set(snapshot_ids):
-                try:
-                    if snapshot_id not in VDiskController.list_snapshot_ids(vdisk=vdisk):
-                        raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
-
-                    nr_clones = len(VDiskList.get_by_parentsnapshot(snapshot_id))
-                    if nr_clones > 0:
-                        raise RuntimeError('Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(snapshot_id, nr_clones, '' if nr_clones == 1 else 's'))
-
-                    VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
-                    vdisk.storagedriver_client.delete_snapshot(volume_id=str(vdisk.volume_id),
-                                                               snapshot_id=str(snapshot_id),
-                                                               req_timeout_secs=10)
-                    result = [True, snapshot_id]
-                except Exception as ex:
-                    result = [False, ex.message]
-                results[vdisk.guid]['results'][snapshot_id] = result
-                if result[0] is False:
-                    results[vdisk.guid].update({'success': False,
-                                                'error': 'One or more snapshots could not be removed'})
         return results
 
     @staticmethod
