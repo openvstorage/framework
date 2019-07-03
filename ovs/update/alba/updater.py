@@ -14,21 +14,20 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-from abc import abstractmethod
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.update.alba_component_update import AlbaComponentUpdater as _AlbacomponentUpdater
+from ovs.log.log_handler import LogHandler
 
 
 class AlbaComponentUpdater(_AlbacomponentUpdater):
     """
     Implementation of abstract class to update alba
     """
+    logger = LogHandler.get('update', 'volumedriver')
 
     @staticmethod
-    @abstractmethod
     def get_persistent_client():
-        # type: () -> PyrakoonStore
         """
         Retrieve a persistent client which needs
         Needs to be implemented by the callee
@@ -37,7 +36,6 @@ class AlbaComponentUpdater(_AlbacomponentUpdater):
 
     @classmethod
     def get_node_id(cls):
-        # type: () -> str
         """
         use a factory to provide the machine id
         :return:
