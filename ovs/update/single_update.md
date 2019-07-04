@@ -12,6 +12,9 @@ The local update will:
 - Restart the volumedriver services
 - Update the node distance map to accept HA back onto the node
 
+Note that a volumedriverupdate will always perform 2 edge sync times of 10 minutes, regardles of the size of the environment.
+Progress can be tailed in `/var/log/ovs/update.log`
+ 
 ### Exceptions
 Certain exception can be thrown during the update.
 
