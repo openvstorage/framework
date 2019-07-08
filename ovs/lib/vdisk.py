@@ -661,8 +661,8 @@ class VDiskController(object):
         :return: the volumedriver std_client output value
         :rtype: Dict
         """
-        error_message = 'Something went wrong during deletion of this snapshot. Try removing it manually please.'
-        sleep_time = 2
+        error_message = 'Snapshot not found. Verify this snapshot ID please.'
+        busy_message = 'Snapshot in use. Make sure its clone is removed please.'
         if not snapshots:
             snapshots = vdisk.snapshot_ids
         to_remove = [i for i in snapshots if len(VDiskList.get_by_parentsnapshot(i)) == 0]
@@ -673,6 +673,7 @@ class VDiskController(object):
                                                                         req_timeout_secs=timeout)
         results = dict([(i, [True, i]) for i in std_client_output.removed_ones()])
         results.update(dict([(i, [False, error_message]) for i in std_client_output.unknown_ones()]))
+        results.update(dict([(i, [False, busy_message]) for i in std_client_output.busy_ones()]))
         return results
 
     @staticmethod
