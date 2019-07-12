@@ -457,4 +457,7 @@ class VDisk(DataObject):
         reloaded_vdisk = VDisk(self.guid)
         scrub_info = reloaded_vdisk.scrubbing_information
         # Scrubbing information shouldn't be expired
-        return isinstance(scrub_info, dict) and any(scrub_info.get(key) for key in ['on_going', 'ongoing']) and self.scrubbing_information['expires'] and self.scrubbing_information['expires'] >= now
+        return isinstance(scrub_info, dict) \
+               and any(scrub_info.get(key) for key in ['on_going', 'ongoing']) \
+               and scrub_info['expires'] is not None \
+               and scrub_info['expires'] >= now
