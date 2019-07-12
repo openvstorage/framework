@@ -57,6 +57,7 @@ class MDSServiceController(MDSShared):
     """
     Contains all BLL related to MDSServices
     """
+
     _logger = logging.getLogger(__name__)
 
     @staticmethod
