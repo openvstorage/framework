@@ -742,7 +742,7 @@ class StackWorker(ScrubShared):
                     return current_state
                 if time.time() - start > timeout:
                     raise RuntimeError('Long polling for the state has timed out')
-                self._logger.debug(self._format_message('Proxies {0{ their state does not match any in  \'{1}\'  (Current: {2})'
+                self._logger.debug(self._format_message('Proxies {0} their state does not match any in  \'{1}\'  (Current: {2})'
                                                         .format(', '.join(self.alba_proxy_services), states, current_state)))
                 time.sleep(1)
         return None
