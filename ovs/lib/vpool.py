@@ -20,6 +20,11 @@ VPool module
 
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.lib.helpers.decorators import log, ovs_task
+from ovs.lib.helpers.vdisk.rebalancer import VDiskBalance, FailedMovesException
+
+# noinspection PyUnreachableCode
+if False:
+    from typing import List, Optional
 
 
 class VPoolController(object):
@@ -40,3 +45,29 @@ class VPoolController(object):
             raise RuntimeError('A Storage Driver with id {0} could not be found.'.format(storagedriver_id))
         storagedriver.startup_counter += 1
         storagedriver.save()
+
+    @staticmethod
+    @ovs_task(name='ovs.vpool.balance_change')
+    def execute_balance_change(vpool_guid, exported_balances, execute_only_for_srs=None):
+        # type: (str, List[dict], Optional[List[str]]) -> None
+        """
+        Execute a balance change. Balances can be calculated through ovs.lib.helpers.vdisk.rebalancer.VDiskRebalancer
+        This task is created to offload the balance change to Celery to get concurrency across VPools
+        :param vpool_guid: Guid of the VPool to execute the balance changes for. Used for ensure_single and validation
+        :type vpool_guid: str
+        :param exported_balances: List of exported balances
+        :type exported_balances: List[dict]
+        :return:
+        """
+        if execute_only_for_srs is None:
+            execute_only_for_srs = []
+        balances = [VDiskBalance.from_dict(b) for b in exported_balances]
+        if not all(b.storagedriver.vpool_guid == vpool_guid for b in balances):
+            raise ValueError("Not all balances are part of the same vpool")
+        for balance in balances:  # type: VDiskBalance
+            if len(execute_only_for_srs) > 0 and balance.storagedriver.storagerouter_guid in execute_only_for_srs:
+                successful_moves, failed_moves = balance.execute_balance_change_through_overflow(balances,
+                                                                                                 user_input=False,
+                                                                                                 abort_on_error=False)
+                if failed_moves:
+                    raise FailedMovesException('Could not move volumes {} away'.format(', '.join(failed_moves)))

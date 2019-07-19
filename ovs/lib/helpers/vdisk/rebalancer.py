@@ -24,6 +24,7 @@ from __future__ import division
 import pprint
 import itertools
 from math import ceil
+from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagedriver import StorageDriver
@@ -32,7 +33,13 @@ from ovs_extensions.log.logger import Logger
 
 # noinspection PyUnreachableCode
 if False:
-    from typing import List, Dict, Tuple, Optional
+    from typing import List, Dict, Tuple, Optional, Union
+
+
+class FailedMovesException(Exception):
+    """
+    Thrown when volumes could not be moved
+    """
 
 
 class VDiskRebalancer(object):
@@ -335,21 +342,36 @@ class VDiskBalance(object):
 
     logger = Logger('vdisk_balance')
 
-    def __init__(self, storagedriver, vdisk_limit):
-        # type: (StorageDriver, int) -> None
+    def __init__(self, storagedriver, vdisk_limit, balance=None, overflow=None, added=None):
+        # type: (StorageDriver, int, Optional[List[str]], Optional[List[str]], Optional[List[str]]) -> None
         """
         Represents the vdisk balance of a storagedriver
         :param storagedriver: StorageDriver to balance for
         :type storagedriver: StorageDriver
         :param vdisk_limit: Maximum amount of vdisks to host. -1 means no limit
         :type vdisk_limit: int
+        :param balance: Balance of vdisk guids to use. Used primarily in serializing/deserializing
+        :type balance: Optional[List[str]]
+        :param overflow: Overflow of vdisk guids to use. Used primarily in serializing/deserializing
+        :type overflow: Optional[List[str]]
+        :param added: List of vdisk guids added to the balance. Used primarily in serializing/deserializing
+        :type added: Optional[List[str]]
         """
         self.storagedriver = storagedriver
         self.hosted_guids = storagedriver.vdisks_guids
         self.limit = vdisk_limit
 
-        self.balance, self.overflow = self.impose_limit()
-        self.added = []
+        combination_vars = [balance, overflow, added]
+        combination_vars_given = all(v is not None for v in combination_vars)
+        if any(v is not None for v in combination_vars) and not combination_vars_given:
+            raise ValueError('When providing any of the variables {}, all should be provided'.format(', '.join(['balance', 'overflow', 'added'])))
+        if combination_vars_given:
+            self.balance = balance
+            self.overflow = overflow
+            self.added = added
+        else:
+            self.balance, self.overflow = self.impose_limit()
+            self.added = []
 
     def __add__(self, other):
         if not isinstance(other, VDiskBalance) or self.storagedriver != other.storagedriver:
@@ -485,6 +507,8 @@ class VDiskBalance(object):
                 try:
                     self._execute_move(vdisk_guid, destination_std, force, user_input)
                     successful_moves.append(vdisk_guid)
+                except KeyboardInterrupt:
+                    raise
                 except:
                     self.logger.exception('Unable to move VDisk {0} to {1}'.format(vdisk_guid, destination_std.storagerouter_guid))
                     if abort_on_error:
@@ -511,43 +535,47 @@ class VDiskBalance(object):
         :param interactive: Prompt for user input before moving
         :return: None
         """
-        vd = VDisk(vdisk_guid)
-        current_sr = StorageRouter(vd.storagerouter_guid).name
-        next_sr = destination_std.storagerouter.name
-        if vd.storagerouter_guid == destination_std.storagerouter_guid:
-            # Ownership changed in meantime
-            self.logger.info('No longer need to move VDisk {0} to {1}'.format(vdisk_guid, destination_std.storagerouter.name))
-            return
-        rebalance_message = 'Rebalancing vPool by moving vDisk {0} from {1} to {2}'.format(vdisk_guid, current_sr, next_sr)
-        if interactive:
-            retry = True
-            while retry:
-                proceed = raw_input('{0}. Continue? (press Enter)'.format(rebalance_message))
-                if proceed == '':  # Mock 'Enter' key
-                    retry = False
+        _ = force
         try:
-            volume_potential = destination_std.vpool.storagedriver_client.volume_potential(str(destination_std.storagedriver_id))
-        except:
-            self.logger.exception('Unable to retrieve volume potential. Aborting')
-            raise
-        if volume_potential > minimum_potential:
-            self.logger.info(rebalance_message)
+            vd = VDisk(vdisk_guid)
+            current_sr = StorageRouter(vd.storagerouter_guid).name
+            next_sr = destination_std.storagerouter.name
+            if vd.storagerouter_guid == destination_std.storagerouter_guid:
+                # Ownership changed in meantime
+                self.logger.info('No longer need to move VDisk {0} to {1}'.format(vdisk_guid, destination_std.storagerouter.name))
+                return
+            rebalance_message = 'Rebalancing vPool by moving vDisk {0} from {1} to {2}'.format(vdisk_guid, current_sr, next_sr)
+            if interactive:
+                retry = True
+                while retry:
+                    proceed = raw_input('{0}. Continue? (press Enter)'.format(rebalance_message))
+                    if proceed == '':  # Mock 'Enter' key
+                        retry = False
             try:
-                vd.storagedriver_client.migrate(str(vd.volume_id), str(destination_std.name), False)
-            except RuntimeError:
-                # When a RunTimeError occurs. Try restarting the volume locally for safety measures.
-                self.logger.warning('Encountered RunTimeError. Checking if vdisk({0}) is not running and restarting it.'.format(vd.guid))
-                vd.invalidate_dynamics('info')
-                if vd.info['live_status'] != vd.STATUSES.RUNNING:
-                    vd.storagedriver_client.restart_object(str(vd.volume_id), False)
-                    # Now check if the migration succeeded and if the volume is running on the correct storagedriver.
-                    if vd.storagedriver_id == destination_std.name:
-                        self.logger.info('Vdisk({0}) got restarted and runs on destination storagedriver. Previous error can be ignored.'.format(vd.guid))
-                    else:
-                        self.logger.warning('Vdisk({0}) got restarted but doesn\'t run on destination storagedriver.'.format(vd.guid))
+                volume_potential = destination_std.vpool.storagedriver_client.volume_potential(str(destination_std.storagedriver_id))
+            except:
+                self.logger.exception('Unable to retrieve volume potential. Aborting')
+                raise
+            if volume_potential > minimum_potential:
+                self.logger.info(rebalance_message)
+                try:
+                    vd.storagedriver_client.migrate(str(vd.volume_id), str(destination_std.name), False)
+                except RuntimeError:
+                    # When a RunTimeError occurs. Try restarting the volume locally for safety measures.
+                    self.logger.warning('Encountered RunTimeError. Checking if vdisk({0}) is not running and restarting it.'.format(vd.guid))
+                    vd.invalidate_dynamics('info')
+                    if vd.info['live_status'] != vd.STATUSES.RUNNING:
+                        vd.storagedriver_client.restart_object(str(vd.volume_id), False)
+                        # Now check if the migration succeeded and if the volume is running on the correct storagedriver.
+                        if vd.storagedriver_id == destination_std.name:
+                            self.logger.info('Vdisk({0}) got restarted and runs on destination storagedriver. Previous error can be ignored.'.format(vd.guid))
+                        else:
+                            self.logger.warning('Vdisk({0}) got restarted but doesn\'t run on destination storagedriver.'.format(vd.guid))
 
-        else:
-            raise ValueError('Volume potential is lower than {0}. Not moving anymore!'.format(minimum_potential))
+            else:
+                raise ValueError('Volume potential is lower than {0}. Not moving anymore!'.format(minimum_potential))
+        except ObjectNotFoundException as ex:
+            self.logger.warning('Could not retrieve an object. Assuming it\'s a vDisk: {}'.format(ex))
 
     @staticmethod
     def map_vdisk_to_destination(balances):
@@ -572,3 +600,28 @@ class VDiskBalance(object):
                     len(self.hosted_guids),
                     self.limit,
                     len(self.balance))
+
+    def to_dict(self):
+        """
+        Export the VDiskBalance object. Workaround to being unable to pickle/serialize a DataObject
+        Use the associated import function to cast it back to an object
+        :return:
+        """
+        return {'storagedriver_guid': self.storagedriver.guid,
+                'hosted_guids': self.hosted_guids,
+                'limit': self.limit,
+                'balance': self.balance,
+                'overflow': self.overflow,
+                'added': self.added}
+
+    @staticmethod
+    def from_dict(data):
+        # type: (Dict[str, Union[str, int, List[str]]]) -> VDiskBalance
+        """
+        Instantiate a VDiskBalance through a dict. See to_dict method to check it's form
+        :param data: Data dict
+        :return:
+        """
+        kwargs = data.copy()
+        kwargs['storagedriver'] = StorageDriver(kwargs.pop('storagedriver_guid'))
+        return VDiskBalance(**kwargs)
