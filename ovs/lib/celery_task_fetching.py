@@ -5,7 +5,6 @@ from ovs.extensions.generic.configuration import Configuration
 
 class TaskFetcher(object):
 
-
     @classmethod
     def fetch_celery(cls, to_csv=False, filepath=None):
         # type: (None, Optional[bool], Optional[str]) -> Dict[str, str]
@@ -17,16 +16,26 @@ class TaskFetcher(object):
                                                         If no path is provided there, will write csv file to /tmp/celery_task_list.csv
         :return: Dict
         """
-        filepath = filepath or Configuration.get(CELERY_TASKS_LISTS_OUTPUT_PATH, default='/tmp/celery_task_list.csv')
+        filepath = filepath or Configuration.get(CELERY_TASKS_LISTS_OUTPUT_PATH, default='/tmp/celery_task_list.md')
         celery_tasks = cls._fetch_celery_tasks()
         if to_csv:
             with open(filepath, 'w') as fh:
-                fh.write(celery_tasks)
+                fh.write(cls.dict_to_markdown(celery_tasks))
         return celery_tasks
-
 
     @classmethod
     def _fetch_celery_tasks(cls):
+        # Celery does not know of our included modules just yet. So we import them.
+        celery.loader.import_default_modules()
+        return dict([(task, decorated_fun_task.__doc__) for task, decorated_fun_task in celery.tasks.iteritems() if task.startswith(BASE_OVS)])
 
-        return [(task, decorated_fun_task.__doc__) for task, decorated_fun_task in celery.tasks.iteritems() if task.startswith(BASE_OVS)]
+    @classmethod
+    def _format_to_markdown(cls, title, body):
+        body = body.replace('\t', '\n')
+        return "### {0}\n"\
+               "```{1}```\n".format(title, body)
+
+    @classmethod
+    def dict_to_markdown(cls, d):
+        return '\n'.join([cls._format_to_markdown(title, body) for title, body in sorted(d.iteritems())])
 
