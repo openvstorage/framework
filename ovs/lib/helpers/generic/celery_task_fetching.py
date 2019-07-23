@@ -75,13 +75,12 @@ class TaskFetcher(object):
         for folder, celery_functions in sorted(indented_dict.iteritems()):
             out += '### {0}\n'.format(folder.capitalize())
             for function_name, function_docstring in sorted(celery_functions.iteritems()):
-                # function_docstring = re.sub('^\s{4,}', '', function_docstring)
-
                 out += "#### {0}\n```{1}\n```\n".format(function_name, function_docstring)
 
         if editor_input:
             out += '## Editor input\n'
             for editor_key, editor_value in editor_input.iteritems():
+                # To allign with the generated output, an additional tab is needed
                 out += "### {0}\n```\n\t{1}\n```\n".format(editor_key, editor_value)
         return out
 
