@@ -17,6 +17,7 @@
 import os
 import time
 import itertools
+from ovs.celery_run import celery
 from celery import chain, group
 from celery.exceptions import TimeoutError
 from ovs.constants.vpool import VPOOL_UPDATE_KEY, STORAGEDRIVER_SERVICE_BASE, VOLUMEDRIVER_BIN_PATH, VOLUMEDRIVER_CMD_NAME, PACKAGES_EE
@@ -35,7 +36,7 @@ from ovs.log.log_handler import LogHandler
 
 # noinspection PyUnreachableCode
 if False:
-    from typing import List, Dict, Tuple
+    from typing import List, Dict, Tuple, Optional
 
 
 class FailedToMigrateException(UpdateException):
@@ -178,7 +179,7 @@ class VolumeDriverUpdater(ComponentUpdater):
         time.sleep(sleep_time)
 
     @classmethod
-    def migrate_away(cls, balances_by_vpool, storagerouter, group_timeout=10 * 60):
+    def migrate_away(cls, balances_by_vpool, storagerouter):
         # type: (Dict[VPool, List[VDiskBalance]], StorageRouter) -> None
         """
         Migrate all volumes away
@@ -186,8 +187,6 @@ class VolumeDriverUpdater(ComponentUpdater):
         :type balances_by_vpool: Dict[VPool, List[VDiskBalance]]
         :param storagerouter: Storagerouter to move away from
         :type storagerouter: StorageRouter
-        :param group_timeout: Timeout for the complete group. Will abort all pending tasks afterwards. Defaults to 10 mins
-        :type group_timeout: int
         :return: None
         :raises: FailureDuringMigrateException if any volumes failed to move
         """
@@ -207,23 +206,13 @@ class VolumeDriverUpdater(ComponentUpdater):
             # Wait for the group result
             async_result = task_group.apply_async()
             cls.logger.info('Waiting for all tasks of group {}'.format(async_result.id))
-            try:
-                _ = async_result.get(timeout=group_timeout)
-            except TimeoutError:
-                cls.logger.warning('Migration took longer than expected. Revoking all non-started tasks')
-                revoked_tasks = []
-                for task in tasks:
-                    if task.state == 'PENDING':
-                        task.revoke()
-                        revoked_tasks.append(task)
-                if revoked_tasks:
-                    cls.logger.warning('Revoked migration tasks: {}'.format(', '.join(revoked_tasks)))
-                cls.logger.warning('Waiting for the execution on the running migrations')
-                _ = async_result.get()
+            # Timeout similar to migrate_master_mds does not make a lot of sense. All tasks are executed in parallel
+            _ = async_result.get()
         cls.logger.info("MDS migration finished")
 
     @classmethod
     def migrate_master_mds(cls, storagerouter, max_chain_size=100, group_timeout=10 * 60):
+        # type: (StorageRouter, Optional[int], Optional[int]) -> None
         """
         Migrate away all master mds from the given storagerouter
         :param storagerouter: Storagerouter to migrate away from
@@ -272,6 +261,8 @@ class VolumeDriverUpdater(ComponentUpdater):
                 revoked_tasks = []
                 for task in all_tasks:
                     if task.state == 'PENDING':
+                        # Certain PENDING tasks cannot be revoked. It appears they're non-existent. Not even the workers know about them
+                        # @todo build a new result chain and wait for that
                         task.revoke()
                         revoked_tasks.append(task)
                 if revoked_tasks:

@@ -55,6 +55,8 @@ class VPoolController(object):
         This task is created to offload the balance change to Celery to get concurrency across VPools
         :param vpool_guid: Guid of the VPool to execute the balance changes for. Used for ensure_single and validation
         :type vpool_guid: str
+        :param execute_only_for_srs: Guids of StorageRouters to perform the balance change for (if not specified, executed for all)
+        :type execute_only_for_srs: Optional[List[str]]
         :param exported_balances: List of exported balances
         :type exported_balances: List[dict]
         :return:

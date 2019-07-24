@@ -342,29 +342,32 @@ class VDiskBalance(object):
 
     logger = Logger('vdisk_balance')
 
-    def __init__(self, storagedriver, vdisk_limit, balance=None, overflow=None, added=None):
-        # type: (StorageDriver, int, Optional[List[str]], Optional[List[str]], Optional[List[str]]) -> None
+    def __init__(self, storagedriver, limit, balance=None, overflow=None, added=None, hosted_guids=None):
+        # type: (StorageDriver, int, Optional[List[str]], Optional[List[str]], Optional[List[str]], Optional[List[str]]) -> None
         """
         Represents the vdisk balance of a storagedriver
         :param storagedriver: StorageDriver to balance for
         :type storagedriver: StorageDriver
-        :param vdisk_limit: Maximum amount of vdisks to host. -1 means no limit
-        :type vdisk_limit: int
-        :param balance: Balance of vdisk guids to use. Used primarily in serializing/deserializing
+        :param limit: Maximum amount of vdisks to host. -1 means no limit
+        :type limit: int
+        :param balance: Balance of vdisk guids to use. Used in serializing/deserializing
         :type balance: Optional[List[str]]
-        :param overflow: Overflow of vdisk guids to use. Used primarily in serializing/deserializing
+        :param overflow: Overflow of vdisk guids to use. Used in serializing/deserializing
         :type overflow: Optional[List[str]]
-        :param added: List of vdisk guids added to the balance. Used primarily in serializing/deserializing
+        :param added: List of vdisk guids added to the balance. Used in serializing/deserializing
         :type added: Optional[List[str]]
+        :param hosted_guids: Guids of the vDisks hosted on the given storagedriver. Used in serializing/deserializing
+        :type hosted_guids: Optional[List[str]]
         """
         self.storagedriver = storagedriver
-        self.hosted_guids = storagedriver.vdisks_guids
-        self.limit = vdisk_limit
+        self.hosted_guids = hosted_guids if hosted_guids is not None else storagedriver.vdisks_guids
+        self.limit = limit
 
-        combination_vars = [balance, overflow, added]
+        combination_vars = [balance, overflow, added, hosted_guids]
+        combination_vars_names = ['balance', 'overflow', 'added', 'hosted_guids']
         combination_vars_given = all(v is not None for v in combination_vars)
         if any(v is not None for v in combination_vars) and not combination_vars_given:
-            raise ValueError('When providing any of the variables {}, all should be provided'.format(', '.join(['balance', 'overflow', 'added'])))
+            raise ValueError('When providing any of the variables {}, all should be provided'.format(', '.join(combination_vars_names)))
         if combination_vars_given:
             self.balance = balance
             self.overflow = overflow
