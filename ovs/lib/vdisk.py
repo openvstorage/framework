@@ -25,6 +25,7 @@ import time
 import uuid
 import pickle
 import random
+from ovs.constants.vdisk import SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
@@ -603,7 +604,7 @@ class VDiskController(object):
                     results[vdisk_guid] = [False, ex.message]
                 continue
             if vdisk.being_scrubbed:
-                msg = 'VDisk is being scrubbed. Unable to remove snapshots at this time'
+                msg = SCRUB_VDISK_EXCEPTION_MESSAGE
                 results[vdisk_guid].update({'success': False,
                                             'error': msg})
                 if backwards_compat is True:

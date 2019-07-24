@@ -84,6 +84,7 @@ class StorageRouterClient(object):
     _dtl_config_cache = {}
     _metadata_backend_config = {}
     _snapshots = {}
+    delete_snapshot_callbacks = {}
     volumes = {}
     exceptions = {}
     vrouter_id = {}
@@ -207,6 +208,9 @@ class StorageRouterClient(object):
         Delete snapshot mockup
         """
         _ = req_timeout_secs
+        callback = self.delete_snapshot_callbacks.get(volume_id, {}).get(snapshot_id)
+        if callback:
+            callback()
         del StorageRouterClient._snapshots[self.vpool_guid][volume_id][snapshot_id]
 
     def empty_info(self, req_timeout_secs=None):

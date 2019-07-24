@@ -60,6 +60,10 @@ function show_help {
     echo "  * Custom Open vStorage modules:"
     echo "    - ovs <modulename> <arguments>               Execute a custom Open vStorage module in /opt/OpenvStorage/scripts/"
     echo ""
+    echo "  * Run automated local update:"
+    echo "    - ovs local_update alba                      Execute a local update of alba and its dependencies"
+    echo "    - ovs local_update volumedriver              Execute a local update of the volumedriver"
+    echo ""
 }
 
 if [ "$1" = "help" ] ; then
@@ -242,6 +246,22 @@ for entry in Configuration.list('$3', recursive=True):
 from ovs.extensions.generic.configuration import Configuration;
 if Configuration.exists('$3', raw=True):
     print Configuration.get('$3', raw=True)
+"""
+    else
+        show_help
+    fi
+elif [ "$1" = "local_update" ] ; then
+    if [ "$2" = "alba" ] ; then
+        python -c """
+from ovs.update import AlbaComponentUpdater
+from ovs.extensions.generic.system import System
+AlbaComponentUpdater.do_update(System.get_my_machine_id(), True)
+"""
+    elif [ "$2" = "volumedriver" ] ; then
+        python -c """
+from ovs.update import VolumeDriverUpdater
+from ovs.extensions.generic.system import System
+VolumeDriverUpdater.do_update(System.get_my_machine_id(), True)
 """
     else
         show_help
