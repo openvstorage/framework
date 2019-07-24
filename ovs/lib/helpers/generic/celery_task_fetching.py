@@ -1,3 +1,20 @@
+# Copyright (C) 2019 iNuron NV
+#
+# This file is part of Open vStorage Open Source Edition (OSE),
+# as available from
+#
+#      http://www.openvstorage.org and
+#      http://www.openvstorage.com.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+# as published by the Free Software Foundation, in version 3 as it comes
+# in the LICENSE.txt file of the Open vStorage OSE distribution.
+#
+# Open vStorage is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY of any kind.
+
+import inspect
 from ovs.celery_run import celery
 from ovs.constants.celery import CELERY_TASKS_LISTS_OUTPUT_PATH
 from ovs_extensions.constants.modules import BASE_OVS
@@ -67,20 +84,18 @@ class TaskFetcher(object):
 
             if celery_function_folder not in indented_dict:
                 indented_dict[celery_function_folder] = {}
-
-            indented_dict[celery_function_folder][celery_function_name] = docstring
+            indented_dict[celery_function_folder][celery_function_name] = inspect.cleandoc(docstring)
 
         # Then build markdown layout
         out = '## Tasks\n'
         for folder, celery_functions in sorted(indented_dict.iteritems()):
             out += '### {0}\n'.format(folder.capitalize())
             for function_name, function_docstring in sorted(celery_functions.iteritems()):
-                out += "#### {0}\n```{1}\n```\n".format(function_name, function_docstring)
+                out += "#### {0}\n```\n{1}\n```\n".format(function_name, function_docstring)
 
         if editor_input:
             out += '## Editor input\n'
             for editor_key, editor_value in editor_input.iteritems():
-                # To allign with the generated output, an additional tab is needed
-                out += "### {0}\n```\n\t{1}\n```\n".format(editor_key, editor_value)
+                out += "### {0}\n```{1}```\n".format(editor_key, editor_value)
         return out
 
