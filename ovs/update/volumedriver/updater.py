@@ -29,7 +29,7 @@ from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer, VDiskBalance
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.log_handler import LogHandler
+from ovs.extensions.generic.logger import Logger
 
 # noinspection PyUnreachableCode
 if False:
@@ -62,7 +62,7 @@ class VolumeDriverUpdater(ComponentUpdater):
     Responsible for updating the volumedriver of a single node
     """
 
-    logger = LogHandler.get('update', 'volumedriver')
+    logger = Logger('update-volumedriver')
 
     COMPONENT = 'volumedriver'
     # List with tuples. [(package_name, binary_name, binary_location, [service_prefix_0]]

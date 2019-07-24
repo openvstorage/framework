@@ -17,14 +17,14 @@
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs_extensions.update.alba_component_update import AlbaComponentUpdater as _AlbacomponentUpdater
-from ovs.log.log_handler import LogHandler
+from ovs.extensions.generic.logger import Logger
 
 
 class AlbaComponentUpdater(_AlbacomponentUpdater):
     """
     Implementation of abstract class to update alba
     """
-    logger = LogHandler.get('update', 'volumedriver')
+    logger = Logger('update-alba')
 
     @staticmethod
     def get_persistent_client():
