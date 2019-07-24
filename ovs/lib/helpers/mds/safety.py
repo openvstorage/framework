@@ -96,7 +96,7 @@ class SafetyEnsurer(MDSShared):
 
         self.metadata_backend_config_start = self.vdisk.info['metadata_backend_config']
         if self.vdisk.info['metadata_backend_config'] == {}:
-            raise RuntimeError('Configured MDS layout for vDisk {0} could not be retrieved}, cannot update MDS configuration'.format(self.vdisk.guid))
+            raise RuntimeError('Configured MDS layout for vDisk {0} could not be retrieved, cannot update MDS configuration'.format(self.vdisk.guid))
 
     def map_mds_services_by_socket(self):
         """

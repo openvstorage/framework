@@ -30,6 +30,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs_extensions.log.logger import Logger
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
+from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.mdsservice import MDSServiceController
 
 
@@ -1523,7 +1524,7 @@ class MDSServices(unittest.TestCase):
 
         vpool_1, vpool_2 = vpools
         runtime_hooks = {'before_execution': lambda: execution_event.wait(),
-                         'after_validation': lambda : validation_event.set()}
+                         'after_validation': lambda: validation_event.set()}
 
         # Running in a thread to simulate a direct invocation
         single_vpool_task = Thread(target=MDSServiceController.mds_checkup_single, args=(vpool_1.guid,), kwargs={'ensure_single_runtime_hooks': runtime_hooks})
@@ -1644,3 +1645,108 @@ class MDSServices(unittest.TestCase):
             else:
                 MDSServiceController.ensure_safety(vdisk_guid=vdisks[vdisk_id].guid, excluded_storagerouter_guids=[storagerouters[5].guid])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+
+    def test_ensure_safety_concurrency_different_vpool(self):
+        """
+        Test if the concurrency works
+        """
+        validation_event = Event()
+        execution_events = [Event(), Event()]
+
+        def wait_for_execute(event_to_set):
+            # type: (Event) -> None
+            event_to_set.set()
+            validation_event.wait()
+
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1, 2],
+             'storagerouters': [1, 2],
+             'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
+        )
+        mds_services = structure['mds_services']
+
+        vdisks = {}
+        for mds_service in mds_services.itervalues():
+            vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
+
+        self.assertTrue(len(vdisks) == 2, '2 VDisks should be created')
+        vdisk_1, vdisk_2 = vdisks.values()
+        event_1, event_2 = execution_events
+
+        kwargs_runtime_hooks_1 = {'ensure_single_runtime_hooks': {'before_execution': lambda: wait_for_execute(event_1)},
+                                  'ensure_single_timeout': 5}
+        kwargs_runtime_hooks_2 = {'ensure_single_runtime_hooks': {'before_execution': lambda: wait_for_execute(event_2)},
+                                  'ensure_single_timeout': 5}
+
+        # Both vdisks should be able to be processed
+        thread_1 = Thread(target=MDSServiceController.ensure_safety, args=(vdisk_1.guid,), kwargs=kwargs_runtime_hooks_1)
+        thread_1.start()
+        threads = [thread_1]
+
+        event_1.wait(5)
+
+        thread_2 = Thread(target=MDSServiceController.ensure_safety, args=(vdisk_2.guid,), kwargs=kwargs_runtime_hooks_2)
+        thread_2.start()
+
+        event_2.wait(5)
+
+        for event in execution_events:
+            self.assertTrue(event.is_set(), 'Both events should be set. No locking/discarding should occur')
+
+        validation_event.set()
+        for thread in threads:
+            thread.join()
+
+    def test_ensure_safety_concurrency_same_vpool(self):
+        """
+        Test if concurrency doesn't happen
+        """
+        validation_event = Event()
+        execution_events = [Event(), Event()]
+
+        def wait_for_execute(event_to_set):
+            # type: (Event) -> None
+            event_to_set.set()
+            validation_event.wait()
+
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
+        )
+        mds_services = structure['mds_services']
+
+        vdisks = {}
+        for mds_service in mds_services.itervalues():
+            vdisks.update(DalHelper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
+
+        self.assertTrue(len(vdisks) == 2, '2 VDisks should be created')
+        vdisk_1, vdisk_2 = vdisks.values()
+        event_1, event_2 = execution_events
+
+        kwargs_runtime_hooks_1 = {'ensure_single_runtime_hooks': {'before_execution': lambda: wait_for_execute(event_1)},
+                                  'ensure_single_timeout': 5}
+        kwargs_runtime_hooks_2 = {'ensure_single_runtime_hooks': {'before_execution': lambda: wait_for_execute(event_2)},
+                                  'ensure_single_timeout': 0.5}
+
+        # Both vdisks should be able to be processed
+        thread_1 = Thread(target=MDSServiceController.ensure_safety, args=(vdisk_1.guid,), kwargs=kwargs_runtime_hooks_1)
+        thread_1.start()
+        threads = [thread_1]
+
+        event_1.wait(5)
+
+        with self.assertRaises(EnsureSingleTimeoutReached) as context:
+            MDSServiceController.ensure_safety(vdisk_2.guid, **kwargs_runtime_hooks_2)
+
+        validation_event.set()
+        for index, event in enumerate(execution_events):
+            if index == 0:
+                self.assertTrue(event.is_set(), 'Only one event should be set. Locking/discarding should occur')
+            else:
+                self.assertFalse(event.is_set(), 'Only one event should be set. Locking/discarding should occur')
+
+        for thread in threads:
+            thread.join()
