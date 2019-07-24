@@ -48,6 +48,10 @@ if os.environ.get('RUNNING_UNITTESTS') == 'True':
 else:
     from api.backend.serializers.serializers import FullSerializer
 
+# noinspection PyUnreachableCode
+if False:
+    from typing import Union, Tuple, Type, Any, Dict
+
 
 def _find_request(args):
     """
@@ -116,7 +120,6 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
     :return: The wrapped function
     :rtype: callable
     """
-    logger = Logger('api')
     regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
     if validator is not None:
@@ -136,7 +139,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         """
         Validate the version and return the parsed and non parsed version passed in the request
         :param request: API request object
-        :type Request: Union[WSGIRequest, Request]
+        :type request: Union[WSGIRequest, Request]
         :return: The parsed and non parsed request
         :rtype: Tuple[int, str]
         :exception: HttpNotAcceptableException when the version is not within the supported versions of the api
@@ -152,7 +155,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             version = versions[1]
         version = int(version)
         if version < versions[0] or version > versions[1]:
-            raise HttpNotAcceptableException(
+            raise HttpUpgradeNeededException(
                 error_description='API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0],
                                                                                                       versions[1],
                                                                                                       version),
@@ -160,20 +163,19 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         return version, raw_version
 
     def build_new_kwargs(original_function, request, instance, version, raw_version, passed_kwargs):
-        # type: (callable, Union[WSGIRequest, Request], Generic[object_type], int, str, **any) -> Tuple[dict, dict]
+        # type: (callable, Union[WSGIRequest, Request], DataObject, int, str, **any) -> Tuple[dict, dict]
         """
         Convert all positional arguments to keyword arguments
         :param original_function: The orignally decorated function
         :type original_function: callable
         :param request: API request object
         :type request: Union[WSGIRequest, Request]
-        :param instance: Generic[object_type]
+        :param instance: The data object instance to inject
+        :type instance: DataObject
         :param version: Parsed API version
         :type version: int
         :param raw_version: Unparsed API version
         :type raw_version: str
-        :param passed_args: Args passed to the original function
-        :type passed_args: tuple
         :param passed_kwargs: Kwargs passed to the original function
         :type passed_kwargs: dict
         :return: The kwargs for the original function and the kwargs for the validator
@@ -221,7 +223,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         return kwargs, validator_kwargs
 
     def _try_convert_bool(value):
-        # type: (any) -> Union[bool, Type[value]]
+        # type: (any) -> Union[bool, Type[Any]]
         """
         Convert strings to boolean
         No idea why we'd ever do this but I'd prefer to keep everything running at the moment
@@ -237,7 +239,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         return value
 
     def _try_parse(value):
-        # type: (any) -> Union[bool, Type[value]]
+        # type: (any) -> Union[bool, Type[Any]]
         """
         Tries to parse a value to a pythonic value
         :param value: Value to be parsed
@@ -733,7 +735,7 @@ def extended_action(methods=None, detail=None, url_path=None, url_name=None, **k
     methods = ['get'] if (methods is None) else methods
     methods = [method.lower() for method in methods]
 
-    assert detail is not None, ( "@action() missing required argument: 'detail'" )
+    assert detail is not None, "@action() missing required argument: 'detail'"
 
     def decorator(func):
         func.bind_to_methods = methods
@@ -743,4 +745,3 @@ def extended_action(methods=None, detail=None, url_path=None, url_name=None, **k
         func.kwargs = kwargs
         return func
     return decorator
-
