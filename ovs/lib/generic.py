@@ -23,12 +23,19 @@ import copy
 import time
 import logging
 from time import mktime
+from celery import group
+from celery.utils import uuid
+from celery.result import GroupResult
 from datetime import datetime, timedelta
 from threading import Thread
 from ovs_extensions.constants import is_unittest_mode
 from ovs_extensions.constants.config import ARAKOON_NAME, ARAKOON_NAME_UNITTEST
+from ovs.constants.vdisk import SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.servicelist import ServiceList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakooninstaller import ArakoonClusterConfig
@@ -78,8 +85,26 @@ class GenericController(object):
     @staticmethod
     @ovs_task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'), ensure_single_info={'mode': 'DEFAULT'})
     def delete_snapshots(timestamp=None):
+        # type: (float) -> GroupResult
         """
-        Delete snapshots & scrubbing policy
+        Delete snapshots based on the retention policy
+        Offloads concurrency to celery
+        Returns a GroupResult. Waiting for the result can be done using result.get()
+        :param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
+        :type timestamp: float
+        :return: The GroupResult
+        :rtype: GroupResult
+        """
+        # The result cannot be fetched in this task
+        group_id = uuid()
+        return group(GenericController.delete_snapshots_storagedriver.s(storagedriver.guid, timestamp, group_id)
+                     for storagedriver in StorageDriverList.get_storagedrivers()).apply_async(task_id=group_id)
+
+    @staticmethod
+    @ovs_task(name='ovs.generic.delete_snapshots_storagedriver', ensure_single_info={'mode': 'DEDUPED'})
+    def delete_snapshots_storagedriver(storagedriver_guid, timestamp=None, group_id=None):
+        """
+        Delete snapshots per storagedriver & scrubbing policy
 
         Implemented delete snapshot policy:
         < 1d | 1d bucket | 1 | best of bucket   | 1d
@@ -87,12 +112,26 @@ class GenericController(object):
         < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
         > 1m | delete
 
+        :param storagedriver_guid: Guid of the StorageDriver to remove snapshots on
+        :type storagedriver_guid: str
         :param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
         :type timestamp: float
-
+        :param group_id: ID of the group task. Used to identify which snapshot deletes were called during the scheduled task
+        :type group_id: str
         :return: None
         """
-        GenericController._logger.info('Delete snapshots started')
+        if group_id:
+            log_id = 'Group job {} - '.format(group_id)
+        else:
+            log_id = ''
+
+        def format_log(message):
+            return '{}{}'.format(log_id, message)
+
+        GenericController._logger.info(format_log('Delete snapshots started for StorageDriver {0}'.format(storagedriver_guid)))
+
+        storagedriver = StorageDriver(storagedriver_guid)
+        exceptions = []
 
         day = timedelta(1)
         week = day * 7
@@ -132,27 +171,31 @@ class GenericController(object):
 
         # Place all snapshots in bucket_chains
         bucket_chains = []
-        for vdisk in VDiskList.get_vdisks():
-            vdisk.invalidate_dynamics('being_scrubbed')
-            if vdisk.being_scrubbed:
-                continue
+        for vdisk_guid in storagedriver.vdisks_guids:
+            try:
+                vdisk = VDisk(vdisk_guid)
+                vdisk.invalidate_dynamics('being_scrubbed')
+                if vdisk.being_scrubbed:
+                    continue
 
-            if vdisk.info['object_type'] in ['BASE']:
-                bucket_chain = copy.deepcopy(buckets)
-                for snapshot in vdisk.snapshots:
-                    if snapshot.get('is_sticky') is True:
-                        continue
-                    if snapshot['guid'] in parent_snapshots:
-                        GenericController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot['guid']))
-                        continue
-                    timestamp = int(snapshot['timestamp'])
-                    for bucket in bucket_chain:
-                        if bucket['start'] >= timestamp > bucket['end']:
-                            bucket['snapshots'].append({'timestamp': timestamp,
-                                                        'snapshot_id': snapshot['guid'],
-                                                        'vdisk_guid': vdisk.guid,
-                                                        'is_consistent': snapshot['is_consistent']})
-                bucket_chains.append(bucket_chain)
+                if vdisk.info['object_type'] in ['BASE']:
+                    bucket_chain = copy.deepcopy(buckets)
+                    for snapshot in vdisk.snapshots:
+                        if snapshot.get('is_sticky') is True:
+                            continue
+                        if snapshot['guid'] in parent_snapshots:
+                            GenericController._logger.info(format_log('Not deleting snapshot {0} because it has clones'.format(snapshot['guid'])))
+                            continue
+                        timestamp = int(snapshot['timestamp'])
+                        for bucket in bucket_chain:
+                            if bucket['start'] >= timestamp > bucket['end']:
+                                bucket['snapshots'].append({'timestamp': timestamp,
+                                                            'snapshot_id': snapshot['guid'],
+                                                            'vdisk_guid': vdisk.guid,
+                                                            'is_consistent': snapshot['is_consistent']})
+                    bucket_chains.append(bucket_chain)
+            except Exception as ex:
+                exceptions.append(ex)
 
         # Clean out the snapshot bucket_chains, we delete the snapshots we want to keep
         # And we'll remove all snapshots that remain in the buckets
@@ -187,11 +230,25 @@ class GenericController(object):
 
         # Delete obsolete snapshots
         for bucket_chain in bucket_chains:
-            for bucket in bucket_chain:
-                for snapshot in bucket['snapshots']:
-                    VDiskController.delete_snapshot(vdisk_guid=snapshot['vdisk_guid'],
-                                                    snapshot_id=snapshot['snapshot_id'])
-        GenericController._logger.info('Delete snapshots finished')
+            # Each bucket chain represents one vdisk's snapshots
+            try:
+                for bucket in bucket_chain:
+                    for snapshot in bucket['snapshots']:
+                        VDiskController.delete_snapshot(vdisk_guid=snapshot['vdisk_guid'],
+                                                        snapshot_id=snapshot['snapshot_id'])
+            except RuntimeError as ex:
+                vdisk_guid = next((snapshot['vdisk_guid'] for bucket in bucket_chain for snapshot in bucket['snapshots']), '')
+                vdisk_id_log = ''
+                if vdisk_guid:
+                    vdisk_id_log = ' for VDisk with guid {}'.format(vdisk_guid)
+                if SCRUB_VDISK_EXCEPTION_MESSAGE in ex.message:
+                    GenericController._logger.warning(format_log('Being scrubbed exception occurred while deleting snapshots{}'.format(vdisk_id_log)))
+                else:
+                    GenericController._logger.exception(format_log('Exception occurred while deleting snapshots{}'.format(vdisk_id_log)))
+                    exceptions.append(ex)
+        if exceptions:
+            raise RuntimeError('Exceptions occurred while deleting snapshots: \n- {}'.format('\n- '.join((str(ex) for ex in exceptions))))
+        GenericController._logger.info(format_log('Delete snapshots finished for StorageDriver {0}'))
 
     @staticmethod
     @ovs_task(name='ovs.generic.execute_scrub', schedule=Schedule(minute='0', hour='3'), ensure_single_info={'mode': 'DEDUPED'})

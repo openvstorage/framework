@@ -1,4 +1,4 @@
-# Copyright (C) 2018 iNuron NV
+# Copyright (C) 2019 iNuron NV
 #
 # This file is part of Open vStorage Open Source Edition (OSE),
 # as available from
@@ -14,13 +14,14 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-"""
-VDisk Constants module. Contains constants related to vdisks
-"""
+import os
 
-# General
-LOCK_NAMESPACE = 'ovs_locks'
+VPOOL_UPDATE_KEY = os.path.join(os.path.sep, 'ovs', 'volumedriver', 'update', 'storagerouter')
 
-# Scrub related
-SCRUB_VDISK_LOCK = '{0}_{{0}}'.format(LOCK_NAMESPACE)  # Second format is the vdisk guid
-SCRUB_VDISK_EXCEPTION_MESSAGE = 'VDisk is being scrubbed. Unable to remove snapshots at this time'
+STORAGEDRIVER_SERVICE_BASE = 'ovs-volumedriver'
+
+PACKAGES_OSE = ['volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']
+PACKAGES_EE = ['volumedriver-ee-base', 'volumedriver-ee-server']
+
+VOLUMEDRIVER_BIN_PATH = os.path.join(os.path.sep, 'usr', 'bin', 'volumedriver_fs.sh')
+VOLUMEDRIVER_CMD_NAME = 'volumedriver_fs'

@@ -27,6 +27,7 @@ import pickle
 import random
 import logging
 from ovs.constants.storagedriver import VOLDRV_DTL_MANUAL_MODE, VOLDRV_DTL_AUTOMATIC_MODE, CACHE_BLOCK, CACHE_FRAGMENT
+from ovs.constants.vdisk import SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
@@ -609,7 +610,7 @@ class VDiskController(object):
         try:
             vdisk = VDisk(vdisk_guid)
             if vdisk.being_scrubbed:
-                msg = 'VDisk is being scrubbed. Unable to remove snapshots at this time'
+                msg = SCRUB_VDISK_EXCEPTION_MESSAGE
                 vdisk_results.update({'success': False,
                                       'error': msg})
                 return vdisk_results
