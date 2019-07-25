@@ -24,7 +24,7 @@ Our django stack is located in the `webapps.api` folder. We only use a subset of
  
  This is hammering Django just hard enough to make it fit our stack
  A Better idea would have been to use flask from the start, as this provides way more liberty in implementation and doesn't rely on an ORM.
- Work has been done to migrate from DFR (Django rest-framework) towards flask, since our current DFR version is harder to control and customize, especially when also upgrading to python 3.x.
+ Work has been done to migrate from DRF (Django rest-framework) towards flask, since our current DRF version is harder to control and customize, especially when also upgrading to python 3.x.
  This transition has been laborous and is unfinished.
 ### Default Django files and contents
 - wsgi.py
