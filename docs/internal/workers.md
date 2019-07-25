@@ -18,7 +18,7 @@ the same ways to trigger the [task](https://docs.celeryproject.org/en/latest/use
 You can execute a task in two ways: inline and through workers.
 
 The Framework configures Celery to use rabbitmq as messagebus and arakoon as resultbackend.
-The [configuration file](ovs/celery_run.py) is used by the `ovs-worker` services
+The [configuration file](../../ovs/celery_run.py) is used by the `ovs-worker` services
 
 #### Queues
 A task is serialized onto a queue within rabbitmq. The default queue it gets serialized onto is `ovs_generic` 
@@ -66,4 +66,4 @@ async_result = do_example.apply_async(routing_key='masters')
 Certain ovs tasks are scheduled to run every xyz minutes. We offload the scheduling to celery through [celery.beat](https://docs.celeryproject.org/en/latest/userguide/periodic-tasks.html) too.
 
 The process responsible for taking up the scheduling is the `ovs-scheduled-tasks`. As of now it runs a [custom scheduler](https://github.com/openvstorage/framework/blob/develop/ovs/celery_beat.py) that can load in all `@ovs_tasks` decorated functions.
-The scheduling can be [configured through configuration](docs/scheduledtasks.md).
+The scheduling can be [configured through configuration](../scheduledtasks.md).
