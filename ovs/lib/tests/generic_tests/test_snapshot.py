@@ -21,9 +21,11 @@ import time
 import datetime
 import unittest
 from ovs_extensions.constants import is_running_on_travis
+from ovs.constants.vdisk import SCRUB_VDISK_EXCEPTION_MESSAGE
 from ovs.dal.tests.helpers import DalHelper
 from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
+from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 
 
 class SnapshotTestCase(unittest.TestCase):
@@ -35,6 +37,7 @@ class SnapshotTestCase(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
+        StorageRouterClient.delete_snapshot_callbacks = {}
         self.volatile, self.persistent = DalHelper.setup()
 
     def tearDown(self):
@@ -92,6 +95,7 @@ class SnapshotTestCase(unittest.TestCase):
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         base = datetime.datetime.now().date()
@@ -121,74 +125,284 @@ class SnapshotTestCase(unittest.TestCase):
                                                           'is_consistent': True,
                                                           'timestamp': str(timestamp)})
             base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * 2)
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
         self.assertIn(base_snapshot_guid, vdisk_1.snapshot_ids, 'Snapshot was deleted while there are still clones of it')
 
-    def test_different_snapshot_flags(self):
+    def test_snapshot_automatic_consistent(self):
         """
-        Tests the GenericController.delete_snapshots() call, but with different snapshot flags
-            Scenario 1: is_automatic: True, is_consistent: True --> Automatically created consistent snapshots should be deleted
-            Scenario 2: is_automatic: True, is_consistent: False --> Automatically created non-consistent snapshots should be deleted
-            Scenario 3: is_automatic: False, is_consistent: True --> Manually created consistent snapshots should be deleted
-            Scenario 4: is_automatic: False, is_consistent: False --> Manually created non-consistent snapshots should be deleted
-            Scenario 5: is_sticky: True --> Sticky snapshots of any kind should never be deleted (Only possible to delete manually)
+        is_automatic: True, is_consistent: True --> Automatically created consistent snapshots should be deleted
         """
         minute = 60
         hour = minute * 60
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        base = datetime.datetime.now().date()
+        vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
 
-        for scenario in range(5):
-            structure = DalHelper.build_dal_structure(
-                {'vpools': [1],
-                 'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
-                 'mds_services': [(1, 1)],
-                 'storagerouters': [1],
-                 'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
-            )
-            base = datetime.datetime.now().date()
-            vdisk_1 = structure['vdisks'][1]
-            is_sticky = False
-            sticky_hours = []
-            if scenario % 2 == 0:
-                label = 'c'
-                additional_time = minute * 30
-                consistent_hours = [2]
-                inconsistent_hours = []
-            else:
-                label = 'i'
-                additional_time = 0
-                consistent_hours = []
-                inconsistent_hours = [2]
+        label = 'c'
+        # Extra time to add to the hourly timestamps
+        additional_time = minute * 30
+        # Hours to create a snapshot on
+        sticky_hours = []
+        consistent_hours = [2]
+        inconsistent_hours = []
+        # Snapshot details
+        is_sticky = len(sticky_hours) > 0
+        is_consistent = len(consistent_hours) > 0
+        is_automatic = True
 
-            if scenario == 4:
-                is_sticky = True
-                sticky_hours = consistent_hours
+        for day in xrange(35):
+            base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * day)
+            self._print_message('')
+            self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
 
-            for day in xrange(35):
-                base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * day)
-                self._print_message('')
-                self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
+            self._print_message('- Deleting snapshots')
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
 
-                self._print_message('- Deleting snapshots')
-                GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            self._validate(vdisk=vdisk_1,
+                           current_day=day,
+                           base_date=base,
+                           sticky_hours=sticky_hours,
+                           consistent_hours=consistent_hours,
+                           inconsistent_hours=inconsistent_hours)
 
-                self._validate(vdisk=vdisk_1,
-                               current_day=day,
-                               base_date=base,
-                               sticky_hours=sticky_hours,
-                               consistent_hours=consistent_hours,
-                               inconsistent_hours=inconsistent_hours)
+            self._print_message('- Creating snapshots')
+            for x in consistent_hours + inconsistent_hours:
+                timestamp = base_timestamp + (hour * x) + additional_time
+                VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
+                                                metadata={'label': 'ss_{0}_{1}:00'.format(label, x),
+                                                          'is_sticky': is_sticky,
+                                                          'timestamp': str(timestamp),
+                                                          'is_automatic': is_automatic,
+                                                          'is_consistent': is_consistent})
 
-                self._print_message('- Creating snapshots')
-                for x in consistent_hours + inconsistent_hours:
-                    timestamp = base_timestamp + (hour * x) + additional_time
-                    VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
-                                                    metadata={'label': 'ss_{0}_{1}:00'.format(label, x),
-                                                              'is_sticky': is_sticky,
-                                                              'timestamp': str(timestamp),
-                                                              'is_automatic': scenario in [0, 1],
-                                                              'is_consistent': len(consistent_hours) > 0})
-            self.persistent._clean()
-            self.volatile._clean()
+    def test_snapshot_automatic_not_consistent(self):
+        """
+        is_automatic: True, is_consistent: False --> Automatically created non-consistent snapshots should be deleted
+        """
+        minute = 60
+        hour = minute * 60
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        base = datetime.datetime.now().date()
+        vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
+
+        label = 'i'
+        # Extra time to add to the hourly timestamps
+        additional_time = 0
+        # Hours to create a snapshot on
+        sticky_hours = []
+        consistent_hours = []
+        inconsistent_hours = [2]
+        # Snapshot details
+        is_sticky = len(sticky_hours) > 0
+        is_consistent = len(consistent_hours) > 0
+        is_automatic = True
+
+        for day in xrange(35):
+            base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * day)
+            self._print_message('')
+            self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
+
+            self._print_message('- Deleting snapshots')
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
+
+            self._validate(vdisk=vdisk_1,
+                           current_day=day,
+                           base_date=base,
+                           sticky_hours=sticky_hours,
+                           consistent_hours=consistent_hours,
+                           inconsistent_hours=inconsistent_hours)
+
+            self._print_message('- Creating snapshots')
+            for x in consistent_hours + inconsistent_hours:
+                timestamp = base_timestamp + (hour * x) + additional_time
+                VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
+                                                metadata={'label': 'ss_{0}_{1}:00'.format(label, x),
+                                                          'is_sticky': is_sticky,
+                                                          'timestamp': str(timestamp),
+                                                          'is_automatic': is_automatic,
+                                                          'is_consistent': is_consistent})
+
+    def test_snapshot_non_automatic_consistent(self):
+        """
+        is_automatic: False, is_consistent: True --> Manually created consistent snapshots should be deleted
+        """
+        minute = 60
+        hour = minute * 60
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        base = datetime.datetime.now().date()
+        vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
+
+        label = 'c'
+        # Extra time to add to the hourly timestamps
+        additional_time = minute * 30
+        # Hours to create a snapshot on
+        sticky_hours = []
+        consistent_hours = [2]
+        inconsistent_hours = []
+        # Snapshot details
+        is_sticky = len(sticky_hours) > 0
+        is_consistent = len(consistent_hours) > 0
+        is_automatic = False
+
+        for day in xrange(35):
+            base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * day)
+            self._print_message('')
+            self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
+
+            self._print_message('- Deleting snapshots')
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
+
+            self._validate(vdisk=vdisk_1,
+                           current_day=day,
+                           base_date=base,
+                           sticky_hours=sticky_hours,
+                           consistent_hours=consistent_hours,
+                           inconsistent_hours=inconsistent_hours)
+
+            self._print_message('- Creating snapshots')
+            for x in consistent_hours + inconsistent_hours:
+                timestamp = base_timestamp + (hour * x) + additional_time
+                VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
+                                                metadata={'label': 'ss_{0}_{1}:00'.format(label, x),
+                                                          'is_sticky': is_sticky,
+                                                          'timestamp': str(timestamp),
+                                                          'is_automatic': is_automatic,
+                                                          'is_consistent': is_consistent})
+
+    def test_snapshot_not_automatic_not_consistent(self):
+        """
+        is_automatic: False, is_consistent: False --> Manually created non-consistent snapshots should be deleted
+        """
+        minute = 60
+        hour = minute * 60
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        base = datetime.datetime.now().date()
+        vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
+
+        label = 'i'
+        # Extra time to add to the hourly timestamps
+        additional_time = 0
+        # Hours to create a snapshot on
+        sticky_hours = []
+        consistent_hours = []
+        inconsistent_hours = [2]
+        # Snapshot details
+        is_sticky = len(sticky_hours) > 0
+        is_consistent = len(consistent_hours) > 0
+        is_automatic = False
+
+        for day in xrange(35):
+            base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * day)
+            self._print_message('')
+            self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
+
+            self._print_message('- Deleting snapshots')
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
+
+            self._validate(vdisk=vdisk_1,
+                           current_day=day,
+                           base_date=base,
+                           sticky_hours=sticky_hours,
+                           consistent_hours=consistent_hours,
+                           inconsistent_hours=inconsistent_hours)
+
+            self._print_message('- Creating snapshots')
+            for x in consistent_hours + inconsistent_hours:
+                timestamp = base_timestamp + (hour * x) + additional_time
+                VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
+                                                metadata={'label': 'ss_{0}_{1}:00'.format(label, x),
+                                                          'is_sticky': is_sticky,
+                                                          'timestamp': str(timestamp),
+                                                          'is_automatic': is_automatic,
+                                                          'is_consistent': is_consistent})
+
+    def test_snapshot_sticky(self):
+        """
+        is_sticky: True --> Sticky snapshots of any kind should never be deleted (Only possible to delete manually)
+        """
+        minute = 60
+        hour = minute * 60
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        base = datetime.datetime.now().date()
+        vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
+
+        label = 'c'
+        # Extra time to add to the hourly timestamps
+        additional_time = minute * 30
+        # Hours to create a snapshot on
+        sticky_hours = [2]
+        consistent_hours = [2]
+        inconsistent_hours = []
+        # Snapshot details
+        is_sticky = len(sticky_hours) > 0
+        is_consistent = len(consistent_hours) > 0
+        is_automatic = False
+
+        for day in xrange(35):
+            base_timestamp = self._make_timestamp(base, datetime.timedelta(1) * day)
+            self._print_message('')
+            self._print_message('Day cycle: {0}: {1}'.format(day, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
+
+            self._print_message('- Deleting snapshots')
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
+
+            self._validate(vdisk=vdisk_1,
+                           current_day=day,
+                           base_date=base,
+                           sticky_hours=sticky_hours,
+                           consistent_hours=consistent_hours,
+                           inconsistent_hours=inconsistent_hours)
+
+            self._print_message('- Creating snapshots')
+            for x in consistent_hours + inconsistent_hours:
+                timestamp = base_timestamp + (hour * x) + additional_time
+                VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
+                                                metadata={'label': 'ss_{0}_{1}:00'.format(label, x),
+                                                          'is_sticky': is_sticky,
+                                                          'timestamp': str(timestamp),
+                                                          'is_automatic': is_automatic,
+                                                          'is_consistent': is_consistent})
 
     def test_happypath(self):
         """
@@ -203,6 +417,7 @@ class SnapshotTestCase(unittest.TestCase):
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
         )
         vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
@@ -221,7 +436,8 @@ class SnapshotTestCase(unittest.TestCase):
 
             # At the start of the day, delete snapshot policy runs at 00:30
             self._print_message('- Deleting snapshots')
-            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid,
+                                                             timestamp=base_timestamp + (minute * 30))
 
             # Validate snapshots
             self._print_message('- Validating snapshots')
@@ -248,6 +464,71 @@ class SnapshotTestCase(unittest.TestCase):
                                                     metadata={'label': 'ss_c_{0}:30'.format(str(h)),
                                                               'is_consistent': True,
                                                               'timestamp': str(ts)})
+
+    def test_exception_handling(self):
+        """
+        Test if the scheduled job can handle exceptions
+        """
+        def raise_an_exception(*args, **kwargs):
+            raise RuntimeError('Emulated snapshot delete error')
+
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1), (2, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+
+        vdisk_1, vdisk_2 = structure['vdisks'].values()
+        storagedriver_1 = structure['storagedrivers'][1]
+
+        vdisks = [vdisk_1, vdisk_2]
+
+        for vdisk in vdisks:
+            [dynamic for dynamic in vdisk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
+            for i in xrange(0, 2):
+                metadata = {'label': str(i),
+                            'is_consistent': False,
+                            'is_sticky': False,
+                            'timestamp': str((int(time.time() - datetime.timedelta(2).total_seconds() - i)))}
+                snapshot_id = VDiskController.create_snapshot(vdisk.guid, metadata)
+                if vdisk == vdisk_1:
+                    StorageRouterClient.delete_snapshot_callbacks[vdisk.volume_id] = {snapshot_id: raise_an_exception}
+        with self.assertRaises(RuntimeError):
+            GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid)
+        self.assertEqual(1, len(vdisk_2.snapshot_ids), 'One snapshot should be removed for vdisk 2')
+        self.assertEqual(2, len(vdisk_1.snapshot_ids), 'No snapshots should be removed for vdisk 1')
+
+    def test_scrubbing_exception_handling(self):
+        """
+        Test if the scheduled job can handle scrub related exceptions
+        """
+        def raise_an_exception(*args, **kwargs):
+            raise RuntimeError(SCRUB_VDISK_EXCEPTION_MESSAGE)
+
+        structure = DalHelper.build_dal_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <storagerouter_id>)
+        )
+        vdisk_1 = structure['vdisks'][1]
+        storagedriver_1 = structure['storagedrivers'][1]
+
+        [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
+
+        for i in xrange(0, 2):
+            metadata = {'label': str(i),
+                        'is_consistent': False,
+                        'is_sticky': False,
+                        'timestamp': str((int(time.time() - datetime.timedelta(2).total_seconds() - i)))}
+            snapshot_id = VDiskController.create_snapshot(vdisk_1.guid, metadata)
+            StorageRouterClient.delete_snapshot_callbacks[vdisk_1.volume_id] = {snapshot_id: raise_an_exception}
+
+        GenericController.delete_snapshots_storagedriver(storagedriver_guid=storagedriver_1.guid)
+        self.assertEqual(2, len(vdisk_1.snapshot_ids), 'No snapshots should be removed for vdisk 1')
 
     ##################
     # HELPER METHODS #

@@ -34,6 +34,7 @@ from .services import framework_start, framework_stop
 from .update import update_command
 from .rollback import rollback_command
 from .unittesting import unittest_command
+from .local_update import local_update_group
 from ovs_extensions.cli import OVSCLI
 from IPython import embed
 
@@ -60,6 +61,7 @@ groups = [setup_group,
           monitor_group,
           unittest_command,
           framework_start, framework_stop,
-          collect_logs, version_command]
+          collect_logs, version_command,
+          local_update_group]
 for group in groups:
     ovs.add_command(group)
