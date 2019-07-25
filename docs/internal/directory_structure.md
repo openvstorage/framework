@@ -6,6 +6,8 @@ Contains metadata for the Frameworkt-tools packager to work it's magic.
 The packaging folder exposes the different distros and their control files.
 
 The settings.json file contains metadata about the packaging process. The source_contents value is used for the tar command to compress the files.
+
+The packager can be found [here](https://github.com/openvstorage/framework-tools)
 ## Scripts
 Contains everything that is a `.sh` file or as script that needs to be run once.
 
