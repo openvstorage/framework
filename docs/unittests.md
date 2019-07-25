@@ -137,6 +137,13 @@ OK
     - SUCCESS: 9 / 9 (100.00 %)
 ```
 
-### Writing
+### Flaws
+The way the Framework handles unittesting is a bit flawed.
+The environment variable is set by the the code which lists the tests. This way we weave in `mocked` instances of certain implementations.
 
-To be documented
+However due to the nature of loading in modules and thus compiling them at runtime, we could end up with real implementation as opposed to mocked ones.
+
+We try to work around these issues by 
+- Substituting clients (like in Configuration with its _passthrough)
+- Offloading to factory patterns (like packagefactory/servicefactory)
+

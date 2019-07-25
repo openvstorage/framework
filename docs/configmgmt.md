@@ -94,3 +94,24 @@ $clustername/metadata = {"internal": True|False,
                          "in_use": True|False}
 $clustername/config = "$raw_arakoon_config_format"
 ```
+
+## Under the hood
+### Arakoon
+As of now, only [arakoon](https://github.com/openvstorage/arakoon) is implemented as backend for persistent storage.
+
+### Structure
+The [main Configuration class](https://github.com/openvstorage/framework-extensions/blob/develop/src/generic/configuration/configuration.py) contains a small number of public functions.
+
+All functions call the _passthrough to offload the implementation to one of the underlying implementation classes.
+
+There is an [interface for these implementation classes](https://github.com/openvstorage/framework-extensions/blob/develop/src/generic/configuration/clients/base.py) available should you wish to plug in a different configuration store. 
+
+### Passthrough
+The passthrough function will dynamically call the implementation class its associated function.
+
+The main reason for the passthrough method is to:
+- Dynamically switch between stores: the current Framework unittesting mindset is flawed. A number of things are checked at 
+runtime but before the environment variable is set, classes can already import the Configuration class, thus compiling it down with the non-mocked client
+- Keep the Configuration statically accessible: mainly to keep legacy alive. The Configuration was statically approached from the start,
+ switching it over the to factory pattern would be too troublesome
+
