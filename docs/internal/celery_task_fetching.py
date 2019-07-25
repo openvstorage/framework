@@ -42,6 +42,9 @@ class TaskFetcher(object):
         :type editor_input: Dict[str, str]
         :return: Dict
         """
+        # Default content of editor_input
+        editor_input['ovs.storagerouter.ping'] = 'Called by a cronjob which is placed under/etc/cron.d/openvstorage-core on install of the openvstorage - core package'
+
         filepath = filepath or Configuration.get(CELERY_TASKS_LISTS_OUTPUT_PATH, default='/tmp/celery_task_list.md')
         celery_tasks = cls._fetch_celery_tasks()
         if to_md:
@@ -94,6 +97,12 @@ class TaskFetcher(object):
                 indented_dict[celery_function_folder] = {}
             indented_dict[celery_function_folder][celery_function_name] = inspect.cleandoc(docstring)
 
+            # Check if special remarks are placed for this ovs task
+            if editor_input and celery_key in editor_input.keys():
+                current_docstring = indented_dict[celery_function_folder][celery_function_name]
+                current_docstring += '\n\nEditor input:\n{0}'.format(editor_input[celery_key])
+                indented_dict[celery_function_folder][celery_function_name] = current_docstring
+
         # Then build markdown layout
         out = '## Tasks\n'
         for folder, celery_functions in sorted(indented_dict.iteritems()):
@@ -101,8 +110,4 @@ class TaskFetcher(object):
             for function_name, function_docstring in sorted(celery_functions.iteritems()):
                 out += "#### {0}\n```\n{1}\n```\n".format(function_name, function_docstring)
 
-        if editor_input:
-            out += '## Editor input\n'
-            for editor_key, editor_value in editor_input.iteritems():
-                out += "### {0}\n```{1}```\n".format(editor_key, editor_value)
         return out
