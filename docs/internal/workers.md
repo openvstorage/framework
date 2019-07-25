@@ -61,3 +61,8 @@ async_result = do_example.delay()
 async_result = do_example.apply_async(routing_key='masters')
 
 ```
+
+#### Scheduling
+Certain ovs tasks are scheduled to run every xyz minutes. We offload the scheduling to celery through [celery.beat](https://docs.celeryproject.org/en/latest/userguide/periodic-tasks.html) too.
+
+The process responsible for taking up the scheduling is the `ovs-scheduled-tasks`. As of now it runs a [custom scheduler](https://github.com/openvstorage/framework/blob/develop/ovs/celery_beat.py) that can load in all `@ovs_tasks` decorated functions.
