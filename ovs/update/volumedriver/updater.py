@@ -266,7 +266,7 @@ class VolumeDriverUpdater(ComponentUpdater):
                         task.revoke()
                         revoked_tasks.append(task)
                 if revoked_tasks:
-                    cls.logger.warning('Revoked migration tasks: {}'.format(', '.join(revoked_tasks)))
+                    cls.logger.warning('Revoked migration tasks: {}'.format(', '.join(t.id for t in revoked_tasks)))
                 cls.logger.warning('Waiting for the execution on the running migrations')
                 _ = async_result.get()
         cls.logger.info("MDS migration finished")
