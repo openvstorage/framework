@@ -20,19 +20,31 @@ from ovs.constants.celery import CELERY_TASKS_LISTS_OUTPUT_PATH
 from ovs_extensions.constants.modules import BASE_OVS
 from ovs.extensions.generic.configuration import Configuration
 
+# noinspection PyUnreachableCode
+if False:
+    from typing import Optional, Dict
+
+
 class TaskFetcher(object):
 
     @classmethod
     def fetch_celery(cls, to_md=False, filepath=None, editor_input=None):
-        # type: (Optional[bool], Optional[str]) -> Dict[str, str]
+        # type: (Optional[bool], Optional[str], Optional[Dict[str, str]]) -> Dict[str, str]
         """
         This will call celery.tasks to list all currently implemented celerytasks, and return them as a dict. E.g.
             {celery_task_1: docstring of this task}
         :param to_md: will write to csv file if put on True. This csv output location will be located in the parameter filepath
+        :type to_md: bool
         :param filepath: filepath to write csv file to. Will first check if a filepath is provided in the configmanagement under /celery/tasks_list
                                                         If no path is provided there, will write csv file to /tmp/celery_task_list.csv
+        :type filepath: str
+        :param editor_input: Key value with task names as keys and the remarks as values
+        :type editor_input: Dict[str, str]
         :return: Dict
         """
+        # Default content of editor_input
+        editor_input['ovs.storagerouter.ping'] = 'Called by a cronjob which is placed under/etc/cron.d/openvstorage-core on install of the openvstorage - core package'
+
         filepath = filepath or Configuration.get(CELERY_TASKS_LISTS_OUTPUT_PATH, default='/tmp/celery_task_list.md')
         celery_tasks = cls._fetch_celery_tasks()
         if to_md:
@@ -46,10 +58,9 @@ class TaskFetcher(object):
         celery.loader.import_default_modules()
         return dict([(task, decorated_fun_task.__doc__) for task, decorated_fun_task in celery.tasks.iteritems() if task.startswith(BASE_OVS)])
 
-
     @classmethod
     def dict_to_markdown(cls, celery_tasks, editor_input=None):
-        # type: (dict[str, str], Optional[dict[str, str]]) -> str
+        # type: (Dict[str, str], Optional[Dict[str, str]]) -> str
         """
         Input:
         {ovs.key1.name1: docstring,
@@ -86,6 +97,12 @@ class TaskFetcher(object):
                 indented_dict[celery_function_folder] = {}
             indented_dict[celery_function_folder][celery_function_name] = inspect.cleandoc(docstring)
 
+            # Check if special remarks are placed for this ovs task
+            if editor_input and celery_key in editor_input.keys():
+                current_docstring = indented_dict[celery_function_folder][celery_function_name]
+                current_docstring += '\n\nEditor input:\n{0}'.format(editor_input[celery_key])
+                indented_dict[celery_function_folder][celery_function_name] = current_docstring
+
         # Then build markdown layout
         out = '## Tasks\n'
         for folder, celery_functions in sorted(indented_dict.iteritems()):
@@ -93,9 +110,4 @@ class TaskFetcher(object):
             for function_name, function_docstring in sorted(celery_functions.iteritems()):
                 out += "#### {0}\n```\n{1}\n```\n".format(function_name, function_docstring)
 
-        if editor_input:
-            out += '## Editor input\n'
-            for editor_key, editor_value in editor_input.iteritems():
-                out += "### {0}\n```{1}```\n".format(editor_key, editor_value)
         return out
-

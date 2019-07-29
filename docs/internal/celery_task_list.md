@@ -16,7 +16,17 @@ Collapse Arakoon's Tlogs
 ```
 #### delete_snapshots
 ```
-Delete snapshots & scrubbing policy
+Delete snapshots based on the retention policy
+Offloads concurrency to celery
+Returns a GroupResult. Waiting for the result can be done using result.get()
+:param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
+:type timestamp: float
+:return: The GroupResult
+:rtype: GroupResult
+```
+#### delete_snapshots_storagedriver
+```
+Delete snapshots per storagedriver & scrubbing policy
 
 Implemented delete snapshot policy:
 < 1d | 1d bucket | 1 | best of bucket   | 1d
@@ -24,9 +34,12 @@ Implemented delete snapshot policy:
 < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
 > 1m | delete
 
+:param storagedriver_guid: Guid of the StorageDriver to remove snapshots on
+:type storagedriver_guid: str
 :param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
 :type timestamp: float
-
+:param group_id: ID of the group task. Used to identify which snapshot deletes were called during the scheduled task
+:type group_id: str
 :return: None
 ```
 #### execute_scrub
@@ -87,6 +100,20 @@ Assumptions:
                       If MDS client cannot be created for any of the current or new MDS services
                       If updateMetadataBackendConfig would fail for whatever reason
 :raises SRCObjectNotFoundException: If vDisk does not have a StorageRouter GUID
+:return: None
+:rtype: NoneType
+```
+#### ensure_safety_vpool
+```
+Ensures safety for a single vdisk of a vpool
+Allows multiple ensure safeties to run at the same time for different vpool
+Used internally
+:param vpool_guid: Guid of the VPool associated with the vDisk
+:type vpool_guid: str
+:param vdisk_guid: Guid of the vDisk to the safety off
+:type vdisk_guid: str
+:param excluded_storagerouter_guids: GUIDs of StorageRouters to leave out of calculation (Eg: When 1 is down or unavailable)
+:type excluded_storagerouter_guids: list[str]
 :return: None
 :rtype: NoneType
 ```
@@ -314,6 +341,9 @@ Update a StorageRouter's celery heartbeat
 :type timestamp: float
 :return: None
 :rtype: NoneType
+
+Editor input:
+Called by a cronjob which is placed under/etc/cron.d/openvstorage-core on install of the openvstorage - core package
 ```
 #### refresh_hardware
 ```
@@ -655,6 +685,18 @@ Syncs vDisks in the model with reality
 :rtype: NoneType
 ```
 ### Vpool
+#### balance_change
+```
+Execute a balance change. Balances can be calculated through ovs.lib.helpers.vdisk.rebalancer.VDiskRebalancer
+This task is created to offload the balance change to Celery to get concurrency across VPools
+:param vpool_guid: Guid of the VPool to execute the balance changes for. Used for ensure_single and validation
+:type vpool_guid: str
+:param execute_only_for_srs: Guids of StorageRouters to perform the balance change for (if not specified, executed for all)
+:type execute_only_for_srs: Optional[List[str]]
+:param exported_balances: List of exported balances
+:type exported_balances: List[dict]
+:return:
+```
 #### shrink_vpool
 ```
 Removes a StorageDriver (if its the last StorageDriver for a vPool, the vPool is removed as well)
