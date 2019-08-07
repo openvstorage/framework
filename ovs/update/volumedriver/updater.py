@@ -23,6 +23,7 @@ from ovs.extensions.generic.system import System
 from ovs_extensions.update.base import ComponentUpdater, UpdateException
 from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer
 from ovs.lib.helpers.mds.safety import SafetyEnsurer
+from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -217,8 +218,11 @@ class VolumeDriverUpdater(ComponentUpdater):
                 cls.logger.info('Ensuring safety for vdisks of vpool {}'.format(vpool_name))
                 for vdisk_guid in vdisk_guids[0:max_chain_size]:
                     cls.logger.info('Ensuring safety for {}'.format(vdisk_guid))
-                    safety_ensurer = SafetyEnsurer(vdisk_guid)
-                    safety_ensurer.ensure_safety()
+                    try:
+                        safety_ensurer = SafetyEnsurer(vdisk_guid)
+                        safety_ensurer.ensure_safety()
+                    except EnsureSingleTimeoutReached:
+                        cls.logger.info("  Ensuring safety timed out will check again on next loop")
         cls.logger.info("MDS migration finished")
 
     @staticmethod
