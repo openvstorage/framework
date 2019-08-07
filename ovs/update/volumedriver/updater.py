@@ -17,21 +17,15 @@
 import os
 import time
 import itertools
-from ovs.celery_run import celery
-from celery import chain, group
-from celery.exceptions import TimeoutError
 from ovs.constants.vpool import VPOOL_UPDATE_KEY, STORAGEDRIVER_SERVICE_BASE, VOLUMEDRIVER_BIN_PATH, VOLUMEDRIVER_CMD_NAME, PACKAGES_EE
 from ovs.extensions.generic.configuration import Configuration
-from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.vdisk import VDisk
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.system import System
 from ovs_extensions.update.base import ComponentUpdater, UpdateException
-from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer, VDiskBalance
+from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer
+from ovs.lib.helpers.mds.safety import SafetyEnsurer
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.vpool import VPoolController
 from ovs.log.log_handler import LogHandler
 
 # noinspection PyUnreachableCode
@@ -87,6 +81,8 @@ class VolumeDriverUpdater(ComponentUpdater):
                 # Get the migration plans for every volume on this host. If there are no plans for certain volumes, it will raise
                 balances_by_vpool = cls.get_vpool_balances_for_evacuating_storagerouter(cls.LOCAL_SR)
                 if initial_run_steps:
+                    cls.logger.info('Offloading a MDS catchup to celery. This will ensure all slaves will be caught up to avoid deadlocking')
+                    MDSServiceController.mds_catchup.apply_async()
                     cls.mark_storagerouter_unreachable_for_ha(cls.LOCAL_SR)
                     initial_run_steps = False
                 try:
@@ -211,31 +207,18 @@ class VolumeDriverUpdater(ComponentUpdater):
         :return: None
         :rtype: NoneType
         """
-        cls.logger.info("Starting MDS migrations")
         while True:
+            cls.logger.info("VDisk MDS migrations")
             vpool_mds_master_vdisks = cls.get_vdisks_mds_masters_on_storagerouter(storagerouter)
             all_masters_gone = sum(len(vds) for vds in vpool_mds_master_vdisks.values()) == 0
             if all_masters_gone:
                 break
-            chains = []
-            for vpool_guid, vdisk_guids in vpool_mds_master_vdisks.iteritems():
-                signatures = []
-                tasks = []
+            for vpool_name, vdisk_guids in vpool_mds_master_vdisks.iteritems():
+                cls.logger.info('Ensuring safety for vdisks of vpool {}'.format(vpool_name))
                 for vdisk_guid in vdisk_guids[0:max_chain_size]:
                     cls.logger.info('Ensuring safety for {}'.format(vdisk_guid))
-                    signature = MDSServiceController.ensure_safety.si(vdisk_guid)
-                    # Freeze freezes the task into its final form. This will net the async result object we'd normally get from delaying it
-                    tasks.append(signature.freeze())
-                    signatures.append(signature)
-                if signatures:
-                    cls.logger.info('Adding chain for VPool {} with tasks {}'.format(vpool_guid, ', '.join(t.id for t in tasks)))
-                    chains.append(chain(signatures))
-            # Add all chain signatures to a group for parallel execution
-            task_group = group(chains)
-            # Wait for the group result
-            async_result = task_group.apply_async()
-            cls.logger.info('Waiting for all tasks of group {}'.format(async_result.id))
-            _ = async_result.get()
+                    safety_ensurer = SafetyEnsurer(vdisk_guid)
+                    safety_ensurer.ensure_safety()
         cls.logger.info("MDS migration finished")
 
     @staticmethod
