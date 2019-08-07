@@ -17,21 +17,16 @@
 import os
 import time
 import itertools
-from ovs.celery_run import celery
-from celery import chain, group
-from celery.exceptions import TimeoutError
 from ovs.constants.vpool import VPOOL_UPDATE_KEY, STORAGEDRIVER_SERVICE_BASE, VOLUMEDRIVER_BIN_PATH, VOLUMEDRIVER_CMD_NAME, PACKAGES_EE
 from ovs.extensions.generic.configuration import Configuration
-from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.vdisk import VDisk
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.system import System
 from ovs_extensions.update.base import ComponentUpdater, UpdateException
-from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer, VDiskBalance
+from ovs.lib.helpers.vdisk.rebalancer import VDiskRebalancer
+from ovs.lib.helpers.mds.safety import SafetyEnsurer
+from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.vpool import VPoolController
 from ovs.log.log_handler import LogHandler
 
 # noinspection PyUnreachableCode
@@ -89,7 +84,6 @@ class VolumeDriverUpdater(ComponentUpdater):
                 if initial_run_steps:
                     cls.logger.info('Offloading a MDS catchup to celery. This will ensure all slaves will be caught up to avoid deadlocking')
                     MDSServiceController.mds_catchup.apply_async()
-                    # Plan to execute migrate. Avoid the VPool from being an HA target
                     cls.mark_storagerouter_unreachable_for_ha(cls.LOCAL_SR)
                     initial_run_steps = False
                 try:
@@ -190,25 +184,15 @@ class VolumeDriverUpdater(ComponentUpdater):
         :return: None
         :raises: FailureDuringMigrateException if any volumes failed to move
         """
-        tasks = []
-        signatures = []
+        evacuate_srs = [storagerouter.guid]
         for vpool, balances in balances_by_vpool.iteritems():
-            # Serialize to offload to celery. DataObjects can't be serialized yet
-            serialized_balances = [b.to_dict() for b in balances]
-            signature = VPoolController.execute_balance_change.si(vpool.guid, serialized_balances, [storagerouter.guid])
-            # Freeze freezes the task into its final form. This will net the async result object we'd normally get from delaying it
-            tasks.append(signature.freeze())
-            signatures.append(signature)
-        if signatures:
-            cls.logger.info('Adding migration group with tasks {}'.format(', '.join(t.id for t in tasks)))
-            # Add all chain signatures to a group for parallel execution
-            task_group = group(signatures)
-            # Wait for the group result
-            async_result = task_group.apply_async()
-            cls.logger.info('Waiting for all tasks of group {}'.format(async_result.id))
-            # Timeout similar to migrate_master_mds does not make a lot of sense. All tasks are executed in parallel
-            _ = async_result.get()
-        cls.logger.info("MDS migration finished")
+            for balance in balances:  # type: VDiskBalance
+                if balance.storagedriver.storagerouter_guid in evacuate_srs:
+                    successfull_moves, failed_moves = balance.execute_balance_change_through_overflow(balances,
+                                                                                                      user_input=False,
+                                                                                                      abort_on_error=False)
+                    if failed_moves:
+                        raise FailureDuringMigrateException('Could not move volumes {} away'.format(', '.join(failed_moves)))
 
     @classmethod
     def migrate_master_mds(cls, storagerouter, max_chain_size=100, group_timeout=10 * 60):
@@ -224,54 +208,22 @@ class VolumeDriverUpdater(ComponentUpdater):
         :return: None
         :rtype: NoneType
         """
-        cls.logger.info("Starting MDS migrations")
         while True:
-            hosted_vdisk_guids = storagerouter._vdisks_guids()
+            cls.logger.info("VDisk MDS migrations")
             vpool_mds_master_vdisks = cls.get_vdisks_mds_masters_on_storagerouter(storagerouter)
             all_masters_gone = sum(len(vds) for vds in vpool_mds_master_vdisks.values()) == 0
             if all_masters_gone:
                 break
-            all_tasks = []
-            chains = []
-            for vpool_guid, vdisk_guids in vpool_mds_master_vdisks.iteritems():
-                signatures = []
-                tasks = []
+            for vpool_name, vdisk_guids in vpool_mds_master_vdisks.iteritems():
+                cls.logger.info('Ensuring safety for vdisks of vpool {}'.format(vpool_name))
                 for vdisk_guid in vdisk_guids[0:max_chain_size]:
-                    if vdisk_guid in hosted_vdisk_guids:
-                        cls.logger.warning('Skipping vDisk {} as it is still hosted on Storagerouter {}'.format(vdisk_guid, storagerouter.name))
                     cls.logger.info('Ensuring safety for {}'.format(vdisk_guid))
-                    # Ensure safety is a common task. Let's timeout on the ensure single quickly to avoid worker lockups
-                    signature = MDSServiceController.ensure_safety.si(vdisk_guid, ensure_single_timeout=5)
-                    # Freeze freezes the task into its final form. This will net the async result object we'd normally get from delaying it
-                    tasks.append(signature.freeze())
-                    signatures.append(signature)
-                all_tasks.extend(tasks)
-                if signatures:
-                    cls.logger.info('Adding chain for VPool {} with tasks {}'.format(vpool_guid, ', '.join(t.id for t in tasks)))
-                    chains.append(chain(signatures))
-            # Add all chain signatures to a group for parallel execution
-            task_group = group(chains)
-            # Wait for the group result
-            async_result = task_group.apply_async()
-            cls.logger.info('Waiting for all tasks of group {}'.format(async_result.id))
-            try:
-                _ = async_result.get(timeout=group_timeout)
-            except TimeoutError:
-                cls.logger.warning('Migration took longer than expected. Revoking all non-started tasks')
-                revoked_tasks = []
-                for task in all_tasks:
-                    if task.state == 'PENDING':
-                        # Certain PENDING tasks cannot be revoked. It appears they're non-existent. Not even the workers know about them
-                        # @todo build a new result chain and wait for that
-                        task.revoke()
-                        revoked_tasks.append(task)
-                if revoked_tasks:
-                    cls.logger.warning('Revoked migration tasks: {}'.format(', '.join(t.id for t in revoked_tasks)))
-                cls.logger.warning('Waiting for the execution on the running migrations')
-                _ = async_result.get()
+                    try:
+                        safety_ensurer = SafetyEnsurer(vdisk_guid)
+                        safety_ensurer.ensure_safety()
+                    except EnsureSingleTimeoutReached:
+                        cls.logger.info("  Ensuring safety timed out will check again on next loop")
         cls.logger.info("MDS migration finished")
-        if len(hosted_vdisk_guids) > 0:
-            raise LocalMastersRemaining('vDisks are still hosted on Storagerouter to migrate from: {}'.format(', '.join(hosted_vdisk_guids), storagerouter.name))
 
     @staticmethod
     def get_vdisks_mds_masters_on_storagerouter(storagerouter):
